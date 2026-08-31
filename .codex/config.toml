@@ -8,23 +8,23 @@ fast_mode = false
 max_depth = 1
 
 [agents.requirements_splitter]
-description = "Architecture-significant Access Desk requirements splitting, Event Storming reconciliation, and bounded-context planning."
+description = "Architecture-significant requirements splitting, Event Storming model updates, and bounded-context planning."
 config_file = "agents/requirements-splitter.toml"
 
 [agents.implementer]
-description = "Production-shaped Spine TS implementation and bounded correction owner."
+description = "Production-shaped Spine TS implementation from the Event Storming model, including scheduled-command corrections."
 config_file = "agents/implementer.toml"
 
 [agents.style_maintainability_reviewer]
-description = "Focused TypeScript style, ownership, context-boundary, and maintainability reviewer."
+description = "Focused TypeScript style, ownership, Event Storming model alignment, context-boundary, and maintainability reviewer."
 config_file = "agents/style-maintainability-reviewer.toml"
 
 [agents.documentation_reviewer]
-description = "Focused reviewer for canonical references, user workflows, limitations, and documentation accuracy."
+description = "Focused reviewer for Event Storming model accuracy, reference integrity, workflows, and documentation accuracy."
 config_file = "agents/documentation-reviewer.toml"
 
 [agents.typescript_api_docs_reviewer]
-description = "Focused TypeScript, Protobuf, generated API, TypeRegistry, and compatibility reviewer."
+description = "Focused TypeScript, Protobuf, Event Storming model mapping, generated API, TypeRegistry, and compatibility reviewer."
 config_file = "agents/typescript-api-docs-reviewer.toml"
 
 [agents.performance_reliability_reviewer]
@@ -32,5 +32,5 @@ description = "Focused scheduler, integration, concurrency, persistence, replay,
 config_file = "agents/performance-reliability-reviewer.toml"
 
 [agents.security_reviewer]
-description = "Final tenant-isolation, authorization, Any-intake, session, logging, and dependency security reviewer."
+description = "Final source-sanitization, tenant-isolation, authorization, command-Any intake, identity, logging, and dependency security reviewer."
 config_file = "agents/security-reviewer.toml"
