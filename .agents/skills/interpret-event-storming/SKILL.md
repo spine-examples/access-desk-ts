@@ -54,7 +54,7 @@ enough. Work top-down:
    ```
 
 3. **Zoom dense clusters 3–4×.** Re-crop tight boxes around anything still small:
-   command sub-notes (the scheduled-command payload), tiny green/purple markers,
+   command sub-notes (the stored command payload), tiny green/purple markers,
    and merged connectors. Do not record a note you have not read at a legible size.
 4. **Record uncertainty, never fabricate.** Illegible text is
    `[unreadable: location]`. Adjacency is not a connector. Do not borrow a name

@@ -7,6 +7,13 @@ records the decisions accepted after the initial `PRD.md` draft and the current
 Event Storming session. The PRD remains useful product input but is not changed
 or silently treated as current when it conflicts with this document.
 
+`references/event-storming.md` is the canonical current model snapshot: the
+domain's aggregates, process managers, and their command→event transitions, read
+from the current board. This architecture and explicit user decisions govern
+where they differ from that model; they do not license rewriting what the board
+shows. A replacement image replaces the current snapshot rather than creating
+model history.
+
 Normative words such as **must**, **must not**, and **required** identify
 architectural requirements. Exact message names remain contract-design choices
 unless this document says otherwise.
@@ -34,7 +41,7 @@ The system has five bounded contexts:
 | Identity | Global users, registration, authentication identity, user activity | Global/single-tenant control plane |
 | Resources | Organizations, memberships, resources, ordered access levels, ownership, request policy, approver policy | Organization-scoped |
 | Access | Requests, approval assignment and decisions, grants, extensions, revocation, access-facing projections | Organization-scoped |
-| Scheduling | Durable, universal time-based release of allowlisted event payloads | Organization-scoped |
+| Scheduling | Durable, universal dispatch of allowlisted application commands | Organization-scoped |
 | Audit | Immutable, redacted audit projections built from durable integration facts | Organization-scoped |
 
 An initial deployment may co-host all five contexts in one Node.js application.
@@ -48,16 +55,19 @@ flowchart LR
   Identity -->|global identity facts| Fanout[Tenant fan-out adapter]
   Fanout -->|tenant-scoped identity facts| Resources
   Resources -->|policy and membership facts| Access
-  Access -->|grant lifecycle facts| Scheduling
-  Scheduling -->|scheduled/released facts| Access
+  Access -->|grant facts and scheduling intents| Scheduling
+  Scheduling -->|schedule confirmations| Access
   Fanout -->|tenant-scoped identity facts| Audit
   Resources -->|durable facts| Audit
   Access -->|durable facts| Audit
   Scheduling -->|durable facts| Audit
 ```
 
-Cross-context business communication uses versioned external events. Commands
-are always domestic to their receiving context. Shared packages may contain
+Cross-context state propagation and lifecycle choreography use versioned
+external events. Commands are domestic to their receiving context. Sending a
+due command is the explicit exception to event-based integration: the
+`Scheduling` process posts it through the supplied same-server client, and it
+re-enters the target through normal command ingress. Shared packages may contain
 wire contracts and value types, but never another context's behavior or mutable
 state.
 
@@ -194,7 +204,7 @@ must never claim scheduled or active access before the required facts exist.
 Scheduled and active grants may be revoked by either the resource owner or an
 Access Administrator in the same organization. Revocation requires a reason.
 Revoked or expired grants never reactivate. Access is authoritative: a stale
-scheduler release after revocation or expiry is an idempotent no-op.
+due command after revocation or expiry is an idempotent no-op.
 
 An extension:
 
@@ -234,9 +244,11 @@ approval is accepted at `A`:
   activate it.
 
 Normal expiration and expiration without activation are distinct facts. A
-delayed or duplicate scheduler release applies the same current-time and state
-checks and cannot resurrect or double-transition a grant. All time-based code
-uses an injected clock; tests must not depend on arbitrary sleeping.
+delayed, duplicate, stale, or cancelled due command applies the same
+current-time, tenant, and grant-state checks and cannot resurrect or
+double-transition a grant. Access treats those arrivals as successful no-ops.
+All time-based code uses an injected clock; tests must not depend on arbitrary
+sleeping.
 
 For maximum-total-lifetime checks after a delayed scheduled approval, use the
 actual effective activation time through the proposed new end, while preserving
@@ -244,38 +256,48 @@ the originally requested interval for audit.
 
 ## Scheduling bounded context
 
-The scheduler persists **event payloads**, never commands, in Protobuf `Any`.
-Allowed type URLs must be registered, explicitly allowlisted, tenant-compatible,
-target-compatible, size-bounded, and schema-compatible.
+Scheduling is a separate multitenant bounded context with a single stateful
+`Scheduling` Process Manager that owns one planned command and manages its
+scheduling lifecycle.
+
+The process persists an allowlisted **application command value** in Protobuf
+`Any` together with its schedule ID, authoritative organization, approved
+purpose and target, due time, and current status. Type URLs must be registered,
+explicitly allowlisted, tenant-compatible, target-compatible, size-bounded,
+schema-compatible, and unpackable to the expected command value. The payload
+never supplies a trusted tenant, actor, target route, or credentials.
 
 The required choreography is:
 
 1. Access commits a genuine fact such as `AccessGrantCreated` with a
-   pending-scheduling status and the required activation/expiration intents.
-2. A Scheduling Process Manager consumes `External<AccessGrantCreated>` and
-   issues private domestic `ScheduleEvent` commands.
-3. The `ScheduledEvent` aggregate persists the `Any` payload plus schedule ID,
-   organization, target, due time, revision, lifecycle status, stable
-   integration ID, lease, and attempt metadata.
-4. Only after persistence does Scheduling emit `EventScheduled`.
-5. Access consumes the confirmation. It exposes scheduled or active access only
-   after every schedule required for that state has been confirmed.
-6. A worker claims due records with an atomic compare-and-set lease and issues a
-   domestic `ReleaseScheduledEvent` command.
-7. The aggregate emits `ScheduledEventReleased` containing an allowlisted due
-   event such as `GrantActivationDue` or `GrantExpirationDue` packed in `Any`.
-8. Access consumes the external release and issues its own domestic
-   `ActivateAccessGrant` or `ExpireAccessGrant` command.
+   pending-scheduling status and activation/expiration scheduling intents.
+2. The `Scheduling` process consumes that external Access fact and accepts the
+   corresponding domestic `ScheduleCommand`.
+3. The process persists the planned command and emits `CommandScheduled` only
+   after that state is durable.
+4. Access consumes the scheduling confirmation and establishes scheduled state
+   only after every required schedule is confirmed. Active state additionally
+   requires successful handling and the resulting fact from the target
+   activation command.
+5. When the due time passes, the same `Scheduling` process sends its stored
+   command through the tenant-aware client supplied by the application. The
+   client sends the command to the same server, and the target receives an
+   ordinary domestic command.
 
-Extension approval is a genuine Access fact consumed by Scheduling, which
-reschedules domestically and emits `EventRescheduled`; Access applies the
-extension after confirmation. Revocation is authoritative in Access and emits a
-fact consumed by Scheduling, which cancels domestically. Cancellation/release
-races are resolved by aggregate revisions, leases, and idempotent Access state
-checks.
+The process accepts `ScheduleCommand`, `RescheduleCommand`, and
+`CancelScheduledCommand`, and emits `CommandScheduled`, `CommandRescheduled`,
+and `ScheduledCommandCancelled`. Extension approval is a genuine Access fact
+consumed by Scheduling, which reschedules domestically and confirms it; Access
+applies the extension only after confirmation. Revocation is authoritative in
+Access and emits a fact that Scheduling consumes to cancel domestically.
 
-No event may be named or presented as "scheduled" before Scheduling has
-persisted it. A suffix such as "requested" is unnecessary for Access facts;
+The allowlist fixes the command schema and target route for each approved type
+and purpose. The payload cannot select an endpoint, context, actor, or tenant.
+Logs and Audit retain only the minimum redacted scheduling and correlation data,
+never the stored command payload.
+
+No item may be named or presented as scheduled before the `Scheduling` process
+has persisted it. A suffix such as "requested" is unnecessary for Access facts;
 they should describe the real Access state that caused a scheduling intent.
 
 ## Audit

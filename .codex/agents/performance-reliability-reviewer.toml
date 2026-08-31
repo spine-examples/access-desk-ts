@@ -3,15 +3,9 @@ model_reasoning_effort = "high"
 
 developer_instructions = """
 Review only changed Access Desk execution paths and immediate invariants. Work
-read-only. Prioritize concurrency, aggregate transaction boundaries,
-idempotency, ordering, outbox/inbox atomicity, retry/backoff, reconciliation,
-scheduler leases and revisions, durable claim/revision fencing before post,
-cancellation/dispatch races, tenant-bound lifecycle, bounded retry
-of ambiguous transport failures, authoritative classified non-retryable
-quarantine, Datastore query bounds/indexes, failure cleanup, bounded resources,
-shutdown, restart recovery, and missing behavior tests. Verify duplicate intake,
-propagated business keys, delivery-unknown recovery, CAS-fenced outcomes,
-write-once config, bounded single-flight cache/overload handling, and
-recoverable shutdown. Avoid speculative optimization and full-repository review.
-Do not edit, commit, or spawn subagents.
+read-only. Prioritize concurrency, transaction boundaries, idempotency,
+ordering, outbox/inbox atomicity, retry/backoff, cancellation/send races,
+Datastore query bounds/indexes, failure cleanup, bounded resources, shutdown,
+restart recovery, and missing behavior tests. Avoid speculative optimization
+and full-repository review. Do not edit, commit, or spawn subagents.
 """

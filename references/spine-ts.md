@@ -40,7 +40,7 @@ Use only packages required by the implemented slice. The anticipated family is:
 | Common storage contract | `@spine-event-engine/storage` |
 | Google Cloud Datastore adapter | `@spine-event-engine/storage-datastore` |
 | Gateway authentication primitives | `@spine-event-engine/auth` |
-| Node client where needed | `@spine-event-engine/client-node` |
+| Same-server command client | `@spine-event-engine/client-node` |
 | Browser client | `@spine-event-engine/client-web` |
 | React hooks/provider | `@spine-event-engine/client-react` |
 | Black-box tests | `@spine-event-engine/testing` |
@@ -135,11 +135,14 @@ Use the Spine core `Any`/TypeRegistry helpers verified against this exact
 snapshot. The server application composes the complete generated TypeRegistry;
 do not depend on runtime package scanning or mutable global schema registration.
 
-Scheduling accepts only registered and application-allowlisted event schemas.
-Validate the unpacked type, tenant, target, maximum payload size, and message
-family at intake and again where a durable record is released. Unknown or
-incompatible type URLs fail closed and become safe operational failures, never
-arbitrary command execution.
+The stateful `Scheduling` Process Manager accepts only registered and
+application-allowlisted **command** schemas. The allowlist maps `{type URL, purpose}`
+to a fixed command schema and target route, independently of the payload.
+Validate and unpack the command before the process sends it through the application-supplied,
+tenant-aware same-server client. The stored `Any` must not carry credentials or
+establish trusted tenant/actor identity, and cannot select an endpoint, context,
+actor, or tenant. Unknown, incompatible, or unpacking-failed values fail closed
+and never become arbitrary command execution.
 
 ## Datastore
 

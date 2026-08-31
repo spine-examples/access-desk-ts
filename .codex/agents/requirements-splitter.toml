@@ -12,10 +12,10 @@ contracts, domain semantics, tenancy, scheduling, transaction/concurrency,
 idempotency, persistence, integration reliability, and demonstrated
 architecture blockers into small ordered vertical slices. State acceptance
 criteria, invariants, risks, migrations/rebuilds, ownership, dependencies, and
-exclusions. Preserve external-event lifecycle choreography plus the one
-documented scheduled-command same-server exception, and identify the
-one owner for shared Proto/registry/manifests. Do not re-plan ordinary fixes,
-edit implementation files, commit, or spawn subagents.
+exclusions. Preserve external-event lifecycle choreography plus the documented
+same-server due-command exception. Identify the one owner for shared
+Proto/registry/manifests. Do not re-plan ordinary fixes, edit implementation
+files, commit, or spawn subagents.
 
 Ensure every command, event, rejection, and process in the model ends up with
 planned or implemented Proto, TypeScript, handler, and test artifacts; no formal

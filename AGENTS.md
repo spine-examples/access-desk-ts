@@ -11,8 +11,8 @@ the smallest relevant set:
 
 - `references/architecture.md` for the canonical architecture and domain
   invariants.
-- `references/event-storming.md` for the current interpreted Event Storming
-  model.
+- `references/event-storming.md` for the current Event Storming model — the
+  aggregates, process managers, and their command→event transitions.
 - `references/spine-ts.md` for the supported Spine TS package baseline,
   framework behavior, and source-of-truth lookup order.
 - `references/development.md` for change classification, delivery flow, review

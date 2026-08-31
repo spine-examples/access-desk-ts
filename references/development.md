@@ -17,8 +17,9 @@ Classify work before editing:
 - **Standard:** one bounded behavior slice with local contracts, handlers,
   projections, UI, or tests.
 - **High-risk:** new bounded context; Event Storming replacement; public/wire
-  contract; tenant/security boundary; `Any` intake; scheduling; delivery
-  strategy or entity-inbox durability; outbox/relay; persistence
+  contract; tenant/security boundary; Scheduling-process `Any` intake;
+  same-server command delivery; delivery strategy or Process Manager inbox
+  durability; outbox/relay; persistence
   transaction/index; concurrency; idempotency; migration; or cross-context
   choreography.
 
@@ -31,10 +32,11 @@ requirements/architecture pass and explicit acceptance criteria.
 1. Read only the relevant root references and source files.
 2. State the behavior to change, affected bounded contexts, acceptance criteria,
    assumptions, exclusions, and failure modes.
-3. For an Event Storming update, replace the canonical interpretation before
-   changing code.
-4. Change shared/integration Proto contracts first when the behavior crosses a
-   context boundary.
+3. For an Event Storming update, first replace the canonical current model
+   snapshot — the aggregates, process managers, and their command→event
+   transitions the board shows — before changing code.
+4. Change shared target-command and integration Proto contracts first when the
+   behavior crosses a context boundary.
 5. Generate code; never patch generated output.
 6. Implement one vertical behavior slice, including the projection/client
    effect needed to observe it.
@@ -58,12 +60,12 @@ Apply lanes based on changed behavior:
   evolution, message compatibility, registry composition, and accidental public
   API.
 - **Performance/reliability:** concurrency, transaction boundaries, retry,
-  idempotency, ordering, leases, replay, cleanup, shutdown, bounded work, and
-  crash recovery.
+  idempotency, ordering, replay, cleanup, shutdown, bounded work, Process
+  Manager reconstruction, and crash recovery.
 - **Security:** tenant isolation, actor trust, authorization, `Any` allowlisting,
-  payload limits, sensitive logging, session handling, resource exhaustion, and
-  dependencies. This is required for a release and for any changed trust
-  boundary.
+  payload limits and unpacking, fixed same-server routing, sensitive logging,
+  session handling, resource exhaustion, and dependencies. This is required for
+  a release and for any changed trust boundary.
 
 ## Verification ladder
 

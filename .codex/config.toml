@@ -12,7 +12,7 @@ description = "Architecture-significant requirements splitting, Event Storming m
 config_file = "agents/requirements-splitter.toml"
 
 [agents.implementer]
-description = "Production-shaped Spine TS implementation from the Event Storming model, including scheduled-command corrections."
+description = "Production-shaped Spine TS implementation from the Event Storming model, including the stateful Scheduling process."
 config_file = "agents/implementer.toml"
 
 [agents.style_maintainability_reviewer]
