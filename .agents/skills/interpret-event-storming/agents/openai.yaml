@@ -1,0 +1,4 @@
+interface:
+  display_name: "Interpret Event Storming"
+  short_description: "Parse an Access Desk Event Storming image into the current model"
+  default_prompt: "Use $interpret-event-storming after reading AGENTS.md and references/architecture.md to capture a supplied Event Storming image as the current model (aggregates, process managers, and their command→event transitions) in references/event-storming.md."
