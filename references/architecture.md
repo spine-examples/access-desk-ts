@@ -68,7 +68,9 @@ due command is the explicit exception to event-based integration: the
 `Scheduling` process posts it through the supplied same-server client, and it
 re-enters the target through normal command ingress. Shared packages may contain
 wire contracts and value types, but never another context's behavior or mutable
-state.
+state. Each context owns its cross-context event contracts in its own model
+package; a consumer depends on the publishing context's model for those schemas
+and declares its external-event receptors internally.
 
 ## Tenant, identity, and authorization model
 

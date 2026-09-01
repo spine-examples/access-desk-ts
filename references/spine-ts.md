@@ -61,45 +61,51 @@ reasonable starting shape is:
 
 ```text
 packages/
-  identity-model/
-  resources-model/
-  access-model/
-  scheduling-model/
-  audit-model/
-  integration-model/
-  server/
+  identity/{model,server}/
+  resources/{model,server}/
+  access/{model,server}/
+  scheduling/{model,server}/
+  audit/{model,server}/
+  app/
   web/
 ```
 
-Each bounded-context model package owns canonical `.proto` sources and an
-authored `spine-proto.json` in `mode: "model"`. The application package uses
-`mode: "application"` to compose the required model modules and generate one
-complete application TypeRegistry and handler registry. The accompanying
-`spine-proto-manifest.json` is generated output, not an authored file; commit it
-if the examples do, but never hand-edit it.
+Each bounded context is two packages. Its `model` package owns canonical
+`.proto` sources and an authored `spine-proto.json` in `mode: "model"`. Its
+`server` package holds the decorated handlers and the `BoundedContext` factory
+and is in `mode: "application"`, because `spine-proto handlers` discovers
+decorated classes only in the package that runs it; each context therefore
+composes its own model subset and generates its own handler registry. The
+top-level `app` package is also `mode: "application"`: it composes the complete
+application TypeRegistry from every context model and assembles the server. The
+accompanying `spine-proto-manifest.json` is generated output, not an authored
+file; commit it if the examples do, but never hand-edit it.
 
 Generate dependencies first. From each affected `mode: "model"` package, in
 dependency order, run generation from that package's working directory:
 
 ```sh
-(cd packages/access-model && spine-proto generate)
+(cd packages/access/model && spine-proto generate)
 ```
 
-After the required model manifests exist, change to the `mode: "application"`
-package and compose the complete application model, then generate its handlers:
+After the required model manifests exist, generate each affected context's
+handlers from its `server` package, then compose the complete application
+TypeRegistry from the `app` package:
 
 ```sh
-(cd packages/server && spine-proto compose)
-(cd packages/server && spine-proto handlers)
+(cd packages/access/server && spine-proto compose)
+(cd packages/access/server && spine-proto handlers)
+(cd packages/app && spine-proto compose)
 ```
 
-Replace the example package paths with the affected model and application
-packages when the workspace is scaffolded. Re-run model generation after a
-model package's `.proto` or authored `spine-proto.json` changes; then re-run
-application `compose` and `handlers` after any affected model manifest or
-application `spine-proto.json` change, and re-run `handlers` after decorated
-handler source changes. Once scaffolding defines it, run the application
-package's configured compile, typecheck, or build step after the generated work.
+Replace the example package paths with the affected packages when the workspace
+is scaffolded. Re-run model generation after a model package's `.proto` or
+authored `spine-proto.json` changes; then re-run the affected context `server`'s
+`compose` + `handlers` and the `app`'s `compose` after any affected model
+manifest or `spine-proto.json` change, and re-run a context `server`'s
+`handlers` after its decorated handler source changes. Once scaffolding defines
+it, run each package's configured compile, typecheck, or build step after the
+generated work.
 Expose this dependency-first sequence through repository pnpm scripts once
 scaffolding exists. Generated sources, manifests, registries, declarations, and
 distribution output are never hand-edited.
