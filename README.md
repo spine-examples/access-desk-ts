@@ -8,9 +8,9 @@ approvals, scheduled activation and expiration, and an immutable audit trail.
 
 ## Status
 
-The app is currently under development.
+Under development.
 
 ## Documentation
 
 - [Product Requirements Document](PRD.md).
-- [#EventStorming](https://miro.com/app/board/uXjVHu7F0ng=).
+- [Event Storming board](https://miro.com/app/board/uXjVHu7F0ng=).

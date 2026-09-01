@@ -48,6 +48,25 @@ requirements/architecture pass and explicit acceptance criteria.
 10. Run the relevant completion verification once the change converges and
     report evidence and remaining limitations.
 
+## Protobuf evolution
+
+Proto contracts are append-only within a compatibility window. Never reuse or
+renumber a field number or enum numeric value. When removing a field, reserve
+its number and name inside the owning message; when removing an enum value,
+reserve its numeric value and name inside the owning enum. This prevents a
+later schema from silently reusing either. Treat a message or Proto package
+rename as an `Any` type-URL compatibility change: preserve the old type URL for
+stored or in-flight values, or plan an explicit migration and retention
+boundary. Where old and new type URLs must coexist during a migration window,
+allowlist and decode both deliberately.
+
+For every serialized-contract change, run a schema-breaking check against the
+approved compatibility baseline before generation. Keep byte fixtures proving
+that the new schema decodes retained old values and that compatible old
+consumers decode new values; cover enum and `Any` payloads when they are part of
+the contract. Record the selected baseline and migration-window evidence in the
+change report.
+
 ## Review lanes
 
 Apply lanes based on changed behavior:

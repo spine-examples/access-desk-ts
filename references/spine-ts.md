@@ -4,12 +4,17 @@
 
 Access Desk consumes published Spine TS npm packages.
 
-Use one exact compatible family, initially `2.0.0-snapshot.2`. Do not use
-unqualified npm versions or mix snapshots. Before relying on an API, inspect in
-this order:
+Use one exact compatible family. Do not use unqualified npm versions or mix
+snapshots. Before relying on an API, inspect in this order:
 
-1. the installed package and its declarations/README;
-2. the package references and runnable examples in that checkout.
+1. the exact installed package's declarations, README, generated metadata, and
+   runnable examples;
+2. the matching local `spine-ts` checkout at the same snapshot/commit, using
+   its references and examples.
+
+Record the resolved package path and version/commit in implementation evidence.
+If neither source establishes an API, treat it as a blocker; do not infer a call
+from another Spine language, an older snapshot, or memory.
 
 The most useful `spine-ts` sources are:
 
@@ -73,17 +78,31 @@ complete application TypeRegistry and handler registry. The accompanying
 `spine-proto-manifest.json` is generated output, not an authored file; commit it
 if the examples do, but never hand-edit it.
 
-Run the public tooling after the related changes:
+Generate dependencies first. From each affected `mode: "model"` package, in
+dependency order, run generation from that package's working directory:
 
 ```sh
-spine-proto generate
-spine-proto compose
-spine-proto handlers
+(cd packages/access-model && spine-proto generate)
 ```
 
-Expose these through repository pnpm scripts once scaffolding exists. Generated
-sources, manifests, registries, declarations, and distribution output are never
-hand-edited.
+After the required model manifests exist, change to the `mode: "application"`
+package and compose the complete application model, then generate its handlers:
+
+```sh
+(cd packages/server && spine-proto compose)
+(cd packages/server && spine-proto handlers)
+```
+
+Replace the example package paths with the affected model and application
+packages when the workspace is scaffolded. Re-run model generation after a
+model package's `.proto` or authored `spine-proto.json` changes; then re-run
+application `compose` and `handlers` after any affected model manifest or
+application `spine-proto.json` change, and re-run `handlers` after decorated
+handler source changes. Once scaffolding defines it, run the application
+package's configured compile, typecheck, or build step after the generated work.
+Expose this dependency-first sequence through repository pnpm scripts once
+scaffolding exists. Generated sources, manifests, registries, declarations, and
+distribution output are never hand-edited.
 
 Keep the entity identifier as the first field of command and entity state when
 the default target is correct. Use exact routing only when the first-field route
@@ -176,6 +195,11 @@ and subscription lifecycle; it is not a cache, router, or authentication system.
 Subscriptions are best-effort notices. Entity subscriptions need an
 authoritative query for reconnect/gap recovery. Command validation remains
 server-side.
+
+The gateway, not a bounded context, performs OIDC/session/CSRF/origin controls
+defined in the architecture. Internal Scheduling ingress uses a distinct trusted
+principal and never reuses a browser session or accepts caller-provided tenant,
+route, or actor claims.
 
 ## Testing boundaries
 

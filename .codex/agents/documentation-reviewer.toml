@@ -1,8 +1,9 @@
 model = "gpt-5.6-luna"
 model_reasoning_effort = "medium"
+sandbox_mode = "read-only"
 
 developer_instructions = """
-Review only documentation affected by the assigned Access Desk milestone. Work
+Review only documentation affected by the assigned Access Desk task. Work
 read-only. Verify canonical-reference authority, Event Storming replacement
 semantics, user workflow/status accuracy, links, examples, limitations, and
 claims against implemented behavior.

@@ -29,8 +29,7 @@ the domain or integration design.
 
 The repository is independent of the Spine TS source repository. It consumes
 published npm artifacts from one exact compatible snapshot family. The initial
-runtime baseline is Node.js 24 or newer, pnpm 11.9, strict TypeScript, ESM, and
-`@spine-event-engine/*@2.0.0-snapshot.2`.
+runtime baseline is Node.js 24 or newer, pnpm 11.9, strict TypeScript, and ESM.
 
 ## System shape
 
@@ -238,15 +237,21 @@ approval is accepted at `A`:
 
 - `A < S`: create the grant pending scheduling; it becomes scheduled only after
   Scheduling confirms persistence.
-- `S <= A < E`: activation is due immediately. Preserve requested `S` and `E`
-  for history, but effective access begins at `A` and ends at `E`.
+- `S <= A < E`: activation is due immediately and uses the same direct domestic
+  activation command as an immediate request, not the Scheduling context.
+  Preserve requested `S` and `E` for history, but effective access begins at `A`
+  and ends at `E`.
 - `A >= E`: create the explicit expired-without-activation outcome. Never
   activate it.
 
-Normal expiration and expiration without activation are distinct facts. A
-delayed, duplicate, stale, or cancelled due command applies the same
-current-time, tenant, and grant-state checks and cannot resurrect or
-double-transition a grant. Access treats those arrivals as successful no-ops.
+Normal expiration and expiration without activation are distinct facts. When a
+due activation command is current and tenant-valid, with matching schedule ID,
+schedule revision, and dispatch ID, and its grant is still eligible, but the
+injected clock is now at or after the requested end `E`, Access atomically
+records the existing expired-without-activation terminal outcome exactly once.
+It neither activates the grant nor creates activation or expiration scheduling
+work. Duplicate commands after that terminal outcome, and stale, revision-mismatched,
+cancelled, revoked, or otherwise terminal commands, are successful no-ops.
 All time-based code uses an injected clock; tests must not depend on arbitrary
 sleeping.
 
@@ -295,6 +300,14 @@ The allowlist fixes the command schema and target route for each approved type
 and purpose. The payload cannot select an endpoint, context, actor, or tenant.
 Logs and Audit retain only the minimum redacted scheduling and correlation data,
 never the stored command payload.
+
+`ScheduleCommand`, `RescheduleCommand`, and `CancelScheduledCommand` are not
+browser/public commands; they are admitted only from an authenticated, validated
+committed integration receipt. Only due `Activate`/`Expire` receives a server-
+minted capability after a current claim, bound to organization, schedule,
+revision, purpose, route, and target type. Browser principals are denied
+schedule/reschedule/cancel and direct activate/expire commands; the capability
+is purpose-bound to the fixed route.
 
 No item may be named or presented as scheduled before the `Scheduling` process
 has persisted it. A suffix such as "requested" is unnecessary for Access facts;

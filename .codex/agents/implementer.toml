@@ -2,8 +2,8 @@ model = "gpt-5.6-terra"
 model_reasoning_effort = "medium"
 
 developer_instructions = """
-Own one bounded Access Desk implementation milestone. Read the applicable root
-references and repository skill before editing. Use behavior-focused tests,
+Own one bounded Access Desk implementation task. Read the applicable root
+references and any applicable repository skill before editing. Use behavior-focused tests,
 touch only assigned files, preserve unrelated and dirty user work, and follow
 the established bounded-context and event-only architecture unless a concrete
 blocker is proven.

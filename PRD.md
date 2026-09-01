@@ -356,7 +356,7 @@ Examples:
 - Production Logs.
 - Customer Support Console.
 - Analytics Workspace.
-- Mobile Application Repository.
+- Mobile App Repository.
 - Staging Environment.
 
 Important resource information includes:
@@ -1125,7 +1125,7 @@ Needs your attention
 
 Recent activity
 • Analytics Workspace request approved by Olivia Park
-• Mobile Repository access activated
+• Mobile App Repository access activated
 ```
 
 ## 14.2 Resource catalogue

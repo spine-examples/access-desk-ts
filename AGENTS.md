@@ -55,8 +55,8 @@ preserved.
 - Do not add analytics, telemetry, tracking, or hidden background work without
   an explicit product requirement.
 - Do not update dependencies outside a dedicated implementation or upgrade
-  task. Keep every `@spine-event-engine/*` dependency on the exact compatible
-  `2.0.0-snapshot.2` family until a verified upgrade is approved.
+  task. Keep every `@spine-event-engine/*` dependency on one exact compatible
+  published family until a verified upgrade is approved.
 - Never invent a Spine API. Inspect installed package declarations and
   documentation, then the matching Spine TS checkout or examples.
 - Do not manually edit generated Protobuf sources, handler registries,
@@ -103,8 +103,8 @@ At the beginning of multi-agent work, confirm that the selected execution
 surface supports the required profiles and explicit child dispatch. Escalate to
 `gpt-5.6-sol` / `high` only for high-risk architecture or correctness ambiguity,
 or after a lower-cost profile cannot establish the answer. Run one such
-architecture pass for an approved work wave and repeat it only after a material
-contract change or a demonstrated architectural blocker.
+architecture pass for an approved batch of work and repeat it only after a
+material contract change or a demonstrated architectural blocker.
 
 ## Multi-Agent Work
 
