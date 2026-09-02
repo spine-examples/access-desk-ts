@@ -12,20 +12,12 @@ Under development.
 
 ## Development
 
-Prerequisites: Node.js ≥ 24 and pnpm 11.9 (the exact versions are pinned in the
-root [`package.json`](package.json); `corepack enable` selects the right pnpm).
+Prerequisites: Node.js ≥ 24 and pnpm 11.9.
 
 Install the workspace:
 
 ```sh
 pnpm install
-```
-
-Reproduce the full foundation check — regenerates the Spine Proto pipeline, then
-builds, typechecks, lints, and tests every package — with a single command:
-
-```sh
-pnpm run verify
 ```
 
 ## Documentation
