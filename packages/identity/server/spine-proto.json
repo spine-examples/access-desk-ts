@@ -1,0 +1,6 @@
+{
+  "formatVersion": 1,
+  "mode": "application",
+  "modelPackages": ["@access-desk/identity-model"],
+  "registryOutput": "generated/model-registry.ts"
+}
