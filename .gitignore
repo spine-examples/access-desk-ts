@@ -1,0 +1,42 @@
+# --- Dependencies ---
+node_modules/
+.pnpm-store/
+
+# --- Build output ---
+dist/
+build/
+lib/
+out/
+*.tsbuildinfo
+
+# --- Test / coverage output ---
+coverage/
+.nyc_output/
+
+# --- Generated Spine / Protobuf output ---
+packages/**/generated/
+packages/**/.generated-*/generated/
+.spine-proto-generation.json
+.spine-proto-generate.lock.*
+
+# --- Logs ---
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+
+# --- Environment & secrets (never commit real credentials) ---
+.env
+.env.*
+!.env.example
+
+# --- Editor / IDE ---
+.idea/
+.vscode/
+*.swp
+*~
+.eslintcache
+
+# --- OS ---
+.DS_Store
+Thumbs.db
