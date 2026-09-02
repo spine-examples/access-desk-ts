@@ -1,0 +1,9 @@
+node_modules/
+.agents/
+PRD.md
+dist/
+coverage/
+generated/
+**/generated/
+pnpm-lock.yaml
+**/spine-proto-manifest.json
