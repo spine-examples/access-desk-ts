@@ -1,0 +1,47 @@
+{
+  "name": "access-desk",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=11.9.0"
+  },
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "generate:models": "pnpm --dir packages/identity/model run generate && pnpm --dir packages/resources/model run generate && pnpm --dir packages/access/model run generate && pnpm --dir packages/scheduling/model run generate && pnpm --dir packages/audit/model run generate",
+    "generate:contexts": "pnpm --dir packages/identity/server run compose && pnpm --dir packages/identity/server run handlers && pnpm --dir packages/resources/server run compose && pnpm --dir packages/resources/server run handlers && pnpm --dir packages/access/server run compose && pnpm --dir packages/access/server run handlers && pnpm --dir packages/scheduling/server run compose && pnpm --dir packages/scheduling/server run handlers && pnpm --dir packages/audit/server run compose && pnpm --dir packages/audit/server run handlers",
+    "generate:app": "pnpm --dir packages/app run compose",
+    "generate": "pnpm run generate:models && pnpm run generate:contexts && pnpm run generate:app",
+    "build": "pnpm -r run build",
+    "typecheck": "pnpm -r run typecheck",
+    "typecheck:tests": "tsc --noEmit -p tsconfig.eslint.json",
+    "lint": "pnpm -r run lint",
+    "test": "pnpm -r run build && vitest run --passWithNoTests",
+    "verify": "pnpm -r run build && pnpm -r run typecheck && pnpm run typecheck:tests && pnpm -r run lint && pnpm run test"
+  },
+  "devDependencies": {
+    "@bufbuild/protobuf": "2.12.1",
+    "@eslint/js": "9.39.1",
+    "@types/node": "24.13.2",
+    "@spine-event-engine/auth": "2.0.0-snapshot.2",
+    "@spine-event-engine/client-node": "2.0.0-snapshot.2",
+    "@spine-event-engine/client-react": "2.0.0-snapshot.2",
+    "@spine-event-engine/client-web": "2.0.0-snapshot.2",
+    "@spine-event-engine/core": "2.0.0-snapshot.2",
+    "@spine-event-engine/proto": "2.0.0-snapshot.2",
+    "@spine-event-engine/proto-tools": "2.0.0-snapshot.2",
+    "@spine-event-engine/server": "2.0.0-snapshot.2",
+    "@spine-event-engine/storage": "2.0.0-snapshot.2",
+    "@spine-event-engine/storage-datastore": "2.0.0-snapshot.2",
+    "@spine-event-engine/testing": "2.0.0-snapshot.2",
+    "eslint": "9.39.1",
+    "eslint-config-prettier": "10.1.8",
+    "prettier": "3.9.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.62.0",
+    "vitest": "4.1.9"
+  }
+}

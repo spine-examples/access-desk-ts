@@ -14,8 +14,10 @@ coverage/
 .nyc_output/
 
 # --- Generated Spine / Protobuf output ---
-packages/**/generated/
-packages/**/.generated-*/generated/
+packages/*/generated/
+packages/*/*/generated/
+packages/*/.generated-*/generated/
+packages/*/*/.generated-*/generated/
 .spine-proto-generation.json
 .spine-proto-generate.lock.*
 
