@@ -1,0 +1,22 @@
+{
+  "formatVersion": 2,
+  "generationId": "19f9e4ac-4141-4e29-a606-b0a944ca1209",
+  "packageName": "@access-desk/resources-model",
+  "packageVersion": "0.0.0",
+  "protoFiles": [
+    "access_desk/resources/commands.proto",
+    "access_desk/resources/events.proto",
+    "access_desk/resources/identifiers.proto",
+    "access_desk/resources/organization.proto"
+  ],
+  "generatedExports": {
+    "access_desk/resources/commands.proto": "generated/access_desk/resources/commands_pb.js",
+    "access_desk/resources/events.proto": "generated/access_desk/resources/events_pb.js",
+    "access_desk/resources/identifiers.proto": "generated/access_desk/resources/identifiers_pb.js",
+    "access_desk/resources/organization.proto": "generated/access_desk/resources/organization_pb.js"
+  },
+  "dependencies": [
+    "@spine-event-engine/proto"
+  ],
+  "moduleExport": "resourcesProtoModule"
+}
