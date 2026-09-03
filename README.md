@@ -14,3 +14,7 @@ Under development.
 
 - [Product Requirements Document](PRD.md).
 - [Event Storming board](https://miro.com/app/board/uXjVHu7F0ng=).
+
+## License
+
+Apache 2.0.
