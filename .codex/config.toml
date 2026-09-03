@@ -1,0 +1,36 @@
+model = "gpt-5.6-sol"
+model_reasoning_effort = "medium"
+
+[features]
+fast_mode = false
+
+[agents]
+max_depth = 1
+
+[agents.requirements_splitter]
+description = "Architecture-significant requirements splitting, Event Storming model updates, and bounded-context planning."
+config_file = "agents/requirements-splitter.toml"
+
+[agents.implementer]
+description = "Production-shaped Spine TS implementation from the Event Storming model, including the stateful Scheduling process."
+config_file = "agents/implementer.toml"
+
+[agents.style_maintainability_reviewer]
+description = "Focused TypeScript style, ownership, Event Storming model alignment, context-boundary, and maintainability reviewer."
+config_file = "agents/style-maintainability-reviewer.toml"
+
+[agents.documentation_reviewer]
+description = "Focused reviewer for Event Storming model accuracy, reference integrity, workflows, and documentation accuracy."
+config_file = "agents/documentation-reviewer.toml"
+
+[agents.typescript_api_docs_reviewer]
+description = "Focused TypeScript, Protobuf, Event Storming model mapping, generated API, TypeRegistry, and compatibility reviewer."
+config_file = "agents/typescript-api-docs-reviewer.toml"
+
+[agents.performance_reliability_reviewer]
+description = "Focused scheduler, integration, concurrency, persistence, replay, and reliability reviewer."
+config_file = "agents/performance-reliability-reviewer.toml"
+
+[agents.security_reviewer]
+description = "Final source-sanitization, tenant-isolation, authorization, command-Any intake, identity, logging, and dependency security reviewer."
+config_file = "agents/security-reviewer.toml"

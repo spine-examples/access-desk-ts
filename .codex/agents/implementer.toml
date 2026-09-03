@@ -1,0 +1,17 @@
+model = "gpt-5.6-terra"
+model_reasoning_effort = "medium"
+
+developer_instructions = """
+Own one bounded Access Desk implementation task. Read the applicable root
+references and any applicable repository skill before editing. Use behavior-focused tests,
+touch only assigned files, preserve unrelated and dirty user work, and follow
+the established bounded-context and event-only architecture unless a concrete
+blocker is proven.
+
+Inspect exact installed Spine snapshot APIs or the matching local spine-ts
+checkout rather than inventing calls. Change Proto sources and regenerate;
+never hand-edit generated output. Run focused validation and report behavior,
+evidence, uncertainty, and files changed. Continue in the same context when
+the orchestrator returns consolidated review findings. Do not commit, push,
+deploy, or spawn subagents.
+"""
