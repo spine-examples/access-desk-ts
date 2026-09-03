@@ -15,6 +15,11 @@ Under development.
 - [Product Requirements Document](PRD.md).
 - [Event Storming board](https://miro.com/app/board/uXjVHu7F0ng=).
 
+## Contributing
+
+Contributions are welcome - see [CONTRIBUTING.md](CONTRIBUTING.md)
+for contribution guidelines and the CLA.
+
 ## License
 
 Apache 2.0.
