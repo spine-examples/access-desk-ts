@@ -1,0 +1,71 @@
+//
+// Copyright 2026, TeamDev. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Redistribution and use in source and/or binary forms, with or without
+// modification, must retain the above copyright notice and the following
+// disclaimer.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+
+syntax = "proto3";
+
+package access_desk.resources;
+
+import "google/protobuf/descriptor.proto";
+import "spine/options.proto";
+
+option (type_url_prefix) = "type.access-desk.resources";
+
+// Metadata attached to each access level enum value.
+message AccessLevelOptions {
+
+  // The relative strength of the level; a higher rank is stronger.
+  uint32 rank = 1;
+
+  // The human-readable level name.
+  string display_name = 2;
+}
+
+extend google.protobuf.EnumValueOptions {
+
+  // Access level metadata attached to enum values.
+  //
+  // Extension field number 75001 is outside the numbers Spine allocates to its
+  // own options and is currently unassigned. It is part of the wire format and
+  // MUST remain stable: do not change, reuse, or reassign it.
+  //
+  AccessLevelOptions access_level = 75001;
+}
+
+// A resource-specific access level, ordered by rank for same-or-stronger checks.
+enum AccessLevel {
+
+  // The unset access level.
+  AL_UNSPECIFIED = 0;
+
+  // Read-only access.
+  READ = 1 [(access_level) = {rank: 1, display_name: "Read"}];
+
+  // Read and write access.
+  WRITE = 2 [(access_level) = {rank: 2, display_name: "Write"}];
+
+  // Full administrative access.
+  ADMIN = 3 [(access_level) = {rank: 3, display_name: "Admin"}];
+}
