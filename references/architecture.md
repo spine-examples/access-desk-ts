@@ -76,7 +76,7 @@ and declares its external-event receptors internally.
 
 Organization is the tenant.
 
-- `UserId` is globally stable and is not an email address.
+- `PersonId` is globally stable and is not an email address.
 - A user may have active memberships in multiple organizations.
 - Every tenant-scoped request, query, subscription, scheduled item, inbox row,
   outbox row, and audit record carries exactly one `OrganizationId` represented
@@ -107,7 +107,7 @@ A single-tenant Spine event has no tenant and cannot be delivered directly to a
 multitenant entity handler. Raw Identity events therefore never flow directly
 into Resources, Access, Scheduling, or Audit.
 
-The durable integration layer maintains a technical `UserId` to
+The durable integration layer maintains a technical `PersonId` to
 `OrganizationId` fan-out index from tenant-scoped Resources membership facts.
 When Identity publishes a relevant global activity/disablement fact, the
 adapter emits one derived, tenant-scoped integration fact for each known active

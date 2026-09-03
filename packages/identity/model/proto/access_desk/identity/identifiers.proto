@@ -28,4 +28,12 @@ syntax = "proto3";
 
 package access_desk.identity;
 
-// Reserves this model package's Proto namespace for future contracts.
+import "spine/options.proto";
+
+option (type_url_prefix) = "type.access-desk.identity";
+
+// Identifies a person globally.
+message PersonId {
+
+  string uuid = 1 [(required) = true];
+}
