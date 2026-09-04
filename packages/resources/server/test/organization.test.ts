@@ -27,7 +27,7 @@
 import { create } from "@bufbuild/protobuf";
 import { AnyMessages, TypeUrls } from "@spine-event-engine/core";
 import { SignalMetadata } from "@spine-event-engine/server";
-import { TenantIdSchema, UserIdSchema } from "@spine-event-engine/proto";
+import { UserIdSchema } from "@spine-event-engine/proto";
 import {
   QueryIdSchema,
   QuerySchema,
@@ -43,15 +43,12 @@ import {
   type OrganizationView,
 } from "@access-desk/resources-model/generated/access_desk/resources/organization_pb.js";
 
-// Imported from compiled output: vitest cannot execute the handler classes'
-// standard decorators from raw TypeScript source.
 type ResourcesModule = typeof import("../dist/src/index.js");
 let createResourcesContext: ResourcesModule["createResourcesContext"];
 
 const signalMetadata = new SignalMetadata();
 const ownedBlackBoxes = new Set<BlackBox>();
 
-// The organization is its own tenant, so its id doubles as the tenant.
 const organizationId = "acme";
 const actor = "resources-user";
 
@@ -65,7 +62,7 @@ afterEach(async () => {
 });
 
 async function resourcesBlackBox(): Promise<BlackBox> {
-  const box = await BlackBox.from(await createResourcesContext(), { tenant: organizationId });
+  const box = await BlackBox.from(await createResourcesContext());
   ownedBlackBoxes.add(box);
   return box;
 }
@@ -79,7 +76,6 @@ function organizationViewQuery(): Query {
     }),
     context: signalMetadata.actorContext({
       actor: create(UserIdSchema, { value: actor }),
-      tenantId: create(TenantIdSchema, { kind: { case: "value", value: organizationId } }),
     }),
   });
 }
@@ -104,15 +100,12 @@ describe("Resources walking skeleton", () => {
     const box = await resourcesBlackBox();
     const scope = box.onBehalfOf(actor);
 
-    // Immediate command outcome.
     const ack = await scope.post(
       CreateOrganizationSchema,
       create(CreateOrganizationSchema, { id: { value: organizationId }, name: "Acme" }),
     );
     expect(ack.kind).toBe("ok");
 
-    // Async read-side visibility proves the whole loop:
-    // command -> event -> projection -> query.
     const rows = await box.eventually(
       () => readOrganizationViews(scope, organizationViewQuery()),
       (candidate) => candidate.length === 1,

@@ -24,10 +24,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { clone, create } from "@bufbuild/protobuf";
+import { create } from "@bufbuild/protobuf";
 import { Aggregate, Assign } from "@spine-event-engine/server";
 import {
-  OrganizationIdSchema,
   type OrganizationId,
 } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
 import { type CreateOrganization } from "@access-desk/resources-model/generated/access_desk/resources/commands_pb.js";
@@ -54,10 +53,9 @@ export class OrganizationAggregate extends Aggregate<
    */
   @Assign
   createOrganization(command: CreateOrganization): OrganizationCreated {
-    const id = clone(OrganizationIdSchema, this.id);
     this.update((draft) => {
-      Object.assign(draft, create(OrganizationSchema, { id, name: command.name }));
+      Object.assign(draft, create(OrganizationSchema, { id: command.id, name: command.name }));
     });
-    return create(OrganizationCreatedSchema, { id, name: command.name });
+    return create(OrganizationCreatedSchema, { id: command.id, name: command.name });
   }
 }
