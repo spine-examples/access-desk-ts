@@ -24,10 +24,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { clone, create } from "@bufbuild/protobuf";
+import { create } from "@bufbuild/protobuf";
 import { Projection, Subscribe } from "@spine-event-engine/server";
 import {
-  OrganizationIdSchema,
   type OrganizationId,
 } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
 import { type OrganizationCreated } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
@@ -48,9 +47,8 @@ export class OrganizationViewProjection extends Projection<
    */
   @Subscribe
   onOrganizationCreated(event: OrganizationCreated): void {
-    const id = clone(OrganizationIdSchema, event.id ?? this.id);
     this.update((draft) => {
-      Object.assign(draft, create(OrganizationViewSchema, { id, name: event.name }));
+      Object.assign(draft, create(OrganizationViewSchema, { id: event.id, name: event.name }));
     });
   }
 }

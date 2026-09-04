@@ -29,7 +29,7 @@ import { OrganizationAggregate } from "./organization-aggregate.js";
 import { OrganizationViewProjection } from "./organization-view.js";
 
 /**
- * Builds the multitenant Resources bounded context.
+ * Builds the single-tenant Resources bounded context.
  *
  * The organization is the tenant: `CreateOrganization` is issued in the tenant
  * scope of the organization it creates (`OrganizationId = TenantId`).
@@ -37,7 +37,7 @@ import { OrganizationViewProjection } from "./organization-view.js";
  * @returns The assembled Resources bounded context.
  */
 export async function createResourcesContext(): Promise<BoundedContext> {
-  const builder = BoundedContext.multitenant("Resources")
+  const builder = BoundedContext.singleTenant("Resources")
     .withGeneratedRegistryRoot(new URL("..", import.meta.url))
     .add(OrganizationAggregate)
     .add(OrganizationViewProjection);
