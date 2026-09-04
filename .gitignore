@@ -16,8 +16,8 @@ coverage/
 # --- Generated Spine / Protobuf output ---
 packages/*/generated/
 packages/*/*/generated/
-packages/*/.generated-*/generated/
-packages/*/*/.generated-*/generated/
+packages/*/.generated*/generated/
+packages/*/*/.generated*/generated/
 .spine-proto-generation.json
 .spine-proto-generate.lock.*
 
@@ -42,3 +42,5 @@ yarn-error.log*
 # --- OS ---
 .DS_Store
 Thumbs.db
+/packages/access/model/.generated.stage-lnGAzr/
+/packages/access/model/.generated.stage-QJWClf/
