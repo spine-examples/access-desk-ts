@@ -1,0 +1,7 @@
+packages:
+  - "packages/*"
+  - "packages/*/*"
+linkWorkspacePackages: true
+allowBuilds:
+  "@bufbuild/buf": false
+  protobufjs: false

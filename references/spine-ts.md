@@ -36,19 +36,19 @@ published versions.
 
 Use only packages required by the implemented slice. The anticipated family is:
 
-| Responsibility | Package |
-| --- | --- |
-| Bounded contexts, entities, handlers, server | `@spine-event-engine/server` |
-| Spine Proto contracts/options | `@spine-event-engine/proto` |
-| Model and handler generation | `@spine-event-engine/proto-tools` |
-| Type registry, type URLs, `Any` helpers | `@spine-event-engine/core` |
-| Common storage contract | `@spine-event-engine/storage` |
-| Google Cloud Datastore adapter | `@spine-event-engine/storage-datastore` |
-| Gateway authentication primitives | `@spine-event-engine/auth` |
-| Same-server command client | `@spine-event-engine/client-node` |
-| Browser client | `@spine-event-engine/client-web` |
-| React hooks/provider | `@spine-event-engine/client-react` |
-| Black-box tests | `@spine-event-engine/testing` |
+| Responsibility                               | Package                                 |
+| -------------------------------------------- | --------------------------------------- |
+| Bounded contexts, entities, handlers, server | `@spine-event-engine/server`            |
+| Spine Proto contracts/options                | `@spine-event-engine/proto`             |
+| Model and handler generation                 | `@spine-event-engine/proto-tools`       |
+| Type registry, type URLs, `Any` helpers      | `@spine-event-engine/core`              |
+| Common storage contract                      | `@spine-event-engine/storage`           |
+| Google Cloud Datastore adapter               | `@spine-event-engine/storage-datastore` |
+| Gateway authentication primitives            | `@spine-event-engine/auth`              |
+| Same-server command client                   | `@spine-event-engine/client-node`       |
+| Browser client                               | `@spine-event-engine/client-web`        |
+| React hooks/provider                         | `@spine-event-engine/client-react`      |
+| Black-box tests                              | `@spine-event-engine/testing`           |
 
 Application model and runtime code also use the exact compatible
 `@bufbuild/protobuf` family selected by the snapshot. Verify peer/dependency

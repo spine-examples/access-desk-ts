@@ -1,0 +1,35 @@
+{
+  "name": "@access-desk/access-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    }
+  },
+  "scripts": {
+    "compose": "spine-proto compose",
+    "handlers": "spine-proto handlers",
+    "generate": "pnpm run compose && pnpm run handlers",
+    "build": "spine-proto compose && spine-proto handlers && tsc -b",
+    "build:ts": "tsc -b",
+    "typecheck": "spine-proto compose && spine-proto handlers && tsc -b --pretty false",
+    "lint": "eslint src --no-error-on-unmatched-pattern"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "2.12.1",
+    "@spine-event-engine/core": "2.0.0-snapshot.2",
+    "@spine-event-engine/proto": "2.0.0-snapshot.2",
+    "@spine-event-engine/server": "2.0.0-snapshot.2",
+    "@spine-event-engine/storage": "2.0.0-snapshot.2",
+    "@access-desk/access-model": "0.0.0"
+  },
+  "devDependencies": {
+    "@spine-event-engine/proto-tools": "2.0.0-snapshot.2",
+    "@spine-event-engine/testing": "2.0.0-snapshot.2",
+    "typescript": "6.0.3",
+    "vitest": "4.1.9"
+  }
+}

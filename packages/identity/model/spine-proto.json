@@ -1,0 +1,10 @@
+{
+  "formatVersion": 1,
+  "mode": "model",
+  "packageName": "@access-desk/identity-model",
+  "protoRoot": "proto",
+  "generatedRoot": "generated",
+  "exportRoot": "generated",
+  "dependencies": ["@spine-event-engine/proto"],
+  "moduleExport": "identityProtoModule"
+}

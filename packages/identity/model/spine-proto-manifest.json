@@ -1,0 +1,16 @@
+{
+  "formatVersion": 2,
+  "generationId": "f5f43995-2059-4f7e-be64-fd658edcc9c5",
+  "packageName": "@access-desk/identity-model",
+  "packageVersion": "0.0.0",
+  "protoFiles": [
+    "access_desk/identity/empty.proto"
+  ],
+  "generatedExports": {
+    "access_desk/identity/empty.proto": "generated/access_desk/identity/empty_pb.js"
+  },
+  "dependencies": [
+    "@spine-event-engine/proto"
+  ],
+  "moduleExport": "identityProtoModule"
+}
