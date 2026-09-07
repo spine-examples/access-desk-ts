@@ -39,11 +39,3 @@ message OrganizationAlreadyExists {
   // The organization that already exists.
   OrganizationId id = 1 [(required) = true];
 }
-
-// A command that tries to act on an organization other than the one it
-// is operating within.
-message OrganizationTenantMismatch {
-
-  // The organization the command tried to act on.
-  OrganizationId organization_id = 1 [(required) = true];
-}

@@ -26,19 +26,29 @@
 
 import { create } from "@bufbuild/protobuf";
 import { Aggregate, Assign } from "@spine-event-engine/server";
+import { type OrganizationId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
 import {
-  type OrganizationId,
-} from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
-import { type CreateOrganization } from "@access-desk/resources-model/generated/access_desk/resources/commands_pb.js";
+  type AddOrganizationMember,
+  type AddResource,
+  type CreateOrganization,
+} from "@access-desk/resources-model/generated/access_desk/resources/organization_commands_pb.js";
 import {
   OrganizationCreatedSchema,
+  OrganizationMemberAddedSchema,
+  ResourceAddedSchema,
   type OrganizationCreated,
-} from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
+  type OrganizationMemberAdded,
+  type ResourceAdded,
+} from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
 import { OrganizationSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_pb.js";
+import { OrganizationMemberSchema } from "@access-desk/resources-model/generated/access_desk/resources/values_pb.js";
+import {
+  OrganizationAlreadyExists,
+} from "@access-desk/resources-model/generated/access_desk/resources/organization_rejections.js";
 
 /**
- * Applies commands to one organization, identified by its `OrganizationId` —
- * which is also the tenant boundary this aggregate lives within.
+ * One organization - the boundary that owns resources and members and within
+ * which access to those resources is granted.
  */
 export class OrganizationAggregate extends Aggregate<
   OrganizationId,
@@ -46,16 +56,53 @@ export class OrganizationAggregate extends Aggregate<
   bigint
 > {
   /**
-   * Creates the organization and publishes the read-side input event.
-   *
-   * @param command The validated command carrying the organization name.
-   * @returns The event that records the creation.
+   * Brings the organization into existence, rejecting a second creation.
    */
   @Assign
   createOrganization(command: CreateOrganization): OrganizationCreated {
+    if (this.state.name !== "") {
+      throw OrganizationAlreadyExists.create({ id: this.id });
+    }
     this.update((draft) => {
-      Object.assign(draft, create(OrganizationSchema, { id: command.id, name: command.name }));
+      Object.assign(draft, create(OrganizationSchema, { id: this.id, name: command.name }));
     });
-    return create(OrganizationCreatedSchema, { id: command.id, name: command.name });
+    return create(OrganizationCreatedSchema, { id: this.id, name: command.name });
+  }
+
+  /**
+   * Makes a person an active member of the organization, at most once each.
+   */
+  @Assign
+  addOrganizationMember(command: AddOrganizationMember): OrganizationMemberAdded {
+    const person = command.person!;
+    this.update((draft) => {
+      const membership = draft.membership.filter((item) => item.person?.uuid !== person.uuid);
+      membership.push(create(OrganizationMemberSchema, { person, active: true }));
+      draft.membership = membership;
+    });
+    return create(OrganizationMemberAddedSchema, {
+      organizationId: this.id,
+      person,
+      active: true,
+    });
+  }
+
+  /**
+   * Records a resource in this organization.
+   *
+   * Name uniqueness is enforced upstream by the Resource-Creation process, not here.
+   */
+  @Assign
+  addResource(command: AddResource): ResourceAdded {
+    const resourceId = command.resourceId!;
+    this.update((draft) => {
+      if (!draft.resource.some((reserved) => reserved.value === resourceId.value)) {
+        draft.resource = [...draft.resource, resourceId];
+      }
+    });
+    return create(ResourceAddedSchema, {
+      resourceId,
+      organizationId: this.id,
+    });
   }
 }
