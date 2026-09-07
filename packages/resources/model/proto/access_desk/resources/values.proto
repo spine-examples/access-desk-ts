@@ -35,41 +35,41 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.access-desk.resources";
 
-// One authoritative domestic organization membership.
+// A person's membership in an organization.
 message OrganizationMember {
 
-  // The member.
+  // The person who belongs to the organization.
   access_desk.identity.PersonId person = 1 [(required) = true, (validate) = true];
 
-  // Whether this membership is active.
+  // Whether the person is currently an active member.
   bool active = 2;
 }
 
-// The access decision rules for a resource, without its identity.
+// The rules that govern access to a resource.
 message ResourcePolicy {
 
-  // Whether new requests are accepted.
+  // Whether the resource is currently accepting new access requests.
   bool open_for_requests = 1;
 
   // The data-sensitivity classification of the resource.
   Sensitivity sensitivity = 2;
 
-  // The resource owner.
+  // The person accountable for the resource.
   access_desk.identity.PersonId owner = 3 [(required) = true, (validate) = true];
 
-  // The ordered access levels offered by this resource.
+  // The access levels the resource offers, from weakest to strongest.
   repeated AccessLevel access_level = 4 [(required) = true];
 
-  // The maximum permitted access duration, at one-minute granularity.
+  // The longest access grant the resource permits, at one-minute granularity.
   google.protobuf.Duration maximum_duration = 5 [(required) = true];
 
-  // The current primary approver.
+  // The person who normally decides access requests to the resource.
   access_desk.identity.PersonId primary_approver = 6 [(required) = true, (validate) = true];
 
-  // The current fallback approver.
+  // The person who decides when the primary approver is unavailable.
   access_desk.identity.PersonId fallback_approver = 7 [(required) = true, (validate) = true];
 
-  // The monotonically increasing policy version.
+  // The revision of these rules; increases with every change.
   uint64 policy_version = 8 [(min).value = "1"];
 }
 

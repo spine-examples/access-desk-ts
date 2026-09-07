@@ -1,0 +1,81 @@
+//
+// Copyright 2026, TeamDev. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Redistribution and use in source and/or binary forms, with or without
+// modification, must retain the above copyright notice and the following
+// disclaimer.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+
+syntax = "proto3";
+
+package access_desk.resources;
+
+import "google/protobuf/duration.proto";
+import "access_desk/resources/identifiers.proto";
+import "access_desk/resources/access_level.proto";
+import "access_desk/resources/values.proto";
+import "access_desk/identity/identifiers.proto";
+import "spine/options.proto";
+
+option (type_url_prefix) = "type.access-desk.resources";
+
+// Requests creation of a resource, starting the Resource Creation process.
+//
+// It does not create the resource directly. The process first rejects a
+// duplicate name within the organization, then creates the resource and
+// reserves it in the organization. The carried policy fields become the
+// resource's complete initial policy.
+//
+message RequestResourceCreation {
+
+  // The requested resource identifier; correlates the whole process.
+  ResourceId id = 1 [(validate) = true];
+
+  // The organization the resource belongs to.
+  OrganizationId organization_id = 2 [(validate) = true];
+
+  // The requested resource name, unique within the organization.
+  string name = 3 [(required) = true];
+
+  // The human-readable resource description.
+  string description = 4 [(required) = true];
+
+  // The catalogue category the resource belongs to.
+  string category = 5 [(required) = true];
+
+  // The data-sensitivity classification of the resource.
+  Sensitivity sensitivity = 6 [(required) = true];
+
+  // The access levels offered by this resource, in ascending order.
+  repeated AccessLevel access_level = 7 [(required) = true];
+
+  // The maximum permitted access duration, at one-minute granularity.
+  google.protobuf.Duration maximum_duration = 8 [(required) = true];
+
+  // The resource owner.
+  access_desk.identity.PersonId owner = 9 [(required) = true, (validate) = true];
+
+  // The initial primary approver of access requests.
+  access_desk.identity.PersonId primary_approver = 10 [(required) = true, (validate) = true];
+
+  // The initial fallback approver, used when the primary is unavailable.
+  access_desk.identity.PersonId fallback_approver = 11 [(required) = true, (validate) = true];
+}
