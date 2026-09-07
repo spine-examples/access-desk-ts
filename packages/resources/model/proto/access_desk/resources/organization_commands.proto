@@ -29,50 +29,42 @@ syntax = "proto3";
 package access_desk.resources;
 
 import "access_desk/resources/identifiers.proto";
-import "access_desk/resources/values.proto";
 import "access_desk/identity/identifiers.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.access-desk.resources";
 
-// An organization that owns resources and within which its members request and
-// are granted access to them.
+// Establishes a new organization within which resources are owned and access to
+// them is granted.
 //
-// Each organization is a self-contained boundary:
-// its members, resources, and access decisions never cross into another.
+// The organization is its own tenant: the command is issued in that tenant's
+// scope, so `id` and the command's `TenantId` carry the same value.
 //
-message Organization {
-  option (entity).kind = AGGREGATE;
+message CreateOrganization {
 
-  // Identifies the organization.
-  OrganizationId id = 1 [(validate) = true, (set_once) = true];
+  // The identifier of the organization to create.
+  OrganizationId id = 1 [(validate) = true];
 
-  // The organization's display name.
+  // The human-readable organization name.
   string name = 2 [(required) = true];
-
-  // The people who belong to the organization.
-  repeated OrganizationMember membership = 3;
-
-  // The resources the organization owns.
-  repeated ResourceId resource = 4;
 }
 
-// An organization together with its members and owned resources, as seen by
-// catalogue queries.
-//
-message OrganizationView {
-  option (entity).kind = PROJECTION;
-  option (entity).visibility = FULL;
+// Adds a person as an active member of an organization.
+message AddOrganizationMember {
 
-  // Identifies the organization.
-  OrganizationId id = 1 [(validate) = true, (set_once) = true];
+  // The organization whose membership changes.
+  OrganizationId organization_id = 1 [(validate) = true];
 
-  // The organization's display name.
-  string name = 2 [(required) = true, (column) = true];
+  // The person to add as a member.
+  access_desk.identity.PersonId person = 2 [(required) = true, (validate) = true];
+}
 
-  // The people who belong to the organization.
-  repeated access_desk.identity.PersonId member = 3;
+// Records a newly created resource as one of an organization's resources.
+message AddResource {
 
-  // The resources the organization owns.
-  repeated ResourceId resource = 4;
+  // The organization the resource belongs to.
+  OrganizationId organization_id = 1 [(validate) = true];
+
+  // The resource being recorded.
+  ResourceId resource_id = 2 [(required) = true, (validate) = true];
 }

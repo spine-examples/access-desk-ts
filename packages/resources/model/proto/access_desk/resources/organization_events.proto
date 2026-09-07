@@ -29,50 +29,40 @@ syntax = "proto3";
 package access_desk.resources;
 
 import "access_desk/resources/identifiers.proto";
-import "access_desk/resources/values.proto";
 import "access_desk/identity/identifiers.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.access-desk.resources";
 
-// An organization that owns resources and within which its members request and
-// are granted access to them.
-//
-// Each organization is a self-contained boundary:
-// its members, resources, and access decisions never cross into another.
-//
-message Organization {
-  option (entity).kind = AGGREGATE;
+// An organization was created.
+message OrganizationCreated {
 
-  // Identifies the organization.
-  OrganizationId id = 1 [(validate) = true, (set_once) = true];
+  // The identifier of the created organization.
+  OrganizationId id = 1 [(required) = true, (validate) = true];
 
-  // The organization's display name.
+  // The human-readable organization name.
   string name = 2 [(required) = true];
-
-  // The people who belong to the organization.
-  repeated OrganizationMember membership = 3;
-
-  // The resources the organization owns.
-  repeated ResourceId resource = 4;
 }
 
-// An organization together with its members and owned resources, as seen by
-// catalogue queries.
-//
-message OrganizationView {
-  option (entity).kind = PROJECTION;
-  option (entity).visibility = FULL;
+// A person was added as a member of an organization.
+message OrganizationMemberAdded {
 
-  // Identifies the organization.
-  OrganizationId id = 1 [(validate) = true, (set_once) = true];
+  // The organization that owns this membership.
+  OrganizationId organization_id = 1 [(required) = true, (validate) = true];
 
-  // The organization's display name.
-  string name = 2 [(required) = true, (column) = true];
+  // The member described by this fact.
+  access_desk.identity.PersonId person = 2 [(required) = true, (validate) = true];
 
-  // The people who belong to the organization.
-  repeated access_desk.identity.PersonId member = 3;
+  // Whether the membership is active.
+  bool active = 3;
+}
 
-  // The resources the organization owns.
-  repeated ResourceId resource = 4;
+// A resource was recorded as one of an organization's resources.
+message ResourceAdded {
+
+  // The resource that was recorded.
+  ResourceId resource_id = 1 [(required) = true, (validate) = true];
+
+  // The organization that recorded it.
+  OrganizationId organization_id = 2 [(required) = true, (validate) = true];
 }
