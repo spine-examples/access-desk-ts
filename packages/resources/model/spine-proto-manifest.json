@@ -1,21 +1,42 @@
 {
   "formatVersion": 2,
-  "generationId": "0af56b72-897a-46cf-9064-9476b33d6e77",
+  "generationId": "e7e0a9ae-6b50-444d-8934-991d3e439c56",
   "packageName": "@access-desk/resources-model",
   "packageVersion": "0.0.0",
   "protoFiles": [
+    "access_desk/resources/access_level.proto",
     "access_desk/resources/commands.proto",
     "access_desk/resources/events.proto",
     "access_desk/resources/identifiers.proto",
-    "access_desk/resources/organization.proto"
+    "access_desk/resources/organization.proto",
+    "access_desk/resources/organization_commands.proto",
+    "access_desk/resources/organization_events.proto",
+    "access_desk/resources/organization_rejections.proto",
+    "access_desk/resources/rejections.proto",
+    "access_desk/resources/resource.proto",
+    "access_desk/resources/resource_creation.proto",
+    "access_desk/resources/resource_creation_commands.proto",
+    "access_desk/resources/resource_creation_events.proto",
+    "access_desk/resources/values.proto"
   ],
   "generatedExports": {
+    "access_desk/resources/access_level.proto": "generated/access_desk/resources/access_level_pb.js",
     "access_desk/resources/commands.proto": "generated/access_desk/resources/commands_pb.js",
     "access_desk/resources/events.proto": "generated/access_desk/resources/events_pb.js",
     "access_desk/resources/identifiers.proto": "generated/access_desk/resources/identifiers_pb.js",
-    "access_desk/resources/organization.proto": "generated/access_desk/resources/organization_pb.js"
+    "access_desk/resources/organization.proto": "generated/access_desk/resources/organization_pb.js",
+    "access_desk/resources/organization_commands.proto": "generated/access_desk/resources/organization_commands_pb.js",
+    "access_desk/resources/organization_events.proto": "generated/access_desk/resources/organization_events_pb.js",
+    "access_desk/resources/organization_rejections.proto": "generated/access_desk/resources/organization_rejections_pb.js",
+    "access_desk/resources/rejections.proto": "generated/access_desk/resources/rejections_pb.js",
+    "access_desk/resources/resource.proto": "generated/access_desk/resources/resource_pb.js",
+    "access_desk/resources/resource_creation.proto": "generated/access_desk/resources/resource_creation_pb.js",
+    "access_desk/resources/resource_creation_commands.proto": "generated/access_desk/resources/resource_creation_commands_pb.js",
+    "access_desk/resources/resource_creation_events.proto": "generated/access_desk/resources/resource_creation_events_pb.js",
+    "access_desk/resources/values.proto": "generated/access_desk/resources/values_pb.js"
   },
   "dependencies": [
+    "@access-desk/identity-model",
     "@spine-event-engine/proto"
   ],
   "moduleExport": "resourcesProtoModule"

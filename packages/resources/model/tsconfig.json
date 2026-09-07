@@ -4,5 +4,5 @@
     "rootDir": ".",
     "outDir": "dist"
   },
-  "include": ["generated/**/*.ts"]
+  "include": ["src/**/*.ts", "generated/**/*.ts"]
 }
