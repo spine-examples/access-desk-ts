@@ -1,15 +1,17 @@
 {
   "formatVersion": 2,
-  "generationId": "0ca48904-a7b8-478c-9938-5aa153e4ef23",
+  "generationId": "dd1b7625-bbd2-45c6-bc62-425973b02187",
   "packageName": "@access-desk/access-model",
   "packageVersion": "0.0.0",
   "protoFiles": [
-    "access_desk/access/empty.proto"
+    "access_desk/access/resource_request_policy.proto"
   ],
   "generatedExports": {
-    "access_desk/access/empty.proto": "generated/access_desk/access/empty_pb.js"
+    "access_desk/access/resource_request_policy.proto": "generated/access_desk/access/resource_request_policy_pb.js"
   },
   "dependencies": [
+    "@access-desk/identity-model",
+    "@access-desk/resources-model",
     "@spine-event-engine/proto"
   ],
   "moduleExport": "accessProtoModule"

@@ -1,0 +1,51 @@
+//
+// Copyright 2026, TeamDev. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Redistribution and use in source and/or binary forms, with or without
+// modification, must retain the above copyright notice and the following
+// disclaimer.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+
+syntax = "proto3";
+
+package access_desk.access;
+
+import "access_desk/resources/identifiers.proto";
+import "access_desk/resources/values.proto";
+import "spine/options.proto";
+
+option (type_url_prefix) = "type.access-desk.access";
+
+// A resource's access rules used to decide access requests.
+//
+// Access keeps its own copy, mirrored from the facts the Resources context
+// publishes, so deciding a request never has to reach back to Resources.
+//
+message ResourceRequestPolicy {
+  option (entity).kind = PROJECTION;
+  option (entity).visibility = FULL;
+
+  // The resource this policy describes.
+  access_desk.resources.ResourceId resource = 1 [(validate) = true, (set_once) = true];
+
+  // The complete current resource request policy, as published by Resources.
+  access_desk.resources.ResourcePolicy policy = 2 [(required) = true];
+}

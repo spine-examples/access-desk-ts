@@ -24,8 +24,17 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+import { BoundedContext } from "@spine-event-engine/server";
+import { ResourceRequestPolicyProjection } from "./resource-request-policy-projection.js";
+
 /**
- * Access bounded context: domain handlers and context assembly.
+ * Builds the multitenant Access bounded context.
+ *
+ * @returns The assembled Access bounded context.
  */
-export { createAccessContext } from "./access-context.js";
-export { ResourceRequestPolicyProjection } from "./resource-request-policy-projection.js";
+export async function createAccessContext(): Promise<BoundedContext> {
+  const builder = BoundedContext.multitenant("Access")
+    .withGeneratedRegistryRoot(new URL("..", import.meta.url))
+    .add(ResourceRequestPolicyProjection);
+  return builder.buildAsync();
+}

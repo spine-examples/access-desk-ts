@@ -5,6 +5,10 @@
   "protoRoot": "proto",
   "generatedRoot": "generated",
   "exportRoot": "generated",
-  "dependencies": ["@spine-event-engine/proto"],
+  "dependencies": [
+    "@spine-event-engine/proto",
+    "@access-desk/resources-model",
+    "@access-desk/identity-model"
+  ],
   "moduleExport": "accessProtoModule"
 }
