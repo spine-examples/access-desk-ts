@@ -39,6 +39,13 @@ option (type_url_prefix) = "type.access-desk.resources";
 //
 message OrganizationId {
 
-  // The stable organization identifier value.
+  // The stable, system-generated organization UUID.
+  string uuid = 1 [(required) = true];
+}
+
+// Identifies a resource within exactly one organization.
+message ResourceId {
+
+  // The immutable resource name - a dash-case slug, unique within the organization.
   string value = 1 [(required) = true];
 }
