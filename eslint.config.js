@@ -56,6 +56,19 @@ export default tseslint.config(
         tsconfigRootDir: import.meta.dirname,
       },
     },
+    rules: {
+      // Underscore-prefixed identifiers mark intentionally unused bindings.
+      // Framework handlers must declare a typed command/event parameter for
+      // handler discovery even when the body reads only the entity state.
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
+    },
   },
   eslintConfigPrettier,
 );
