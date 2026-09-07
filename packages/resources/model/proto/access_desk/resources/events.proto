@@ -29,16 +29,66 @@ syntax = "proto3";
 package access_desk.resources;
 
 import "access_desk/resources/identifiers.proto";
+import "access_desk/resources/values.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.access-desk.resources";
 
-// An organization was created.
-message OrganizationCreated {
+// A resource was created with its complete initial policy.
+message ResourceCreated {
 
-  // The identifier of the created organization.
-  OrganizationId id = 1 [(required) = true, (validate) = true];
+  // The created resource.
+  ResourceId id = 1 [(required) = true, (validate) = true];
 
-  // The human-readable organization name.
+  // The resource name.
   string name = 2 [(required) = true];
+
+  // The resource description.
+  string description = 3 [(required) = true];
+
+  // The catalogue category.
+  string category = 4 [(required) = true];
+
+  // The complete first version of the resource policy.
+  ResourcePolicy policy = 5 [(required) = true];
+}
+
+// A resource's primary approver was assigned, yielding the next policy version.
+message ResourcePrimaryApproverAssigned {
+
+  // The resource whose policy changed.
+  ResourceId id = 1 [(required) = true, (validate) = true];
+
+  // The complete next version of the resource policy.
+  ResourcePolicy policy = 2 [(required) = true];
+}
+
+// A resource's fallback approver was assigned, yielding the next policy version.
+message ResourceFallbackApproverAssigned {
+
+  // The resource whose policy changed.
+  ResourceId id = 1 [(required) = true, (validate) = true];
+
+  // The complete next version of the resource policy.
+  ResourcePolicy policy = 2 [(required) = true];
+}
+
+// A resource was opened to new access requests, yielding the next policy version.
+message ResourceOpenedForRequests {
+
+  // The resource whose policy changed.
+  ResourceId id = 1 [(required) = true, (validate) = true];
+
+  // The complete next version of the resource policy.
+  ResourcePolicy policy = 2 [(required) = true];
+}
+
+// A resource was closed to new access requests, yielding the next policy version.
+message ResourceClosedForRequests {
+
+  // The resource whose policy changed.
+  ResourceId id = 1 [(required) = true, (validate) = true];
+
+  // The complete next version of the resource policy.
+  ResourcePolicy policy = 2 [(required) = true];
 }

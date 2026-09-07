@@ -28,17 +28,79 @@ syntax = "proto3";
 
 package access_desk.resources;
 
+import "google/protobuf/duration.proto";
 import "access_desk/resources/identifiers.proto";
+import "access_desk/resources/access_level.proto";
+import "access_desk/resources/values.proto";
+import "access_desk/identity/identifiers.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.access-desk.resources";
 
-// Creates a new organization.
-message CreateOrganization {
+// Creates a resource with its complete initial policy, closed to requests.
+message CreateResource {
 
-  // The identifier of the organization to create.
-  OrganizationId id = 1 [(validate) = true];
+  // The resource identifier.
+  ResourceId id = 1 [(validate) = true];
 
-  // The human-readable organization name.
+  // The resource name, unique within the organization.
   string name = 2 [(required) = true];
+
+  // The human-readable resource description.
+  string description = 3 [(required) = true];
+
+  // The catalogue category the resource belongs to.
+  string category = 4 [(required) = true];
+
+  // The data-sensitivity classification of the resource.
+  Sensitivity sensitivity = 5 [(required) = true];
+
+  // The access levels offered by this resource, in ascending order.
+  repeated AccessLevel access_level = 6 [(required) = true];
+
+  // The maximum permitted access duration, at one-minute granularity.
+  google.protobuf.Duration maximum_duration = 7 [(required) = true];
+
+  // The resource owner.
+  access_desk.identity.PersonId owner = 8 [(required) = true, (validate) = true];
+
+  // The initial primary approver of access requests.
+  access_desk.identity.PersonId primary_approver = 9 [(required) = true, (validate) = true];
+
+  // The initial fallback approver, used when the primary is unavailable.
+  access_desk.identity.PersonId fallback_approver = 10 [(required) = true, (validate) = true];
+}
+
+// Assigns a resource's primary approver, advancing the policy version.
+message AssignResourcePrimaryApprover {
+
+  // The resource whose policy changes.
+  ResourceId id = 1 [(validate) = true];
+
+  // The person to assign as primary approver.
+  access_desk.identity.PersonId approver = 2 [(required) = true, (validate) = true];
+}
+
+// Assigns a resource's fallback approver, advancing the policy version.
+message AssignResourceFallbackApprover {
+
+  // The resource whose policy changes.
+  ResourceId id = 1 [(validate) = true];
+
+  // The person to assign as fallback approver.
+  access_desk.identity.PersonId approver = 2 [(required) = true, (validate) = true];
+}
+
+// Opens a resource to new access requests, advancing the policy version.
+message OpenResourceForRequests {
+
+  // The resource to open.
+  ResourceId id = 1 [(validate) = true];
+}
+
+// Closes a resource to new access requests, advancing the policy version.
+message CloseResourceForRequests {
+
+  // The resource to close.
+  ResourceId id = 1 [(validate) = true];
 }

@@ -1,0 +1,83 @@
+//
+// Copyright 2026, TeamDev. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Redistribution and use in source and/or binary forms, with or without
+// modification, must retain the above copyright notice and the following
+// disclaimer.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+
+syntax = "proto3";
+
+package access_desk.resources;
+
+import "access_desk/resources/identifiers.proto";
+import "access_desk/resources/values.proto";
+import "spine/options.proto";
+
+option (type_url_prefix) = "type.access-desk.resources";
+
+// A protected internal source - a system, dataset, or tool - that people
+// request access to.
+//
+// It belongs to one organization, and its policy governs who
+// may access it, at what level, and for how long.
+//
+message Resource {
+  option (entity).kind = AGGREGATE;
+
+  // Identifies the resource within its organization.
+  ResourceId id = 1 [(validate) = true, (set_once) = true];
+
+  // The resource's name, unique within its organization.
+  string name = 2;
+
+  // A human-readable summary of what the resource is.
+  string description = 3;
+
+  // The catalogue category the resource is listed under.
+  string category = 4;
+
+  // The rules that govern access to the resource.
+  ResourcePolicy policy = 5;
+}
+
+// A resource as it appears in its organization's access catalogue: what it is
+// and the access rules currently in force for it.
+//
+message ResourceCatalogueItem {
+  option (entity).kind = PROJECTION;
+  option (entity).visibility = FULL;
+
+  // Identifies the resource within its organization.
+  ResourceId id = 1 [(validate) = true, (set_once) = true];
+
+  // The resource's name; queryable so a name can be looked up for uniqueness.
+  string name = 2 [(required) = true, (column) = true];
+
+  // A human-readable summary of what the resource is.
+  string description = 3 [(required) = true];
+
+  // The catalogue category the resource is listed under.
+  string category = 5 [(required) = true];
+
+  // The rules that govern access to the resource.
+  ResourcePolicy policy = 6 [(required) = true];
+}
