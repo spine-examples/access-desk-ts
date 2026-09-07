@@ -24,16 +24,17 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { create } from "@bufbuild/protobuf";
 import { Projection, Subscribe } from "@spine-event-engine/server";
+import { type OrganizationId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
 import {
-  type OrganizationId,
-} from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
-import { type OrganizationCreated } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
+  type OrganizationCreated,
+  type OrganizationMemberAdded,
+  type ResourceAdded,
+} from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
 import { OrganizationViewSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_pb.js";
 
 /**
- * Builds the read-side view of each organization from Resources events.
+ * Each organization with its members and the resources it owns.
  */
 export class OrganizationViewProjection extends Projection<
   OrganizationId,
@@ -42,13 +43,43 @@ export class OrganizationViewProjection extends Projection<
 > {
   /**
    * Records one organization in the catalogue view.
-   *
-   * @param event The event whose organization fields become the row state.
    */
   @Subscribe
   onOrganizationCreated(event: OrganizationCreated): void {
+    const id = event.id ?? this.id;
     this.update((draft) => {
-      Object.assign(draft, create(OrganizationViewSchema, { id: event.id, name: event.name }));
+      draft.id = id;
+      draft.name = event.name;
+    });
+  }
+
+  /**
+   * Adds one member to the organization view.
+   */
+  @Subscribe
+  onOrganizationMemberAdded(event: OrganizationMemberAdded): void {
+    const person = event.person;
+    if (person === undefined) {
+      return;
+    }
+    this.update((draft) => {
+      draft.id = event.organizationId ?? this.id;
+      if (!draft.member.some((existing) => existing.uuid === person.uuid)) {
+        draft.member = [...draft.member, person];
+      }
+    });
+  }
+
+  /**
+   * Reflects a reserved resource in its organization's view.
+   */
+  @Subscribe
+  onResourceAdded(event: ResourceAdded): void {
+    this.update((draft) => {
+      draft.id = event.organizationId ?? this.id;
+      if (!draft.resource.some((existing) => existing.value === event.resourceId!.value)) {
+        draft.resource = [...draft.resource, event.resourceId!];
+      }
     });
   }
 }
