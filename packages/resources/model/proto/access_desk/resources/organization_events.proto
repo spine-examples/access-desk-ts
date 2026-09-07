@@ -60,9 +60,9 @@ message OrganizationMemberAdded {
 // A resource was recorded as one of an organization's resources.
 message ResourceAdded {
 
-  // The resource that was recorded.
-  ResourceId resource_id = 1 [(required) = true, (validate) = true];
-
   // The organization that recorded it.
-  OrganizationId organization_id = 2 [(required) = true, (validate) = true];
+  OrganizationId organization_id = 1 [(required) = true, (validate) = true];
+
+  // The resource that was recorded.
+  ResourceId resource_id = 2 [(required) = true, (validate) = true];
 }
