@@ -24,12 +24,17 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { BoundedContext } from "@spine-event-engine/server";
+import { BoundedContext, EventRouting } from "@spine-event-engine/server";
+import { ResourceAddedSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
+import { type ResourceId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
 import { OrganizationAggregate } from "./organization-aggregate.js";
-import { OrganizationViewProjection } from "./organization-view.js";
+import { OrganizationViewProjection } from "./organization-view-projection.js";
+import { ResourceAggregate } from "./resource-aggregate.js";
+import { ResourceCatalogueProjection } from "./resource-view-projection.js";
+import { ResourceCreationProcessManager } from "./resource-creation-process.js";
 
 /**
- * Builds the single-tenant Resources bounded context.
+ * Builds the multitenant Resources bounded context.
  *
  * The organization is the tenant: `CreateOrganization` is issued in the tenant
  * scope of the organization it creates (`OrganizationId = TenantId`).
@@ -37,9 +42,16 @@ import { OrganizationViewProjection } from "./organization-view.js";
  * @returns The assembled Resources bounded context.
  */
 export async function createResourcesContext(): Promise<BoundedContext> {
-  const builder = BoundedContext.singleTenant("Resources")
+  const resourceCreationProcmanRouting = EventRouting.create<ResourceId>()
+    .route(ResourceAddedSchema, (event) => {
+      return event.resourceId === undefined ? [] : [event.resourceId]
+    });
+  const builder = BoundedContext.multitenant("Resources")
     .withGeneratedRegistryRoot(new URL("..", import.meta.url))
     .add(OrganizationAggregate)
-    .add(OrganizationViewProjection);
+    .add(OrganizationViewProjection)
+    .add(ResourceCreationProcessManager, { eventRouting: resourceCreationProcmanRouting })
+    .add(ResourceAggregate)
+    .add(ResourceCatalogueProjection);
   return builder.buildAsync();
 }
