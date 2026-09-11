@@ -74,7 +74,10 @@ export class OrganizationAggregate extends Aggregate<
    */
   @Assign
   addOrganizationMember(command: AddOrganizationMember): OrganizationMemberAdded {
-    const person = command.person!;
+    const person = command.person;
+    if (person === undefined) {
+      throw new Error("AddOrganizationMember requires a person.");
+    }
     this.update((draft) => {
       const membership = draft.membership.filter((item) => item.person?.uuid !== person.uuid);
       membership.push(create(OrganizationMemberSchema, { person, active: true }));
@@ -94,7 +97,10 @@ export class OrganizationAggregate extends Aggregate<
    */
   @Assign
   addResource(command: AddResource): ResourceAdded {
-    const resourceId = command.resourceId!;
+    const resourceId = command.resourceId;
+    if (resourceId === undefined) {
+      throw new Error("AddResource requires a resource id.");
+    }
     this.update((draft) => {
       if (!draft.resource.some((reserved) => reserved.value === resourceId.value)) {
         draft.resource = [...draft.resource, resourceId];

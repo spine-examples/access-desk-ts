@@ -75,10 +75,14 @@ export class OrganizationViewProjection extends Projection<
    */
   @Subscribe
   onResourceAdded(event: ResourceAdded): void {
+    const resourceId = event.resourceId;
+    if (resourceId === undefined) {
+      return;
+    }
     this.update((draft) => {
       draft.id = event.organizationId ?? this.id;
-      if (!draft.resource.some((existing) => existing.value === event.resourceId!.value)) {
-        draft.resource = [...draft.resource, event.resourceId!];
+      if (!draft.resource.some((existing) => existing.value === resourceId.value)) {
+        draft.resource = [...draft.resource, resourceId];
       }
     });
   }
