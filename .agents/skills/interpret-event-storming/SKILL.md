@@ -21,7 +21,17 @@ say the image is missing and ask for it.
 
 ## What You Produce
 
-Replace `references/event-storming.md` in place with a board-transcription model: per
+**Minimal diffs — change only what the iteration requires.** Edit the smallest
+span that reflects the change; never rewrite an unchanged section, reframe prose,
+or restructure a file wholesale when a surgical edit would do. This matters most
+for living documents. `references/event-storming.md` is a cumulative per-context
+snapshot: a new Event Storming board updates **only** the section(s) it redraws
+(e.g. its bounded context's transcription), leaving the purpose text and every
+other context's tables byte-for-byte. Start from the committed version and apply
+the necessary changes to it — do not regenerate the whole file. If a large diff
+seems unavoidable, that is a signal to stop and reconsider, not to proceed.
+
+The output is a board-transcription model in `references/event-storming.md`: per
 bounded context, its aggregates and process managers and their `command → event`
 transitions, with the rejections and actors that go with them, plus the
 cross-context flow. Record **transitions and message names** — the domain shape —
@@ -88,10 +98,11 @@ with their transitions in one table:
   as `event → owner → command`. If connectors are absent/illegible, say so;
   place required architecture mappings in the separate reconciliation section.
 
-## Replace In Place and Implement
+## Update In Place and Implement
 
-- Overwrite `references/event-storming.md`; do not keep a change log or a
-  second model version. Do not commit the source image. Never delete or move a
+- Update `references/event-storming.md` in place, editing only the section(s) the
+  board redraws (see _Minimal diffs_ above); do not keep a change log or a second
+  model version. Do not commit the source image. Never delete or move a
   user-supplied image. After processing or detecting sensitive content, always
   remove agent-created temporary derivatives from the verified private ephemeral
   directory.

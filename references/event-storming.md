@@ -33,18 +33,28 @@ the board.
 
 ### Resources
 
-| Owner        | Trigger (actor/event) | Command                           | Event(s)                            | Rejections                  |
-| ------------ | --------------------- | --------------------------------- | ----------------------------------- | --------------------------- |
-| Organization | Platform Operator     | Create Organization               | Organization Created                | Organization Already Exists |
-| Resource     | Platform Operator     | Create Resource                   | Resource Created                    | Resource Name Already Used  |
-| Resource     | Resource Owner        | Assign Resource Primary Approver  | Resource Primary Approver Assigned  | —                           |
-| Resource     | Resource Owner        | Open Resource For Requests        | Resource Opened For Requests        | —                           |
-| Resource     | Resource Owner        | Assign Resource Fallback Approver | Resource Fallback Approver Assigned | —                           |
-| Resource     | Resource Owner        | Close Resource For Requests       | Resource Closed For Requests        | —                           |
+| Owner                  | Trigger (actor/event)          | Command                           | Event(s)                            | Rejections                  |
+| ---------------------- | ------------------------------ | --------------------------------- | ----------------------------------- | --------------------------- |
+| Organization           | Platform Operator              | Create Organization               | Organization Created                | Organization Already Exists |
+| Organization           | Platform Operator              | Add Organization Member           | Organization Member Added           | —                           |
+| Resource Creation (PM) | Platform Operator              | Request Resource Creation         | Resource Creation Requested         | Resource Name Already Used  |
+| Resource Creation (PM) | on Resource Creation Requested | Create Resource                   | —                                   | —                           |
+| Resource               | Resource Creation (PM)         | Create Resource                   | Resource Created                    | —                           |
+| Resource Creation (PM) | on Resource Created            | Add Resource                      | —                                   | —                           |
+| Organization           | Resource Creation (PM)         | Add Resource                      | Resource Added                      | —                           |
+| Resource               | Resource Owner                 | Assign Resource Primary Approver  | Resource Primary Approver Assigned  | —                           |
+| Resource               | Resource Owner                 | Assign Resource Fallback Approver | Resource Fallback Approver Assigned | —                           |
+| Resource               | Resource Owner                 | Open Resource For Requests        | Resource Opened For Requests        | —                           |
+| Resource               | Resource Owner                 | Close Resource For Requests       | Resource Closed For Requests        | —                           |
 
-Projection: Resource commands maintain the **Resource Request Policy** read
-model. The disconnected gray annotation reads **Organization member
-management**.
+Process: **Resource Creation** runs `Request Resource Creation → Resource Creation
+Requested → Create Resource → Resource Created → Add Resource → Resource Added`,
+then completes on `Resource Added`.
+
+Projections: **Organization View** receives Organization Created, Organization
+Member Added, and Resource Added; **Resource Catalogue Item** and **Resource
+Request Policy** receive Resource Created and each policy event (Primary/Fallback
+Approver Assigned, Opened/Closed For Requests).
 
 ### Access
 
