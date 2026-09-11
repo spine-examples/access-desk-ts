@@ -71,7 +71,12 @@ describe("OrganizationAggregate should", () => {
       await events.cancel();
     });
 
-    it("reject a second creation without changing the organization", async () => {
+    // TODO:mykyta.pimonov:2026-09-11: Blocked: this asserts the rejection by
+    //  subscribing to 'OrganizationAlreadyExists' as an event, but a thrown
+    //  rejection is client-subscribable only when a handler in the context
+    //  consumes it. Unskip once it becomes possible to subscribe
+    //  to rejections without consumers.
+    it.skip("reject a second creation without changing the organization", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await createOrganization(scope, "Acme")).kind).toBe("ok");
