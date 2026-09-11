@@ -83,6 +83,12 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
 - `pnpm run verify` — build → typecheck → typecheck:tests → lint → test. **This is the gate.**
 - `pnpm run format` / `format:check`.
 
+> After changing a `model` package's contracts, `tsc -b` (incremental) will **not**
+> recompile dependent packages that consume it through `node_modules` — `verify`
+> can go green against stale types. Force-rebuild the dependents (`tsc -b --force`,
+> or delete `dist/` + `*.tsbuildinfo`) before trusting it. See
+> `references/development.md`.
+
 ## Testing model
 
 - BlackBox tests (`@spine-event-engine/testing`) exercise one built context through a
@@ -96,7 +102,32 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
 - Multitenant BlackBox: pass `{ tenant }` to `BlackBox.from`; assert the immediate
   command ack directly and use `box.eventually(...)` only for async read-side visibility.
 
-## Dependencies & the local patch
+## Dependencies
 
-- One exact Spine family pinned at **`@spine-event-engine/* 2.0.0-snapshot.2`** with
-  `@bufbuild/protobuf 2.12.1`. Never invent an API.
+- One exact Spine family pinned at **`@spine-event-engine/* 2.0.0-snapshot.8`** with
+  `@bufbuild/protobuf 2.12.1`. Never invent an API. Keep the whole family on one
+  version; upgrade it together in a dedicated task.
+
+## Conventions
+
+**Documentation is domain-first.** Every doc comment — `.proto` messages and
+fields, and TS entity/handler classes alike — opens with what the thing _is_ in
+the business, not how the software works. A resource is "a protected internal
+source people request access to"; an organization is "the boundary that owns
+resources and grants access within it"; never "stores the aggregate state" or
+"the read-side projection". Framework detail (routing, tenancy, delivery) comes
+after the domain sentence, or is left to the code entirely. A process or workflow
+describes its steps as a numbered list. Proto specifics are in the
+`protobuf-style` skill.
+
+**Copying messages (`clone`).** protobuf-es keeps the _same reference_ when you
+put a message inside another — `create(S, { field: msg })` and `draft.field = msg`
+both alias `msg` — and inbound signals (`this.id`, event/command fields) are
+framework-owned and read-only. `clone(schema, msg)` is the only independent copy.
+Clone **only right before you mutate a borrowed sub-message in place** (e.g. store
+an inbound `event.policy` in state, then bump a field on it). Routing callbacks,
+field reads, producing events/commands with `create(...)`, and one-shot
+`this.update` assignments all consume the value read-only or emit-then-forget, so
+they need **no** clone. Prefer building fresh with `create(...)` over mutating
+borrowed messages. Full scenarios: the `spine-handlers` skill and
+`references/spine-ts.md` (Bounded contexts and handlers).

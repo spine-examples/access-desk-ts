@@ -110,6 +110,15 @@ Expose this dependency-first sequence through repository pnpm scripts once
 scaffolding exists. Generated sources, manifests, registries, declarations, and
 distribution output are never hand-edited.
 
+For one model to import another's `.proto` (e.g. Resources using Identity's
+`PersonId`, or Access referencing Resources types), add the producer package to
+the consumer model's `spine-proto.json` `dependencies` **and** to its
+`package.json` `dependencies`, then `pnpm install`; declare
+transitive proto deps too (Access declares both Resources and Identity).
+Reference cross-package types by full proto path (`access_desk.identity.PersonId`).
+Authored helper TS (e.g. enum-option accessors) lives in a model's `src/`; add
+`src/**/*.ts` to that package's tsconfig `include` and an `exports` subpath.
+
 Keep the entity identifier as the first field of command and entity state when
 the default target is correct. Use exact routing only when the first-field route
 is not the domain target. Put query/sort `(column)` options only on fields
@@ -118,7 +127,15 @@ actually used by application queries.
 Validation failures and domain rejections are different. Define generated
 rejections for valid commands that violate business rules and let the framework
 roll back the transition. Do not implement business rejection as arbitrary
-transport exceptions.
+transport exceptions. **A business rejection acks `ok`, not `error`** — command
+delivery is deferred through the entity inbox, so a thrown generated rejection
+fires asynchronously and never reaches the post outcome. Validation errors ack
+`error` synchronously; business rejections do not. Prove a rejection in BlackBox
+by _no state change_ plus a _fence_: post the offending command (with a
+different payload so a wrongly-accepted write would show), then post a later
+accepted command that creates another entity, `eventually` wait until the fence
+entity is visible (the inbox has drained past the rejected command), and read
+the target once to assert it is unchanged.
 
 ## Bounded contexts and handlers
 
@@ -132,9 +149,64 @@ Projections build query-side state; Process Managers coordinate domestic
 multi-entity workflows. Application handlers return generated messages and do
 not open or commit storage transactions manually.
 
+**Decorator contract** (the first parameter is the trigger signal; the return
+type is what the handler produces). Choosing wrongly costs real time, so pick
+from this table rather than guessing:
+
+| Decorator    | Trigger → produces             | Valid on      | The semantic that bites                                                                                |
+| ------------ | ------------------------------ | ------------- | ------------------------------------------------------------------------------------------------------ |
+| `@Assign`    | command → event(s)             | Aggregate, PM | **Only `@Assign` makes a command postable** (adds it to `acceptedCommandTypes`); must return ≥1 event. |
+| `@Command`   | event **or** command → command | PM            | Command **reaction / substitution**. Does **not** register its trigger as a postable command.          |
+| `@React`     | event → event(s)               | PM            | Domestic event reactor (produces events, never commands).                                              |
+| `@Subscribe` | event → `void` (mutates state) | Projection    | Read-model / process state update; use `External<T>` on the parameter for a cross-context event.       |
+
 Entity inbox replay uses the normal handler path, so effects must be replay-safe.
 Process Manager outputs must not be the only irreplaceable source of a critical
 public fact.
+
+**Default event routing** targets by the event's `producerId` first (when it is
+type-compatible with the consuming entity's id field), then falls back to the
+event's first field. Custom routing is `.add(EntityClass, { eventRouting })` with
+`EventRouting.create<Id>().route(Schema, (event) => [id, …])`. Custom
+`commandRouting` (`.add(EntityClass, { commandRouting })` with
+`CommandRouting.create<Id>().route(Schema, (command) => id)`) works the same way
+and is needed when a command's target-entity id is **not** its first field.
+
+**Message references and copying (`clone`).** protobuf-es never deep-copies a
+nested message: both `create(Schema, { field: msg })` and `draft.field = msg`
+store the _same_ reference as `msg`, and inbound signals (`this.id`, an event's or
+command's fields) are framework-owned and must be treated as read-only.
+`clone(schema, msg)` (from `@bufbuild/protobuf`) is the only call that yields an
+independent copy. The decision is one question: _will this borrowed sub-message be
+mutated in place after I attach it?_
+
+- **No clone** when the value is read-only or emitted-then-forgotten: a command or
+  event routing callback returning an id (`route(Schema, (c) => [c.orgId])` — the
+  framework only reads it to compute the target key), a field read or comparison,
+  producing an event/command with `create(...)` (the message is serialized and
+  emitted, never mutated), or a one-shot `this.update` assignment
+  (`draft.id = event.id ?? this.id`) that is assigned and then returned.
+- **Clone** (or rebuild with `create`) only before you _mutate a borrowed
+  sub-message in place_ — e.g. keeping an inbound `event.policy` in entity state
+  and later bumping a field on it, or assigning a borrowed message into a `draft`
+  and then mutating that same object. The clone severs the shared reference so the
+  in-place edit cannot corrupt the inbound signal or committed state.
+
+Prefer constructing fresh messages with `create(...)` over mutating borrowed ones;
+do that consistently and `clone` is almost never needed. Copies of one-field id
+messages are cheap — the choice is about correctness and clarity, not performance.
+Note: `!` non-null assertions on optional proto fields fail lint
+(`no-non-null-assertion`); guard with `=== undefined` instead, which also handles
+the field-absent case the assertion silently ignores.
+
+**Diagnosing a swallowed command error.** A failed post that is neither a
+validation nor a transition error surfaces as a generic
+`{ type: "COMMAND_POST_ERROR", message: "Command post failed." }` with the real
+error and stack discarded (`ServiceValues.commandPostError` fallback). To see the
+true cause, temporarily log in the `catch` of `#post` in
+`@spine-event-engine/server/dist/services/spine-services.js` (revert after) — do
+not commit or leave `node_modules` edits. This is how the single-field-id and
+`UNSUPPORTED_COMMAND` causes above were found.
 
 ## External events
 
@@ -168,6 +240,14 @@ tenant-aware same-server client. The stored `Any` must not carry credentials or
 establish trusted tenant/actor identity, and cannot select an endpoint, context,
 actor, or tenant. Unknown, incompatible, or unpacking-failed values fail closed
 and never become arbitrary command execution.
+
+**Reading Protobuf enum custom options** (the "enum with `EnumValueOptions`
+extension" pattern): `getOption` from `@bufbuild/protobuf`,
+`getOption(EnumSchema.values.find((v) => v.number === n), extension)`. Comparing
+`v.number` (plain number) to an enum member trips
+`@typescript-eslint/no-unsafe-enum-comparison`; assign the member to a `number`
+local first. Pick an extension field number outside Spine's `73800`–`73971`
+block (Spine leaves `EnumValueOptions` free).
 
 ## Datastore
 
@@ -218,3 +298,21 @@ BlackBox alone does not prove browser behavior, cross-process delivery,
 authentication, Datastore deployment, or multi-context choreography. Those need
 separate integration and end-to-end tests listed in
 `references/architecture.md`.
+
+BlackBox tests import the context from compiled `dist/` (`await
+import("../dist/src/index.js")`) because vitest cannot execute Spine's standard
+decorators from raw TS source; the root `vitest.config.ts` externalizes `dist`
+so handler classes keep the identity the registry registered. Multitenant
+BlackBox: pass `{ tenant }` to `BlackBox.from`.
+
+**Testing an `External<T>` subscription** uses `ThirdPartyContext` (from
+`@spine-event-engine/server`) to stand in for the producing context. In
+`beforeEach`: `resetServerEnvironmentForTest()` (from
+`@spine-event-engine/server/testing`), then
+`ServerEnvironment.when(EnvironmentType.Local).use({ typeRegistry: TypeRegistry.from(producerProtoModule, consumerProtoModule) })`
+— `ThirdPartyContext` resolves emitted event schemas from that registry, else it
+throws `ThirdPartyContext does not know <type>`. Build the consumer with
+`BlackBox.from(ctx, { tenant })` (shares the in-memory broker), then
+`await ThirdPartyContext.multitenant("Producer")` and
+`emittedEvent(create(EventSchema, {...}), actorContext)` with a tenant-bearing
+actor; assert via `box.eventually(query)`.

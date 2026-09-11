@@ -124,20 +124,24 @@ before the affected identity change is considered fully delivered.
 ## Resources and policy ownership
 
 Resources is authoritative for organizations, membership, resources, and
-resource policy. A resource policy includes:
+resource policy. A resource carries descriptive catalogue attributes — its
+identity, description, and category — that describe it for browsing but are not
+access decision rules.
 
-- resource identity, description, category, and sensitivity;
+Its **policy** is the access decision rules that Access consumes, and includes:
+
 - whether new requests are open;
+- the data-sensitivity classification;
 - the resource owner;
 - ordered, resource-specific access levels;
 - maximum permitted duration;
 - primary approver and fallback approver;
 - a monotonically increasing policy version.
 
-Resources publishes complete, versioned policy and membership facts. Access
-maintains local monotonic projections and must not query Resources synchronously
-while deciding a command. Stale or duplicate policy facts cannot roll a local
-projection back.
+Resources publishes complete policy and membership facts; policy facts carry a
+monotonically increasing version. Access maintains local monotonic projections
+and must not query Resources synchronously while deciding a command. Stale or
+duplicate policy facts cannot roll a local projection back.
 
 Closing a resource prevents new requests. Requests already accepted while the
 resource was open remain eligible for decision. The request captures the policy

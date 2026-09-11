@@ -1,0 +1,4 @@
+interface:
+  display_name: "Spine Handlers"
+  short_description: "Choose the right Spine decorator and wire an aggregate, projection, or process manager"
+  default_prompt: "Use $spine-handlers after reading AGENTS.md when implementing or fixing a Spine TS handler under packages/*/server/src, then generate handlers and prove the slice with a BlackBox test."
