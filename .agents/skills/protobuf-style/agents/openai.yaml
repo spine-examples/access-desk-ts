@@ -1,0 +1,4 @@
+interface:
+  display_name: "Protobuf Style"
+  short_description: "Apply Access Desk Protobuf conventions and regenerate code"
+  default_prompt: "Use $protobuf-style after reading AGENTS.md to create or revise an Access Desk Protobuf contract, then regenerate its generated outputs."

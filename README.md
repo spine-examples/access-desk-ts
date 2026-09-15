@@ -10,6 +10,16 @@ approvals, scheduled activation and expiration, and an immutable audit trail.
 
 Under development.
 
+## Development
+
+Prerequisites: Node.js ≥ 24 and pnpm 11.9.
+
+Install the workspace:
+
+```sh
+pnpm install
+```
+
 ## Documentation
 
 - [Product Requirements Document](PRD.md).

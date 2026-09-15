@@ -1,0 +1,16 @@
+{
+  "formatVersion": 2,
+  "generationId": "162606fb-260f-45d7-8984-ef15c5a8dc0a",
+  "packageName": "@access-desk/access-model",
+  "packageVersion": "0.0.0",
+  "protoFiles": [
+    "access_desk/access/empty.proto"
+  ],
+  "generatedExports": {
+    "access_desk/access/empty.proto": "generated/access_desk/access/empty_pb.js"
+  },
+  "dependencies": [
+    "@spine-event-engine/proto"
+  ],
+  "moduleExport": "accessProtoModule"
+}

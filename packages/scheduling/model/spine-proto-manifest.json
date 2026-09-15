@@ -1,0 +1,16 @@
+{
+  "formatVersion": 2,
+  "generationId": "a6ca67bf-f12f-4988-8d2e-88bde2886602",
+  "packageName": "@access-desk/scheduling-model",
+  "packageVersion": "0.0.0",
+  "protoFiles": [
+    "access_desk/scheduling/empty.proto"
+  ],
+  "generatedExports": {
+    "access_desk/scheduling/empty.proto": "generated/access_desk/scheduling/empty_pb.js"
+  },
+  "dependencies": [
+    "@spine-event-engine/proto"
+  ],
+  "moduleExport": "schedulingProtoModule"
+}

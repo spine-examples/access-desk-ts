@@ -35,13 +35,13 @@ runtime baseline is Node.js 24 or newer, pnpm 11.9, strict TypeScript, and ESM.
 
 The system has five bounded contexts:
 
-| Bounded context | Owns | Tenant mode |
-| --- | --- | --- |
-| Identity | Global users, registration, authentication identity, user activity | Global/single-tenant control plane |
-| Resources | Organizations, memberships, resources, ordered access levels, ownership, request policy, approver policy | Organization-scoped |
-| Access | Requests, approval assignment and decisions, grants, extensions, revocation, access-facing projections | Organization-scoped |
-| Scheduling | Durable, universal dispatch of allowlisted application commands | Organization-scoped |
-| Audit | Immutable, redacted audit projections built from durable integration facts | Organization-scoped |
+| Bounded context | Owns                                                                                                     | Tenant mode                        |
+| --------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| Identity        | Global users, registration, authentication identity, user activity                                       | Global/single-tenant control plane |
+| Resources       | Organizations, memberships, resources, ordered access levels, ownership, request policy, approver policy | Organization-scoped                |
+| Access          | Requests, approval assignment and decisions, grants, extensions, revocation, access-facing projections   | Organization-scoped                |
+| Scheduling      | Durable, universal dispatch of allowlisted application commands                                          | Organization-scoped                |
+| Audit           | Immutable, redacted audit projections built from durable integration facts                               | Organization-scoped                |
 
 An initial deployment may co-host all five contexts in one Node.js application.
 Co-location does not weaken the boundaries: each context must have its own model

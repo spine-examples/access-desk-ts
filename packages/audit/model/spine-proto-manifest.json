@@ -1,0 +1,16 @@
+{
+  "formatVersion": 2,
+  "generationId": "0e1f83e9-d592-4c3f-9caf-fe2da3b88ebe",
+  "packageName": "@access-desk/audit-model",
+  "packageVersion": "0.0.0",
+  "protoFiles": [
+    "access_desk/audit/empty.proto"
+  ],
+  "generatedExports": {
+    "access_desk/audit/empty.proto": "generated/access_desk/audit/empty_pb.js"
+  },
+  "dependencies": [
+    "@spine-event-engine/proto"
+  ],
+  "moduleExport": "auditProtoModule"
+}

@@ -9,6 +9,8 @@ audit.
 For substantive implementation, review, or documentation work, start by reading
 the smallest relevant set:
 
+- `.agents/project.md` for the physical project structure — packages, the
+  generate pipeline, commands, the testing model, and conventions.
 - `references/architecture.md` for the canonical architecture and domain
   invariants.
 - `references/event-storming.md` for the current Event Storming model — the
