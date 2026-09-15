@@ -104,7 +104,7 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
 
 ## Dependencies
 
-- One exact Spine family pinned at **`@spine-event-engine/* 2.0.0-snapshot.8`** with
+- One exact Spine family pinned at **`@spine-event-engine/* 2.0.0-snapshot.11`** with
   `@bufbuild/protobuf 2.12.1`. Never invent an API. Keep the whole family on one
   version; upgrade it together in a dedicated task.
 
