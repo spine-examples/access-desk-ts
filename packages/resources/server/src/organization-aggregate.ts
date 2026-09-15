@@ -25,7 +25,7 @@
  */
 
 import { create } from "@bufbuild/protobuf";
-import { Aggregate, Assign } from "@spine-event-engine/server";
+import { Aggregate, Assign, Throws } from "@spine-event-engine/server";
 import { type OrganizationId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
 import {
   type AddOrganizationMember,
@@ -41,7 +41,10 @@ import {
   type ResourceAdded,
 } from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
 import { OrganizationSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_pb.js";
-import { OrganizationMemberSchema } from "@access-desk/resources-model/generated/access_desk/resources/values_pb.js";
+import {
+  OrganizationMemberSchema,
+  OrganizationResourceSchema,
+} from "@access-desk/resources-model/generated/access_desk/resources/values_pb.js";
 import {
   OrganizationAlreadyExists,
   OrganizationMemberAlreadyAdded,
@@ -60,6 +63,7 @@ export class OrganizationAggregate extends Aggregate<
    * Brings the organization into existence, rejecting a second creation.
    */
   @Assign
+  @Throws(OrganizationAlreadyExists)
   createOrganization(command: CreateOrganization): OrganizationCreated {
     if (this.state.name !== "") {
       throw OrganizationAlreadyExists.create({ id: this.id });
@@ -74,6 +78,7 @@ export class OrganizationAggregate extends Aggregate<
    * Makes a person an active member of the organization, at most once each.
    */
   @Assign
+  @Throws(OrganizationMemberAlreadyAdded)
   addOrganizationMember(command: AddOrganizationMember): OrganizationMemberAdded {
     const person = command.person;
     if (person === undefined) {
@@ -107,13 +112,17 @@ export class OrganizationAggregate extends Aggregate<
       throw new Error("AddResource requires a resource id.");
     }
     this.update((draft) => {
-      if (!draft.resource.some((reserved) => reserved.value === resourceId.value)) {
-        draft.resource = [...draft.resource, resourceId];
+      if (!draft.resource.some((reserved) => reserved.id === resourceId)) {
+        draft.resource = [
+          ...draft.resource,
+          create(OrganizationResourceSchema, { id: resourceId, name: command.name }),
+        ];
       }
     });
     return create(ResourceAddedSchema, {
       resourceId,
       organizationId: this.id,
+      name: command.name,
     });
   }
 }

@@ -59,7 +59,7 @@ import {
 } from "./given/resources-integration.js";
 import { type BlackBoxScope } from "@spine-event-engine/testing";
 
-const resourceId = { value: "payroll" };
+const resourceId = { uuid: "payroll" };
 const dana = person("dana");
 const erin = person("erin");
 
@@ -133,7 +133,7 @@ describe("ResourceRequestPolicyProjection should", () => {
       (candidate) => candidate[0]?.policy?.policyVersion === 5n,
     );
     expect(rows).toHaveLength(1);
-    expect(rows[0]?.resource?.value).toBe("payroll");
+    expect(rows[0]?.resource?.uuid).toBe("payroll");
     expect(rows[0]?.policy).toMatchObject({
       openForRequests: false,
       sensitivity: Sensitivity.RESTRICTED,

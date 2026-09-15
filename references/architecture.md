@@ -129,12 +129,18 @@ identity, description, and category — that describe it for browsing but are no
 access decision rules.
 
 Names are display attributes, not identifiers. An organization has a stable
-`OrganizationId` and a resource a stable `ResourceId` slug; the human-readable
-name is separate and may change. Organization names are unique across
-organizations, and resource names are unique within their organization. Both
-comparisons are case-insensitive, so "TeamDev" and "teamdev" denote the same
+`OrganizationId` and a resource a stable, system-generated `ResourceId` UUID; the
+human-readable name is separate and may change. Organization names are unique
+across organizations, and resource names are unique within their organization.
+Both comparisons are case-insensitive, so "TeamDev" and "teamdev" denote the same
 organization. Access levels are named per resource and are likewise unique and
 case-insensitive within that resource.
+
+Resource-name uniqueness is a separate business rule: the Resource Creation process
+reads its organization's resource names from the Organization View and rejects
+`Resource Name Already Used` before creating the resource. That read is eventually
+consistent, so it is a best-effort guard against concurrent creations rather
+than a strict lock.
 
 Its **policy** is the access decision rules that Access consumes, and includes:
 

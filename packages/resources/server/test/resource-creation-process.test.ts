@@ -29,6 +29,10 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ResourceAddedSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
 import { ResourceCreatedSchema } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
 import { ResourceCreationRequestedSchema } from "@access-desk/resources-model/generated/access_desk/resources/resource_creation_events_pb.js";
+import {
+  ResourceAlreadyExistsSchema,
+  ResourceNameAlreadyUsedSchema,
+} from "@access-desk/resources-model/generated/access_desk/resources/rejections_pb.js";
 
 import {
   actor,
@@ -37,9 +41,9 @@ import {
   organizationId,
   resourcesBlackBox,
 } from "./given/resources-context.js";
-import { recordEvents } from "./given/events.js";
+import { expectRejection, recordEvents } from "./given/events.js";
 import { awaitOrganizationView, createOrganization } from "./given/organization.js";
-import { awaitCatalogueItem, requestResourceCreation } from "./given/resource.js";
+import { awaitCatalogueItem, createResource, requestResourceCreation } from "./given/resource.js";
 
 // The process manager is NONE-visibility, so each handler is observed through
 // the domain facts and projections it produces.
@@ -48,42 +52,53 @@ afterEach(closeResourcesBlackBoxes);
 
 describe("ResourceCreationProcessManager should", () => {
   describe("handle 'RequestResourceCreation', and", () => {
-    it("acknowledge the request and emit 'ResourceCreationRequested'", async () => {
+    it("admit a free name and emit 'ResourceCreationRequested'", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       const requested = await recordEvents(scope, ResourceCreationRequestedSchema);
       try {
         expect((await requestResourceCreation(scope, "payroll")).kind).toBe("ok");
-        expect((await requested.waitFor(box)).id?.value).toBe("payroll");
+        expect((await requested.waitFor(box)).id?.uuid).toBe("payroll");
       } finally {
         await requested.cancel();
       }
     });
+
+    it("reject a name already used in the organization", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      expect((await createOrganization(scope)).kind).toBe("ok");
+      expect((await requestResourceCreation(scope, "payroll-1", "Payroll")).kind).toBe("ok");
+      await awaitOrganizationView(box, scope, (view) =>
+        view.resource.some((resource) => resource.id?.uuid === "payroll-1"),
+      );
+
+      await expectRejection(box, scope, ResourceNameAlreadyUsedSchema, () =>
+        requestResourceCreation(scope, "payroll-2", "payroll"),
+      );
+    });
+
+    it("abandon the creation when the resource already exists", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      expect((await createResource(scope, "payroll")).kind).toBe("ok");
+
+      await expectRejection(box, scope, ResourceAlreadyExistsSchema, () =>
+        requestResourceCreation(scope, "payroll"),
+      );
+    });
   });
 
   describe("handle 'ResourceCreationRequested', and", () => {
-    it("create the requested resource and catalogue its initial policy", async () => {
+    it("create the requested resource with its initial policy", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       const created = await recordEvents(scope, ResourceCreatedSchema);
       try {
         expect((await requestResourceCreation(scope, "payroll")).kind).toBe("ok");
-        expect((await created.waitFor(box)).policy?.policyVersion).toBe(1n);
-
-        const item = await awaitCatalogueItem(box, scope, "payroll");
-        expect(item).toMatchObject({
-          id: { value: "payroll" },
-          name: "payroll",
-          description: "Payroll production",
-          category: "application",
-          policy: {
-            openForRequests: false,
-            policyVersion: 1n,
-            owner: { uuid: "owner" },
-            primaryApprover: { uuid: "primary" },
-            fallbackApprover: { uuid: "fallback" },
-          },
-        });
+        const event = await created.waitFor(box);
+        expect(event.id?.uuid).toBe("payroll");
+        expect(event.policy?.policyVersion).toBe(1n);
       } finally {
         await created.cancel();
       }
@@ -95,14 +110,14 @@ describe("ResourceCreationProcessManager should", () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await createOrganization(scope)).kind).toBe("ok");
-      await awaitOrganizationView(box, scope, (view) => view.name === "Acme");
 
       const added = await recordEvents(scope, ResourceAddedSchema);
       try {
         expect((await requestResourceCreation(scope, "payroll")).kind).toBe("ok");
         expect(await added.waitFor(box)).toMatchObject({
           organizationId: { uuid: organizationId },
-          resourceId: { value: "payroll" },
+          resourceId: { uuid: "payroll" },
+          name: "payroll",
         });
       } finally {
         await added.cancel();
@@ -111,26 +126,14 @@ describe("ResourceCreationProcessManager should", () => {
   });
 
   describe("handle 'ResourceAdded', and", () => {
-    // The handler only marks the process deleted, and the manager is
-    // NONE-visibility, so its self-deletion is not directly observable.
-    it("complete once the resource is reserved in its organization", async () => {
+    it("complete once the resource is created and recorded", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await createOrganization(scope)).kind).toBe("ok");
-      await awaitOrganizationView(box, scope, (view) => view.name === "Acme");
 
-      const added = await recordEvents(scope, ResourceAddedSchema);
-      try {
-        expect((await requestResourceCreation(scope, "payroll")).kind).toBe("ok");
-        expect((await added.waitFor(box)).resourceId?.value).toBe("payroll");
-        const views = await awaitOrganizationView(box, scope, (view) =>
-          view.resource.some((resource) => resource.value === "payroll"),
-        );
-        const reserved = views[0]?.resource.filter((resource) => resource.value === "payroll");
-        expect(reserved).toHaveLength(1);
-      } finally {
-        await added.cancel();
-      }
+      expect((await requestResourceCreation(scope, "payroll")).kind).toBe("ok");
+      const item = await awaitCatalogueItem(box, scope, "payroll");
+      expect(item.name).toBe("payroll");
     });
   });
 });

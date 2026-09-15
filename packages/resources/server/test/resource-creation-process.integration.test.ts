@@ -46,7 +46,7 @@ beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
 
 describe("ResourceCreationProcessManager should", () => {
-  it("integrates resource creation from request through organization reservation", async () => {
+  it("integrates resource creation from request through organization recording", async () => {
     const box = await resourcesBlackBox();
     const scope = box.onBehalfOf(actor);
     expect((await createOrganization(scope)).kind).toBe("ok");
@@ -58,22 +58,22 @@ describe("ResourceCreationProcessManager should", () => {
     try {
       expect((await requestResourceCreation(scope, "payroll")).kind).toBe("ok");
 
-      expect((await requested.waitFor(box)).id?.value).toBe("payroll");
+      expect((await requested.waitFor(box)).id?.uuid).toBe("payroll");
       expect((await created.waitFor(box)).policy?.policyVersion).toBe(1n);
       const catalogueItem = await awaitCatalogueItem(box, scope, "payroll");
       expect(catalogueItem).toMatchObject({
-        id: { value: "payroll" },
+        id: { uuid: "payroll" },
         name: "payroll",
         policy: { policyVersion: 1n },
       });
 
-      // The ResourceAdded fact completes the process by reserving the resource
+      // The ResourceAdded fact completes the process by recording the resource
       // in its organization's view.
-      expect((await added.waitFor(box)).resourceId?.value).toBe("payroll");
+      expect((await added.waitFor(box)).resourceId?.uuid).toBe("payroll");
       const views = await awaitOrganizationView(box, scope, (view) =>
-        view.resource.some((resource) => resource.value === "payroll"),
+        view.resource.some((resource) => resource.id?.uuid === "payroll"),
       );
-      expect(views[0]?.resource.some((resource) => resource.value === "payroll")).toBe(true);
+      expect(views[0]?.resource.some((resource) => resource.id?.uuid === "payroll")).toBe(true);
     } finally {
       await Promise.all([requested.cancel(), created.cancel(), added.cancel()]);
     }

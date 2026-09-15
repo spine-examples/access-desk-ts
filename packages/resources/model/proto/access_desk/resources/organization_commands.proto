@@ -68,4 +68,7 @@ message AddResource {
 
   // The resource being recorded.
   ResourceId resource_id = 2 [(required) = true, (validate) = true];
+
+  // The resource's display name.
+  string name = 3 [(required) = true];
 }

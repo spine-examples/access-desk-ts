@@ -32,6 +32,10 @@ import {
   OrganizationMemberAddedSchema,
   ResourceAddedSchema,
 } from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
+import {
+  OrganizationAlreadyExistsSchema,
+  OrganizationMemberAlreadyAddedSchema,
+} from "@access-desk/resources-model/generated/access_desk/resources/organization_rejections_pb.js";
 
 import {
   actor,
@@ -47,7 +51,7 @@ import {
   createOrganization,
   readOrganizationViews,
 } from "./given/organization.js";
-import { recordEvents } from "./given/events.js";
+import { expectRejection, recordEvents } from "./given/events.js";
 
 // The Organization aggregate is NONE-visibility, so each command handler is
 // verified through the fact it publishes.
@@ -70,23 +74,14 @@ describe("OrganizationAggregate should", () => {
       await events.cancel();
     });
 
-    it("reject a second creation without changing the organization", async () => {
+    it("reject a second creation with 'OrganizationAlreadyExists'", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await createOrganization(scope, "Acme")).kind).toBe("ok");
-      await awaitOrganizationView(box, scope, (v) => v.name === "Acme");
 
-      expect((await createOrganization(scope, "Evil")).kind).toBe("ok");
-      // This accepted command fences the rejected duplicate without subscribing
-      // to its rejection, which is not independently client-subscribable.
-      expect((await addOrganizationMember(scope, "maya")).kind).toBe("ok");
-      await awaitOrganizationView(box, scope, (view) =>
-        view.member.some((member) => member.person?.uuid === "maya"),
+      await expectRejection(box, scope, OrganizationAlreadyExistsSchema, () =>
+        createOrganization(scope, "Evil"),
       );
-
-      const views = await readOrganizationViews(scope);
-      expect(views).toHaveLength(1);
-      expect(views[0]).toMatchObject({ name: "Acme", member: [{ person: { uuid: "maya" } }] });
     });
   });
 
@@ -110,36 +105,15 @@ describe("OrganizationAggregate should", () => {
       await events.cancel();
     });
 
-    it("reject a duplicate member without publishing another member-added fact", async () => {
+    it("reject a duplicate member with 'OrganizationMemberAlreadyAdded'", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await createOrganization(scope)).kind).toBe("ok");
       expect((await addOrganizationMember(scope, "maya")).kind).toBe("ok");
-      await awaitOrganizationView(box, scope, (view) =>
-        view.member.some((member) => member.person?.uuid === "maya"),
+
+      await expectRejection(box, scope, OrganizationMemberAlreadyAddedSchema, () =>
+        addOrganizationMember(scope, "maya"),
       );
-
-      const events = await recordEvents(scope, OrganizationMemberAddedSchema);
-      try {
-        expect((await addOrganizationMember(scope, "maya")).kind).toBe("ok");
-        expect((await addOrganizationMember(scope, "dana")).kind).toBe("ok");
-        await events.waitFor(box, (event) => event.person?.uuid === "dana");
-
-        expect(events.received).toEqual([
-          create(OrganizationMemberAddedSchema, {
-            organizationId: { uuid: organizationId },
-            person: { uuid: "dana" },
-            active: true,
-          }),
-        ]);
-        const views = await readOrganizationViews(scope);
-        expect(views[0]?.member).toMatchObject([
-          { person: { uuid: "maya" } },
-          { person: { uuid: "dana" } },
-        ]);
-      } finally {
-        await events.cancel();
-      }
     });
   });
 
@@ -156,7 +130,8 @@ describe("OrganizationAggregate should", () => {
       expect(event).toEqual(
         create(ResourceAddedSchema, {
           organizationId: { uuid: organizationId },
-          resourceId: { value: "payroll" },
+          resourceId: { uuid: "payroll" },
+          name: "payroll",
         }),
       );
       await events.cancel();
@@ -168,22 +143,23 @@ describe("OrganizationAggregate should", () => {
       expect((await createOrganization(scope)).kind).toBe("ok");
       expect((await addResource(scope, "payroll")).kind).toBe("ok");
       await awaitOrganizationView(box, scope, (view) =>
-        view.resource.some((resource) => resource.value === "payroll"),
+        view.resource.some((resource) => resource.id?.uuid === "payroll"),
       );
 
       const events = await recordEvents(scope, ResourceAddedSchema);
       try {
         expect((await addResource(scope, "payroll")).kind).toBe("ok");
-        await events.waitFor(box, (event) => event.resourceId?.value === "payroll");
+        await events.waitFor(box, (event) => event.resourceId?.uuid === "payroll");
 
         expect(events.received).toEqual([
           create(ResourceAddedSchema, {
             organizationId: { uuid: organizationId },
-            resourceId: { value: "payroll" },
+            resourceId: { uuid: "payroll" },
+            name: "payroll",
           }),
         ]);
         const views = await readOrganizationViews(scope);
-        expect(views[0]?.resource).toMatchObject([{ value: "payroll" }]);
+        expect(views[0]?.resource).toMatchObject([{ id: { uuid: "payroll" }, name: "payroll" }]);
         expect(views[0]?.resource).toHaveLength(1);
       } finally {
         await events.cancel();

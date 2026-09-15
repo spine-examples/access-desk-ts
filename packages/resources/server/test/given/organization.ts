@@ -59,12 +59,13 @@ export function addOrganizationMember(scope: BlackBoxScope, person: string) {
 }
 
 /** Posts `AddResource`, recording the resource among the organization's resources. */
-export function addResource(scope: BlackBoxScope, resource: string) {
+export function addResource(scope: BlackBoxScope, resource: string, name: string = resource) {
   return scope.post(
     AddResourceSchema,
     create(AddResourceSchema, {
       organizationId: { uuid: organizationId },
-      resourceId: { value: resource },
+      resourceId: { uuid: resource },
+      name,
     }),
   );
 }

@@ -34,7 +34,7 @@ the board.
 ### Resources
 
 | Owner                  | Trigger (actor/event)          | Command                           | Event(s)                            | Rejections                                  |
-| ---------------------- | ------------------------------ | --------------------------------- | ----------------------------------- |---------------------------------------------|
+| ---------------------- |--------------------------------| --------------------------------- | ----------------------------------- |---------------------------------------------|
 | Organization           | Platform Operator              | Create Organization               | Organization Created                | Organization Already Exists                 |
 | Organization           | Platform Operator              | Add Organization Member           | Organization Member Added           | Organization Member Already Added           |
 | Resource Creation (PM) | Platform Operator              | Request Resource Creation         | Resource Creation Requested         | Resource Name Already Used                  |
@@ -47,9 +47,9 @@ the board.
 | Resource               | Resource Owner                 | Open Resource For Requests        | Resource Opened For Requests        | Resource Already Opened For Requests        |
 | Resource               | Resource Owner                 | Close Resource For Requests       | Resource Closed For Requests        | Resource Already Closed For Requests        |
 
-Process: **Resource Creation** runs `Request Resource Creation → Resource Creation
-Requested → Create Resource → Resource Created → Add Resource → Resource Added`,
-then completes on `Resource Added`.
+Process: **Resource Creation** runs `Request Resource Creation → Resource
+Creation Requested → Create Resource → Resource Created → Add Resource →
+Resource Added`, then completes on `Resource Added`.
 
 Projections: **Organization View** receives Organization Created, Organization
 Member Added, and Resource Added; **Resource Catalogue Item** and **Resource

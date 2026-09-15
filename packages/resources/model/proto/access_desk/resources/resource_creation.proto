@@ -36,13 +36,14 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.access-desk.resources";
 
-// The process of creating a new resource in an organization.
+// The creation of a new resource in an organization.
 //
-// 1. A member requests the resource; if its name is not already taken within the
-//    organization, the request is remembered here.
+// 1. A member requests the resource; the request is admitted only when its name
+//    is not already used by another resource in the organization, and is then
+//    remembered here.
 // 2. The resource is created with the requested policy.
 // 3. The created resource is recorded among the organization's resources.
-// 4. The process is complete.
+// 4. The creation is complete.
 //
 message ResourceCreation {
   option (entity).kind = PROCESS_MANAGER;

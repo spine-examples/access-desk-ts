@@ -130,12 +130,16 @@ roll back the transition. Do not implement business rejection as arbitrary
 transport exceptions. **A business rejection acks `ok`, not `error`** — command
 delivery is deferred through the entity inbox, so a thrown generated rejection
 fires asynchronously and never reaches the post outcome. Validation errors ack
-`error` synchronously; business rejections do not. Prove a rejection in BlackBox
-by _no state change_ plus a _fence_: post the offending command (with a
-different payload so a wrongly-accepted write would show), then post a later
-accepted command that creates another entity, `eventually` wait until the fence
-entity is visible (the inbox has drained past the rejected command), and read
-the target once to assert it is unchanged.
+`error` synchronously; business rejections do not.
+
+**Declare every rejection a command handler may throw with `@Throws(Companion)`**
+— the generated rejection companion, e.g. `@Throws(ResourceNameAlreadyUsed)`, on
+the `@Assign`/`@Command` method. The runtime refuses an *undeclared* thrown
+rejection, so a handler's `@Throws` must list all of them. A declared rejection
+becomes a first-class produced signal, so a client can **subscribe to the
+rejection type directly**. Prove a rejection in BlackBox by subscribing to its type,
+posting the offending command (which still acks `ok`), and asserting the rejection
+is delivered. (`box.assertEvents()` does not include rejection events; subscribe.)
 
 ## Bounded contexts and handlers
 
@@ -163,6 +167,18 @@ from this table rather than guessing:
 Entity inbox replay uses the normal handler path, so effects must be replay-safe.
 Process Manager outputs must not be the only irreplaceable source of a critical
 public fact.
+
+**Async handlers and read-side reads from a Process Manager.** A handler may be
+`async` and return `Promise<Event>`; the runtime awaits it and the generator
+accepts the async form. From inside a Process Manager handler, read a projection
+with the protected `this.select(StateSchema, columns)` query
+(`byId`/`where`/`mask`/`orderBy`/`limit`, then async `read()`/`findById()`/
+`all()`). It is bound only during the handler, uses that signal's actor and
+tenant, is read-only, and is eventually consistent — a best-effort cross-entity
+check, not a lock. Pass `columns` as `{}` for an id-only read. Caveat:
+`findById`/`byId` are typed `EntityQueryIdentifier<Schema>`, which resolves to
+`never` for a message id whose generated field is optional (all of them), so
+either cast the id (`findById(orgId as never)`) or `read()` and match in TS.
 
 **Default event routing** targets by the event's `producerId` first (when it is
 type-compatible with the consuming entity's id field), then falls back to the

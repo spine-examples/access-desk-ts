@@ -25,7 +25,7 @@
  */
 
 import { create } from "@bufbuild/protobuf";
-import { Aggregate, Assign } from "@spine-event-engine/server";
+import { Aggregate, Assign, Throws } from "@spine-event-engine/server";
 import {
   type AssignResourceFallbackApprover,
   type AssignResourcePrimaryApprover,
@@ -73,6 +73,7 @@ export class ResourceAggregate extends Aggregate<ResourceId, typeof ResourceSche
    * Name uniqueness is enforced by the Resource-Creation process, not here.
    */
   @Assign
+  @Throws(ResourceAlreadyExists)
   createResource(command: CreateResource): ResourceCreated {
     if (this.state.name !== "") {
       throw ResourceAlreadyExists.create({ id: this.id });
@@ -115,6 +116,7 @@ export class ResourceAggregate extends Aggregate<ResourceId, typeof ResourceSche
    * the policy version untouched.
    */
   @Assign
+  @Throws(ResourcePrimaryApproverAlreadyAssigned)
   assignResourcePrimaryApprover(
     command: AssignResourcePrimaryApprover,
   ): ResourcePrimaryApproverAssigned {
@@ -133,6 +135,7 @@ export class ResourceAggregate extends Aggregate<ResourceId, typeof ResourceSche
    * the policy version untouched.
    */
   @Assign
+  @Throws(ResourceFallbackApproverAlreadyAssigned)
   assignResourceFallbackApprover(
     command: AssignResourceFallbackApprover,
   ): ResourceFallbackApproverAssigned {
@@ -149,6 +152,7 @@ export class ResourceAggregate extends Aggregate<ResourceId, typeof ResourceSche
    * policy version does not advance on a no-op change.
    */
   @Assign
+  @Throws(ResourceAlreadyOpenedForRequests)
   openResourceForRequests(_command: OpenResourceForRequests): ResourceOpenedForRequests {
     if (this.state.policy?.openForRequests === true) {
       throw ResourceAlreadyOpenedForRequests.create({ id: this.id });
@@ -162,6 +166,7 @@ export class ResourceAggregate extends Aggregate<ResourceId, typeof ResourceSche
    * policy version does not advance on a no-op change.
    */
   @Assign
+  @Throws(ResourceAlreadyClosedForRequests)
   closeResourceForRequests(_command: CloseResourceForRequests): ResourceClosedForRequests {
     if (this.state.policy?.openForRequests === false) {
       throw ResourceAlreadyClosedForRequests.create({ id: this.id });

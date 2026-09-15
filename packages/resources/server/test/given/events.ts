@@ -29,15 +29,16 @@ import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { AnyMessages, TypeUrls } from "@spine-event-engine/core";
 import { TopicIdSchema, TopicSchema, TargetSchema } from "@spine-event-engine/proto/client";
 import { type BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
+import { expect } from "vitest";
 
 import { testActorContext } from "./resources-context.js";
 
 /**
  * A live recording of one event type, delivered to a client subscription.
  *
- * A rejection is an event too, but is only subscribable when the read side
- * observes it (a projection `@Subscribe`s to it); a domain event emitted by a
- * handler is subscribable on its own.
+ * A rejection is an event too. A rejection a command handler declares with
+ * `@Throws` is a first-class produced signal, so it is subscribable on its own
+ * without a read-side consumer, just like any domain event.
  */
 export interface EventRecorder<Event> {
   /** Every event received so far, in delivery order. */
@@ -103,4 +104,34 @@ export async function recordEvents<Schema extends GenMessage<Message>>(
     },
     cancel: () => subscription.cancel(),
   };
+}
+
+/**
+ * Posts a command expected to be rejected, and returns the rejection it produced.
+ *
+ * Subscribes to the rejection type first (a `@Throws`-declared rejection is a
+ * subscribable produced signal), then runs `act`, then waits for the rejection.
+ * The command is acknowledged as `ok`; the refusal is the published rejection,
+ * so this is how a rejection is asserted rather than through the post outcome.
+ *
+ * @param box The BlackBox whose eventual reads back the wait.
+ * @param scope The actor scope that owns the subscription and the command.
+ * @param schema The expected rejection schema.
+ * @param act Triggers the command under test.
+ * @returns The recorded rejection message.
+ */
+export async function expectRejection<Schema extends GenMessage<Message>>(
+  box: BlackBox,
+  scope: BlackBoxScope,
+  schema: Schema,
+  act: () => Promise<unknown>,
+): Promise<MessageShape<Schema>> {
+  const recorder = await recordEvents(scope, schema);
+  try {
+    const outcome = await act();
+    expect(outcome).toMatchObject({ kind: "ok" });
+    return await recorder.waitFor(box);
+  } finally {
+    await recorder.cancel();
+  }
 }

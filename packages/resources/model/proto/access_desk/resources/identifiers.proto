@@ -46,6 +46,5 @@ message OrganizationId {
 // Identifies a resource within exactly one organization.
 message ResourceId {
 
-  // The immutable resource name - a dash-case slug, unique within the organization.
-  string value = 1 [(required) = true];
+  string uuid = 1 [(required) = true];
 }

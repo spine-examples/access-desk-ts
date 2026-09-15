@@ -53,7 +53,7 @@ describe("ResourceCatalogueProjection should", () => {
       expect((await createResource(scope, "payroll")).kind).toBe("ok");
 
       const item = await awaitCatalogueItem(box, scope, "payroll");
-      expect(item.id?.value).toBe("payroll");
+      expect(item.id?.uuid).toBe("payroll");
       expect(item.name).toBe("payroll");
       expect(item.description).toBe("Payroll production");
       expect(item.category).toBe("application");

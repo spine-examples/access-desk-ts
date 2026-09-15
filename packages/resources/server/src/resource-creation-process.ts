@@ -25,7 +25,7 @@
  */
 
 import { create } from "@bufbuild/protobuf";
-import { Assign, Command, ProcessManager, Subscribe } from "@spine-event-engine/server";
+import { Assign, Command, ProcessManager, Subscribe, Throws } from "@spine-event-engine/server";
 import {
   AddResourceSchema,
   type AddResource,
@@ -43,14 +43,24 @@ import {
 } from "@access-desk/resources-model/generated/access_desk/resources/resource_creation_events_pb.js";
 import { type ResourceId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
 import { ResourceCreationSchema } from "@access-desk/resources-model/generated/access_desk/resources/resource_creation_pb.js";
+import { OrganizationViewSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_pb.js";
+import { ResourceNameAlreadyUsed } from "@access-desk/resources-model/generated/access_desk/resources/rejections.js";
+import { type ResourceAlreadyExists } from "@access-desk/resources-model/generated/access_desk/resources/rejections_pb.js";
+
+/** Normalizes a resource name for case-insensitive within-organization comparison. */
+function normalizeName(name: string): string {
+  return name.trim().toLowerCase();
+}
 
 /**
- * The introduction of a new resource into an organization, step by step:
+ * The creation of a new resource in an organization, step by step:
  *
- * 1. A member requests the resource, and the request is stored.
+ * 1. A member requests the resource. The request is admitted only when its name
+ *    is not already used by another resource in the organization; otherwise it
+ *    is rejected with {@link ResourceNameAlreadyUsed}.
  * 2. The resource is created with the requested policy.
  * 3. The created resource is recorded among the organization's resources.
- * 4. The process is complete and deletes itself.
+ * 4. The creation is complete and the process deletes itself.
  */
 export class ResourceCreationProcessManager extends ProcessManager<
   ResourceId,
@@ -58,11 +68,26 @@ export class ResourceCreationProcessManager extends ProcessManager<
   bigint
 > {
   /**
-   * Stores the requested resource and its initial policy, then starts the process
+   * Admits a creation request whose name is free within the organization.
+   *
+   * Reads the organization's own catalogue view to reject a name already used by
+   * another resource before any resource is created. The read is eventually
+   * consistent, so it is a best-effort guard rather than a strict lock.
    */
   @Assign
-  onRequestResourceCreation(command: RequestResourceCreation): ResourceCreationRequested {
-    // TODO:mykyta.pimonov:2026-09-07: Reject with `ResourceNameAlreadyUsed` if the name is already in use.
+  @Throws(ResourceNameAlreadyUsed)
+  async onRequestResourceCreation(
+    command: RequestResourceCreation,
+  ): Promise<ResourceCreationRequested> {
+    const organizationId = command.organizationId;
+    const organization = await this.select(OrganizationViewSchema, {}).findById(organizationId as never);
+    const requestedName = normalizeName(command.name);
+    const nameTaken =
+      organization?.resource.some((resource) => normalizeName(resource.name) === requestedName) ??
+      false;
+    if (nameTaken) {
+      throw ResourceNameAlreadyUsed.create({ id: this.id, name: command.name });
+    }
     this.update((draft) => {
       Object.assign(
         draft,
@@ -85,7 +110,7 @@ export class ResourceCreationProcessManager extends ProcessManager<
   }
 
   /**
-   * Creates the resource with the requested policy once the process starts.
+   * Creates the resource with the requested policy once creation starts.
    */
   @Command
   onResourceCreationRequested(_event: ResourceCreationRequested): CreateResource {
@@ -105,14 +130,23 @@ export class ResourceCreationProcessManager extends ProcessManager<
   }
 
   /**
-   * Records the created resource in its organization.
+   * Records the created resource in its organization, carrying its display name.
    */
   @Command
   onResourceCreated(event: ResourceCreated): AddResource {
     return create(AddResourceSchema, {
       organizationId: this.state.organizationId,
       resourceId: event.id ?? this.id,
+      name: this.state.name,
     });
+  }
+
+  /**
+   * Abandons the creation when the resource already exists, deleting the process.
+   */
+  @Subscribe
+  onResourceAlreadyExists(_rejection: ResourceAlreadyExists): void {
+    this.markDraftDeleted();
   }
 
   /**

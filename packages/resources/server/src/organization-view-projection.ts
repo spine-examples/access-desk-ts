@@ -33,7 +33,10 @@ import {
   type ResourceAdded,
 } from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
 import { OrganizationViewSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_pb.js";
-import { OrganizationMemberSchema } from "@access-desk/resources-model/generated/access_desk/resources/values_pb.js";
+import {
+  OrganizationMemberSchema,
+  OrganizationResourceSchema,
+} from "@access-desk/resources-model/generated/access_desk/resources/values_pb.js";
 
 /**
  * Each organization with its members and the resources it owns.
@@ -86,8 +89,11 @@ export class OrganizationViewProjection extends Projection<
     }
     this.update((draft) => {
       draft.id = event.organizationId ?? this.id;
-      if (!draft.resource.some((existing) => existing.value === resourceId.value)) {
-        draft.resource = [...draft.resource, resourceId];
+      if (!draft.resource.some((existing) => existing.id === resourceId)) {
+        draft.resource = [
+          ...draft.resource,
+          create(OrganizationResourceSchema, { id: resourceId, name: event.name }),
+        ];
       }
     });
   }

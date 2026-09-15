@@ -29,6 +29,7 @@ syntax = "proto3";
 package access_desk.resources;
 
 import "google/protobuf/duration.proto";
+import "access_desk/resources/identifiers.proto";
 import "access_desk/identity/identifiers.proto";
 import "spine/options.proto";
 
@@ -42,6 +43,16 @@ message OrganizationMember {
 
   // Whether the person is currently an active member.
   bool active = 2;
+}
+
+// A resource owned by an organization.
+message OrganizationResource {
+
+  // The owned resource.
+  ResourceId id = 1 [(required) = true, (validate) = true];
+
+  // The resource's display name.
+  string name = 2 [(required) = true];
 }
 
 // A named degree of access that one resource grants.

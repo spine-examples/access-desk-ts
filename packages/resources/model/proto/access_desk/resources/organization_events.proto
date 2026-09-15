@@ -66,4 +66,7 @@ message ResourceAdded {
 
   // The resource that was recorded.
   ResourceId resource_id = 2 [(required) = true, (validate) = true];
+
+  // The recorded resource's display name.
+  string name = 3 [(required) = true];
 }

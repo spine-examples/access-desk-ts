@@ -100,7 +100,7 @@ describe("OrganizationViewProjection should", () => {
       expect((await addResource(scope, "ledger")).kind).toBe("ok");
 
       const [view] = await awaitOrganizationView(box, scope, (v) => v.resource.length === 2);
-      expect(view?.resource.map((resource) => resource.value)).toEqual(["payroll", "ledger"]);
+      expect(view?.resource.map((resource) => resource.id?.uuid)).toEqual(["payroll", "ledger"]);
     });
 
     it("keep a resource listed once when recorded again", async () => {
@@ -113,9 +113,9 @@ describe("OrganizationViewProjection should", () => {
 
       expect((await addResource(scope, "ledger")).kind).toBe("ok");
       const [view] = await awaitOrganizationView(box, scope, (v) =>
-        v.resource.some((resource) => resource.value === "ledger"),
+        v.resource.some((resource) => resource.id?.uuid === "ledger"),
       );
-      expect(view?.resource.map((resource) => resource.value)).toEqual(["payroll", "ledger"]);
+      expect(view?.resource.map((resource) => resource.id?.uuid)).toEqual(["payroll", "ledger"]);
     });
   });
 });

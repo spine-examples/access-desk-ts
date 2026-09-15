@@ -84,22 +84,29 @@ export function createResource(
 ) {
   return scope.post(
     CreateResourceSchema,
-    create(CreateResourceSchema, { id: { value: resource }, ...resourceDraft(overrides) }),
+    create(CreateResourceSchema, { id: { uuid: resource }, ...resourceDraft(overrides) }),
   );
 }
 
-/** Posts `RequestResourceCreation`, the entry point of the creation process. */
+/**
+ * Posts `RequestResourceCreation`, the entry point of the creation process.
+ *
+ * The resource identifier and its display name are separate: `resource` is the
+ * system-generated id, and `name` defaults to it but can differ, so two distinct
+ * resources can be requested under the same name to exercise uniqueness.
+ */
 export function requestResourceCreation(
   scope: BlackBoxScope,
   resource: string,
+  name: string = resource,
   overrides: Partial<ResourceDraft> = {},
 ) {
   return scope.post(
     RequestResourceCreationSchema,
     create(RequestResourceCreationSchema, {
-      id: { value: resource },
+      id: { uuid: resource },
       organizationId: { uuid: organizationId },
-      ...resourceDraft({ name: resource, ...overrides }),
+      ...resourceDraft({ name, ...overrides }),
     }),
   );
 }
@@ -109,7 +116,7 @@ export function assignPrimaryApprover(scope: BlackBoxScope, resource: string, ap
   return scope.post(
     AssignResourcePrimaryApproverSchema,
     create(AssignResourcePrimaryApproverSchema, {
-      id: { value: resource },
+      id: { uuid: resource },
       approver: { uuid: approver },
     }),
   );
@@ -120,7 +127,7 @@ export function assignFallbackApprover(scope: BlackBoxScope, resource: string, a
   return scope.post(
     AssignResourceFallbackApproverSchema,
     create(AssignResourceFallbackApproverSchema, {
-      id: { value: resource },
+      id: { uuid: resource },
       approver: { uuid: approver },
     }),
   );
@@ -130,7 +137,7 @@ export function assignFallbackApprover(scope: BlackBoxScope, resource: string, a
 export function openResource(scope: BlackBoxScope, resource: string) {
   return scope.post(
     OpenResourceForRequestsSchema,
-    create(OpenResourceForRequestsSchema, { id: { value: resource } }),
+    create(OpenResourceForRequestsSchema, { id: { uuid: resource } }),
   );
 }
 
@@ -138,7 +145,7 @@ export function openResource(scope: BlackBoxScope, resource: string) {
 export function closeResource(scope: BlackBoxScope, resource: string) {
   return scope.post(
     CloseResourceForRequestsSchema,
-    create(CloseResourceForRequestsSchema, { id: { value: resource } }),
+    create(CloseResourceForRequestsSchema, { id: { uuid: resource } }),
   );
 }
 
@@ -155,7 +162,7 @@ export async function awaitCatalogueItem(
   accept: (item: ResourceCatalogueItem) => boolean = () => true,
 ): Promise<ResourceCatalogueItem> {
   const matches = (item: ResourceCatalogueItem): boolean =>
-    item.id?.value === resource && accept(item);
+    item.id?.uuid === resource && accept(item);
   const items = await box.eventually(
     () => readCatalogue(scope),
     (rows) => rows.some(matches),

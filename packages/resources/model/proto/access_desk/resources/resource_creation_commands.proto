@@ -36,16 +36,17 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.access-desk.resources";
 
-// Requests creation of a resource, starting the Resource Creation process.
+// Requests creation of a resource in an organization, starting the Resource
+// Creation process.
 //
-// It does not create the resource directly. The process first rejects a
-// duplicate name within the organization, then creates the resource and
-// reserves it in the organization. The carried policy fields become the
-// resource's complete initial policy.
+// It does not create the resource directly. The process first rejects a name
+// already used within the organization, then creates the resource and records
+// it in the organization. The carried policy fields become the resource's
+// complete initial policy.
 //
 message RequestResourceCreation {
 
-  // The requested resource identifier; correlates the whole process.
+  // The identifier for the resource.
   ResourceId id = 1 [(validate) = true];
 
   // The organization the resource belongs to.

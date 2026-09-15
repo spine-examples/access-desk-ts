@@ -54,7 +54,7 @@ message Organization {
   repeated OrganizationMember membership = 3;
 
   // The resources the organization owns.
-  repeated ResourceId resource = 4;
+  repeated OrganizationResource resource = 4;
 }
 
 // An organization together with its members and owned resources, as seen by
@@ -76,5 +76,5 @@ message OrganizationView {
   repeated OrganizationMember member = 3;
 
   // The resources the organization owns.
-  repeated ResourceId resource = 4;
+  repeated OrganizationResource resource = 4;
 }

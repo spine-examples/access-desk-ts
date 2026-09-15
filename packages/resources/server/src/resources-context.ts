@@ -26,6 +26,7 @@
 
 import { BoundedContext, EventRouting } from "@spine-event-engine/server";
 import { ResourceAddedSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
+import { ResourceAlreadyExistsSchema } from "@access-desk/resources-model/generated/access_desk/resources/rejections_pb.js";
 import { type ResourceId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
 import { OrganizationAggregate } from "./organization-aggregate.js";
 import { OrganizationViewProjection } from "./organization-view-projection.js";
@@ -42,12 +43,13 @@ import { ResourceCreationProcessManager } from "./resource-creation-process.js";
  * @returns The assembled Resources bounded context.
  */
 export async function createResourcesContext(): Promise<BoundedContext> {
-  const resourceCreationProcmanRouting = EventRouting.create<ResourceId>().route(
-    ResourceAddedSchema,
-    (event) => {
-      return event.resourceId === undefined ? [] : [event.resourceId];
-    },
-  );
+  const resourceCreationProcmanRouting = EventRouting.create<ResourceId>()
+    .route(ResourceAddedSchema, (event) =>
+      event.resourceId === undefined ? [] : [event.resourceId],
+    )
+    .route(ResourceAlreadyExistsSchema, (rejection) =>
+      rejection.id === undefined ? [] : [rejection.id],
+    );
   const builder = BoundedContext.multitenant("Resources")
     .withGeneratedRegistryRoot(new URL("..", import.meta.url))
     .add(OrganizationAggregate)
