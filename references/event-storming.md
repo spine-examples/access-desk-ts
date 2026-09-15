@@ -33,19 +33,19 @@ the board.
 
 ### Resources
 
-| Owner                  | Trigger (actor/event)          | Command                           | Event(s)                            | Rejections                  |
-| ---------------------- | ------------------------------ | --------------------------------- | ----------------------------------- | --------------------------- |
-| Organization           | Platform Operator              | Create Organization               | Organization Created                | Organization Already Exists |
-| Organization           | Platform Operator              | Add Organization Member           | Organization Member Added           | —                           |
-| Resource Creation (PM) | Platform Operator              | Request Resource Creation         | Resource Creation Requested         | Resource Name Already Used  |
-| Resource Creation (PM) | on Resource Creation Requested | Create Resource                   | —                                   | —                           |
-| Resource               | Resource Creation (PM)         | Create Resource                   | Resource Created                    | —                           |
-| Resource Creation (PM) | on Resource Created            | Add Resource                      | —                                   | —                           |
-| Organization           | Resource Creation (PM)         | Add Resource                      | Resource Added                      | —                           |
-| Resource               | Resource Owner                 | Assign Resource Primary Approver  | Resource Primary Approver Assigned  | —                           |
-| Resource               | Resource Owner                 | Assign Resource Fallback Approver | Resource Fallback Approver Assigned | —                           |
-| Resource               | Resource Owner                 | Open Resource For Requests        | Resource Opened For Requests        | —                           |
-| Resource               | Resource Owner                 | Close Resource For Requests       | Resource Closed For Requests        | —                           |
+| Owner                  | Trigger (actor/event)          | Command                           | Event(s)                            | Rejections                                  |
+| ---------------------- | ------------------------------ | --------------------------------- | ----------------------------------- |---------------------------------------------|
+| Organization           | Platform Operator              | Create Organization               | Organization Created                | Organization Already Exists                 |
+| Organization           | Platform Operator              | Add Organization Member           | Organization Member Added           | Organization Member Already Added           |
+| Resource Creation (PM) | Platform Operator              | Request Resource Creation         | Resource Creation Requested         | Resource Name Already Used                  |
+| Resource Creation (PM) | on Resource Creation Requested | Create Resource                   | —                                   | —                                           |
+| Resource               | Resource Creation (PM)         | Create Resource                   | Resource Created                    | Resource Already Exists                     |
+| Resource Creation (PM) | on Resource Created            | Add Resource                      | —                                   | —                                           |
+| Organization           | Resource Creation (PM)         | Add Resource                      | Resource Added                      | —                                           |
+| Resource               | Resource Owner                 | Assign Resource Primary Approver  | Resource Primary Approver Assigned  | Resource Primary Approver Already Assigned  |
+| Resource               | Resource Owner                 | Assign Resource Fallback Approver | Resource Fallback Approver Assigned | Resource Fallback Approver Already Assigned |
+| Resource               | Resource Owner                 | Open Resource For Requests        | Resource Opened For Requests        | Resource Already Opened For Requests        |
+| Resource               | Resource Owner                 | Close Resource For Requests       | Resource Closed For Requests        | Resource Already Closed For Requests        |
 
 Process: **Resource Creation** runs `Request Resource Creation → Resource Creation
 Requested → Create Resource → Resource Created → Add Resource → Resource Added`,

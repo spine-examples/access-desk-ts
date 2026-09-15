@@ -43,10 +43,11 @@ option (type_url_prefix) = "type.access-desk.resources";
 message Resource {
   option (entity).kind = AGGREGATE;
 
-  // Identifies the resource within its organization.
+  // The resource's stable identity within its organization.
   ResourceId id = 1 [(validate) = true, (set_once) = true];
 
-  // The resource's name, unique within its organization.
+  // The resource's display name, unique within its organization and compared
+  // case-insensitively.
   string name = 2;
 
   // A human-readable summary of what the resource is.
@@ -66,18 +67,19 @@ message ResourceCatalogueItem {
   option (entity).kind = PROJECTION;
   option (entity).visibility = FULL;
 
-  // Identifies the resource within its organization.
+  // The resource's stable identity within its organization.
   ResourceId id = 1 [(validate) = true, (set_once) = true];
 
-  // The resource's name; queryable so a name can be looked up for uniqueness.
+  // The resource's display name, unique within its organization and compared
+  // case-insensitively; queryable so a name can be looked up for uniqueness.
   string name = 2 [(required) = true, (column) = true];
 
   // A human-readable summary of what the resource is.
   string description = 3 [(required) = true];
 
   // The catalogue category the resource is listed under.
-  string category = 5 [(required) = true];
+  string category = 4 [(required) = true];
 
   // The rules that govern access to the resource.
-  ResourcePolicy policy = 6 [(required) = true];
+  ResourcePolicy policy = 5 [(required) = true];
 }

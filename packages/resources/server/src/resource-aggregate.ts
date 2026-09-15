@@ -24,8 +24,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import {create} from "@bufbuild/protobuf";
-import {Aggregate, Assign} from "@spine-event-engine/server";
+import { create } from "@bufbuild/protobuf";
+import { Aggregate, Assign } from "@spine-event-engine/server";
 import {
   type AssignResourceFallbackApprover,
   type AssignResourcePrimaryApprover,
@@ -45,8 +45,15 @@ import {
   type ResourcePrimaryApproverAssigned,
   ResourcePrimaryApproverAssignedSchema,
 } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
-import {type ResourceId} from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
-import {ResourceSchema} from "@access-desk/resources-model/generated/access_desk/resources/resource_pb.js";
+import { type ResourceId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
+import { ResourceSchema } from "@access-desk/resources-model/generated/access_desk/resources/resource_pb.js";
+import {
+  ResourceAlreadyClosedForRequests,
+  ResourceAlreadyExists,
+  ResourceAlreadyOpenedForRequests,
+  ResourceFallbackApproverAlreadyAssigned,
+  ResourcePrimaryApproverAlreadyAssigned,
+} from "@access-desk/resources-model/generated/access_desk/resources/rejections.js";
 import {
   ResourcePolicySchema,
   type ResourcePolicy,
@@ -67,6 +74,9 @@ export class ResourceAggregate extends Aggregate<ResourceId, typeof ResourceSche
    */
   @Assign
   createResource(command: CreateResource): ResourceCreated {
+    if (this.state.name !== "") {
+      throw ResourceAlreadyExists.create({ id: this.id });
+    }
     const policy = create(ResourcePolicySchema, {
       openForRequests: false,
       sensitivity: command.sensitivity,
@@ -78,13 +88,16 @@ export class ResourceAggregate extends Aggregate<ResourceId, typeof ResourceSche
       policyVersion: 1n,
     });
     this.update((draft) => {
-      Object.assign(draft, create(ResourceSchema, {
-        id: command.id,
-        name: command.name,
-        description: command.description,
-        category: command.category,
-        policy
-      }));
+      Object.assign(
+        draft,
+        create(ResourceSchema, {
+          id: command.id,
+          name: command.name,
+          description: command.description,
+          category: command.category,
+          policy,
+        }),
+      );
     });
     return create(ResourceCreatedSchema, {
       id: this.id,
@@ -95,36 +108,66 @@ export class ResourceAggregate extends Aggregate<ResourceId, typeof ResourceSche
     });
   }
 
-  /** Assigns a new primary approver and publishes the complete next policy. */
+  /**
+   * Assigns a new primary approver and publishes the complete next policy.
+   *
+   * Rejects a no-op reassignment of the person already holding the role, leaving
+   * the policy version untouched.
+   */
   @Assign
   assignResourcePrimaryApprover(
     command: AssignResourcePrimaryApprover,
   ): ResourcePrimaryApproverAssigned {
-    const policy = this.nextPolicy({primaryApprover: command.approver});
-    return create(ResourcePrimaryApproverAssignedSchema, {id: this.id, policy});
+    const approver = command.approver;
+    if (approver !== undefined && this.state.policy?.primaryApprover?.uuid === approver.uuid) {
+      throw ResourcePrimaryApproverAlreadyAssigned.create({ id: this.id, approver });
+    }
+    const policy = this.nextPolicy({ primaryApprover: approver });
+    return create(ResourcePrimaryApproverAssignedSchema, { id: this.id, policy });
   }
 
-  /** Assigns a new fallback approver and publishes the complete next policy. */
+  /**
+   * Assigns a new fallback approver and publishes the complete next policy.
+   *
+   * Rejects a no-op reassignment of the person already holding the role, leaving
+   * the policy version untouched.
+   */
   @Assign
   assignResourceFallbackApprover(
     command: AssignResourceFallbackApprover,
   ): ResourceFallbackApproverAssigned {
-    const policy = this.nextPolicy({fallbackApprover: command.approver});
-    return create(ResourceFallbackApproverAssignedSchema, {id: this.id, policy});
+    const approver = command.approver;
+    if (approver !== undefined && this.state.policy?.fallbackApprover?.uuid === approver.uuid) {
+      throw ResourceFallbackApproverAlreadyAssigned.create({ id: this.id, approver });
+    }
+    const policy = this.nextPolicy({ fallbackApprover: approver });
+    return create(ResourceFallbackApproverAssignedSchema, { id: this.id, policy });
   }
 
-  /** Opens the resource. */
+  /**
+   * Opens the resource, rejecting the command when it is already open so the
+   * policy version does not advance on a no-op change.
+   */
   @Assign
   openResourceForRequests(_command: OpenResourceForRequests): ResourceOpenedForRequests {
-    const policy = this.nextPolicy({openForRequests: true});
-    return create(ResourceOpenedForRequestsSchema, {id: this.id, policy});
+    if (this.state.policy?.openForRequests === true) {
+      throw ResourceAlreadyOpenedForRequests.create({ id: this.id });
+    }
+    const policy = this.nextPolicy({ openForRequests: true });
+    return create(ResourceOpenedForRequestsSchema, { id: this.id, policy });
   }
 
-  /** Closes the resource. */
+  /**
+   * Closes the resource, rejecting the command when it is already closed so the
+   * policy version does not advance on a no-op change.
+   */
   @Assign
   closeResourceForRequests(_command: CloseResourceForRequests): ResourceClosedForRequests {
-    const policy = this.nextPolicy({openForRequests: false});
-    return create(ResourceClosedForRequestsSchema, {id: this.id, policy});
+    if (this.state.policy?.openForRequests === false) {
+      throw ResourceAlreadyClosedForRequests.create({ id: this.id });
+    }
+    const policy = this.nextPolicy({ openForRequests: false });
+    return create(ResourceClosedForRequestsSchema, { id: this.id, policy });
   }
 
   private nextPolicy(change: PolicyChange): ResourcePolicy {
@@ -140,7 +183,7 @@ export class ResourceAggregate extends Aggregate<ResourceId, typeof ResourceSche
       ...change,
       policyVersion: current.policyVersion + 1n,
     });
-    this.update((draft) => draft.policy = policy);
+    this.update((draft) => (draft.policy = policy));
     return policy;
   }
 }

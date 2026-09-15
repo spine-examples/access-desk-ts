@@ -29,9 +29,17 @@ syntax = "proto3";
 package access_desk.resources;
 
 import "access_desk/resources/identifiers.proto";
+import "access_desk/identity/identifiers.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.access-desk.resources";
+
+// A resource that already exists.
+message ResourceAlreadyExists {
+
+  // The resource that already exists.
+  ResourceId id = 1 [(required) = true, (validate) = true];
+}
 
 // A resource name already allocated within an organization.
 message ResourceNameAlreadyUsed {
@@ -41,4 +49,42 @@ message ResourceNameAlreadyUsed {
 
   // The already-allocated resource name.
   string name = 2 [(required) = true];
+}
+
+// The resource already accepts new access requests,
+// so opening it again is refused and its policy version is left unchanged.
+message ResourceAlreadyOpenedForRequests {
+
+  // The resource that is already open.
+  ResourceId id = 1 [(required) = true, (validate) = true];
+}
+
+// The resource already rejects new access requests,
+// so closing it again is refused and its policy version is left unchanged.
+message ResourceAlreadyClosedForRequests {
+
+  // The resource that is already closed.
+  ResourceId id = 1 [(required) = true, (validate) = true];
+}
+
+// The named person is already the resource's primary approver,
+// so assigning them again is refused and its policy version is left unchanged.
+message ResourcePrimaryApproverAlreadyAssigned {
+
+  // The resource whose primary approver is unchanged.
+  ResourceId id = 1 [(required) = true, (validate) = true];
+
+  // The person already assigned as the primary approver.
+  access_desk.identity.PersonId approver = 2 [(required) = true, (validate) = true];
+}
+
+// The named person is already the resource's fallback approver,
+// so assigning them again is refused and its policy version is left unchanged.
+message ResourceFallbackApproverAlreadyAssigned {
+
+  // The resource whose fallback approver is unchanged.
+  ResourceId id = 1 [(required) = true, (validate) = true];
+
+  // The person already assigned as the fallback approver.
+  access_desk.identity.PersonId approver = 2 [(required) = true, (validate) = true];
 }

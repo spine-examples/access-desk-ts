@@ -79,6 +79,32 @@ describe("ResourceAggregate should", () => {
       });
       await events.cancel();
     });
+
+    it("reject a duplicate creation without resetting the original policy", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      expect((await createResource(scope, "payroll")).kind).toBe("ok");
+
+      const opened = await recordEvents(scope, ResourceOpenedForRequestsSchema);
+      expect((await openResource(scope, "payroll")).kind).toBe("ok");
+      await opened.waitFor(box);
+
+      const duplicateCreates = await recordEvents(scope, ResourceCreatedSchema);
+      const closed = await recordEvents(scope, ResourceClosedForRequestsSchema);
+      try {
+        expect(
+          (await createResource(scope, "payroll", { description: "Replacement payroll" })).kind,
+        ).toBe("ok");
+        expect((await closeResource(scope, "payroll")).kind).toBe("ok");
+
+        const event = await closed.waitFor(box);
+        expect(event.policy?.policyVersion).toBe(3n);
+        expect(event.policy?.openForRequests).toBe(false);
+        expect(duplicateCreates.received).toHaveLength(0);
+      } finally {
+        await Promise.all([opened.cancel(), duplicateCreates.cancel(), closed.cancel()]);
+      }
+    });
   });
 
   describe("handle 'AssignResourcePrimaryApprover', and", () => {
@@ -98,6 +124,28 @@ describe("ResourceAggregate should", () => {
       expect(event.policy?.sensitivity).toBe(Sensitivity.RESTRICTED);
       await events.cancel();
     });
+
+    it("reject reassigning the current primary approver without advancing the policy", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      expect((await createResource(scope, "payroll")).kind).toBe("ok");
+      const assigned = await recordEvents(scope, ResourcePrimaryApproverAssignedSchema);
+      const opened = await recordEvents(scope, ResourceOpenedForRequestsSchema);
+      try {
+        expect((await assignPrimaryApprover(scope, "payroll", "dana")).kind).toBe("ok");
+        await assigned.waitFor(box);
+
+        // A rejection still acks "ok" and is not independently client-subscribable,
+        // so the no-op is fenced by a real change that must land at version three;
+        // the repeated assignment must not have advanced the policy past two.
+        expect((await assignPrimaryApprover(scope, "payroll", "dana")).kind).toBe("ok");
+        expect((await openResource(scope, "payroll")).kind).toBe("ok");
+        expect((await opened.waitFor(box)).policy?.policyVersion).toBe(3n);
+        expect(assigned.received).toHaveLength(1);
+      } finally {
+        await Promise.all([assigned.cancel(), opened.cancel()]);
+      }
+    });
   });
 
   describe("handle 'AssignResourceFallbackApprover', and", () => {
@@ -116,6 +164,28 @@ describe("ResourceAggregate should", () => {
       expect(event.policy?.sensitivity).toBe(Sensitivity.RESTRICTED);
       await events.cancel();
     });
+
+    it("reject reassigning the current fallback approver without advancing the policy", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      expect((await createResource(scope, "payroll")).kind).toBe("ok");
+      const assigned = await recordEvents(scope, ResourceFallbackApproverAssignedSchema);
+      const opened = await recordEvents(scope, ResourceOpenedForRequestsSchema);
+      try {
+        expect((await assignFallbackApprover(scope, "payroll", "erin")).kind).toBe("ok");
+        await assigned.waitFor(box);
+
+        // A rejection still acks "ok" and is not independently client-subscribable,
+        // so the no-op is fenced by a real change that must land at version three;
+        // the repeated assignment must not have advanced the policy past two.
+        expect((await assignFallbackApprover(scope, "payroll", "erin")).kind).toBe("ok");
+        expect((await openResource(scope, "payroll")).kind).toBe("ok");
+        expect((await opened.waitFor(box)).policy?.policyVersion).toBe(3n);
+        expect(assigned.received).toHaveLength(1);
+      } finally {
+        await Promise.all([assigned.cancel(), opened.cancel()]);
+      }
+    });
   });
 
   describe("handle 'OpenResourceForRequests', and", () => {
@@ -132,6 +202,28 @@ describe("ResourceAggregate should", () => {
       expect(event.policy?.policyVersion).toBe(2n);
       expect(event.policy?.openForRequests).toBe(true);
       await events.cancel();
+    });
+
+    it("reject opening an already-open resource without advancing the policy", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      expect((await createResource(scope, "payroll")).kind).toBe("ok");
+      const opened = await recordEvents(scope, ResourceOpenedForRequestsSchema);
+      const assigned = await recordEvents(scope, ResourcePrimaryApproverAssignedSchema);
+      try {
+        expect((await openResource(scope, "payroll")).kind).toBe("ok");
+        await opened.waitFor(box);
+
+        // A rejection still acks "ok" and is not independently client-subscribable,
+        // so the no-op is fenced by a real change that must land at version three;
+        // had the second open advanced the policy it would already be at three.
+        expect((await openResource(scope, "payroll")).kind).toBe("ok");
+        expect((await assignPrimaryApprover(scope, "payroll", "dana")).kind).toBe("ok");
+        expect((await assigned.waitFor(box)).policy?.policyVersion).toBe(3n);
+        expect(opened.received).toHaveLength(1);
+      } finally {
+        await Promise.all([opened.cancel(), assigned.cancel()]);
+      }
     });
   });
 
@@ -150,6 +242,26 @@ describe("ResourceAggregate should", () => {
       expect(event.policy?.policyVersion).toBe(3n);
       expect(event.policy?.openForRequests).toBe(false);
       await events.cancel();
+    });
+
+    it("reject closing an already-closed resource without advancing the policy", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      // A freshly created resource is already closed.
+      expect((await createResource(scope, "payroll")).kind).toBe("ok");
+      const closed = await recordEvents(scope, ResourceClosedForRequestsSchema);
+      const assigned = await recordEvents(scope, ResourcePrimaryApproverAssignedSchema);
+      try {
+        // A rejection still acks "ok" and is not independently client-subscribable,
+        // so the no-op is fenced by a real change that must land at version two;
+        // had the redundant close advanced the policy it would already be at two.
+        expect((await closeResource(scope, "payroll")).kind).toBe("ok");
+        expect((await assignPrimaryApprover(scope, "payroll", "dana")).kind).toBe("ok");
+        expect((await assigned.waitFor(box)).policy?.policyVersion).toBe(2n);
+        expect(closed.received).toHaveLength(0);
+      } finally {
+        await Promise.all([closed.cancel(), assigned.cancel()]);
+      }
     });
   });
 });

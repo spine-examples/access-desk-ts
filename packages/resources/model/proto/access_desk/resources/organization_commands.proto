@@ -45,7 +45,8 @@ message CreateOrganization {
   // The identifier of the organization to create.
   OrganizationId id = 1 [(validate) = true];
 
-  // The human-readable organization name.
+  // The human-readable organization name, unique across organizations and
+  // compared case-insensitively.
   string name = 2 [(required) = true];
 }
 

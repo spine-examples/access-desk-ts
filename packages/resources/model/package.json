@@ -10,10 +10,6 @@
     },
     "./spine-proto-manifest.json": "./spine-proto-manifest.json",
     "./proto/*": "./proto/*",
-    "./access-level": {
-      "types": "./dist/src/access-level.d.ts",
-      "default": "./dist/src/access-level.js"
-    },
     "./generated/*.js": {
       "types": "./dist/generated/*.d.ts",
       "default": "./dist/generated/*.js"

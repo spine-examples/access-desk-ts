@@ -39,8 +39,11 @@ import {
   ResourceCatalogueItemSchema,
   type ResourceCatalogueItem,
 } from "@access-desk/resources-model/generated/access_desk/resources/resource_pb.js";
-import { AccessLevel } from "@access-desk/resources-model/generated/access_desk/resources/access_level_pb.js";
-import { Sensitivity } from "@access-desk/resources-model/generated/access_desk/resources/values_pb.js";
+import {
+  AccessLevelSchema,
+  Sensitivity,
+  type AccessLevel,
+} from "@access-desk/resources-model/generated/access_desk/resources/values_pb.js";
 
 import { organizationId, readAll } from "./resources-context.js";
 
@@ -64,7 +67,7 @@ export function resourceDraft(overrides: Partial<ResourceDraft> = {}): ResourceD
     description: "Payroll production",
     category: "application",
     sensitivity: Sensitivity.RESTRICTED,
-    accessLevel: [AccessLevel.READ],
+    accessLevel: [create(AccessLevelSchema, { name: "Read", rank: 1 })],
     maximumDuration: { seconds: 3600n },
     owner: { uuid: "owner" },
     primaryApprover: { uuid: "primary" },

@@ -24,6 +24,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+import { create } from "@bufbuild/protobuf";
 import { Projection, Subscribe } from "@spine-event-engine/server";
 import { type OrganizationId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
 import {
@@ -32,6 +33,7 @@ import {
   type ResourceAdded,
 } from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
 import { OrganizationViewSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_pb.js";
+import { OrganizationMemberSchema } from "@access-desk/resources-model/generated/access_desk/resources/values_pb.js";
 
 /**
  * Each organization with its members and the resources it owns.
@@ -39,7 +41,7 @@ import { OrganizationViewSchema } from "@access-desk/resources-model/generated/a
 export class OrganizationViewProjection extends Projection<
   OrganizationId,
   typeof OrganizationViewSchema,
-  number
+  bigint
 > {
   /**
    * Records one organization in the catalogue view.
@@ -54,7 +56,7 @@ export class OrganizationViewProjection extends Projection<
   }
 
   /**
-   * Adds one member to the organization view.
+   * Adds one member to the organization view, with their membership status.
    */
   @Subscribe
   onOrganizationMemberAdded(event: OrganizationMemberAdded): void {
@@ -64,8 +66,11 @@ export class OrganizationViewProjection extends Projection<
     }
     this.update((draft) => {
       draft.id = event.organizationId ?? this.id;
-      if (!draft.member.some((existing) => existing.uuid === person.uuid)) {
-        draft.member = [...draft.member, person];
+      if (!draft.member.some((existing) => existing.person?.uuid === person.uuid)) {
+        draft.member = [
+          ...draft.member,
+          create(OrganizationMemberSchema, { person, active: event.active }),
+        ];
       }
     });
   }

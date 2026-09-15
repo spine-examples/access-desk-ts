@@ -69,7 +69,9 @@ describe("OrganizationViewProjection should", () => {
       expect((await addOrganizationMember(scope, "noah")).kind).toBe("ok");
 
       const [view] = await awaitOrganizationView(box, scope, (v) => v.member.length === 2);
-      expect(view?.member.map((person) => person.uuid)).toEqual(["maya", "noah"]);
+      expect(view?.member.map((member) => member.person?.uuid)).toEqual(["maya", "noah"]);
+      // Every newly added member is recorded as active.
+      expect(view?.member.every((member) => member.active)).toBe(true);
     });
 
     it("keep a member listed once when added again", async () => {
@@ -82,9 +84,9 @@ describe("OrganizationViewProjection should", () => {
 
       expect((await addOrganizationMember(scope, "noah")).kind).toBe("ok");
       const [view] = await awaitOrganizationView(box, scope, (v) =>
-        v.member.some((person) => person.uuid === "noah"),
+        v.member.some((member) => member.person?.uuid === "noah"),
       );
-      expect(view?.member.map((person) => person.uuid)).toEqual(["maya", "noah"]);
+      expect(view?.member.map((member) => member.person?.uuid)).toEqual(["maya", "noah"]);
     });
   });
 

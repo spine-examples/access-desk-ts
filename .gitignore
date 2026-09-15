@@ -18,6 +18,8 @@ packages/*/generated/
 packages/*/*/generated/
 packages/*/.generated*/generated/
 packages/*/*/.generated*/generated/
+packages/*/.generated.stage-*/
+packages/*/*/.generated.stage-*/
 .spine-proto-generation.json
 .spine-proto-generate.lock.*
 
@@ -42,5 +44,3 @@ yarn-error.log*
 # --- OS ---
 .DS_Store
 Thumbs.db
-/packages/access/model/.generated.stage-lnGAzr/
-/packages/access/model/.generated.stage-QJWClf/

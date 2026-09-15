@@ -33,7 +33,7 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.access-desk.resources";
 
-// A request to add a resource to an organization was accepted.
+// A request to create a resource in an organization was accepted.
 message ResourceCreationRequested {
 
   // The resource whose creation was requested.

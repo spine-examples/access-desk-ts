@@ -42,10 +42,12 @@ import { ResourceCreationProcessManager } from "./resource-creation-process.js";
  * @returns The assembled Resources bounded context.
  */
 export async function createResourcesContext(): Promise<BoundedContext> {
-  const resourceCreationProcmanRouting = EventRouting.create<ResourceId>()
-    .route(ResourceAddedSchema, (event) => {
-      return event.resourceId === undefined ? [] : [event.resourceId]
-    });
+  const resourceCreationProcmanRouting = EventRouting.create<ResourceId>().route(
+    ResourceAddedSchema,
+    (event) => {
+      return event.resourceId === undefined ? [] : [event.resourceId];
+    },
+  );
   const builder = BoundedContext.multitenant("Resources")
     .withGeneratedRegistryRoot(new URL("..", import.meta.url))
     .add(OrganizationAggregate)

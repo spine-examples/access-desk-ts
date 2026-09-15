@@ -29,8 +29,8 @@ import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { SignalMetadata, ThirdPartyContext } from "@spine-event-engine/server";
 import { type ActorContext, TenantIdSchema, UserIdSchema } from "@spine-event-engine/proto";
 
-import { AccessLevel } from "@access-desk/resources-model/generated/access_desk/resources/access_level_pb.js";
 import {
+  AccessLevelSchema,
   ResourcePolicySchema,
   Sensitivity,
   type ResourcePolicy,
@@ -60,7 +60,7 @@ export function resourcePolicy(
     openForRequests: false,
     sensitivity: Sensitivity.RESTRICTED,
     owner: { uuid: "owner" },
-    accessLevel: [AccessLevel.READ],
+    accessLevel: [create(AccessLevelSchema, { name: "Read", rank: 1 })],
     maximumDuration: { seconds: 3600n },
     primaryApprover: { uuid: "primary" },
     fallbackApprover: { uuid: "fallback" },

@@ -32,7 +32,6 @@ import {
   OrganizationMemberAddedSchema,
   ResourceAddedSchema,
 } from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
-import { OrganizationAlreadyExistsSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_rejections_pb.js";
 
 import {
   actor,
@@ -71,28 +70,23 @@ describe("OrganizationAggregate should", () => {
       await events.cancel();
     });
 
-    // TODO:mykyta.pimonov:2026-09-11: Blocked: this asserts the rejection by
-    //  subscribing to 'OrganizationAlreadyExists' as an event, but a thrown
-    //  rejection is client-subscribable only when a handler in the context
-    //  consumes it. Unskip once it becomes possible to subscribe
-    //  to rejections without consumers.
-    it.skip("reject a second creation without changing the organization", async () => {
+    it("reject a second creation without changing the organization", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await createOrganization(scope, "Acme")).kind).toBe("ok");
       await awaitOrganizationView(box, scope, (v) => v.name === "Acme");
 
-      const rejections = await recordEvents(scope, OrganizationAlreadyExistsSchema);
       expect((await createOrganization(scope, "Evil")).kind).toBe("ok");
-      const rejection = await rejections.waitFor(box);
-      expect(rejection).toEqual(
-        create(OrganizationAlreadyExistsSchema, { id: { uuid: organizationId } }),
+      // This accepted command fences the rejected duplicate without subscribing
+      // to its rejection, which is not independently client-subscribable.
+      expect((await addOrganizationMember(scope, "maya")).kind).toBe("ok");
+      await awaitOrganizationView(box, scope, (view) =>
+        view.member.some((member) => member.person?.uuid === "maya"),
       );
-      await rejections.cancel();
 
       const views = await readOrganizationViews(scope);
       expect(views).toHaveLength(1);
-      expect(views[0]?.name).toBe("Acme");
+      expect(views[0]).toMatchObject({ name: "Acme", member: [{ person: { uuid: "maya" } }] });
     });
   });
 
@@ -115,6 +109,38 @@ describe("OrganizationAggregate should", () => {
       );
       await events.cancel();
     });
+
+    it("reject a duplicate member without publishing another member-added fact", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      expect((await createOrganization(scope)).kind).toBe("ok");
+      expect((await addOrganizationMember(scope, "maya")).kind).toBe("ok");
+      await awaitOrganizationView(box, scope, (view) =>
+        view.member.some((member) => member.person?.uuid === "maya"),
+      );
+
+      const events = await recordEvents(scope, OrganizationMemberAddedSchema);
+      try {
+        expect((await addOrganizationMember(scope, "maya")).kind).toBe("ok");
+        expect((await addOrganizationMember(scope, "dana")).kind).toBe("ok");
+        await events.waitFor(box, (event) => event.person?.uuid === "dana");
+
+        expect(events.received).toEqual([
+          create(OrganizationMemberAddedSchema, {
+            organizationId: { uuid: organizationId },
+            person: { uuid: "dana" },
+            active: true,
+          }),
+        ]);
+        const views = await readOrganizationViews(scope);
+        expect(views[0]?.member).toMatchObject([
+          { person: { uuid: "maya" } },
+          { person: { uuid: "dana" } },
+        ]);
+      } finally {
+        await events.cancel();
+      }
+    });
   });
 
   describe("handle 'AddResource', and", () => {
@@ -134,6 +160,34 @@ describe("OrganizationAggregate should", () => {
         }),
       );
       await events.cancel();
+    });
+
+    it("emit a duplicate resource-added fact without duplicating organization state", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      expect((await createOrganization(scope)).kind).toBe("ok");
+      expect((await addResource(scope, "payroll")).kind).toBe("ok");
+      await awaitOrganizationView(box, scope, (view) =>
+        view.resource.some((resource) => resource.value === "payroll"),
+      );
+
+      const events = await recordEvents(scope, ResourceAddedSchema);
+      try {
+        expect((await addResource(scope, "payroll")).kind).toBe("ok");
+        await events.waitFor(box, (event) => event.resourceId?.value === "payroll");
+
+        expect(events.received).toEqual([
+          create(ResourceAddedSchema, {
+            organizationId: { uuid: organizationId },
+            resourceId: { value: "payroll" },
+          }),
+        ]);
+        const views = await readOrganizationViews(scope);
+        expect(views[0]?.resource).toMatchObject([{ value: "payroll" }]);
+        expect(views[0]?.resource).toHaveLength(1);
+      } finally {
+        await events.cancel();
+      }
     });
   });
 });

@@ -30,7 +30,6 @@ package access_desk.resources;
 
 import "google/protobuf/duration.proto";
 import "access_desk/resources/identifiers.proto";
-import "access_desk/resources/access_level.proto";
 import "access_desk/resources/values.proto";
 import "access_desk/identity/identifiers.proto";
 import "spine/options.proto";

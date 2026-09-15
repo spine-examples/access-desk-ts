@@ -1,10 +1,9 @@
 {
   "formatVersion": 2,
-  "generationId": "4c2f3b4d-47ed-47bc-b4ca-944b61887bab",
+  "generationId": "1e8320f5-121a-4f44-91e7-a53d8cea4cb3",
   "packageName": "@access-desk/resources-model",
   "packageVersion": "0.0.0",
   "protoFiles": [
-    "access_desk/resources/access_level.proto",
     "access_desk/resources/commands.proto",
     "access_desk/resources/events.proto",
     "access_desk/resources/identifiers.proto",
@@ -20,7 +19,6 @@
     "access_desk/resources/values.proto"
   ],
   "generatedExports": {
-    "access_desk/resources/access_level.proto": "generated/access_desk/resources/access_level_pb.js",
     "access_desk/resources/commands.proto": "generated/access_desk/resources/commands_pb.js",
     "access_desk/resources/events.proto": "generated/access_desk/resources/events_pb.js",
     "access_desk/resources/identifiers.proto": "generated/access_desk/resources/identifiers_pb.js",

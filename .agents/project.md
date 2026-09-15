@@ -92,7 +92,7 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
 ## Testing model
 
 - BlackBox tests (`@spine-event-engine/testing`) exercise one built context through a
-  local server and the public client. They live in `packages/<ctx>/server/test/*.blackbox.test.ts`.
+  local server and the public client. They live in `packages/<ctx>/server/test/*.test.ts`.
 - **They import the context from compiled `dist/`** (`await import("../dist/src/index.js")`)
   because vitest cannot execute Spine's standard decorators from raw TypeScript source.
 - The **root `vitest.config.ts`** is the only vitest config: it includes all packages'

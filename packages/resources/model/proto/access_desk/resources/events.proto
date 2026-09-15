@@ -40,7 +40,8 @@ message ResourceCreated {
   // The created resource.
   ResourceId id = 1 [(required) = true, (validate) = true];
 
-  // The resource name.
+  // The resource's display name, unique within the organization and compared
+  // case-insensitively.
   string name = 2 [(required) = true];
 
   // The resource description.

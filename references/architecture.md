@@ -128,6 +128,14 @@ resource policy. A resource carries descriptive catalogue attributes — its
 identity, description, and category — that describe it for browsing but are not
 access decision rules.
 
+Names are display attributes, not identifiers. An organization has a stable
+`OrganizationId` and a resource a stable `ResourceId` slug; the human-readable
+name is separate and may change. Organization names are unique across
+organizations, and resource names are unique within their organization. Both
+comparisons are case-insensitive, so "TeamDev" and "teamdev" denote the same
+organization. Access levels are named per resource and are likewise unique and
+case-insensitive within that resource.
+
 Its **policy** is the access decision rules that Access consumes, and includes:
 
 - whether new requests are open;

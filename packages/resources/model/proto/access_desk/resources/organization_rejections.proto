@@ -29,6 +29,7 @@ syntax = "proto3";
 package access_desk.resources;
 
 import "access_desk/resources/identifiers.proto";
+import "access_desk/identity/identifiers.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.access-desk.resources";
@@ -37,5 +38,15 @@ option (type_url_prefix) = "type.access-desk.resources";
 message OrganizationAlreadyExists {
 
   // The organization that already exists.
-  OrganizationId id = 1 [(required) = true];
+  OrganizationId id = 1 [(required) = true, (validate) = true];
+}
+
+// A person who is already an active member of an organization.
+message OrganizationMemberAlreadyAdded {
+
+  // The organization where the person is already a member.
+  OrganizationId organization_id = 1 [(required) = true, (validate) = true];
+
+  // The person who is already a member.
+  access_desk.identity.PersonId person = 2 [(required) = true, (validate) = true];
 }

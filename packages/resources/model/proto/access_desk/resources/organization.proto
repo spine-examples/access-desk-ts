@@ -30,7 +30,6 @@ package access_desk.resources;
 
 import "access_desk/resources/identifiers.proto";
 import "access_desk/resources/values.proto";
-import "access_desk/identity/identifiers.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.access-desk.resources";
@@ -47,7 +46,8 @@ message Organization {
   // Identifies the organization.
   OrganizationId id = 1 [(validate) = true, (set_once) = true];
 
-  // The organization's display name.
+  // The organization's display name, unique across organizations and compared
+  // case-insensitively.
   string name = 2 [(required) = true];
 
   // The people who belong to the organization.
@@ -67,11 +67,13 @@ message OrganizationView {
   // Identifies the organization.
   OrganizationId id = 1 [(validate) = true, (set_once) = true];
 
-  // The organization's display name.
+  // The organization's display name, unique across organizations and compared
+  // case-insensitively.
   string name = 2 [(required) = true, (column) = true];
 
-  // The people who belong to the organization.
-  repeated access_desk.identity.PersonId member = 3;
+  // The people who belong to the organization, each with their current
+  // membership status.
+  repeated OrganizationMember member = 3;
 
   // The resources the organization owns.
   repeated ResourceId resource = 4;

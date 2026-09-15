@@ -44,6 +44,7 @@ import { OrganizationSchema } from "@access-desk/resources-model/generated/acces
 import { OrganizationMemberSchema } from "@access-desk/resources-model/generated/access_desk/resources/values_pb.js";
 import {
   OrganizationAlreadyExists,
+  OrganizationMemberAlreadyAdded,
 } from "@access-desk/resources-model/generated/access_desk/resources/organization_rejections.js";
 
 /**
@@ -78,10 +79,14 @@ export class OrganizationAggregate extends Aggregate<
     if (person === undefined) {
       throw new Error("AddOrganizationMember requires a person.");
     }
+    if (this.state.membership.some((item) => item.person?.uuid === person.uuid)) {
+      throw OrganizationMemberAlreadyAdded.create({ organizationId: this.id, person });
+    }
     this.update((draft) => {
-      const membership = draft.membership.filter((item) => item.person?.uuid !== person.uuid);
-      membership.push(create(OrganizationMemberSchema, { person, active: true }));
-      draft.membership = membership;
+      draft.membership = [
+        ...draft.membership,
+        create(OrganizationMemberSchema, { person, active: true }),
+      ];
     });
     return create(OrganizationMemberAddedSchema, {
       organizationId: this.id,

@@ -69,7 +69,7 @@ export class ResourceCatalogueProjection extends Projection<
   }
 
   /**
-   * Updates the catalogue policy after the fallback approver changes.\
+   * Updates the catalogue policy after the fallback approver changes.
    */
   @Subscribe
   onResourceFallbackApproverAssigned(event: ResourceFallbackApproverAssigned): void {

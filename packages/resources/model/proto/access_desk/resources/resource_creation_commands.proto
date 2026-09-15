@@ -30,7 +30,6 @@ package access_desk.resources;
 
 import "google/protobuf/duration.proto";
 import "access_desk/resources/identifiers.proto";
-import "access_desk/resources/access_level.proto";
 import "access_desk/resources/values.proto";
 import "access_desk/identity/identifiers.proto";
 import "spine/options.proto";
@@ -52,7 +51,8 @@ message RequestResourceCreation {
   // The organization the resource belongs to.
   OrganizationId organization_id = 2 [(validate) = true];
 
-  // The requested resource name, unique within the organization.
+  // The requested resource display name, unique within the organization and
+  // compared case-insensitively.
   string name = 3 [(required) = true];
 
   // The human-readable resource description.
@@ -64,8 +64,8 @@ message RequestResourceCreation {
   // The data-sensitivity classification of the resource.
   Sensitivity sensitivity = 6 [(required) = true];
 
-  // The access levels offered by this resource, in ascending order.
-  repeated AccessLevel access_level = 7 [(required) = true];
+  // The access levels offered by this resource, ordered from weakest to strongest.
+  repeated AccessLevel access_level = 7 [(required) = true, (validate) = true];
 
   // The maximum permitted access duration, at one-minute granularity.
   google.protobuf.Duration maximum_duration = 8 [(required) = true];

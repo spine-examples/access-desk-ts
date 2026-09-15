@@ -26,82 +26,111 @@
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
+import { ResourceAddedSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
+import { ResourceCreatedSchema } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
 import { ResourceCreationRequestedSchema } from "@access-desk/resources-model/generated/access_desk/resources/resource_creation_events_pb.js";
 
 import {
   actor,
   closeResourcesBlackBoxes,
   loadResourcesContext,
+  organizationId,
   resourcesBlackBox,
 } from "./given/resources-context.js";
-import {
-  awaitCatalogueItem,
-  createResource,
-  readCatalogue,
-  requestResourceCreation,
-} from "./given/resource.js";
 import { recordEvents } from "./given/events.js";
+import { awaitOrganizationView, createOrganization } from "./given/organization.js";
+import { awaitCatalogueItem, requestResourceCreation } from "./given/resource.js";
 
-// The process manager is NONE-visibility, so it is observed through the resource
-// it brings into the catalogue rather than by reading its own state.
+// The process manager is NONE-visibility, so each handler is observed through
+// the domain facts and projections it produces.
 beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
 
 describe("ResourceCreationProcessManager should", () => {
   describe("handle 'RequestResourceCreation', and", () => {
-    it("emit 'ResourceCreationRequested'", async () => {
+    it("acknowledge the request and emit 'ResourceCreationRequested'", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
-      const events = await recordEvents(scope, ResourceCreationRequestedSchema);
-
-      expect((await requestResourceCreation(scope, "payroll")).kind).toBe("ok");
-
-      const event = await events.waitFor(box);
-      expect(event.id?.value).toBe("payroll");
-      await events.cancel();
+      const requested = await recordEvents(scope, ResourceCreationRequestedSchema);
+      try {
+        expect((await requestResourceCreation(scope, "payroll")).kind).toBe("ok");
+        expect((await requested.waitFor(box)).id?.value).toBe("payroll");
+      } finally {
+        await requested.cancel();
+      }
     });
+  });
 
-    it("create the requested resource with its requested policy", async () => {
+  describe("handle 'ResourceCreationRequested', and", () => {
+    it("create the requested resource and catalogue its initial policy", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
+      const created = await recordEvents(scope, ResourceCreatedSchema);
+      try {
+        expect((await requestResourceCreation(scope, "payroll")).kind).toBe("ok");
+        expect((await created.waitFor(box)).policy?.policyVersion).toBe(1n);
 
-      // The process stores the request, then issues CreateResource; the resource
-      // reaches the catalogue at version one.
-      //
-      // The later hop that reserves the resource in the organization
-      // (ResourceCreated -> AddResource) is cross-repository and does not deliver on
-      // this Spine snapshot, so the reservation and the process's terminal deletion
-      // stall. See TICKET-spine-cross-repo-pm-event-delivery.md.
-      expect((await requestResourceCreation(scope, "payroll")).kind).toBe("ok");
-
-      const item = await awaitCatalogueItem(box, scope, "payroll");
-      expect(item.name).toBe("payroll");
-      expect(item.description).toBe("Payroll production");
-      expect(item.policy?.policyVersion).toBe(1n);
+        const item = await awaitCatalogueItem(box, scope, "payroll");
+        expect(item).toMatchObject({
+          id: { value: "payroll" },
+          name: "payroll",
+          description: "Payroll production",
+          category: "application",
+          policy: {
+            openForRequests: false,
+            policyVersion: 1n,
+            owner: { uuid: "owner" },
+            primaryApprover: { uuid: "primary" },
+            fallbackApprover: { uuid: "fallback" },
+          },
+        });
+      } finally {
+        await created.cancel();
+      }
     });
+  });
 
-    // TODO:mykyta.pimonov:11-08-2026: Blocked: rejecting a request whose name is already taken
-    //  is not implemented yet. Unskip once the process records accepted names and rejects duplicates.
-    it.skip("reject a request whose name is already taken", async () => {
+  describe("handle 'ResourceCreated', and", () => {
+    it("emit 'ResourceAdded' for the organization that owns the resource", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
+      expect((await createOrganization(scope)).kind).toBe("ok");
+      await awaitOrganizationView(box, scope, (view) => view.name === "Acme");
 
-      // A resource named "payroll" already exists, so its name is allocated.
-      expect((await createResource(scope, "payroll")).kind).toBe("ok");
-      await awaitCatalogueItem(box, scope, "payroll");
+      const added = await recordEvents(scope, ResourceAddedSchema);
+      try {
+        expect((await requestResourceCreation(scope, "payroll")).kind).toBe("ok");
+        expect(await added.waitFor(box)).toMatchObject({
+          organizationId: { uuid: organizationId },
+          resourceId: { value: "payroll" },
+        });
+      } finally {
+        await added.cancel();
+      }
+    });
+  });
 
-      // The process must reject the taken name, so no resource is created for it; a
-      // request for a free name is accepted and creates one.
-      expect(
-        (await requestResourceCreation(scope, "payroll-again", { name: "payroll" })).kind,
-      ).toBe("ok");
-      expect((await requestResourceCreation(scope, "alpha")).kind).toBe("ok");
+  describe("handle 'ResourceAdded', and", () => {
+    // The handler only marks the process deleted, and the manager is
+    // NONE-visibility, so its self-deletion is not directly observable.
+    it("complete once the resource is reserved in its organization", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      expect((await createOrganization(scope)).kind).toBe("ok");
+      await awaitOrganizationView(box, scope, (view) => view.name === "Acme");
 
-      // Fence on the accepted resource, then confirm the rejected one never appeared.
-      await awaitCatalogueItem(box, scope, "alpha");
-      const ids = (await readCatalogue(scope)).map((item) => item.id?.value);
-      expect(ids).toContain("alpha");
-      expect(ids).not.toContain("payroll-again");
+      const added = await recordEvents(scope, ResourceAddedSchema);
+      try {
+        expect((await requestResourceCreation(scope, "payroll")).kind).toBe("ok");
+        expect((await added.waitFor(box)).resourceId?.value).toBe("payroll");
+        const views = await awaitOrganizationView(box, scope, (view) =>
+          view.resource.some((resource) => resource.value === "payroll"),
+        );
+        const reserved = views[0]?.resource.filter((resource) => resource.value === "payroll");
+        expect(reserved).toHaveLength(1);
+      } finally {
+        await added.cancel();
+      }
     });
   });
 });
