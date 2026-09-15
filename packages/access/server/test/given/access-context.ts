@@ -26,9 +26,8 @@
 
 import { create, type Message, type MessageShape } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
-import { AnyMessages, TypeRegistry, TypeUrls } from "@spine-event-engine/core";
-import { EnvironmentType, ServerEnvironment, SignalMetadata } from "@spine-event-engine/server";
-import { resetServerEnvironmentForTest } from "@spine-event-engine/server/testing";
+import { AnyMessages, TypeUrls } from "@spine-event-engine/core";
+import { SignalMetadata } from "@spine-event-engine/server";
 import { type ActorContext, TenantIdSchema, UserIdSchema } from "@spine-event-engine/proto";
 import {
   QueryIdSchema,
@@ -37,9 +36,6 @@ import {
   type Query,
 } from "@spine-event-engine/proto/client";
 import { BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
-
-import { resourcesProtoModule } from "@access-desk/resources-model";
-import { accessProtoModule } from "@access-desk/access-model";
 
 // The organization is its own tenant, so its id doubles as the tenant.
 export const organizationId = "acme";
@@ -63,22 +59,6 @@ let createAccessContext: AccessModule["createAccessContext"] | undefined;
 /** Loads the compiled Access context factory once, for a suite's `beforeAll`. */
 export async function loadAccessContext(): Promise<void> {
   ({ createAccessContext } = await import("../../dist/src/index.js"));
-}
-
-/**
- * Registers the Resources and Access contracts in the local environment so a
- * `ThirdPartyContext` can resolve the external event schemas it emits.
- */
-export async function configureAccessEnvironment(): Promise<void> {
-  await resetServerEnvironmentForTest();
-  ServerEnvironment.when(EnvironmentType.Local).use({
-    typeRegistry: TypeRegistry.from(resourcesProtoModule, accessProtoModule),
-  });
-}
-
-/** Clears the environment registered by {@link configureAccessEnvironment}. */
-export function resetAccessEnvironment(): Promise<void> {
-  return resetServerEnvironmentForTest();
 }
 
 const ownedBlackBoxes = new Set<BlackBox>();

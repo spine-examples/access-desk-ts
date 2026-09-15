@@ -26,8 +26,7 @@
 
 import { create, type Message, type MessageInitShape } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
-import { SignalMetadata, ThirdPartyContext } from "@spine-event-engine/server";
-import { type ActorContext, TenantIdSchema, UserIdSchema } from "@spine-event-engine/proto";
+import type { BlackBoxScope } from "@spine-event-engine/testing";
 
 import {
   AccessLevelSchema,
@@ -36,21 +35,8 @@ import {
   type ResourcePolicy,
 } from "@access-desk/resources-model/generated/access_desk/resources/values_pb.js";
 
-import { organizationId } from "./access-context.js";
-
-const signalMetadata = new SignalMetadata();
-
-/**
- * The identity under which Resources imports its facts into Access. It carries
- * the organization as its tenant, so each external event reaches the multitenant
- * Access context in-tenant.
- */
-export function importingActor(): ActorContext {
-  return signalMetadata.actorContext({
-    actor: create(UserIdSchema, { value: "resources-system" }),
-    tenantId: create(TenantIdSchema, { kind: { case: "value", value: organizationId } }),
-  });
-}
+/** The producer identity used when Resources publishes external facts to Access. */
+export const resourcesSystemActor = "resources-system";
 
 /** The complete access policy in force for a resource, restricted and read-only by default. */
 export function resourcePolicy(
@@ -69,26 +55,11 @@ export function resourcePolicy(
   });
 }
 
-const ownedSources = new Set<ThirdPartyContext>();
-
-/** Opens a multitenant Resources source that publishes facts into Access. */
-export async function openResourcesSource(): Promise<ThirdPartyContext> {
-  const source = await ThirdPartyContext.multitenant("Resources");
-  ownedSources.add(source);
-  return source;
-}
-
-/** Closes and forgets every source opened through {@link openResourcesSource}. */
-export async function closeResourcesSources(): Promise<void> {
-  await Promise.all([...ownedSources].map((source) => source.close()));
-  ownedSources.clear();
-}
-
-/** Publishes one Resources event into Access as an external fact. */
+/** Posts one Resources fact through Access's external-event intake. */
 export function publishResourceFact<Schema extends GenMessage<Message>>(
-  source: ThirdPartyContext,
+  scope: BlackBoxScope,
   schema: Schema,
   fact: MessageInitShape<Schema>,
 ): Promise<void> {
-  return source.emittedEvent(create(schema, fact), importingActor());
+  return scope.postExternalEvent(schema, create(schema, fact));
 }

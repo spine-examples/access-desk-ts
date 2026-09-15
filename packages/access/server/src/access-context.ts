@@ -24,7 +24,15 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { BoundedContext } from "@spine-event-engine/server";
+import { BoundedContext, EventRouting } from "@spine-event-engine/server";
+import {
+  ResourceClosedForRequestsSchema,
+  ResourceCreatedSchema,
+  ResourceFallbackApproverAssignedSchema,
+  ResourceOpenedForRequestsSchema,
+  ResourcePrimaryApproverAssignedSchema,
+} from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
+import { type ResourceId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
 import { ResourceRequestPolicyProjection } from "./resource-request-policy-projection.js";
 
 /**
@@ -33,8 +41,18 @@ import { ResourceRequestPolicyProjection } from "./resource-request-policy-proje
  * @returns The assembled Access bounded context.
  */
 export async function createAccessContext(): Promise<BoundedContext> {
+  const eventRouting = EventRouting.create<ResourceId>()
+    .route(ResourceCreatedSchema, (event) => (event.id === undefined ? [] : [event.id]))
+    .route(ResourcePrimaryApproverAssignedSchema, (event) =>
+      event.id === undefined ? [] : [event.id],
+    )
+    .route(ResourceFallbackApproverAssignedSchema, (event) =>
+      event.id === undefined ? [] : [event.id],
+    )
+    .route(ResourceOpenedForRequestsSchema, (event) => (event.id === undefined ? [] : [event.id]))
+    .route(ResourceClosedForRequestsSchema, (event) => (event.id === undefined ? [] : [event.id]));
   const builder = BoundedContext.multitenant("Access")
     .withGeneratedRegistryRoot(new URL("..", import.meta.url))
-    .add(ResourceRequestPolicyProjection);
+    .add(ResourceRequestPolicyProjection, { eventRouting });
   return builder.buildAsync();
 }

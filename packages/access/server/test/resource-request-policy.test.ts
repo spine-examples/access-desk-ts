@@ -24,7 +24,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import {
   ResourceClosedForRequestsSchema,
@@ -46,16 +46,13 @@ import {
   accessBlackBox,
   actor,
   closeAccessBlackBoxes,
-  configureAccessEnvironment,
   loadAccessContext,
   readAll,
-  resetAccessEnvironment,
 } from "./given/access-context.js";
 import {
-  closeResourcesSources,
-  openResourcesSource,
   publishResourceFact,
   resourcePolicy,
+  resourcesSystemActor,
 } from "./given/resources-integration.js";
 import { type BlackBoxScope } from "@spine-event-engine/testing";
 
@@ -78,31 +75,28 @@ function readPolicies(scope: BlackBoxScope): Promise<readonly ResourceRequestPol
 // The Access read side never queries Resources back; it builds its model from the
 // complete, versioned policy facts Resources publishes as external events.
 beforeAll(loadAccessContext, 30_000);
-beforeEach(configureAccessEnvironment);
 afterEach(async () => {
   await closeAccessBlackBoxes();
-  await closeResourcesSources();
-  await resetAccessEnvironment();
 });
 
 describe("ResourceRequestPolicyProjection should", () => {
   it("builds its policy read model from every subscribed Resources policy fact", async () => {
     const box = await accessBlackBox();
     const scope = box.onBehalfOf(actor);
-    const source = await openResourcesSource();
+    const resourcesScope = box.onBehalfOf(resourcesSystemActor);
 
-    await publishResourceFact(source, ResourceCreatedSchema, {
+    await publishResourceFact(resourcesScope, ResourceCreatedSchema, {
       id: resourceId,
       name: "payroll",
       description: "Payroll production",
       category: "application",
       policy: resourcePolicy({ policyVersion: 1n }),
     });
-    await publishResourceFact(source, ResourcePrimaryApproverAssignedSchema, {
+    await publishResourceFact(resourcesScope, ResourcePrimaryApproverAssignedSchema, {
       id: resourceId,
       policy: resourcePolicy({ primaryApprover: dana, policyVersion: 2n }),
     });
-    await publishResourceFact(source, ResourceFallbackApproverAssignedSchema, {
+    await publishResourceFact(resourcesScope, ResourceFallbackApproverAssignedSchema, {
       id: resourceId,
       policy: resourcePolicy({
         primaryApprover: dana,
@@ -110,7 +104,7 @@ describe("ResourceRequestPolicyProjection should", () => {
         policyVersion: 3n,
       }),
     });
-    await publishResourceFact(source, ResourceOpenedForRequestsSchema, {
+    await publishResourceFact(resourcesScope, ResourceOpenedForRequestsSchema, {
       id: resourceId,
       policy: resourcePolicy({
         primaryApprover: dana,
@@ -119,7 +113,7 @@ describe("ResourceRequestPolicyProjection should", () => {
         policyVersion: 4n,
       }),
     });
-    await publishResourceFact(source, ResourceClosedForRequestsSchema, {
+    await publishResourceFact(resourcesScope, ResourceClosedForRequestsSchema, {
       id: resourceId,
       policy: resourcePolicy({
         primaryApprover: dana,
@@ -148,25 +142,25 @@ describe("ResourceRequestPolicyProjection should", () => {
   it("ignores stale facts and accepts an exact duplicate without changing its policy", async () => {
     const box = await accessBlackBox();
     const scope = box.onBehalfOf(actor);
-    const source = await openResourcesSource();
+    const resourcesScope = box.onBehalfOf(resourcesSystemActor);
     const closedPolicy = resourcePolicy({ openForRequests: false, policyVersion: 2n });
 
-    await publishResourceFact(source, ResourceCreatedSchema, {
+    await publishResourceFact(resourcesScope, ResourceCreatedSchema, {
       id: resourceId,
       name: "payroll",
       description: "Payroll production",
       category: "application",
       policy: resourcePolicy({ openForRequests: true, policyVersion: 1n }),
     });
-    await publishResourceFact(source, ResourceClosedForRequestsSchema, {
+    await publishResourceFact(resourcesScope, ResourceClosedForRequestsSchema, {
       id: resourceId,
       policy: closedPolicy,
     });
-    await publishResourceFact(source, ResourceOpenedForRequestsSchema, {
+    await publishResourceFact(resourcesScope, ResourceOpenedForRequestsSchema, {
       id: resourceId,
       policy: resourcePolicy({ openForRequests: true, policyVersion: 1n }),
     });
-    await publishResourceFact(source, ResourceClosedForRequestsSchema, {
+    await publishResourceFact(resourcesScope, ResourceClosedForRequestsSchema, {
       id: resourceId,
       policy: closedPolicy,
     });

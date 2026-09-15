@@ -321,14 +321,13 @@ decorators from raw TS source; the root `vitest.config.ts` externalizes `dist`
 so handler classes keep the identity the registry registered. Multitenant
 BlackBox: pass `{ tenant }` to `BlackBox.from`.
 
-**Testing an `External<T>` subscription** uses `ThirdPartyContext` (from
-`@spine-event-engine/server`) to stand in for the producing context. In
-`beforeEach`: `resetServerEnvironmentForTest()` (from
-`@spine-event-engine/server/testing`), then
-`ServerEnvironment.when(EnvironmentType.Local).use({ typeRegistry: TypeRegistry.from(producerProtoModule, consumerProtoModule) })`
-— `ThirdPartyContext` resolves emitted event schemas from that registry, else it
-throws `ThirdPartyContext does not know <type>`. Build the consumer with
-`BlackBox.from(ctx, { tenant })` (shares the in-memory broker), then
-`await ThirdPartyContext.multitenant("Producer")` and
-`emittedEvent(create(EventSchema, {...}), actorContext)` with a tenant-bearing
-actor; assert via `box.eventually(query)`.
+**Testing an `External<T>` subscription** posts the producing fact directly to
+the consumer's BlackBox actor scope: `await box.onBehalfOf("producer")
+.postExternalEvent(EventSchema, create(EventSchema, {...}))`. The scope retains
+the BlackBox tenant, actor, zone, and timestamp; the event is marked external,
+reaches only external handlers, and is not recorded as a context-produced
+event. Build multitenant consumers with `BlackBox.from(ctx, { tenant })`
+and use `box.eventually(query)` when the read-side projection is asynchronous.
+In this snapshot, `postExternalEvent()` omits `producerId`; a consumer repository
+that would otherwise use default event routing must declare exact `EventRouting`
+routes for the tested external schemas.
