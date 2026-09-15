@@ -98,5 +98,5 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
 
 ## Dependencies & the local patch
 
-- One exact Spine family pinned at **`@spine-event-engine/* 2.0.0-snapshot.2`** with
+- One exact Spine family pinned at **`@spine-event-engine/* 2.0.0-snapshot.11`** with
   `@bufbuild/protobuf 2.12.1`. Never invent an API.
