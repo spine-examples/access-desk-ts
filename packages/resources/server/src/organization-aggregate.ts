@@ -112,7 +112,7 @@ export class OrganizationAggregate extends Aggregate<
       throw new Error("AddResource requires a resource id.");
     }
     this.update((draft) => {
-      if (!draft.resource.some((reserved) => reserved.id === resourceId)) {
+      if (!draft.resource.some((reserved) => reserved.id?.uuid === resourceId.uuid)) {
         draft.resource = [
           ...draft.resource,
           create(OrganizationResourceSchema, { id: resourceId, name: command.name }),

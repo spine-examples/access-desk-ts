@@ -89,7 +89,7 @@ export class OrganizationViewProjection extends Projection<
     }
     this.update((draft) => {
       draft.id = event.organizationId ?? this.id;
-      if (!draft.resource.some((existing) => existing.id === resourceId)) {
+      if (!draft.resource.some((existing) => existing.id?.uuid === resourceId.uuid)) {
         draft.resource = [
           ...draft.resource,
           create(OrganizationResourceSchema, { id: resourceId, name: event.name }),
