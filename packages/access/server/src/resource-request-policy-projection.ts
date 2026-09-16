@@ -57,7 +57,7 @@ export class ResourceRequestPolicyProjection extends Projection<
   bigint
 > {
   /**
-   * Seeds Access's local policy from a resource creation fact.
+   * Seeds Access's local policy from a resource registration fact.
    */
   @Subscribe
   onResourceCreated(event: External<ResourceCreated>): void {

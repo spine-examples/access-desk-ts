@@ -33,9 +33,9 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.access-desk.resources";
 
-// A request to create a resource in an organization was accepted.
-message ResourceCreationRequested {
+// A request to register a resource in an organization was accepted.
+message ResourceRegistrationRequested {
 
-  // The resource whose creation was requested.
+  // The resource whose registration was requested.
   ResourceId id = 1 [(required) = true, (validate) = true];
 }

@@ -36,18 +36,18 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.access-desk.resources";
 
-// The creation of a new resource in an organization.
+// The registration of a new resource in an organization.
 //
-// 1. A member requests the resource, and the request is remembered here.
+// 1. A member registers the resource, and the request is remembered here.
 // 2. The resource is created with the requested policy.
 // 3. The created resource is recorded among the organization's resources.
 // 4. If the organization rejects the name, the created resource is deleted.
-// 5. The creation is complete after the resource is recorded or deleted.
+// 5. The registration is complete after the resource is recorded or deleted.
 //
-message ResourceCreation {
+message ResourceRegistration {
   option (entity).kind = PROCESS_MANAGER;
 
-  // The resource being brought into existence.
+  // The resource being entered into the organization's registry.
   ResourceId id = 1 [(validate) = true, (set_once) = true];
 
   // The organization the resource will belong to.

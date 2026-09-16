@@ -1,6 +1,6 @@
 {
   "formatVersion": 2,
-  "generationId": "fc6568eb-e5b6-4e9e-bae3-769becb7de14",
+  "generationId": "a47dc409-8487-4e4d-aac6-f1a6ac283b8c",
   "packageName": "@access-desk/resources-model",
   "packageVersion": "0.0.0",
   "protoFiles": [
@@ -13,9 +13,9 @@
     "access_desk/resources/organization_rejections.proto",
     "access_desk/resources/rejections.proto",
     "access_desk/resources/resource.proto",
-    "access_desk/resources/resource_creation.proto",
-    "access_desk/resources/resource_creation_commands.proto",
-    "access_desk/resources/resource_creation_events.proto",
+    "access_desk/resources/resource_registration.proto",
+    "access_desk/resources/resource_registration_commands.proto",
+    "access_desk/resources/resource_registration_events.proto",
     "access_desk/resources/values.proto"
   ],
   "generatedExports": {
@@ -28,9 +28,9 @@
     "access_desk/resources/organization_rejections.proto": "generated/access_desk/resources/organization_rejections_pb.js",
     "access_desk/resources/rejections.proto": "generated/access_desk/resources/rejections_pb.js",
     "access_desk/resources/resource.proto": "generated/access_desk/resources/resource_pb.js",
-    "access_desk/resources/resource_creation.proto": "generated/access_desk/resources/resource_creation_pb.js",
-    "access_desk/resources/resource_creation_commands.proto": "generated/access_desk/resources/resource_creation_commands_pb.js",
-    "access_desk/resources/resource_creation_events.proto": "generated/access_desk/resources/resource_creation_events_pb.js",
+    "access_desk/resources/resource_registration.proto": "generated/access_desk/resources/resource_registration_pb.js",
+    "access_desk/resources/resource_registration_commands.proto": "generated/access_desk/resources/resource_registration_commands_pb.js",
+    "access_desk/resources/resource_registration_events.proto": "generated/access_desk/resources/resource_registration_events_pb.js",
     "access_desk/resources/values.proto": "generated/access_desk/resources/values_pb.js"
   },
   "dependencies": [

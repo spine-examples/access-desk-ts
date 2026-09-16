@@ -36,7 +36,7 @@ import {
   DeleteResourceSchema,
   type DeleteResource,
 } from "@access-desk/resources-model/generated/access_desk/resources/commands_pb.js";
-import { type RequestResourceCreation } from "@access-desk/resources-model/generated/access_desk/resources/resource_creation_commands_pb.js";
+import { type RegisterResource } from "@access-desk/resources-model/generated/access_desk/resources/resource_registration_commands_pb.js";
 import { type ResourceAdded } from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
 import { type OrganizationResourceNameAlreadyUsed } from "@access-desk/resources-model/generated/access_desk/resources/organization_rejections_pb.js";
 import {
@@ -44,15 +44,15 @@ import {
   type ResourceDeleted,
 } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
 import {
-  ResourceCreationRequestedSchema,
-  type ResourceCreationRequested,
-} from "@access-desk/resources-model/generated/access_desk/resources/resource_creation_events_pb.js";
+  ResourceRegistrationRequestedSchema,
+  type ResourceRegistrationRequested,
+} from "@access-desk/resources-model/generated/access_desk/resources/resource_registration_events_pb.js";
 import { type ResourceId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
-import { ResourceCreationSchema } from "@access-desk/resources-model/generated/access_desk/resources/resource_creation_pb.js";
+import { ResourceRegistrationSchema } from "@access-desk/resources-model/generated/access_desk/resources/resource_registration_pb.js";
 import { type ResourceAlreadyExists } from "@access-desk/resources-model/generated/access_desk/resources/rejections_pb.js";
 
 /**
- * The creation of a new resource in an organization, step by step:
+ * The registration of a new resource in an organization, step by step:
  *
  * 1. A member requests the resource, and the request is remembered here.
  * 2. The resource is created with the requested policy.
@@ -60,23 +60,23 @@ import { type ResourceAlreadyExists } from "@access-desk/resources-model/generat
  *    organization rejects the recording when the name is already used.
  * 4. If recording is rejected because the name is taken, the unchanged resource
  *    is deleted. A changed resource stops for manual resolution.
- * 5. The creation is complete and the process deletes itself after recording
+ * 5. The registration is complete and the process deletes itself after recording
  *    or deletion.
  */
-export class ResourceCreationProcessManager extends ProcessManager<
+export class ResourceRegistrationProcessManager extends ProcessManager<
   ResourceId,
-  typeof ResourceCreationSchema,
+  typeof ResourceRegistrationSchema,
   bigint
 > {
   /**
-   * Remembers a creation request and starts the process.
+   * Remembers a registration request and starts the process.
    */
   @Assign
-  onRequestResourceCreation(command: RequestResourceCreation): ResourceCreationRequested {
+  onRegisterResource(command: RegisterResource): ResourceRegistrationRequested {
     this.update((draft) => {
       Object.assign(
         draft,
-        create(ResourceCreationSchema, {
+        create(ResourceRegistrationSchema, {
           id: this.id,
           organizationId: command.organizationId,
           name: command.name,
@@ -92,14 +92,14 @@ export class ResourceCreationProcessManager extends ProcessManager<
         }),
       );
     });
-    return create(ResourceCreationRequestedSchema, { id: this.id });
+    return create(ResourceRegistrationRequestedSchema, { id: this.id });
   }
 
   /**
-   * Creates the resource with the requested policy once creation starts.
+   * Creates the resource with the requested policy once registration starts.
    */
   @Command
-  onResourceCreationRequested(_event: ResourceCreationRequested): CreateResource {
+  onResourceRegistrationRequested(_event: ResourceRegistrationRequested): CreateResource {
     const state = this.state;
     return create(CreateResourceSchema, {
       id: this.id,
@@ -139,7 +139,7 @@ export class ResourceCreationProcessManager extends ProcessManager<
   }
 
   /**
-   * Abandons the creation when the resource already exists, deleting the process.
+   * Abandons the registration when the resource already exists, deleting the process.
    */
   @Subscribe
   onResourceAlreadyExists(_rejection: ResourceAlreadyExists): void {

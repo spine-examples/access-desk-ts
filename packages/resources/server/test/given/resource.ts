@@ -35,7 +35,7 @@ import {
   DeleteResourceSchema,
   OpenResourceForRequestsSchema,
 } from "@access-desk/resources-model/generated/access_desk/resources/commands_pb.js";
-import { RequestResourceCreationSchema } from "@access-desk/resources-model/generated/access_desk/resources/resource_creation_commands_pb.js";
+import { RegisterResourceSchema } from "@access-desk/resources-model/generated/access_desk/resources/resource_registration_commands_pb.js";
 import {
   ResourceCatalogueItemSchema,
   type ResourceCatalogueItem,
@@ -48,7 +48,7 @@ import {
 
 import { organizationId, readAll } from "./resources-context.js";
 
-/** The descriptive and policy fields shared by resource creation commands. */
+/** The descriptive and policy fields shared by resource registration commands. */
 export interface ResourceDraft {
   readonly name: string;
   readonly description: string;
@@ -79,7 +79,7 @@ export function resourceDraft(overrides: Partial<ResourceDraft> = {}): ResourceD
   };
 }
 
-/** Posts `CreateResource` directly, bypassing the creation process. */
+/** Posts `CreateResource` directly, bypassing the registration process. */
 export function createResource(
   scope: BlackBoxScope,
   resource: string,
@@ -97,21 +97,21 @@ export function deleteResource(scope: BlackBoxScope, resource: string) {
 }
 
 /**
- * Posts `RequestResourceCreation`, the entry point of the creation process.
+ * Posts `RegisterResource`, the entry point of the registration process.
  *
  * The resource identifier and its display name are separate: `resource` is the
  * system-generated id, and `name` defaults to it but can differ, so two distinct
  * resources can be requested under the same name to exercise uniqueness.
  */
-export function requestResourceCreation(
+export function registerResource(
   scope: BlackBoxScope,
   resource: string,
   name: string = resource,
   overrides: Partial<ResourceDraft> = {},
 ) {
   return scope.post(
-    RequestResourceCreationSchema,
-    create(RequestResourceCreationSchema, {
+    RegisterResourceSchema,
+    create(RegisterResourceSchema, {
       id: { uuid: resource },
       organizationId: { uuid: organizationId },
       ...resourceDraft({ name, ...overrides }),

@@ -28,7 +28,7 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { ResourceAddedSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
 import { ResourceCreatedSchema } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
-import { ResourceCreationRequestedSchema } from "@access-desk/resources-model/generated/access_desk/resources/resource_creation_events_pb.js";
+import { ResourceRegistrationRequestedSchema } from "@access-desk/resources-model/generated/access_desk/resources/resource_registration_events_pb.js";
 import { ResourceAlreadyExistsSchema } from "@access-desk/resources-model/generated/access_desk/resources/rejections_pb.js";
 import { OrganizationResourceNameAlreadyUsedSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_rejections_pb.js";
 
@@ -41,21 +41,21 @@ import {
 } from "./given/resources-context.js";
 import { expectRejection, recordEvents } from "./given/events.js";
 import { awaitOrganizationView, createOrganization } from "./given/organization.js";
-import { awaitCatalogueItem, createResource, requestResourceCreation } from "./given/resource.js";
+import { awaitCatalogueItem, createResource, registerResource } from "./given/resource.js";
 
 // The process manager is NONE-visibility, so each handler is observed through
 // the domain facts and projections it produces.
 beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
 
-describe("ResourceCreationProcessManager should", () => {
-  describe("handle 'RequestResourceCreation', and", () => {
-    it("admit a free name and emit 'ResourceCreationRequested'", async () => {
+describe("ResourceRegistrationProcessManager should", () => {
+  describe("handle 'RegisterResource', and", () => {
+    it("admit a free name and emit 'ResourceRegistrationRequested'", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
-      const requested = await recordEvents(scope, ResourceCreationRequestedSchema);
+      const requested = await recordEvents(scope, ResourceRegistrationRequestedSchema);
       try {
-        expect((await requestResourceCreation(scope, "payroll")).kind).toBe("ok");
+        expect((await registerResource(scope, "payroll")).kind).toBe("ok");
         expect((await requested.waitFor(box)).id?.uuid).toBe("payroll");
       } finally {
         await requested.cancel();
@@ -66,34 +66,34 @@ describe("ResourceCreationProcessManager should", () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await createOrganization(scope)).kind).toBe("ok");
-      expect((await requestResourceCreation(scope, "payroll-1", "Payroll")).kind).toBe("ok");
+      expect((await registerResource(scope, "payroll-1", "Payroll")).kind).toBe("ok");
       await awaitOrganizationView(box, scope, (view) =>
         view.resource.some((resource) => resource.id?.uuid === "payroll-1"),
       );
 
       await expectRejection(box, scope, OrganizationResourceNameAlreadyUsedSchema, () =>
-        requestResourceCreation(scope, "payroll-2", "payroll"),
+        registerResource(scope, "payroll-2", "payroll"),
       );
     });
 
-    it("abandon the creation when the resource already exists", async () => {
+    it("abandon the registration when the resource already exists", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await createResource(scope, "payroll")).kind).toBe("ok");
 
       await expectRejection(box, scope, ResourceAlreadyExistsSchema, () =>
-        requestResourceCreation(scope, "payroll"),
+        registerResource(scope, "payroll"),
       );
     });
   });
 
-  describe("handle 'ResourceCreationRequested', and", () => {
+  describe("handle 'ResourceRegistrationRequested', and", () => {
     it("create the requested resource with its initial policy", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       const created = await recordEvents(scope, ResourceCreatedSchema);
       try {
-        expect((await requestResourceCreation(scope, "payroll")).kind).toBe("ok");
+        expect((await registerResource(scope, "payroll")).kind).toBe("ok");
         const event = await created.waitFor(box);
         expect(event.id?.uuid).toBe("payroll");
         expect(event.policy?.policyVersion).toBe(1n);
@@ -111,7 +111,7 @@ describe("ResourceCreationProcessManager should", () => {
 
       const added = await recordEvents(scope, ResourceAddedSchema);
       try {
-        expect((await requestResourceCreation(scope, "payroll")).kind).toBe("ok");
+        expect((await registerResource(scope, "payroll")).kind).toBe("ok");
         expect(await added.waitFor(box)).toMatchObject({
           organizationId: { uuid: organizationId },
           resourceId: { uuid: "payroll" },
@@ -129,7 +129,7 @@ describe("ResourceCreationProcessManager should", () => {
       const scope = box.onBehalfOf(actor);
       expect((await createOrganization(scope)).kind).toBe("ok");
 
-      expect((await requestResourceCreation(scope, "payroll")).kind).toBe("ok");
+      expect((await registerResource(scope, "payroll")).kind).toBe("ok");
       const item = await awaitCatalogueItem(box, scope, "payroll");
       expect(item.name).toBe("payroll");
     });

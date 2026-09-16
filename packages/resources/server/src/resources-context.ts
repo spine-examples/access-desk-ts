@@ -34,7 +34,7 @@ import { OrganizationAggregate } from "./organization-aggregate.js";
 import { OrganizationViewProjection } from "./organization-view-projection.js";
 import { ResourceAggregate } from "./resource-aggregate.js";
 import { ResourceCatalogueProjection } from "./resource-view-projection.js";
-import { ResourceCreationProcessManager } from "./resource-creation-process.js";
+import { ResourceRegistrationProcessManager } from "./resource-registration-process.js";
 
 /**
  * Builds the multitenant Resources bounded context.
@@ -45,7 +45,7 @@ import { ResourceCreationProcessManager } from "./resource-creation-process.js";
  * @returns The assembled Resources bounded context.
  */
 export async function createResourcesContext(): Promise<BoundedContext> {
-  const resourceCreationProcmanRouting = EventRouting.create<ResourceId>()
+  const resourceRegistrationProcmanRouting = EventRouting.create<ResourceId>()
     .route(ResourceAddedSchema, (event) =>
       event.resourceId === undefined ? [] : [event.resourceId],
     )
@@ -60,7 +60,7 @@ export async function createResourcesContext(): Promise<BoundedContext> {
     .withGeneratedRegistryRoot(new URL("..", import.meta.url))
     .add(OrganizationAggregate)
     .add(OrganizationViewProjection)
-    .add(ResourceCreationProcessManager, { eventRouting: resourceCreationProcmanRouting })
+    .add(ResourceRegistrationProcessManager, { eventRouting: resourceRegistrationProcmanRouting })
     .add(ResourceAggregate)
     .add(ResourceCatalogueProjection);
   return builder.buildAsync();

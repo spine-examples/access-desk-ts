@@ -73,7 +73,7 @@ export class ResourceAggregate extends Aggregate<ResourceId, typeof ResourceSche
   /**
    * Creates the initial closed policy at version one.
    *
-   * Name uniqueness is enforced by the Resource-Creation process, not here.
+   * Name uniqueness is enforced by the Organization during resource registration.
    */
   @Assign
   @Throws(ResourceAlreadyExists)

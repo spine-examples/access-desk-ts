@@ -28,7 +28,7 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { ResourceAddedSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
 import { ResourceCreatedSchema } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
-import { ResourceCreationRequestedSchema } from "@access-desk/resources-model/generated/access_desk/resources/resource_creation_events_pb.js";
+import { ResourceRegistrationRequestedSchema } from "@access-desk/resources-model/generated/access_desk/resources/resource_registration_events_pb.js";
 
 import {
   actor,
@@ -36,7 +36,7 @@ import {
   loadResourcesContext,
   resourcesBlackBox,
 } from "./given/resources-context.js";
-import { awaitCatalogueItem, requestResourceCreation } from "./given/resource.js";
+import { awaitCatalogueItem, registerResource } from "./given/resource.js";
 import { awaitOrganizationView, createOrganization } from "./given/organization.js";
 import { recordEvents } from "./given/events.js";
 
@@ -45,18 +45,18 @@ import { recordEvents } from "./given/events.js";
 beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
 
-describe("ResourceCreationProcessManager should", () => {
-  it("integrates resource creation from request through organization recording", async () => {
+describe("ResourceRegistrationProcessManager should", () => {
+  it("integrates resource registration through organization recording", async () => {
     const box = await resourcesBlackBox();
     const scope = box.onBehalfOf(actor);
     expect((await createOrganization(scope)).kind).toBe("ok");
     await awaitOrganizationView(box, scope, (view) => view.name === "Acme");
 
-    const requested = await recordEvents(scope, ResourceCreationRequestedSchema);
+    const requested = await recordEvents(scope, ResourceRegistrationRequestedSchema);
     const created = await recordEvents(scope, ResourceCreatedSchema);
     const added = await recordEvents(scope, ResourceAddedSchema);
     try {
-      expect((await requestResourceCreation(scope, "payroll")).kind).toBe("ok");
+      expect((await registerResource(scope, "payroll")).kind).toBe("ok");
 
       expect((await requested.waitFor(box)).id?.uuid).toBe("payroll");
       expect((await created.waitFor(box)).policy?.policyVersion).toBe(1n);
