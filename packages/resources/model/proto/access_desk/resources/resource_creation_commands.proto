@@ -39,10 +39,10 @@ option (type_url_prefix) = "type.access-desk.resources";
 // Requests creation of a resource in an organization, starting the Resource
 // Creation process.
 //
-// It does not create the resource directly. The process first rejects a name
-// already used within the organization, then creates the resource and records
-// it in the organization. The carried policy fields become the resource's
-// complete initial policy.
+// It does not create the resource directly. The process creates the resource and
+// records it in the organization, which rejects the recording when the name is
+// already used; a rejected recording deletes the created resource. The carried
+// policy fields become the resource's complete initial policy.
 //
 message RequestResourceCreation {
 
@@ -74,9 +74,13 @@ message RequestResourceCreation {
   // The resource owner.
   access_desk.identity.PersonId owner = 9 [(required) = true, (validate) = true];
 
+  // The person who operates the resource's live access, revoking and remediating
+  // its grants.
+  access_desk.identity.PersonId access_administrator = 10 [(required) = true, (validate) = true];
+
   // The initial primary approver of access requests.
-  access_desk.identity.PersonId primary_approver = 10 [(required) = true, (validate) = true];
+  access_desk.identity.PersonId primary_approver = 11 [(required) = true, (validate) = true];
 
   // The initial fallback approver, used when the primary is unavailable.
-  access_desk.identity.PersonId fallback_approver = 11 [(required) = true, (validate) = true];
+  access_desk.identity.PersonId fallback_approver = 12 [(required) = true, (validate) = true];
 }

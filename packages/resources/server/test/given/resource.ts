@@ -32,6 +32,7 @@ import {
   AssignResourcePrimaryApproverSchema,
   CloseResourceForRequestsSchema,
   CreateResourceSchema,
+  DeleteResourceSchema,
   OpenResourceForRequestsSchema,
 } from "@access-desk/resources-model/generated/access_desk/resources/commands_pb.js";
 import { RequestResourceCreationSchema } from "@access-desk/resources-model/generated/access_desk/resources/resource_creation_commands_pb.js";
@@ -56,6 +57,7 @@ export interface ResourceDraft {
   readonly accessLevel: AccessLevel[];
   readonly maximumDuration: { readonly seconds: bigint };
   readonly owner: { readonly uuid: string };
+  readonly accessAdministrator: { readonly uuid: string };
   readonly primaryApprover: { readonly uuid: string };
   readonly fallbackApprover: { readonly uuid: string };
 }
@@ -70,6 +72,7 @@ export function resourceDraft(overrides: Partial<ResourceDraft> = {}): ResourceD
     accessLevel: [create(AccessLevelSchema, { name: "Read", rank: 1 })],
     maximumDuration: { seconds: 3600n },
     owner: { uuid: "owner" },
+    accessAdministrator: { uuid: "admin" },
     primaryApprover: { uuid: "primary" },
     fallbackApprover: { uuid: "fallback" },
     ...overrides,
@@ -86,6 +89,11 @@ export function createResource(
     CreateResourceSchema,
     create(CreateResourceSchema, { id: { uuid: resource }, ...resourceDraft(overrides) }),
   );
+}
+
+/** Posts `DeleteResource` to remove a resource during compensation. */
+export function deleteResource(scope: BlackBoxScope, resource: string) {
+  return scope.post(DeleteResourceSchema, create(DeleteResourceSchema, { id: { uuid: resource } }));
 }
 
 /**

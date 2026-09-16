@@ -31,6 +31,7 @@ import {
   type AssignResourcePrimaryApprover,
   type CloseResourceForRequests,
   type CreateResource,
+  type DeleteResource,
   type OpenResourceForRequests,
 } from "@access-desk/resources-model/generated/access_desk/resources/commands_pb.js";
 import {
@@ -38,6 +39,8 @@ import {
   ResourceClosedForRequestsSchema,
   type ResourceCreated,
   ResourceCreatedSchema,
+  type ResourceDeleted,
+  ResourceDeletedSchema,
   type ResourceFallbackApproverAssigned,
   ResourceFallbackApproverAssignedSchema,
   type ResourceOpenedForRequests,
@@ -82,6 +85,7 @@ export class ResourceAggregate extends Aggregate<ResourceId, typeof ResourceSche
       openForRequests: false,
       sensitivity: command.sensitivity,
       owner: command.owner,
+      accessAdministrator: command.accessAdministrator,
       accessLevel: command.accessLevel,
       maximumDuration: command.maximumDuration,
       primaryApprover: command.primaryApprover,
@@ -107,6 +111,13 @@ export class ResourceAggregate extends Aggregate<ResourceId, typeof ResourceSche
       category: command.category,
       policy,
     });
+  }
+
+  /** Deletes a resource, used to compensate a creation the organization rejected. */
+  @Assign
+  deleteResource(_command: DeleteResource): ResourceDeleted {
+    this.markDraftDeleted();
+    return create(ResourceDeletedSchema, { id: this.id });
   }
 
   /**
@@ -181,6 +192,7 @@ export class ResourceAggregate extends Aggregate<ResourceId, typeof ResourceSche
       openForRequests: current.openForRequests,
       sensitivity: current.sensitivity,
       owner: current.owner,
+      accessAdministrator: current.accessAdministrator,
       accessLevel: current.accessLevel,
       maximumDuration: current.maximumDuration,
       primaryApprover: current.primaryApprover,

@@ -35,6 +35,7 @@ import {
 import {
   OrganizationAlreadyExistsSchema,
   OrganizationMemberAlreadyAddedSchema,
+  OrganizationResourceNameAlreadyUsedSchema,
 } from "@access-desk/resources-model/generated/access_desk/resources/organization_rejections_pb.js";
 
 import {
@@ -164,6 +165,25 @@ describe("OrganizationAggregate should", () => {
       } finally {
         await events.cancel();
       }
+    });
+
+    it("reject a differently identified resource with the same name, ignoring case", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      expect((await createOrganization(scope)).kind).toBe("ok");
+      expect((await addResource(scope, "payroll-a", "Payroll")).kind).toBe("ok");
+
+      const rejection = await expectRejection(
+        box,
+        scope,
+        OrganizationResourceNameAlreadyUsedSchema,
+        () => addResource(scope, "payroll-b", " payroll "),
+      );
+
+      expect(rejection).toMatchObject({ resourceId: { uuid: "payroll-b" }, name: " payroll " });
+      const views = await readOrganizationViews(scope);
+      expect(views[0]?.resource).toMatchObject([{ id: { uuid: "payroll-a" }, name: "Payroll" }]);
+      expect(views[0]?.resource).toHaveLength(1);
     });
   });
 });

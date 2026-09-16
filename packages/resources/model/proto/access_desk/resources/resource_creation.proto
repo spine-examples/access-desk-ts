@@ -38,12 +38,11 @@ option (type_url_prefix) = "type.access-desk.resources";
 
 // The creation of a new resource in an organization.
 //
-// 1. A member requests the resource; the request is admitted only when its name
-//    is not already used by another resource in the organization, and is then
-//    remembered here.
+// 1. A member requests the resource, and the request is remembered here.
 // 2. The resource is created with the requested policy.
 // 3. The created resource is recorded among the organization's resources.
-// 4. The creation is complete.
+// 4. If the organization rejects the name, the created resource is deleted.
+// 5. The creation is complete after the resource is recorded or deleted.
 //
 message ResourceCreation {
   option (entity).kind = PROCESS_MANAGER;
@@ -75,9 +74,12 @@ message ResourceCreation {
   // The requested resource owner.
   access_desk.identity.PersonId owner = 9;
 
+  // The requested access administrator.
+  access_desk.identity.PersonId access_administrator = 10;
+
   // The requested primary approver.
-  access_desk.identity.PersonId primary_approver = 10;
+  access_desk.identity.PersonId primary_approver = 11;
 
   // The requested fallback approver.
-  access_desk.identity.PersonId fallback_approver = 11;
+  access_desk.identity.PersonId fallback_approver = 12;
 }

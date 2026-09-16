@@ -93,20 +93,24 @@ message ResourcePolicy {
   // The person accountable for the resource.
   access_desk.identity.PersonId owner = 3 [(required) = true, (validate) = true];
 
+  // The person who operates the resource's live access, revoking and remediating
+  // its grants.
+  access_desk.identity.PersonId access_administrator = 4 [(required) = true, (validate) = true];
+
   // The access levels the resource offers, ordered from weakest to strongest.
-  repeated AccessLevel access_level = 4 [(required) = true, (validate) = true];
+  repeated AccessLevel access_level = 5 [(required) = true, (validate) = true];
 
   // The longest access grant the resource permits, at one-minute granularity.
-  google.protobuf.Duration maximum_duration = 5 [(required) = true];
+  google.protobuf.Duration maximum_duration = 6 [(required) = true];
 
   // The person who normally decides access requests to the resource.
-  access_desk.identity.PersonId primary_approver = 6 [(required) = true, (validate) = true];
+  access_desk.identity.PersonId primary_approver = 7 [(required) = true, (validate) = true];
 
   // The person who decides when the primary approver is unavailable.
-  access_desk.identity.PersonId fallback_approver = 7 [(required) = true, (validate) = true];
+  access_desk.identity.PersonId fallback_approver = 8 [(required) = true, (validate) = true];
 
   // The revision of these rules; increases with every change.
-  uint64 policy_version = 8 [(min).value = "1"];
+  uint64 policy_version = 9 [(min).value = "1"];
 }
 
 // The data-sensitivity classification of a resource.

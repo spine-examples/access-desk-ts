@@ -25,7 +25,7 @@
  */
 
 import { create } from "@bufbuild/protobuf";
-import { Assign, Command, ProcessManager, Subscribe, Throws } from "@spine-event-engine/server";
+import { Assign, Command, ProcessManager, Subscribe } from "@spine-event-engine/server";
 import {
   AddResourceSchema,
   type AddResource,
@@ -33,34 +33,35 @@ import {
 import {
   CreateResourceSchema,
   type CreateResource,
+  DeleteResourceSchema,
+  type DeleteResource,
 } from "@access-desk/resources-model/generated/access_desk/resources/commands_pb.js";
 import { type RequestResourceCreation } from "@access-desk/resources-model/generated/access_desk/resources/resource_creation_commands_pb.js";
 import { type ResourceAdded } from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
-import { type ResourceCreated } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
+import { type OrganizationResourceNameAlreadyUsed } from "@access-desk/resources-model/generated/access_desk/resources/organization_rejections_pb.js";
+import {
+  type ResourceCreated,
+  type ResourceDeleted,
+} from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
 import {
   ResourceCreationRequestedSchema,
   type ResourceCreationRequested,
 } from "@access-desk/resources-model/generated/access_desk/resources/resource_creation_events_pb.js";
 import { type ResourceId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
 import { ResourceCreationSchema } from "@access-desk/resources-model/generated/access_desk/resources/resource_creation_pb.js";
-import { OrganizationViewSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_pb.js";
-import { ResourceNameAlreadyUsed } from "@access-desk/resources-model/generated/access_desk/resources/rejections.js";
 import { type ResourceAlreadyExists } from "@access-desk/resources-model/generated/access_desk/resources/rejections_pb.js";
-
-/** Normalizes a resource name for case-insensitive within-organization comparison. */
-function normalizeName(name: string): string {
-  return name.trim().toLowerCase();
-}
 
 /**
  * The creation of a new resource in an organization, step by step:
  *
- * 1. A member requests the resource. The request is admitted only when its name
- *    is not already used by another resource in the organization; otherwise it
- *    is rejected with {@link ResourceNameAlreadyUsed}.
+ * 1. A member requests the resource, and the request is remembered here.
  * 2. The resource is created with the requested policy.
- * 3. The created resource is recorded among the organization's resources.
- * 4. The creation is complete and the process deletes itself.
+ * 3. The created resource is recorded among the organization's resources; the
+ *    organization rejects the recording when the name is already used.
+ * 4. If recording is rejected because the name is taken, the unchanged resource
+ *    is deleted. A changed resource stops for manual resolution.
+ * 5. The creation is complete and the process deletes itself after recording
+ *    or deletion.
  */
 export class ResourceCreationProcessManager extends ProcessManager<
   ResourceId,
@@ -68,26 +69,10 @@ export class ResourceCreationProcessManager extends ProcessManager<
   bigint
 > {
   /**
-   * Admits a creation request whose name is free within the organization.
-   *
-   * Reads the organization's own catalogue view to reject a name already used by
-   * another resource before any resource is created. The read is eventually
-   * consistent, so it is a best-effort guard rather than a strict lock.
+   * Remembers a creation request and starts the process.
    */
   @Assign
-  @Throws(ResourceNameAlreadyUsed)
-  async onRequestResourceCreation(
-    command: RequestResourceCreation,
-  ): Promise<ResourceCreationRequested> {
-    const organizationId = command.organizationId;
-    const organization = await this.select(OrganizationViewSchema, {}).findById(organizationId as never);
-    const requestedName = normalizeName(command.name);
-    const nameTaken =
-      organization?.resource.some((resource) => normalizeName(resource.name) === requestedName) ??
-      false;
-    if (nameTaken) {
-      throw ResourceNameAlreadyUsed.create({ id: this.id, name: command.name });
-    }
+  onRequestResourceCreation(command: RequestResourceCreation): ResourceCreationRequested {
     this.update((draft) => {
       Object.assign(
         draft,
@@ -101,6 +86,7 @@ export class ResourceCreationProcessManager extends ProcessManager<
           accessLevel: command.accessLevel,
           maximumDuration: command.maximumDuration,
           owner: command.owner,
+          accessAdministrator: command.accessAdministrator,
           primaryApprover: command.primaryApprover,
           fallbackApprover: command.fallbackApprover,
         }),
@@ -124,6 +110,7 @@ export class ResourceCreationProcessManager extends ProcessManager<
       accessLevel: state.accessLevel,
       maximumDuration: state.maximumDuration,
       owner: state.owner,
+      accessAdministrator: state.accessAdministrator,
       primaryApprover: state.primaryApprover,
       fallbackApprover: state.fallbackApprover,
     });
@@ -142,10 +129,23 @@ export class ResourceCreationProcessManager extends ProcessManager<
   }
 
   /**
+   * Compensates a rejected organization recording by deleting the created resource.
+   */
+  @Command
+  onOrganizationResourceNameAlreadyUsed(
+    _rejection: OrganizationResourceNameAlreadyUsed,
+  ): DeleteResource {
+    return create(DeleteResourceSchema, { id: this.id });
+  }
+
+  /**
    * Abandons the creation when the resource already exists, deleting the process.
    */
   @Subscribe
   onResourceAlreadyExists(_rejection: ResourceAlreadyExists): void {
+    if (this.isDeleted) {
+      return;
+    }
     this.markDraftDeleted();
   }
 
@@ -154,6 +154,17 @@ export class ResourceCreationProcessManager extends ProcessManager<
    */
   @Subscribe
   onResourceAdded(_event: ResourceAdded): void {
+    if (this.isDeleted) {
+      return;
+    }
+    this.markDraftDeleted();
+  }
+
+  /**
+   * Completes compensation after the unrecorded resource is deleted.
+   */
+  @Subscribe
+  onResourceDeleted(_event: ResourceDeleted): void {
     this.markDraftDeleted();
   }
 }

@@ -48,6 +48,7 @@ import {
 import {
   OrganizationAlreadyExists,
   OrganizationMemberAlreadyAdded,
+  OrganizationResourceNameAlreadyUsed,
 } from "@access-desk/resources-model/generated/access_desk/resources/organization_rejections.js";
 
 /**
@@ -101,28 +102,40 @@ export class OrganizationAggregate extends Aggregate<
   }
 
   /**
-   * Records a resource in this organization.
-   *
-   * Name uniqueness is enforced upstream by the Resource-Creation process, not here.
+   * Records a resource in this organization when its name is still available.
    */
   @Assign
+  @Throws(OrganizationResourceNameAlreadyUsed)
   addResource(command: AddResource): ResourceAdded {
     const resourceId = command.resourceId;
     if (resourceId === undefined) {
       throw new Error("AddResource requires a resource id.");
     }
-    this.update((draft) => {
-      if (!draft.resource.some((reserved) => reserved.id?.uuid === resourceId.uuid)) {
+    const existing = this.state.resource.find((reserved) => reserved.id?.uuid === resourceId.uuid);
+    if (existing === undefined) {
+      const requestedName = normalizeName(command.name);
+      const nameTaken = this.state.resource.some(
+        (reserved) => normalizeName(reserved.name) === requestedName,
+      );
+      if (nameTaken) {
+        throw OrganizationResourceNameAlreadyUsed.create({ resourceId, name: command.name });
+      }
+      this.update((draft) => {
         draft.resource = [
           ...draft.resource,
           create(OrganizationResourceSchema, { id: resourceId, name: command.name }),
         ];
-      }
-    });
+      });
+    }
     return create(ResourceAddedSchema, {
       resourceId,
       organizationId: this.id,
       name: command.name,
     });
   }
+}
+
+/** Normalizes a resource name for case-insensitive within-organization comparison. */
+function normalizeName(name: string): string {
+  return name.trim().toLowerCase();
 }

@@ -41,16 +41,6 @@ message ResourceAlreadyExists {
   ResourceId id = 1 [(required) = true, (validate) = true];
 }
 
-// A resource name already allocated within an organization.
-message ResourceNameAlreadyUsed {
-
-  // The resource whose requested name is already allocated.
-  ResourceId id = 1 [(required) = true];
-
-  // The already-allocated resource name.
-  string name = 2 [(required) = true];
-}
-
 // The resource already accepts new access requests,
 // so opening it again is refused and its policy version is left unchanged.
 message ResourceAlreadyOpenedForRequests {

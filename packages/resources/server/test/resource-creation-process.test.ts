@@ -29,10 +29,8 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ResourceAddedSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
 import { ResourceCreatedSchema } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
 import { ResourceCreationRequestedSchema } from "@access-desk/resources-model/generated/access_desk/resources/resource_creation_events_pb.js";
-import {
-  ResourceAlreadyExistsSchema,
-  ResourceNameAlreadyUsedSchema,
-} from "@access-desk/resources-model/generated/access_desk/resources/rejections_pb.js";
+import { ResourceAlreadyExistsSchema } from "@access-desk/resources-model/generated/access_desk/resources/rejections_pb.js";
+import { OrganizationResourceNameAlreadyUsedSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_rejections_pb.js";
 
 import {
   actor,
@@ -64,7 +62,7 @@ describe("ResourceCreationProcessManager should", () => {
       }
     });
 
-    it("reject a name already used in the organization", async () => {
+    it("reject recording a name already used in the organization", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await createOrganization(scope)).kind).toBe("ok");
@@ -73,7 +71,7 @@ describe("ResourceCreationProcessManager should", () => {
         view.resource.some((resource) => resource.id?.uuid === "payroll-1"),
       );
 
-      await expectRejection(box, scope, ResourceNameAlreadyUsedSchema, () =>
+      await expectRejection(box, scope, OrganizationResourceNameAlreadyUsedSchema, () =>
         requestResourceCreation(scope, "payroll-2", "payroll"),
       );
     });

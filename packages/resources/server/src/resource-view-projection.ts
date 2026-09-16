@@ -29,6 +29,7 @@ import { Projection, Subscribe } from "@spine-event-engine/server";
 import {
   type ResourceClosedForRequests,
   type ResourceCreated,
+  type ResourceDeleted,
   type ResourceFallbackApproverAssigned,
   type ResourceOpenedForRequests,
   type ResourcePrimaryApproverAssigned,
@@ -58,6 +59,15 @@ export class ResourceCatalogueProjection extends Projection<
   @Subscribe
   onResourceCreated(event: ResourceCreated): void {
     this.apply(event, event.name, event.description, event.category);
+  }
+
+  /** Removes a deleted resource from catalogue queries. */
+  @Subscribe
+  onResourceDeleted(_event: ResourceDeleted): void {
+    if (this.isDeleted) {
+      return;
+    }
+    this.markDraftDeleted();
   }
 
   /**
@@ -104,6 +114,9 @@ export class ResourceCatalogueProjection extends Projection<
    * @param category The category when supplied by the creation event.
    */
   private apply(event: PolicyEvent, name?: string, description?: string, category?: string): void {
+    if (this.isDeleted) {
+      return;
+    }
     const policy = event.policy;
     if (
       policy === undefined ||

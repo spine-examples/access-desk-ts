@@ -30,6 +30,7 @@ import { Sensitivity } from "@access-desk/resources-model/generated/access_desk/
 import {
   ResourceClosedForRequestsSchema,
   ResourceCreatedSchema,
+  ResourceDeletedSchema,
   ResourceFallbackApproverAssignedSchema,
   ResourceOpenedForRequestsSchema,
   ResourcePrimaryApproverAssignedSchema,
@@ -53,6 +54,7 @@ import {
   assignPrimaryApprover,
   closeResource,
   createResource,
+  deleteResource,
   openResource,
 } from "./given/resource.js";
 import { expectRejection, recordEvents } from "./given/events.js";
@@ -81,6 +83,7 @@ describe("ResourceAggregate should", () => {
         openForRequests: false,
         sensitivity: Sensitivity.RESTRICTED,
         owner: { uuid: "owner" },
+        accessAdministrator: { uuid: "admin" },
         primaryApprover: { uuid: "primary" },
         fallbackApprover: { uuid: "fallback" },
       });
@@ -95,6 +98,21 @@ describe("ResourceAggregate should", () => {
       await expectRejection(box, scope, ResourceAlreadyExistsSchema, () =>
         createResource(scope, "payroll"),
       );
+    });
+  });
+
+  describe("handle 'DeleteResource', and", () => {
+    it("emit 'ResourceDeleted'", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      expect((await createResource(scope, "payroll")).kind).toBe("ok");
+      const events = await recordEvents(scope, ResourceDeletedSchema);
+      try {
+        expect((await deleteResource(scope, "payroll")).kind).toBe("ok");
+        expect((await events.waitFor(box)).id?.uuid).toBe("payroll");
+      } finally {
+        await events.cancel();
+      }
     });
   });
 

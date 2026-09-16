@@ -64,11 +64,22 @@ message CreateResource {
   // The resource owner.
   access_desk.identity.PersonId owner = 8 [(required) = true, (validate) = true];
 
+  // The person who operates the resource's live access, revoking and remediating
+  // its grants.
+  access_desk.identity.PersonId access_administrator = 9 [(required) = true, (validate) = true];
+
   // The initial primary approver of access requests.
-  access_desk.identity.PersonId primary_approver = 9 [(required) = true, (validate) = true];
+  access_desk.identity.PersonId primary_approver = 10 [(required) = true, (validate) = true];
 
   // The initial fallback approver, used when the primary is unavailable.
-  access_desk.identity.PersonId fallback_approver = 10 [(required) = true, (validate) = true];
+  access_desk.identity.PersonId fallback_approver = 11 [(required) = true, (validate) = true];
+}
+
+// Deletes a resource that must be removed from its organization.
+message DeleteResource {
+
+  // The resource to delete.
+  ResourceId id = 1 [(validate) = true];
 }
 
 // Assigns a resource's primary approver, advancing the policy version.

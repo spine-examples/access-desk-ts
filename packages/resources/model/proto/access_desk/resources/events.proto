@@ -54,6 +54,13 @@ message ResourceCreated {
   ResourcePolicy policy = 5 [(required) = true];
 }
 
+// A resource was deleted and can no longer receive access requests.
+message ResourceDeleted {
+
+  // The resource that was deleted.
+  ResourceId id = 1 [(required) = true, (validate) = true];
+}
+
 // A resource's primary approver was assigned, yielding the next policy version.
 message ResourcePrimaryApproverAssigned {
 

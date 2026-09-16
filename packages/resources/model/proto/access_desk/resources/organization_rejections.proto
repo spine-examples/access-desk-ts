@@ -50,3 +50,13 @@ message OrganizationMemberAlreadyAdded {
   // The person who is already a member.
   access_desk.identity.PersonId person = 2 [(required) = true, (validate) = true];
 }
+
+// A resource name already reserved by a different resource in this organization.
+message OrganizationResourceNameAlreadyUsed {
+
+  // The resource whose organization recording was refused.
+  ResourceId resource_id = 1 [(required) = true, (validate) = true];
+
+  // The already-reserved resource name.
+  string name = 2 [(required) = true];
+}

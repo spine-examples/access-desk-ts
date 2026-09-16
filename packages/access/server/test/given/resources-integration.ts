@@ -46,6 +46,7 @@ export function resourcePolicy(
     openForRequests: false,
     sensitivity: Sensitivity.RESTRICTED,
     owner: { uuid: "owner" },
+    accessAdministrator: { uuid: "admin" },
     accessLevel: [create(AccessLevelSchema, { name: "Read", rank: 1 })],
     maximumDuration: { seconds: 3600n },
     primaryApprover: { uuid: "primary" },

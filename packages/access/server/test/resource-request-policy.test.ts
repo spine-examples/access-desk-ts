@@ -29,6 +29,7 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   ResourceClosedForRequestsSchema,
   ResourceCreatedSchema,
+  ResourceDeletedSchema,
   ResourceFallbackApproverAssignedSchema,
   ResourceOpenedForRequestsSchema,
   ResourcePrimaryApproverAssignedSchema,
@@ -171,5 +172,24 @@ describe("ResourceRequestPolicyProjection should", () => {
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]?.policy).toMatchObject({ openForRequests: false, policyVersion: 2n });
+  });
+
+  it("removes a deleted resource", async () => {
+    const box = await accessBlackBox();
+    const scope = box.onBehalfOf(actor);
+    const resourcesScope = box.onBehalfOf(resourcesSystemActor);
+    const created = {
+      id: resourceId,
+      name: "payroll",
+      description: "Payroll production",
+      category: "application",
+      policy: resourcePolicy({ policyVersion: 1n }),
+    };
+
+    await publishResourceFact(resourcesScope, ResourceCreatedSchema, created);
+    await box.eventually(() => readPolicies(scope), (rows) => rows.length === 1);
+    await publishResourceFact(resourcesScope, ResourceDeletedSchema, { id: resourceId });
+    const deleted = await box.eventually(() => readPolicies(scope), (rows) => rows.length === 0);
+    expect(deleted).toHaveLength(0);
   });
 });

@@ -31,6 +31,7 @@ import {
   ResourceFallbackApproverAssignedSchema,
   ResourceOpenedForRequestsSchema,
   ResourcePrimaryApproverAssignedSchema,
+  ResourceDeletedSchema,
 } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
 import { type ResourceId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
 import { ResourceRequestPolicyProjection } from "./resource-request-policy-projection.js";
@@ -50,7 +51,8 @@ export async function createAccessContext(): Promise<BoundedContext> {
       event.id === undefined ? [] : [event.id],
     )
     .route(ResourceOpenedForRequestsSchema, (event) => (event.id === undefined ? [] : [event.id]))
-    .route(ResourceClosedForRequestsSchema, (event) => (event.id === undefined ? [] : [event.id]));
+    .route(ResourceClosedForRequestsSchema, (event) => (event.id === undefined ? [] : [event.id]))
+    .route(ResourceDeletedSchema, (event) => (event.id === undefined ? [] : [event.id]));
   const builder = BoundedContext.multitenant("Access")
     .withGeneratedRegistryRoot(new URL("..", import.meta.url))
     .add(ResourceRequestPolicyProjection, { eventRouting });

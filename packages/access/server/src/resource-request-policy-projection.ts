@@ -32,6 +32,7 @@ import {
   type ResourceFallbackApproverAssigned,
   type ResourceOpenedForRequests,
   type ResourcePrimaryApproverAssigned,
+  type ResourceDeleted,
 } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
 import { type ResourceId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
 import { ResourceRequestPolicySchema } from "@access-desk/access-model/generated/access_desk/access/resource_request_policy_pb.js";
@@ -95,6 +96,15 @@ export class ResourceRequestPolicyProjection extends Projection<
     this.apply(event);
   }
 
+  /** Removes a deleted resource from Access policy queries. */
+  @Subscribe
+  onResourceDeleted(_event: External<ResourceDeleted>): void {
+    if (this.isDeleted) {
+      return;
+    }
+    this.markDraftDeleted();
+  }
+
   /**
    * Stores a complete external policy only when it cannot regress this resource's version.
    *
@@ -104,6 +114,9 @@ export class ResourceRequestPolicyProjection extends Projection<
    * @param event The complete external policy fact to apply.
    */
   private apply(event: PolicyEvent): void {
+    if (this.isDeleted) {
+      return;
+    }
     const policy = event.policy;
     if (
       policy === undefined ||
