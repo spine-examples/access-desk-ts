@@ -33,8 +33,6 @@ import {
   resourcesBlackBox,
 } from "./given/resources-context.js";
 import {
-  assignFallbackApprover,
-  assignPrimaryApprover,
   awaitCatalogueItem,
   closeResource,
   createResource,
@@ -59,44 +57,7 @@ describe("ResourceCatalogueProjection should", () => {
       expect(item.category).toBe("application");
       expect(item.policy?.policyVersion).toBe(1n);
       expect(item.policy?.openForRequests).toBe(false);
-    });
-  });
-
-  describe("react on 'ResourcePrimaryApproverAssigned', and", () => {
-    it("record the new primary approver at the next version", async () => {
-      const box = await resourcesBlackBox();
-      const scope = box.onBehalfOf(actor);
-      expect((await createResource(scope, "payroll")).kind).toBe("ok");
-
-      expect((await assignPrimaryApprover(scope, "payroll", "dana")).kind).toBe("ok");
-
-      const item = await awaitCatalogueItem(
-        box,
-        scope,
-        "payroll",
-        (i) => i.policy?.policyVersion === 2n,
-      );
-      expect(item.policy?.primaryApprover?.uuid).toBe("dana");
-      expect(item.name).toBe("payroll");
-      expect(item.category).toBe("application");
-    });
-  });
-
-  describe("react on 'ResourceFallbackApproverAssigned', and", () => {
-    it("record the new fallback approver at the next version", async () => {
-      const box = await resourcesBlackBox();
-      const scope = box.onBehalfOf(actor);
-      expect((await createResource(scope, "payroll")).kind).toBe("ok");
-
-      expect((await assignFallbackApprover(scope, "payroll", "erin")).kind).toBe("ok");
-
-      const item = await awaitCatalogueItem(
-        box,
-        scope,
-        "payroll",
-        (i) => i.policy?.policyVersion === 2n,
-      );
-      expect(item.policy?.fallbackApprover?.uuid).toBe("erin");
+      expect(item.policy?.manager.map((person) => person.uuid)).toEqual(["manager"]);
     });
   });
 
@@ -143,23 +104,22 @@ describe("ResourceCatalogueProjection should", () => {
     const scope = box.onBehalfOf(actor);
     expect((await createResource(scope, "payroll")).kind).toBe("ok");
 
-    expect((await assignPrimaryApprover(scope, "payroll", "dana")).kind).toBe("ok");
     expect((await openResource(scope, "payroll")).kind).toBe("ok");
     expect((await closeResource(scope, "payroll")).kind).toBe("ok");
 
-    // Version 4: created (1) -> approver (2) -> opened (3) -> closed (4).
+    // Version 3: created (1) -> opened (2) -> closed (3).
     const item = await awaitCatalogueItem(
       box,
       scope,
       "payroll",
-      (i) => i.policy?.policyVersion === 4n,
+      (i) => i.policy?.policyVersion === 3n,
     );
     // The creation-only fields survive every later policy event.
     expect(item.name).toBe("payroll");
     expect(item.description).toBe("Payroll production");
     expect(item.category).toBe("application");
-    // The latest policy is in force.
-    expect(item.policy?.primaryApprover?.uuid).toBe("dana");
+    // The latest policy is in force, and the managers set at creation are retained.
+    expect(item.policy?.manager.map((person) => person.uuid)).toEqual(["manager"]);
     expect(item.policy?.openForRequests).toBe(false);
   });
 });

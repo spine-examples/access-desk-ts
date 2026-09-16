@@ -30,14 +30,9 @@ import {
   ResourceClosedForRequestsSchema,
   ResourceCreatedSchema,
   ResourceDeletedSchema,
-  ResourceFallbackApproverAssignedSchema,
   ResourceOpenedForRequestsSchema,
-  ResourcePrimaryApproverAssignedSchema,
 } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
-import {
-  Sensitivity,
-  type ResourcePolicy,
-} from "@access-desk/resources-model/generated/access_desk/resources/values_pb.js";
+import { Sensitivity } from "@access-desk/resources-model/generated/access_desk/resources/values_pb.js";
 import {
   ResourceRequestPolicySchema,
   type ResourceRequestPolicy,
@@ -58,16 +53,6 @@ import {
 import { type BlackBoxScope } from "@spine-event-engine/testing";
 
 const resourceId = { uuid: "payroll" };
-const dana = person("dana");
-const erin = person("erin");
-
-function person(uuid: string): NonNullable<ResourcePolicy["primaryApprover"]> {
-  const defaultPerson = resourcePolicy().primaryApprover;
-  if (defaultPerson === undefined) {
-    throw new Error("The resource policy test fixture must include a primary approver.");
-  }
-  return { ...defaultPerson, uuid };
-}
 
 function readPolicies(scope: BlackBoxScope): Promise<readonly ResourceRequestPolicy[]> {
   return readAll(scope, ResourceRequestPolicySchema, "query-resource-request-policy");
@@ -93,50 +78,27 @@ describe("ResourceRequestPolicyProjection should", () => {
       category: "application",
       policy: resourcePolicy({ policyVersion: 1n }),
     });
-    await publishResourceFact(resourcesScope, ResourcePrimaryApproverAssignedSchema, {
-      id: resourceId,
-      policy: resourcePolicy({ primaryApprover: dana, policyVersion: 2n }),
-    });
-    await publishResourceFact(resourcesScope, ResourceFallbackApproverAssignedSchema, {
-      id: resourceId,
-      policy: resourcePolicy({
-        primaryApprover: dana,
-        fallbackApprover: erin,
-        policyVersion: 3n,
-      }),
-    });
     await publishResourceFact(resourcesScope, ResourceOpenedForRequestsSchema, {
       id: resourceId,
-      policy: resourcePolicy({
-        primaryApprover: dana,
-        fallbackApprover: erin,
-        openForRequests: true,
-        policyVersion: 4n,
-      }),
+      policy: resourcePolicy({ openForRequests: true, policyVersion: 2n }),
     });
     await publishResourceFact(resourcesScope, ResourceClosedForRequestsSchema, {
       id: resourceId,
-      policy: resourcePolicy({
-        primaryApprover: dana,
-        fallbackApprover: erin,
-        policyVersion: 5n,
-      }),
+      policy: resourcePolicy({ policyVersion: 3n }),
     });
 
     const rows = await box.eventually(
       () => readPolicies(scope),
-      (candidate) => candidate[0]?.policy?.policyVersion === 5n,
+      (candidate) => candidate[0]?.policy?.policyVersion === 3n,
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]?.resource?.uuid).toBe("payroll");
     expect(rows[0]?.policy).toMatchObject({
       openForRequests: false,
       sensitivity: Sensitivity.RESTRICTED,
-      policyVersion: 5n,
-      owner: { uuid: "owner" },
-      primaryApprover: { uuid: "dana" },
-      fallbackApprover: { uuid: "erin" },
+      policyVersion: 3n,
     });
+    expect(rows[0]?.policy?.manager.map((person) => person.uuid)).toEqual(["manager"]);
     expect(rows[0]?.policy?.accessLevel).toMatchObject([{ name: "Read", rank: 1 }]);
   });
 

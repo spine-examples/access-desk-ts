@@ -28,8 +28,6 @@ import { create } from "@bufbuild/protobuf";
 import { type BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
 
 import {
-  AssignResourceFallbackApproverSchema,
-  AssignResourcePrimaryApproverSchema,
   CloseResourceForRequestsSchema,
   CreateResourceSchema,
   DeleteResourceSchema,
@@ -54,12 +52,9 @@ export interface ResourceDraft {
   readonly description: string;
   readonly category: string;
   readonly sensitivity: Sensitivity;
+  readonly manager: { readonly uuid: string }[];
   readonly accessLevel: AccessLevel[];
   readonly maximumDuration: { readonly seconds: bigint };
-  readonly owner: { readonly uuid: string };
-  readonly accessAdministrator: { readonly uuid: string };
-  readonly primaryApprover: { readonly uuid: string };
-  readonly fallbackApprover: { readonly uuid: string };
 }
 
 /** A restricted, read-only payroll resource used as the baseline in every spec. */
@@ -69,12 +64,9 @@ export function resourceDraft(overrides: Partial<ResourceDraft> = {}): ResourceD
     description: "Payroll production",
     category: "application",
     sensitivity: Sensitivity.RESTRICTED,
+    manager: [{ uuid: "manager" }],
     accessLevel: [create(AccessLevelSchema, { name: "Read", rank: 1 })],
     maximumDuration: { seconds: 3600n },
-    owner: { uuid: "owner" },
-    accessAdministrator: { uuid: "admin" },
-    primaryApprover: { uuid: "primary" },
-    fallbackApprover: { uuid: "fallback" },
     ...overrides,
   };
 }
@@ -115,28 +107,6 @@ export function registerResource(
       id: { uuid: resource },
       organizationId: { uuid: organizationId },
       ...resourceDraft({ name, ...overrides }),
-    }),
-  );
-}
-
-/** Posts `AssignResourcePrimaryApprover` for the resource. */
-export function assignPrimaryApprover(scope: BlackBoxScope, resource: string, approver: string) {
-  return scope.post(
-    AssignResourcePrimaryApproverSchema,
-    create(AssignResourcePrimaryApproverSchema, {
-      id: { uuid: resource },
-      approver: { uuid: approver },
-    }),
-  );
-}
-
-/** Posts `AssignResourceFallbackApprover` for the resource. */
-export function assignFallbackApprover(scope: BlackBoxScope, resource: string, approver: string) {
-  return scope.post(
-    AssignResourceFallbackApproverSchema,
-    create(AssignResourceFallbackApproverSchema, {
-      id: { uuid: resource },
-      approver: { uuid: approver },
     }),
   );
 }

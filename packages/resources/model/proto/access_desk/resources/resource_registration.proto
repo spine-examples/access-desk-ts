@@ -66,21 +66,12 @@ message ResourceRegistration {
   // The requested data-sensitivity classification.
   Sensitivity sensitivity = 6;
 
+  // The requested resource managers.
+  repeated access_desk.identity.PersonId manager = 7;
+
   // The requested access levels.
-  repeated AccessLevel access_level = 7;
+  repeated AccessLevel access_level = 8;
 
   // The requested maximum access duration.
-  google.protobuf.Duration maximum_duration = 8;
-
-  // The requested resource owner.
-  access_desk.identity.PersonId owner = 9;
-
-  // The requested access administrator.
-  access_desk.identity.PersonId access_administrator = 10;
-
-  // The requested primary approver.
-  access_desk.identity.PersonId primary_approver = 11;
-
-  // The requested fallback approver.
-  access_desk.identity.PersonId fallback_approver = 12;
+  google.protobuf.Duration maximum_duration = 9;
 }

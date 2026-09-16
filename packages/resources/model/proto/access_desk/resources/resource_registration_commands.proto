@@ -65,22 +65,12 @@ message RegisterResource {
   // The data-sensitivity classification of the resource.
   Sensitivity sensitivity = 6 [(required) = true];
 
+  // The people who manage the resource; at least one is required.
+  repeated access_desk.identity.PersonId manager = 7 [(required) = true, (validate) = true];
+
   // The access levels offered by this resource, ordered from weakest to strongest.
-  repeated AccessLevel access_level = 7 [(required) = true, (validate) = true];
+  repeated AccessLevel access_level = 8 [(required) = true, (validate) = true];
 
   // The maximum permitted access duration, at one-minute granularity.
-  google.protobuf.Duration maximum_duration = 8 [(required) = true];
-
-  // The resource owner.
-  access_desk.identity.PersonId owner = 9 [(required) = true, (validate) = true];
-
-  // The person who operates the resource's live access, revoking and remediating
-  // its grants.
-  access_desk.identity.PersonId access_administrator = 10 [(required) = true, (validate) = true];
-
-  // The initial primary approver of access requests.
-  access_desk.identity.PersonId primary_approver = 11 [(required) = true, (validate) = true];
-
-  // The initial fallback approver, used when the primary is unavailable.
-  access_desk.identity.PersonId fallback_approver = 12 [(required) = true, (validate) = true];
+  google.protobuf.Duration maximum_duration = 9 [(required) = true];
 }

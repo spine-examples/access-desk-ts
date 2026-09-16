@@ -61,26 +61,6 @@ message ResourceDeleted {
   ResourceId id = 1 [(required) = true, (validate) = true];
 }
 
-// A resource's primary approver was assigned, yielding the next policy version.
-message ResourcePrimaryApproverAssigned {
-
-  // The resource whose policy changed.
-  ResourceId id = 1 [(required) = true, (validate) = true];
-
-  // The complete next version of the resource policy.
-  ResourcePolicy policy = 2 [(required) = true];
-}
-
-// A resource's fallback approver was assigned, yielding the next policy version.
-message ResourceFallbackApproverAssigned {
-
-  // The resource whose policy changed.
-  ResourceId id = 1 [(required) = true, (validate) = true];
-
-  // The complete next version of the resource policy.
-  ResourcePolicy policy = 2 [(required) = true];
-}
-
 // A resource was opened to new access requests, yielding the next policy version.
 message ResourceOpenedForRequests {
 

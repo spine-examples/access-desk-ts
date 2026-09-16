@@ -17,7 +17,7 @@ Five contexts (`references/architecture.md`):
 | Context    | Owns                                                    | Tenancy                  |
 | ---------- | ------------------------------------------------------- | ------------------------ |
 | Identity   | Global users, registration, auth identity               | Global / single-tenant   |
-| Resources  | Organizations, membership, resources, policy, approvers | Org-scoped (multitenant) |
+| Resources  | Organizations, membership, resources, policy, managers  | Org-scoped (multitenant) |
 | Access     | Requests, approvals, grants, extensions, revocation     | Org-scoped (multitenant) |
 | Scheduling | Durable dispatch of allowlisted commands                | Org-scoped (multitenant) |
 | Audit      | Immutable, redacted audit projections                   | Org-scoped (multitenant) |

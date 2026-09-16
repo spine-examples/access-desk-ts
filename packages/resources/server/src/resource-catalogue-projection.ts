@@ -30,17 +30,13 @@ import {
   type ResourceClosedForRequests,
   type ResourceCreated,
   type ResourceDeleted,
-  type ResourceFallbackApproverAssigned,
   type ResourceOpenedForRequests,
-  type ResourcePrimaryApproverAssigned,
 } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
 import { type ResourceId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
 import { ResourceCatalogueItemSchema } from "@access-desk/resources-model/generated/access_desk/resources/resource_pb.js";
 
 type PolicyEvent =
   | ResourceCreated
-  | ResourcePrimaryApproverAssigned
-  | ResourceFallbackApproverAssigned
   | ResourceOpenedForRequests
   | ResourceClosedForRequests;
 
@@ -68,22 +64,6 @@ export class ResourceCatalogueProjection extends Projection<
       return;
     }
     this.markDraftDeleted();
-  }
-
-  /**
-   * Updates the catalogue policy after the primary approver changes.
-   */
-  @Subscribe
-  onResourcePrimaryApproverAssigned(event: ResourcePrimaryApproverAssigned): void {
-    this.apply(event);
-  }
-
-  /**
-   * Updates the catalogue policy after the fallback approver changes.
-   */
-  @Subscribe
-  onResourceFallbackApproverAssigned(event: ResourceFallbackApproverAssigned): void {
-    this.apply(event);
   }
 
   /**

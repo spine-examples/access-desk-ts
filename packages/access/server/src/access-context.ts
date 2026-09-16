@@ -28,9 +28,7 @@ import { BoundedContext, EventRouting } from "@spine-event-engine/server";
 import {
   ResourceClosedForRequestsSchema,
   ResourceCreatedSchema,
-  ResourceFallbackApproverAssignedSchema,
   ResourceOpenedForRequestsSchema,
-  ResourcePrimaryApproverAssignedSchema,
   ResourceDeletedSchema,
 } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
 import { type ResourceId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
@@ -44,12 +42,6 @@ import { ResourceRequestPolicyProjection } from "./resource-request-policy-proje
 export async function createAccessContext(): Promise<BoundedContext> {
   const eventRouting = EventRouting.create<ResourceId>()
     .route(ResourceCreatedSchema, (event) => (event.id === undefined ? [] : [event.id]))
-    .route(ResourcePrimaryApproverAssignedSchema, (event) =>
-      event.id === undefined ? [] : [event.id],
-    )
-    .route(ResourceFallbackApproverAssignedSchema, (event) =>
-      event.id === undefined ? [] : [event.id],
-    )
     .route(ResourceOpenedForRequestsSchema, (event) => (event.id === undefined ? [] : [event.id]))
     .route(ResourceClosedForRequestsSchema, (event) => (event.id === undefined ? [] : [event.id]))
     .route(ResourceDeletedSchema, (event) => (event.id === undefined ? [] : [event.id]));

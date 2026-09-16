@@ -27,8 +27,6 @@
 import { create } from "@bufbuild/protobuf";
 import { Aggregate, Assign, Throws } from "@spine-event-engine/server";
 import {
-  type AssignResourceFallbackApprover,
-  type AssignResourcePrimaryApprover,
   type CloseResourceForRequests,
   type CreateResource,
   type DeleteResource,
@@ -41,12 +39,8 @@ import {
   ResourceCreatedSchema,
   type ResourceDeleted,
   ResourceDeletedSchema,
-  type ResourceFallbackApproverAssigned,
-  ResourceFallbackApproverAssignedSchema,
   type ResourceOpenedForRequests,
   ResourceOpenedForRequestsSchema,
-  type ResourcePrimaryApproverAssigned,
-  ResourcePrimaryApproverAssignedSchema,
 } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
 import { type ResourceId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
 import { ResourceSchema } from "@access-desk/resources-model/generated/access_desk/resources/resource_pb.js";
@@ -54,8 +48,6 @@ import {
   ResourceAlreadyClosedForRequests,
   ResourceAlreadyExists,
   ResourceAlreadyOpenedForRequests,
-  ResourceFallbackApproverAlreadyAssigned,
-  ResourcePrimaryApproverAlreadyAssigned,
 } from "@access-desk/resources-model/generated/access_desk/resources/rejections.js";
 import {
   ResourcePolicySchema,
@@ -84,12 +76,9 @@ export class ResourceAggregate extends Aggregate<ResourceId, typeof ResourceSche
     const policy = create(ResourcePolicySchema, {
       openForRequests: false,
       sensitivity: command.sensitivity,
-      owner: command.owner,
-      accessAdministrator: command.accessAdministrator,
+      manager: command.manager,
       accessLevel: command.accessLevel,
       maximumDuration: command.maximumDuration,
-      primaryApprover: command.primaryApprover,
-      fallbackApprover: command.fallbackApprover,
       policyVersion: 1n,
     });
     this.update((draft) => {
@@ -118,44 +107,6 @@ export class ResourceAggregate extends Aggregate<ResourceId, typeof ResourceSche
   deleteResource(_command: DeleteResource): ResourceDeleted {
     this.markDraftDeleted();
     return create(ResourceDeletedSchema, { id: this.id });
-  }
-
-  /**
-   * Assigns a new primary approver and publishes the complete next policy.
-   *
-   * Rejects a no-op reassignment of the person already holding the role, leaving
-   * the policy version untouched.
-   */
-  @Assign
-  @Throws(ResourcePrimaryApproverAlreadyAssigned)
-  assignResourcePrimaryApprover(
-    command: AssignResourcePrimaryApprover,
-  ): ResourcePrimaryApproverAssigned {
-    const approver = command.approver;
-    if (approver !== undefined && this.state.policy?.primaryApprover?.uuid === approver.uuid) {
-      throw ResourcePrimaryApproverAlreadyAssigned.create({ id: this.id, approver });
-    }
-    const policy = this.nextPolicy({ primaryApprover: approver });
-    return create(ResourcePrimaryApproverAssignedSchema, { id: this.id, policy });
-  }
-
-  /**
-   * Assigns a new fallback approver and publishes the complete next policy.
-   *
-   * Rejects a no-op reassignment of the person already holding the role, leaving
-   * the policy version untouched.
-   */
-  @Assign
-  @Throws(ResourceFallbackApproverAlreadyAssigned)
-  assignResourceFallbackApprover(
-    command: AssignResourceFallbackApprover,
-  ): ResourceFallbackApproverAssigned {
-    const approver = command.approver;
-    if (approver !== undefined && this.state.policy?.fallbackApprover?.uuid === approver.uuid) {
-      throw ResourceFallbackApproverAlreadyAssigned.create({ id: this.id, approver });
-    }
-    const policy = this.nextPolicy({ fallbackApprover: approver });
-    return create(ResourceFallbackApproverAssignedSchema, { id: this.id, policy });
   }
 
   /**
@@ -191,12 +142,9 @@ export class ResourceAggregate extends Aggregate<ResourceId, typeof ResourceSche
     const policy = create(ResourcePolicySchema, {
       openForRequests: current.openForRequests,
       sensitivity: current.sensitivity,
-      owner: current.owner,
-      accessAdministrator: current.accessAdministrator,
+      manager: current.manager,
       accessLevel: current.accessLevel,
       maximumDuration: current.maximumDuration,
-      primaryApprover: current.primaryApprover,
-      fallbackApprover: current.fallbackApprover,
       ...change,
       policyVersion: current.policyVersion + 1n,
     });

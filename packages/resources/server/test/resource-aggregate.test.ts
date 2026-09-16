@@ -31,16 +31,12 @@ import {
   ResourceClosedForRequestsSchema,
   ResourceCreatedSchema,
   ResourceDeletedSchema,
-  ResourceFallbackApproverAssignedSchema,
   ResourceOpenedForRequestsSchema,
-  ResourcePrimaryApproverAssignedSchema,
 } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
 import {
   ResourceAlreadyClosedForRequestsSchema,
   ResourceAlreadyExistsSchema,
   ResourceAlreadyOpenedForRequestsSchema,
-  ResourceFallbackApproverAlreadyAssignedSchema,
-  ResourcePrimaryApproverAlreadyAssignedSchema,
 } from "@access-desk/resources-model/generated/access_desk/resources/rejections_pb.js";
 
 import {
@@ -50,8 +46,6 @@ import {
   resourcesBlackBox,
 } from "./given/resources-context.js";
 import {
-  assignFallbackApprover,
-  assignPrimaryApprover,
   closeResource,
   createResource,
   deleteResource,
@@ -82,10 +76,7 @@ describe("ResourceAggregate should", () => {
       expect(event.policy).toMatchObject({
         openForRequests: false,
         sensitivity: Sensitivity.RESTRICTED,
-        owner: { uuid: "owner" },
-        accessAdministrator: { uuid: "admin" },
-        primaryApprover: { uuid: "primary" },
-        fallbackApprover: { uuid: "fallback" },
+        manager: [{ uuid: "manager" }],
       });
       await events.cancel();
     });
@@ -113,65 +104,6 @@ describe("ResourceAggregate should", () => {
       } finally {
         await events.cancel();
       }
-    });
-  });
-
-  describe("handle 'AssignResourcePrimaryApprover', and", () => {
-    it("emit 'ResourcePrimaryApproverAssigned' with the complete next policy", async () => {
-      const box = await resourcesBlackBox();
-      const scope = box.onBehalfOf(actor);
-      expect((await createResource(scope, "payroll")).kind).toBe("ok");
-      const events = await recordEvents(scope, ResourcePrimaryApproverAssignedSchema);
-
-      expect((await assignPrimaryApprover(scope, "payroll", "dana")).kind).toBe("ok");
-
-      const event = await events.waitFor(box);
-      expect(event.id?.uuid).toBe("payroll");
-      expect(event.policy?.policyVersion).toBe(2n);
-      expect(event.policy?.primaryApprover?.uuid).toBe("dana");
-      // The complete next policy carries the unchanged fields forward.
-      expect(event.policy?.sensitivity).toBe(Sensitivity.RESTRICTED);
-      await events.cancel();
-    });
-
-    it("reject reassigning the current primary approver", async () => {
-      const box = await resourcesBlackBox();
-      const scope = box.onBehalfOf(actor);
-      expect((await createResource(scope, "payroll")).kind).toBe("ok");
-      expect((await assignPrimaryApprover(scope, "payroll", "dana")).kind).toBe("ok");
-
-      await expectRejection(box, scope, ResourcePrimaryApproverAlreadyAssignedSchema, () =>
-        assignPrimaryApprover(scope, "payroll", "dana"),
-      );
-    });
-  });
-
-  describe("handle 'AssignResourceFallbackApprover', and", () => {
-    it("emit 'ResourceFallbackApproverAssigned' with the complete next policy", async () => {
-      const box = await resourcesBlackBox();
-      const scope = box.onBehalfOf(actor);
-      expect((await createResource(scope, "payroll")).kind).toBe("ok");
-      const events = await recordEvents(scope, ResourceFallbackApproverAssignedSchema);
-
-      expect((await assignFallbackApprover(scope, "payroll", "erin")).kind).toBe("ok");
-
-      const event = await events.waitFor(box);
-      expect(event.id?.uuid).toBe("payroll");
-      expect(event.policy?.policyVersion).toBe(2n);
-      expect(event.policy?.fallbackApprover?.uuid).toBe("erin");
-      expect(event.policy?.sensitivity).toBe(Sensitivity.RESTRICTED);
-      await events.cancel();
-    });
-
-    it("reject reassigning the current fallback approver", async () => {
-      const box = await resourcesBlackBox();
-      const scope = box.onBehalfOf(actor);
-      expect((await createResource(scope, "payroll")).kind).toBe("ok");
-      expect((await assignFallbackApprover(scope, "payroll", "erin")).kind).toBe("ok");
-
-      await expectRejection(box, scope, ResourceFallbackApproverAlreadyAssignedSchema, () =>
-        assignFallbackApprover(scope, "payroll", "erin"),
-      );
     });
   });
 

@@ -29,20 +29,13 @@ import { type External, Projection, Subscribe } from "@spine-event-engine/server
 import {
   type ResourceClosedForRequests,
   type ResourceCreated,
-  type ResourceFallbackApproverAssigned,
   type ResourceOpenedForRequests,
-  type ResourcePrimaryApproverAssigned,
   type ResourceDeleted,
 } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
 import { type ResourceId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
 import { ResourceRequestPolicySchema } from "@access-desk/access-model/generated/access_desk/access/resource_request_policy_pb.js";
 
-type PolicyEvent =
-  | ResourceCreated
-  | ResourcePrimaryApproverAssigned
-  | ResourceFallbackApproverAssigned
-  | ResourceOpenedForRequests
-  | ResourceClosedForRequests;
+type PolicyEvent = ResourceCreated | ResourceOpenedForRequests | ResourceClosedForRequests;
 
 /**
  * Each resource's access rules as the Access context knows them, so it can
@@ -61,22 +54,6 @@ export class ResourceRequestPolicyProjection extends Projection<
    */
   @Subscribe
   onResourceCreated(event: External<ResourceCreated>): void {
-    this.apply(event);
-  }
-
-  /**
-   * Applies a newer complete policy after the primary approver changes.
-   */
-  @Subscribe
-  onResourcePrimaryApproverAssigned(event: External<ResourcePrimaryApproverAssigned>): void {
-    this.apply(event);
-  }
-
-  /**
-   * Applies a newer complete policy after the fallback approver changes.
-   */
-  @Subscribe
-  onResourceFallbackApproverAssigned(event: External<ResourceFallbackApproverAssigned>): void {
     this.apply(event);
   }
 

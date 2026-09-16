@@ -87,12 +87,9 @@ export class ResourceRegistrationProcessManager extends ProcessManager<
           description: command.description,
           category: command.category,
           sensitivity: command.sensitivity,
+          manager: command.manager,
           accessLevel: command.accessLevel,
           maximumDuration: command.maximumDuration,
-          owner: command.owner,
-          accessAdministrator: command.accessAdministrator,
-          primaryApprover: command.primaryApprover,
-          fallbackApprover: command.fallbackApprover,
         }),
       );
     });
@@ -111,12 +108,9 @@ export class ResourceRegistrationProcessManager extends ProcessManager<
       description: state.description,
       category: state.category,
       sensitivity: state.sensitivity,
+      manager: state.manager,
       accessLevel: state.accessLevel,
       maximumDuration: state.maximumDuration,
-      owner: state.owner,
-      accessAdministrator: state.accessAdministrator,
-      primaryApprover: state.primaryApprover,
-      fallbackApprover: state.fallbackApprover,
     });
   }
 
