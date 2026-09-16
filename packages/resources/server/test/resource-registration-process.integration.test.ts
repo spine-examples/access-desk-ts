@@ -28,7 +28,10 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { ResourceAddedSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
 import { ResourceCreatedSchema } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
-import { ResourceRegistrationRequestedSchema } from "@access-desk/resources-model/generated/access_desk/resources/resource_registration_events_pb.js";
+import {
+  ResourceRegisteredSchema,
+  ResourceRegistrationRequestedSchema,
+} from "@access-desk/resources-model/generated/access_desk/resources/resource_registration_events_pb.js";
 
 import {
   actor,
@@ -55,6 +58,7 @@ describe("ResourceRegistrationProcessManager should", () => {
     const requested = await recordEvents(scope, ResourceRegistrationRequestedSchema);
     const created = await recordEvents(scope, ResourceCreatedSchema);
     const added = await recordEvents(scope, ResourceAddedSchema);
+    const registered = await recordEvents(scope, ResourceRegisteredSchema);
     try {
       expect((await registerResource(scope, "payroll")).kind).toBe("ok");
 
@@ -67,15 +71,21 @@ describe("ResourceRegistrationProcessManager should", () => {
         policy: { policyVersion: 1n },
       });
 
-      // The ResourceAdded fact completes the process by recording the resource
-      // in its organization's view.
+      // ResourceAdded records the resource in its organization's view, then the
+      // registration process emits its terminal fact and deletes itself.
       expect((await added.waitFor(box)).resourceId?.uuid).toBe("payroll");
+      expect((await registered.waitFor(box)).id?.uuid).toBe("payroll");
       const views = await awaitOrganizationView(box, scope, (view) =>
         view.resource.some((resource) => resource.id?.uuid === "payroll"),
       );
       expect(views[0]?.resource.some((resource) => resource.id?.uuid === "payroll")).toBe(true);
     } finally {
-      await Promise.all([requested.cancel(), created.cancel(), added.cancel()]);
+      await Promise.all([
+        requested.cancel(),
+        created.cancel(),
+        added.cancel(),
+        registered.cancel(),
+      ]);
     }
   });
 });

@@ -25,7 +25,7 @@
  */
 
 import { create } from "@bufbuild/protobuf";
-import { Assign, Command, ProcessManager, Subscribe } from "@spine-event-engine/server";
+import { Assign, Command, ProcessManager, React } from "@spine-event-engine/server";
 import {
   AddResourceSchema,
   type AddResource,
@@ -46,6 +46,10 @@ import {
 import {
   ResourceRegistrationRequestedSchema,
   type ResourceRegistrationRequested,
+  ResourceRegisteredSchema,
+  type ResourceRegistered,
+  ResourceRegistrationFailedSchema,
+  type ResourceRegistrationFailed,
 } from "@access-desk/resources-model/generated/access_desk/resources/resource_registration_events_pb.js";
 import { type ResourceId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
 import { ResourceRegistrationSchema } from "@access-desk/resources-model/generated/access_desk/resources/resource_registration_pb.js";
@@ -60,7 +64,7 @@ import { type ResourceAlreadyExists } from "@access-desk/resources-model/generat
  *    organization rejects the recording when the name is already used.
  * 4. If recording is rejected because the name is taken, the unchanged resource
  *    is deleted. A changed resource stops for manual resolution.
- * 5. The registration is complete and the process deletes itself after recording
+ * 5. The process emits a registration result and deletes itself after recording
  *    or deletion.
  */
 export class ResourceRegistrationProcessManager extends ProcessManager<
@@ -139,32 +143,35 @@ export class ResourceRegistrationProcessManager extends ProcessManager<
   }
 
   /**
-   * Abandons the registration when the resource already exists, deleting the process.
+   * Announces failed registration and deletes the process when the resource already exists.
    */
-  @Subscribe
-  onResourceAlreadyExists(_rejection: ResourceAlreadyExists): void {
-    if (this.isDeleted) {
-      return;
+  @React
+  onResourceAlreadyExists(_rejection: ResourceAlreadyExists): ResourceRegistrationFailed {
+    if (!this.isDeleted) {
+      this.markDraftDeleted();
     }
-    this.markDraftDeleted();
+    return create(ResourceRegistrationFailedSchema, { id: this.id });
   }
 
   /**
-   * Completes and deletes the process once the resource belongs to the organization.
+   * Announces successful registration and deletes the process once the resource belongs to the organization.
    */
-  @Subscribe
-  onResourceAdded(_event: ResourceAdded): void {
-    if (this.isDeleted) {
-      return;
+  @React
+  onResourceAdded(_event: ResourceAdded): ResourceRegistered {
+    if (!this.isDeleted) {
+      this.markDraftDeleted();
     }
-    this.markDraftDeleted();
+    return create(ResourceRegisteredSchema, { id: this.id });
   }
 
   /**
-   * Completes compensation after the unrecorded resource is deleted.
+   * Announces failed registration and deletes the process after the unrecorded resource is deleted.
    */
-  @Subscribe
-  onResourceDeleted(_event: ResourceDeleted): void {
-    this.markDraftDeleted();
+  @React
+  onResourceDeleted(_event: ResourceDeleted): ResourceRegistrationFailed {
+    if (!this.isDeleted) {
+      this.markDraftDeleted();
+    }
+    return create(ResourceRegistrationFailedSchema, { id: this.id });
   }
 }
