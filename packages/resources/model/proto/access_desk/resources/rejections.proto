@@ -26,6 +26,33 @@
 
 syntax = "proto3";
 
-package access_desk.identity;
+package access_desk.resources;
 
-// Reserves this model package's Proto namespace for future contracts.
+import "access_desk/resources/identifiers.proto";
+import "spine/options.proto";
+
+option (type_url_prefix) = "type.access-desk.resources";
+
+// A resource that already exists.
+message ResourceAlreadyExists {
+
+  // The resource that already exists.
+  ResourceId id = 1 [(required) = true, (validate) = true];
+}
+
+// The resource already accepts new access requests,
+// so opening it again is refused and its policy version is left unchanged.
+message ResourceAlreadyOpenForRequests {
+
+  // The resource that is already open.
+  ResourceId id = 1 [(required) = true, (validate) = true];
+}
+
+// The resource already rejects new access requests,
+// so closing it again is refused and its policy version is left unchanged.
+message ResourceAlreadyClosedForRequests {
+
+  // The resource that is already closed.
+  ResourceId id = 1 [(required) = true, (validate) = true];
+}
+

@@ -26,10 +26,6 @@
 
 /**
  * Access bounded context: domain handlers and context assembly.
- *
- * Decorated handlers (aggregates, projections, process managers) and the
- * createAccessContext() factory are added in a later iteration. They live in
- * this package because spine-proto handlers discovers decorated classes only in
- * the application-mode package that runs it, not in its dependencies.
  */
-export {};
+export { createAccessContext } from "./access-context.js";
+export { ResourceRequestPolicyProjection } from "./resource-request-policy-projection.js";

@@ -72,8 +72,21 @@ only in files that declare messages.
 
 Use `//` line comments (never `/** */`). Document every message and every field.
 
-- **The first line is a single concise sentence** describing what the element is.
-  Never put two sentences on the first line.
+**Describe the domain first, the software second — or not at all.** Say what the
+thing _is_ in the business: a resource is "a protected internal source people
+request access to"; an organization is "the boundary that owns resources and
+grants access within it"; a policy is "the rules that govern access". Never lead
+with the storage or framework mechanism ("stores the aggregate state", "the
+read-side projection", "coordinates the process manager"). Mechanism detail
+(routing, tenancy, delivery) belongs _after_ the domain sentence, or in the
+handler code — never in place of it. This holds for TS entity/handler doc
+comments too, not only `.proto`.
+
+- **The first line is a single concise sentence** describing what the element is
+  in the domain. Never put two sentences on the first line.
+- **A process manager's state message (and any workflow) lists its steps as a
+  numbered list** — `1.` … `2.` … `3.` — after the opening sentence, describing
+  the domain steps, not the handlers.
 - Any further detail follows in later paragraphs, each separated by a blank `//`
   line.
 - **If the documentation is more than one line, end it with a blank `//` line**
@@ -106,14 +119,46 @@ message OrganizationCreated {
 
 ## File naming
 
-- Split contracts by role: `identifiers.proto`, `commands.proto`, `events.proto`,
-  `rejections.proto`, and a state file per entity (e.g. `organization.proto`).
+- Split contracts by role **and by aggregate/purpose**, not one file per role.
+  The context's **main** entity — the one whose name matches the context — uses
+  the bare `commands.proto` / `events.proto` / `rejections.proto` (Resource in the
+  Resources context). Every other aggregate or process takes a prefix:
+  `<name>_commands.proto`, `<name>_events.proto`, `<name>_rejections.proto` (e.g.
+  `organization_commands.proto`, `resource_creation_commands.proto`). Plus shared
+  `identifiers.proto` / `values.proto` and a state file per entity
+  (`organization.proto`, `resource.proto`, `resource_creation.proto`). Group a
+  command/event with the aggregate that handles/emits it (`AddResource` and
+  `ResourceAdded` are the Organization's, so they live in the `organization_*`
+  files). The framework classifies by file **suffix** — `commands`/`_commands`,
+  `events`/`_events`, `rejections`/`_rejections` — so the prefix is free but the
+  suffix is load-bearing.
+- **Where an enum lives.** A plain enum goes in the general shared file with the
+  value objects it serves (`values.proto`). Give an enum its own file only when
+  it is _special_ — carrying custom options and helper logic. Rule of
+  thumb: options → own file; optionless → the general file.
+
+## Field naming & order
+
+- **`snake_case`** field names.
+- **Repeated fields use the singular noun**, never the plural — `repeated
+  AccessLevel access_level`, `repeated OrganizationMember membership` (not
+  `access_levels` / `memberships`). The generated TS accessor is the singular
+  camelCase name holding an array.
+- **Order fields logically, not by when they were added:** identity first, then
+  name, then descriptive fields (description, category), then classification and
+  policy (sensitivity, access levels, duration), then people (owner, approvers).
+  A related family of messages (`RequestResourceCreation`, `CreateResource`, the
+  state, the created event) shares the same order. While a contract is not
+  deployed, renumber freely to keep the order sensible.
 
 ## Message & field options
 
 - The entity id is the **first field** of both the command and the entity state;
   default command routing uses it. Keep it first.
-- ID types are wrapper messages: `OrganizationId { string value = 1 [(required) = true]; }`.
+- An ID type can be a **primitive or any value object** — one or
+  more fields, as rich as the identity needs. **Name each field for what it
+  holds:** `uuid` for an opaque, system-generated id, `value` for a human-readable
+  dash-case slug, or a composite of several fields for a naturally compound identity.
 - Aggregate state: `option (entity).kind = AGGREGATE;`, id
   `[(validate) = true, (set_once) = true]`.
 - Projection state: `option (entity).kind = PROJECTION;` and

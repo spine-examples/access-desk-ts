@@ -34,47 +34,52 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.access-desk.resources";
 
-// An organization that owns resources and within which its members request and
-// are granted access to them.
+// A protected internal source - a system, dataset, or tool - that people
+// request access to.
 //
-// Each organization is a self-contained boundary:
-// its members, resources, and access decisions never cross into another.
+// It belongs to one organization, and its policy governs who
+// may access it, at what level, and for how long.
 //
-message Organization {
+message Resource {
   option (entity).kind = AGGREGATE;
 
-  // Identifies the organization.
-  OrganizationId id = 1 [(validate) = true, (set_once) = true];
+  // The resource's stable identity within its organization.
+  ResourceId id = 1 [(validate) = true, (set_once) = true];
 
-  // The organization's display name, unique across organizations and compared
+  // The resource's display name, unique within its organization and compared
   // case-insensitively.
-  string name = 2 [(required) = true];
+  string name = 2;
 
-  // The people who belong to the organization.
-  repeated OrganizationMember membership = 3;
+  // A human-readable summary of what the resource is.
+  string description = 3;
 
-  // The resources the organization owns.
-  repeated OrganizationResource resource = 4;
+  // The catalog category the resource is listed under.
+  string category = 4;
+
+  // The rules that govern access to the resource.
+  ResourcePolicy policy = 5;
 }
 
-// An organization together with its members and owned resources, as seen by
-// catalog queries.
+// A resource as it appears in its organization's access catalog: what it is
+// and the access rules currently in force for it.
 //
-message OrganizationView {
+message ResourceCatalogItem {
   option (entity).kind = PROJECTION;
   option (entity).visibility = FULL;
 
-  // Identifies the organization.
-  OrganizationId id = 1 [(validate) = true, (set_once) = true];
+  // The resource's stable identity within its organization.
+  ResourceId id = 1 [(validate) = true, (set_once) = true];
 
-  // The organization's display name, unique across organizations and compared
-  // case-insensitively.
+  // The resource's display name, unique within its organization and compared
+  // case-insensitively; queryable so a name can be looked up for uniqueness.
   string name = 2 [(required) = true, (column) = true];
 
-  // The people who belong to the organization, each with their current
-  // membership status.
-  repeated OrganizationMember member = 3;
+  // A human-readable summary of what the resource is.
+  string description = 3 [(required) = true];
 
-  // The resources the organization owns.
-  repeated OrganizationResource resource = 4;
+  // The catalog category the resource is listed under.
+  string category = 4 [(required) = true];
+
+  // The rules that govern access to the resource.
+  ResourcePolicy policy = 5 [(required) = true];
 }

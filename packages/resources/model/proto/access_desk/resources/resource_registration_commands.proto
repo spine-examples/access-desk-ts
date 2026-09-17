@@ -36,52 +36,41 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.access-desk.resources";
 
-// Creates a resource with its complete initial policy, closed to requests.
-message CreateResource {
+// Registers a resource in an organization, starting the Resource Registration
+// process.
+//
+// It does not create the resource directly. The process creates the resource and
+// records it in the organization, which rejects the recording when the name is
+// already used; a rejected recording deletes the created resource. The carried
+// policy fields become the resource's complete initial policy.
+//
+message RegisterResource {
 
-  // The resource identifier.
+  // The identifier for the resource.
   ResourceId id = 1 [(validate) = true];
 
-  // The resource's display name, unique within the organization and compared
-  // case-insensitively.
-  string name = 2 [(required) = true];
+  // The organization the resource belongs to.
+  OrganizationId organization_id = 2 [(validate) = true];
+
+  // The requested resource display name, unique within the organization and
+  // compared case-insensitively.
+  string name = 3 [(required) = true];
 
   // The human-readable resource description.
-  string description = 3 [(required) = true];
+  string description = 4 [(required) = true];
 
   // The catalog category the resource belongs to.
-  string category = 4 [(required) = true];
+  string category = 5 [(required) = true];
 
   // The data-sensitivity classification of the resource.
-  Sensitivity sensitivity = 5 [(required) = true];
+  Sensitivity sensitivity = 6 [(required) = true];
 
   // The people who manage the resource; at least one is required.
-  repeated access_desk.identity.PersonId manager = 6 [(required) = true, (validate) = true];
+  repeated access_desk.identity.PersonId manager = 7 [(required) = true, (validate) = true];
 
   // The access levels offered by this resource, ordered from weakest to strongest.
-  repeated AccessLevel access_level = 7 [(required) = true, (validate) = true];
+  repeated AccessLevel access_level = 8 [(required) = true, (validate) = true];
 
   // The maximum permitted access duration, at one-minute granularity.
-  google.protobuf.Duration maximum_duration = 8 [(required) = true];
-}
-
-// Deletes a resource that must be removed from its organization.
-message DeleteResource {
-
-  // The resource to delete.
-  ResourceId id = 1 [(validate) = true];
-}
-
-// Opens a resource to new access requests, advancing the policy version.
-message OpenResourceForRequests {
-
-  // The resource to open.
-  ResourceId id = 1 [(validate) = true];
-}
-
-// Closes a resource to new access requests, advancing the policy version.
-message CloseResourceForRequests {
-
-  // The resource to close.
-  ResourceId id = 1 [(validate) = true];
+  google.protobuf.Duration maximum_duration = 9 [(required) = true];
 }

@@ -102,6 +102,17 @@ convergence:
 Do not use arbitrary sleeps for domain-time tests. Use an injected clock and
 bounded eventual assertions only for truly asynchronous propagation.
 
+Cross-package contract changes need a clean build to be trusted. A package
+consumes another package through `node_modules`, not a TS project reference, so
+`tsc -b` (incremental) does not recompile it when only the _dependency's_
+`.proto`/`.d.ts` changed — it reports a misleading green against stale types.
+After any change to a `model` package's contracts, force-rebuild the dependents
+(`tsc -b --force`, or delete `dist/` and `*.tsbuildinfo`) before treating
+`verify` as authoritative. Diagnosing a rejection or delivery question by
+instrumenting `node_modules` is legitimate, but always restore the framework
+files and remove the debug afterwards; never commit or leave `node_modules`
+edits.
+
 Completion reports must name the commands run, outcomes, untested boundaries,
 and any follow-up decision. A passing local BlackBox test must not be described
 as proof of cross-process, browser, authentication, or production Datastore

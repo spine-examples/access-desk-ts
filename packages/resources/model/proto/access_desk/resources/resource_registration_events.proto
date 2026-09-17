@@ -28,23 +28,28 @@ syntax = "proto3";
 
 package access_desk.resources;
 
+import "access_desk/resources/identifiers.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.access-desk.resources";
 
-// Identifies an organization.
-//
-// The organization is also the tenant boundary; its identifier is the
-// `TenantId` for every tenant-scoped message.
-//
-message OrganizationId {
+// A request to register a resource in an organization was accepted.
+message ResourceRegistrationRequested {
 
-  // The stable, system-generated organization UUID.
-  string uuid = 1 [(required) = true];
+  // The resource whose registration was requested.
+  ResourceId id = 1 [(required) = true, (validate) = true];
 }
 
-// Identifies a resource within exactly one organization.
-message ResourceId {
+// A resource was successfully entered into its organization's registry.
+message ResourceRegistered {
 
-  string uuid = 1 [(required) = true];
+  // The resource that was registered.
+  ResourceId id = 1 [(required) = true, (validate) = true];
+}
+
+// A resource could not be entered into its organization's registry.
+message ResourceRegistrationFailed {
+
+  // The resource whose registration failed.
+  ResourceId id = 1 [(required) = true, (validate) = true];
 }

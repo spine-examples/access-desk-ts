@@ -16,7 +16,7 @@
     "build": "spine-proto compose && spine-proto handlers && tsc -b",
     "build:ts": "tsc -b",
     "typecheck": "spine-proto compose && spine-proto handlers && tsc -b --pretty false",
-    "lint": "eslint src --no-error-on-unmatched-pattern"
+    "lint": "eslint src test --no-error-on-unmatched-pattern"
   },
   "dependencies": {
     "@bufbuild/protobuf": "2.12.1",
@@ -24,7 +24,8 @@
     "@spine-event-engine/proto": "2.0.0-snapshot.11",
     "@spine-event-engine/server": "2.0.0-snapshot.11",
     "@spine-event-engine/storage": "2.0.0-snapshot.11",
-    "@access-desk/access-model": "0.0.0"
+    "@access-desk/access-model": "0.0.0",
+    "@access-desk/resources-model": "0.0.0"
   },
   "devDependencies": {
     "@spine-event-engine/proto-tools": "2.0.0-snapshot.11",

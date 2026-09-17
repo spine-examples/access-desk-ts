@@ -1,21 +1,40 @@
 {
   "formatVersion": 2,
-  "generationId": "1be89620-5527-4bca-aad1-0066b2b46ce7",
+  "generationId": "c41525d5-f13f-411e-8e12-46da20eb2764",
   "packageName": "@access-desk/resources-model",
   "packageVersion": "0.0.0",
   "protoFiles": [
     "access_desk/resources/commands.proto",
     "access_desk/resources/events.proto",
     "access_desk/resources/identifiers.proto",
-    "access_desk/resources/organization.proto"
+    "access_desk/resources/organization.proto",
+    "access_desk/resources/organization_commands.proto",
+    "access_desk/resources/organization_events.proto",
+    "access_desk/resources/organization_rejections.proto",
+    "access_desk/resources/rejections.proto",
+    "access_desk/resources/resource.proto",
+    "access_desk/resources/resource_registration.proto",
+    "access_desk/resources/resource_registration_commands.proto",
+    "access_desk/resources/resource_registration_events.proto",
+    "access_desk/resources/values.proto"
   ],
   "generatedExports": {
     "access_desk/resources/commands.proto": "generated/access_desk/resources/commands_pb.js",
     "access_desk/resources/events.proto": "generated/access_desk/resources/events_pb.js",
     "access_desk/resources/identifiers.proto": "generated/access_desk/resources/identifiers_pb.js",
-    "access_desk/resources/organization.proto": "generated/access_desk/resources/organization_pb.js"
+    "access_desk/resources/organization.proto": "generated/access_desk/resources/organization_pb.js",
+    "access_desk/resources/organization_commands.proto": "generated/access_desk/resources/organization_commands_pb.js",
+    "access_desk/resources/organization_events.proto": "generated/access_desk/resources/organization_events_pb.js",
+    "access_desk/resources/organization_rejections.proto": "generated/access_desk/resources/organization_rejections_pb.js",
+    "access_desk/resources/rejections.proto": "generated/access_desk/resources/rejections_pb.js",
+    "access_desk/resources/resource.proto": "generated/access_desk/resources/resource_pb.js",
+    "access_desk/resources/resource_registration.proto": "generated/access_desk/resources/resource_registration_pb.js",
+    "access_desk/resources/resource_registration_commands.proto": "generated/access_desk/resources/resource_registration_commands_pb.js",
+    "access_desk/resources/resource_registration_events.proto": "generated/access_desk/resources/resource_registration_events_pb.js",
+    "access_desk/resources/values.proto": "generated/access_desk/resources/values_pb.js"
   },
   "dependencies": [
+    "@access-desk/identity-model",
     "@spine-event-engine/proto"
   ],
   "moduleExport": "resourcesProtoModule"

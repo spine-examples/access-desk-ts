@@ -23,6 +23,8 @@
     "lint": "eslint src --no-error-on-unmatched-pattern"
   },
   "dependencies": {
+    "@access-desk/identity-model": "0.0.0",
+    "@access-desk/resources-model": "0.0.0",
     "@bufbuild/protobuf": "2.12.1",
     "@spine-event-engine/proto": "2.0.0-snapshot.11"
   },

@@ -16,8 +16,10 @@ coverage/
 # --- Generated Spine / Protobuf output ---
 packages/*/generated/
 packages/*/*/generated/
-packages/*/.generated-*/generated/
-packages/*/*/.generated-*/generated/
+packages/*/.generated*/generated/
+packages/*/*/.generated*/generated/
+packages/*/.generated.stage-*/
+packages/*/*/.generated.stage-*/
 .spine-proto-generation.json
 .spine-proto-generate.lock.*
 

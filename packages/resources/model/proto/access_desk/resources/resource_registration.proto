@@ -28,55 +28,50 @@ syntax = "proto3";
 
 package access_desk.resources;
 
+import "google/protobuf/duration.proto";
 import "access_desk/resources/identifiers.proto";
 import "access_desk/resources/values.proto";
+import "access_desk/identity/identifiers.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.access-desk.resources";
 
-// A resource was created with its complete initial policy.
-message ResourceCreated {
+// The registration of a new resource in an organization.
+//
+// 1. A member registers the resource, and the request is remembered here.
+// 2. The resource is created with the requested policy.
+// 3. The created resource is recorded among the organization's resources.
+// 4. If the organization rejects the name, the created resource is deleted.
+// 5. The process emits a registration result and is deleted after the resource
+//    is recorded or deleted.
+//
+message ResourceRegistration {
+  option (entity).kind = PROCESS_MANAGER;
 
-  // The created resource.
-  ResourceId id = 1 [(required) = true, (validate) = true];
+  // The resource being entered into the organization's registry.
+  ResourceId id = 1 [(validate) = true, (set_once) = true];
 
-  // The resource's display name, unique within the organization and compared
-  // case-insensitively.
-  string name = 2 [(required) = true];
+  // The organization the resource will belong to.
+  OrganizationId organization_id = 2 [(validate) = true];
 
-  // The resource description.
-  string description = 3 [(required) = true];
+  // The requested resource name.
+  string name = 3;
 
-  // The catalog category.
-  string category = 4 [(required) = true];
+  // The requested resource description.
+  string description = 4;
 
-  // The complete first version of the resource policy.
-  ResourcePolicy policy = 5 [(required) = true];
-}
+  // The requested resource category.
+  string category = 5;
 
-// A resource was deleted and can no longer receive access requests.
-message ResourceDeleted {
+  // The requested data-sensitivity classification.
+  Sensitivity sensitivity = 6;
 
-  // The resource that was deleted.
-  ResourceId id = 1 [(required) = true, (validate) = true];
-}
+  // The requested resource managers.
+  repeated access_desk.identity.PersonId manager = 7;
 
-// A resource was opened to new access requests, yielding the next policy version.
-message ResourceOpenedForRequests {
+  // The requested access levels.
+  repeated AccessLevel access_level = 8;
 
-  // The resource whose policy changed.
-  ResourceId id = 1 [(required) = true, (validate) = true];
-
-  // The complete next version of the resource policy.
-  ResourcePolicy policy = 2 [(required) = true];
-}
-
-// A resource was closed to new access requests, yielding the next policy version.
-message ResourceClosedForRequests {
-
-  // The resource whose policy changed.
-  ResourceId id = 1 [(required) = true, (validate) = true];
-
-  // The complete next version of the resource policy.
-  ResourcePolicy policy = 2 [(required) = true];
+  // The requested maximum access duration.
+  google.protobuf.Duration maximum_duration = 9;
 }

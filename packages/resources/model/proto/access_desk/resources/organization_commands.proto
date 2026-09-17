@@ -28,23 +28,47 @@ syntax = "proto3";
 
 package access_desk.resources;
 
+import "access_desk/resources/identifiers.proto";
+import "access_desk/identity/identifiers.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.access-desk.resources";
 
-// Identifies an organization.
+// Establishes a new organization within which resources are owned and access to
+// them is granted.
 //
-// The organization is also the tenant boundary; its identifier is the
-// `TenantId` for every tenant-scoped message.
+// The organization is its own tenant: the command is issued in that tenant's
+// scope, so `id` and the command's `TenantId` carry the same value.
 //
-message OrganizationId {
+message CreateOrganization {
 
-  // The stable, system-generated organization UUID.
-  string uuid = 1 [(required) = true];
+  // The identifier of the organization to create.
+  OrganizationId id = 1 [(validate) = true];
+
+  // The human-readable organization name, unique across organizations and
+  // compared case-insensitively.
+  string name = 2 [(required) = true];
 }
 
-// Identifies a resource within exactly one organization.
-message ResourceId {
+// Adds a person as an active member of an organization.
+message AddOrganizationMember {
 
-  string uuid = 1 [(required) = true];
+  // The organization whose membership changes.
+  OrganizationId organization_id = 1 [(validate) = true];
+
+  // The person to add as a member.
+  access_desk.identity.PersonId person = 2 [(required) = true, (validate) = true];
+}
+
+// Records a newly created resource as one of an organization's resources.
+message AddResource {
+
+  // The organization the resource belongs to.
+  OrganizationId organization_id = 1 [(validate) = true];
+
+  // The resource being recorded.
+  ResourceId resource_id = 2 [(required) = true, (validate) = true];
+
+  // The resource's display name.
+  string name = 3 [(required) = true];
 }

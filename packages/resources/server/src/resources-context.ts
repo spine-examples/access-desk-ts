@@ -24,12 +24,20 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { BoundedContext } from "@spine-event-engine/server";
+import { BoundedContext, EventRouting } from "@spine-event-engine/server";
+import { ResourceAddedSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
+import { ResourceDeletedSchema } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
+import { ResourceAlreadyExistsSchema } from "@access-desk/resources-model/generated/access_desk/resources/rejections_pb.js";
+import { OrganizationResourceNameAlreadyUsedSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_rejections_pb.js";
+import { type ResourceId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
 import { OrganizationAggregate } from "./organization-aggregate.js";
-import { OrganizationViewProjection } from "./organization-view.js";
+import { OrganizationViewProjection } from "./organization-view-projection.js";
+import { ResourceAggregate } from "./resource-aggregate.js";
+import { ResourceCatalogProjection } from "./resource-catalog-projection.js";
+import { ResourceRegistrationProcessManager } from "./resource-registration-process.js";
 
 /**
- * Builds the single-tenant Resources bounded context.
+ * Builds the multitenant Resources bounded context.
  *
  * The organization is the tenant: `CreateOrganization` is issued in the tenant
  * scope of the organization it creates (`OrganizationId = TenantId`).
@@ -37,9 +45,23 @@ import { OrganizationViewProjection } from "./organization-view.js";
  * @returns The assembled Resources bounded context.
  */
 export async function createResourcesContext(): Promise<BoundedContext> {
-  const builder = BoundedContext.singleTenant("Resources")
+  const resourceRegistrationProcmanRouting = EventRouting.create<ResourceId>()
+    .route(ResourceAddedSchema, (event) =>
+      event.resourceId === undefined ? [] : [event.resourceId],
+    )
+    .route(ResourceAlreadyExistsSchema, (rejection) =>
+      rejection.id === undefined ? [] : [rejection.id],
+    )
+    .route(OrganizationResourceNameAlreadyUsedSchema, (rejection) =>
+      rejection.resourceId === undefined ? [] : [rejection.resourceId],
+    )
+    .route(ResourceDeletedSchema, (event) => (event.id === undefined ? [] : [event.id]));
+  const builder = BoundedContext.multitenant("Resources")
     .withGeneratedRegistryRoot(new URL("..", import.meta.url))
     .add(OrganizationAggregate)
-    .add(OrganizationViewProjection);
+    .add(OrganizationViewProjection)
+    .add(ResourceRegistrationProcessManager, { eventRouting: resourceRegistrationProcmanRouting })
+    .add(ResourceAggregate)
+    .add(ResourceCatalogProjection);
   return builder.buildAsync();
 }

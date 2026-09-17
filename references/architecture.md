@@ -35,13 +35,13 @@ runtime baseline is Node.js 24 or newer, pnpm 11.9, strict TypeScript, and ESM.
 
 The system has five bounded contexts:
 
-| Bounded context | Owns                                                                                                     | Tenant mode                        |
-| --------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| Identity        | Global users, registration, authentication identity, user activity                                       | Global/single-tenant control plane |
-| Resources       | Organizations, memberships, resources, ordered access levels, ownership, request policy, approver policy | Organization-scoped                |
-| Access          | Requests, approval assignment and decisions, grants, extensions, revocation, access-facing projections   | Organization-scoped                |
-| Scheduling      | Durable, universal dispatch of allowlisted application commands                                          | Organization-scoped                |
-| Audit           | Immutable, redacted audit projections built from durable integration facts                               | Organization-scoped                |
+| Bounded context | Owns                                                                                            | Tenant mode                        |
+| --------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------- |
+| Identity        | Global users, registration, authentication identity, user activity                              | Global/single-tenant control plane |
+| Resources       | Organizations, memberships, resources, ordered access levels, resource managers, request policy | Organization-scoped                |
+| Access          | Requests, approval decisions, grants, extensions, revocation, access-facing projections         | Organization-scoped                |
+| Scheduling      | Durable, universal dispatch of allowlisted application commands                                 | Organization-scoped                |
+| Audit           | Immutable, redacted audit projections built from durable integration facts                      | Organization-scoped                |
 
 An initial deployment may co-host all five contexts in one Node.js application.
 Co-location does not weaken the boundaries: each context must have its own model
@@ -76,7 +76,7 @@ and declares its external-event receptors internally.
 
 Organization is the tenant.
 
-- `UserId` is globally stable and is not an email address.
+- `PersonId` is globally stable and is not an email address.
 - A user may have active memberships in multiple organizations.
 - Every tenant-scoped request, query, subscription, scheduled item, inbox row,
   outbox row, and audit record carries exactly one `OrganizationId` represented
@@ -101,13 +101,44 @@ domain code. Browser credentials are exchanged for opaque application sessions.
 Provider tokens are not stored in browser application storage or passed into
 bounded contexts.
 
+### Roles, relations, and fine-grained authorization
+
+Authority in Access Desk takes two forms, both organization-scoped.
+
+A **role** is standing authority a person holds in the organization itself,
+independent of any single resource or request. The roles are Organization
+Member — the baseline active participant, who may act as a requester — Auditor,
+with read-only access to the audit timeline, and an organization administration
+role that provisions the organization and its membership. This is role-based
+access control.
+
+A **relation** is a position a person holds toward one specific entity, read
+from domain state rather than granted as a role: a **manager** of a resource and
+the **requester** of a request. A relation is the same mechanism as a role,
+attached to a domain entity instead of the organization — `resource#manager` and
+`request#requester` in relationship-based terms.
+
+A resource has one or more managers. Manager is a relation, not a role: no one is
+granted "manager" across the organization. A person manages a specific resource
+because they are named in that resource's managers when it is created, and any
+manager of a resource holds the same authority over it — there is no
+owner/administrator split and no approver-assignment priority.
+
+Authorization is fine-grained and enforced as a domain invariant. The decisive
+check is made per entity — only a current manager of a resource may decide its
+access requests or revoke its grants — inside the `AccessRequest` and grant
+boundaries, not by a separate authorization service or a stored permission list.
+The trusted gateway still performs coarse role- and tenant-level authorization of
+every command, query, and subscription as defense in depth; it never replaces the
+domain invariant, and a caller-supplied identifier is never authority.
+
 ### Global-to-tenant identity bridge
 
 A single-tenant Spine event has no tenant and cannot be delivered directly to a
 multitenant entity handler. Raw Identity events therefore never flow directly
 into Resources, Access, Scheduling, or Audit.
 
-The durable integration layer maintains a technical `UserId` to
+The durable integration layer maintains a technical `PersonId` to
 `OrganizationId` fan-out index from tenant-scoped Resources membership facts.
 When Identity publishes a relevant global activity/disablement fact, the
 adapter emits one derived, tenant-scoped integration fact for each known active
@@ -124,20 +155,52 @@ before the affected identity change is considered fully delivered.
 ## Resources and policy ownership
 
 Resources is authoritative for organizations, membership, resources, and
-resource policy. A resource policy includes:
+resource policy. A resource carries descriptive catalog attributes — its
+identity, description, and category — that describe it for browsing but are not
+access decision rules.
 
-- resource identity, description, category, and sensitivity;
+Names are display attributes, not identifiers. An organization has a stable
+`OrganizationId` and a resource a stable, system-generated `ResourceId` UUID; the
+human-readable name is separate and may change. Organization names are unique
+across organizations, and resource names are unique within their organization.
+Both comparisons are case-insensitive, so "TeamDev" and "teamdev" denote the same
+organization. Access levels are named per resource and are likewise unique and
+case-insensitive within that resource.
+
+Resource-name uniqueness is a separate business rule enforced by the Organization
+aggregate, which owns the set of resource names and performs the authoritative,
+serialized name check when handling `Add Resource`. Because the `ResourceId` is a
+system-generated UUID, the name is only checked at that recording step, not at the
+request. If the aggregate rejects a newly created resource because another
+resource has the same case-insensitive name, Resource Registration compensates by
+issuing `Delete Resource`, emits `Resource Registration Failed` after receiving
+`Resource Deleted`, and deletes its process state. On successful recording, it
+emits `Resource Registered` after `Resource Added` and deletes its process state.
+If resource creation itself reports `Resource Already Exists`, it emits the same
+failure fact and deletes its process state. The rejected resource is never
+recorded in the organization.
+
+Its **policy** is the access decision rules that Access consumes, and includes:
+
 - whether new requests are open;
-- the resource owner;
+- the data-sensitivity classification;
+- one or more resource managers;
 - ordered, resource-specific access levels;
 - maximum permitted duration;
-- primary approver and fallback approver;
 - a monotonically increasing policy version.
 
-Resources publishes complete, versioned policy and membership facts. Access
-maintains local monotonic projections and must not query Resources synchronously
-while deciding a command. Stale or duplicate policy facts cannot roll a local
-projection back.
+A resource's **managers** are its resource-scoped relation: any manager may decide
+the resource's access requests, revoke and remediate its grants, and open or close
+it for requests. All managers of a resource hold the same authority; there is no
+owner/administrator split and no approver priority. The managers are set when the
+resource is created and always number at least one. Authority is scoped to the
+resource, never the organization; there is no organization-wide access
+administrator.
+
+Resources publishes complete policy and membership facts; policy facts carry a
+monotonically increasing version. Access maintains local monotonic projections
+and must not query Resources synchronously while deciding a command. Stale or
+duplicate policy facts cannot roll a local projection back.
 
 Closing a resource prevents new requests. Requests already accepted while the
 resource was open remain eligible for decision. The request captures the policy
@@ -165,7 +228,6 @@ Submission must enforce all the following:
 - No other nonterminal request by the same requester for the same resource has
   any overlapping requested interval, regardless of access level. Intervals are
   half-open, so `[a,b)` and `[b,c)` do not overlap.
-- An eligible approver can be assigned before the request is accepted.
 
 Conflicting nonterminal requests use a duplicate-request rejection. Conflicts
 with scheduled or active grants use the existing-access policy and a distinct
@@ -173,22 +235,15 @@ business rejection. Immediate requests retain a duration; overlap that can only
 be known after an approval time is established must be revalidated before a
 grant is created.
 
-Approver assignment follows this policy:
-
-1. Use the primary approver only when their current organization membership is
-   active and they are not the requester.
-2. Otherwise use the active fallback approver when they are not the requester.
-3. If neither is eligible at submission, reject the command; do not create an
-   unserviceable request.
-4. If the assigned primary becomes inactive before decision, reassign to the
-   eligible fallback.
-5. If no eligible approver remains after acceptance, close the request
-   terminally with an explicit system reason.
-
-Only the currently assigned, eligible approver may decide a pending request.
-Self-approval is forbidden. Approval or denial is terminal and happens at most
-once. Denial requires a reason. Concurrent decisions are resolved by the
-aggregate transaction so only one fact is accepted.
+Any current manager of the resource may decide a pending request; no approver is
+assigned, because every manager is already eligible. The decider's current
+organization membership must be active. Self-approval is forbidden: a manager who
+is the requester of a request may not decide it, so a resource whose sole manager
+raises a request needs another manager to decide it. Because a resource always
+has at least one manager, a request never becomes undecidable for lack of an
+approver. Approval or denial is terminal and happens at most once. Denial requires
+a reason. Concurrent decisions are resolved by the aggregate transaction so only
+one fact is accepted.
 
 ## Request and grant lifecycles
 
@@ -196,16 +251,17 @@ Requests and grants are separate aggregates and lifecycles. Approval records a
 decision; it does not by itself prove that access is active or durably
 scheduled.
 
-Required request outcomes are pending, approved, denied, cancelled, and a
-terminal system closure when no approver remains. Required grant outcomes are
-pending scheduling, scheduled, active, expired, expired without activation, and
-revoked. Contract design may use more precise internal substates, but the UI
-must never claim scheduled or active access before the required facts exist.
+Required request outcomes are pending, approved, denied, and cancelled. Required
+grant outcomes are pending scheduling, scheduled, active, expired, expired
+without activation, and revoked. Contract design may use more precise internal
+substates, but the UI must never claim scheduled or active access before the
+required facts exist.
 
-Scheduled and active grants may be revoked by either the resource owner or an
-Access Administrator in the same organization. Revocation requires a reason.
-Revoked or expired grants never reactivate. Access is authoritative: a stale
-due command after revocation or expiry is an idempotent no-op.
+Scheduled and active grants may be revoked by any current manager of the granting
+resource. Revocation authority is scoped to that resource, not the organization.
+Revocation requires a reason. Revoked or expired grants never reactivate. Access
+is authoritative: a stale due command after revocation or expiry is an idempotent
+no-op.
 
 An extension:
 
@@ -348,7 +404,7 @@ and `@spine-event-engine/client-react`.
 ### Notifications and timeline
 
 The in-application notifications and timeline entries are derived read-side views.
-Pending approver work, requester request status, active-access changes, and the audit
+Pending manager decisions, requester request status, active-access changes, and the audit
 timeline are Projections over durable facts, surfaced through the same
 authenticated subscriptions and authoritative re-query as every other screen. A
 subscription is a best-effort hint; a missed notification is repaired by the
