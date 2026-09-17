@@ -62,8 +62,8 @@ import { type ResourceAlreadyExists } from "@access-desk/resources-model/generat
  * 2. The resource is created with the requested policy.
  * 3. The created resource is recorded among the organization's resources; the
  *    organization rejects the recording when the name is already used.
- * 4. If recording is rejected because the name is taken, the unchanged resource
- *    is deleted. A changed resource stops for manual resolution.
+ * 4. If recording is rejected because the name is taken, the created resource is
+ *    deleted, undoing the half-completed registration.
  * 5. The process emits a registration result and deletes itself after recording
  *    or deletion.
  */

@@ -28,8 +28,10 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { ResourceAddedSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
 import { ResourceCreatedSchema } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
+import { OrganizationResourceNameAlreadyUsedSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_rejections_pb.js";
 import {
   ResourceRegisteredSchema,
+  ResourceRegistrationFailedSchema,
   ResourceRegistrationRequestedSchema,
 } from "@access-desk/resources-model/generated/access_desk/resources/resource_registration_events_pb.js";
 
@@ -39,9 +41,13 @@ import {
   loadResourcesContext,
   resourcesBlackBox,
 } from "./given/resources-context.js";
-import { awaitCatalogueItem, registerResource } from "./given/resource.js";
-import { awaitOrganizationView, createOrganization } from "./given/organization.js";
-import { recordEvents } from "./given/events.js";
+import { awaitCatalogueItem, readCatalogue, registerResource } from "./given/resource.js";
+import {
+  awaitOrganizationView,
+  createOrganization,
+  readOrganizationViews,
+} from "./given/organization.js";
+import { expectRejection, recordEvents } from "./given/events.js";
 
 // The process manager is NONE-visibility, so it is observed through the resource
 // it brings into the catalogue rather than by reading its own state.
@@ -86,6 +92,45 @@ describe("ResourceRegistrationProcessManager should", () => {
         added.cancel(),
         registered.cancel(),
       ]);
+    }
+  });
+
+  it("compensates a name conflict by deleting the created resource", async () => {
+    const box = await resourcesBlackBox();
+    const scope = box.onBehalfOf(actor);
+    expect((await createOrganization(scope)).kind).toBe("ok");
+    await awaitOrganizationView(box, scope, (view) => view.name === "Acme");
+
+    // The first resource reserves the name "payroll" in the organization.
+    expect((await registerResource(scope, "payroll-1", "payroll")).kind).toBe("ok");
+    await awaitCatalogueItem(box, scope, "payroll-1");
+    await awaitOrganizationView(box, scope, (view) =>
+      view.resource.some((resource) => resource.id?.uuid === "payroll-1"),
+    );
+
+    const failed = await recordEvents(scope, ResourceRegistrationFailedSchema);
+    try {
+      // The second resource is created, then rejected by the organization for the
+      // duplicate name; the process compensates by deleting the created resource.
+      await expectRejection(box, scope, OrganizationResourceNameAlreadyUsedSchema, () =>
+        registerResource(scope, "payroll-2", "payroll"),
+      );
+      expect((await failed.waitFor(box)).id?.uuid).toBe("payroll-2");
+
+      // The compensated resource must leave the catalogue, while the organization
+      // keeps only the first resource under the reserved name.
+      const catalogue = await box.eventually(
+        () => readCatalogue(scope),
+        (rows) => !rows.some((item) => item.id?.uuid === "payroll-2"),
+      );
+      expect(catalogue.some((item) => item.id?.uuid === "payroll-2")).toBe(false);
+      expect(catalogue.some((item) => item.id?.uuid === "payroll-1")).toBe(true);
+
+      const views = await readOrganizationViews(scope);
+      expect(views[0]?.resource).toMatchObject([{ id: { uuid: "payroll-1" }, name: "payroll" }]);
+      expect(views[0]?.resource).toHaveLength(1);
+    } finally {
+      await failed.cancel();
     }
   });
 });
