@@ -34,10 +34,10 @@ the board.
 ### Resources
 
 | Owner                      | Trigger (actor/event)              | Command                     | Event(s)                        | Rejections                           |
-| -------------------------- | ---------------------------------- | --------------------------- | ------------------------------- | ------------------------------------ |
+| -------------------------- |------------------------------------| --------------------------- | ------------------------------- | ------------------------------------ |
 | Organization               | Platform Operator                  | Create Organization         | Organization Created            | Organization Already Exists          |
-| Organization               | Organization Owner                 | Add Organization Member     | Organization Member Added       | Organization Member Already Added    |
-| Resource Registration (PM) | Organization Owner                 | Register Resource           | Resource Registration Requested | Resource Already Exists              |
+| Organization               | Platform Operator                  | Add Organization Member     | Organization Member Added       | Organization Member Already Added    |
+| Resource Registration (PM) | Platform Operator                  | Register Resource           | Resource Registration Requested | Resource Already Exists              |
 | Resource Registration (PM) | on Resource Already Exists         | —                           | Resource Registration Failed    | —                                    |
 | Resource Registration (PM) | on Resource Registration Requested | Create Resource             | —                               | —                                    |
 | Resource                   | Resource Registration (PM)         | Create Resource             | Resource Created                | —                                    |
