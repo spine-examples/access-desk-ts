@@ -58,7 +58,7 @@ message Organization {
 }
 
 // An organization together with its members and owned resources, as seen by
-// catalogue queries.
+// catalog queries.
 //
 message OrganizationView {
   option (entity).kind = PROJECTION;

@@ -57,7 +57,7 @@ If `Add Resource` rejects `Resource Name Already Used`, it runs `Delete Resource
 → Resource Deleted → Resource Registration Failed`, then completes.
 
 Projections: **Organization View** receives Organization Created, Organization
-Member Added, and Resource Added; **Resource Catalogue Item** and **Resource
+Member Added, and Resource Added; **Resource Catalog Item** and **Resource
 Request Policy** receive Resource Created and each policy event (Opened/Closed For
 Requests).
 

@@ -45,7 +45,7 @@ import {
 } from "./given/resources-context.js";
 import { expectRejection, recordEvents } from "./given/events.js";
 import { awaitOrganizationView, createOrganization } from "./given/organization.js";
-import { awaitCatalogueItem, createResource, registerResource } from "./given/resource.js";
+import { awaitCatalogItem, createResource, registerResource } from "./given/resource.js";
 
 // The process manager is NONE-visibility, so each handler is observed through
 // the domain facts and projections it produces.
@@ -148,7 +148,7 @@ describe("ResourceRegistrationProcessManager should", () => {
       const registered = await recordEvents(scope, ResourceRegisteredSchema);
       try {
         expect((await registerResource(scope, "payroll")).kind).toBe("ok");
-        const item = await awaitCatalogueItem(box, scope, "payroll");
+        const item = await awaitCatalogItem(box, scope, "payroll");
         expect(item.name).toBe("payroll");
         expect((await registered.waitFor(box)).id?.uuid).toBe("payroll");
       } finally {

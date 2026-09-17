@@ -47,7 +47,7 @@ export class OrganizationViewProjection extends Projection<
   bigint
 > {
   /**
-   * Records one organization in the catalogue view.
+   * Records one organization in the catalog view.
    */
   @Subscribe
   onOrganizationCreated(event: OrganizationCreated): void {

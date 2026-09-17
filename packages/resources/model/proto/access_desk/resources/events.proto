@@ -47,7 +47,7 @@ message ResourceCreated {
   // The resource description.
   string description = 3 [(required) = true];
 
-  // The catalogue category.
+  // The catalog category.
   string category = 4 [(required) = true];
 
   // The complete first version of the resource policy.

@@ -47,7 +47,7 @@ import { ResourceSchema } from "@access-desk/resources-model/generated/access_de
 import {
   ResourceAlreadyClosedForRequests,
   ResourceAlreadyExists,
-  ResourceAlreadyOpenedForRequests,
+  ResourceAlreadyOpenForRequests,
 } from "@access-desk/resources-model/generated/access_desk/resources/rejections.js";
 import {
   ResourcePolicySchema,
@@ -114,10 +114,10 @@ export class ResourceAggregate extends Aggregate<ResourceId, typeof ResourceSche
    * policy version does not advance on a no-op change.
    */
   @Assign
-  @Throws(ResourceAlreadyOpenedForRequests)
+  @Throws(ResourceAlreadyOpenForRequests)
   openResourceForRequests(_command: OpenResourceForRequests): ResourceOpenedForRequests {
     if (this.state.policy?.openForRequests === true) {
-      throw ResourceAlreadyOpenedForRequests.create({ id: this.id });
+      throw ResourceAlreadyOpenForRequests.create({ id: this.id });
     }
     const policy = this.nextPolicy({ openForRequests: true });
     return create(ResourceOpenedForRequestsSchema, { id: this.id, policy });

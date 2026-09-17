@@ -33,7 +33,7 @@ import {
   resourcesBlackBox,
 } from "./given/resources-context.js";
 import {
-  awaitCatalogueItem,
+  awaitCatalogItem,
   closeResource,
   createResource,
   openResource,
@@ -42,15 +42,15 @@ import {
 beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
 
-describe("ResourceCatalogueProjection should", () => {
+describe("ResourceCatalogProjection should", () => {
   describe("react on 'ResourceCreated', and", () => {
-    it("start a catalogue entry from the resource's creation fact", async () => {
+    it("start a catalog entry from the resource's creation fact", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
 
       expect((await createResource(scope, "payroll")).kind).toBe("ok");
 
-      const item = await awaitCatalogueItem(box, scope, "payroll");
+      const item = await awaitCatalogItem(box, scope, "payroll");
       expect(item.id?.uuid).toBe("payroll");
       expect(item.name).toBe("payroll");
       expect(item.description).toBe("Payroll production");
@@ -69,7 +69,7 @@ describe("ResourceCatalogueProjection should", () => {
 
       expect((await openResource(scope, "payroll")).kind).toBe("ok");
 
-      const item = await awaitCatalogueItem(
+      const item = await awaitCatalogItem(
         box,
         scope,
         "payroll",
@@ -85,11 +85,11 @@ describe("ResourceCatalogueProjection should", () => {
       const scope = box.onBehalfOf(actor);
       expect((await createResource(scope, "payroll")).kind).toBe("ok");
       expect((await openResource(scope, "payroll")).kind).toBe("ok");
-      await awaitCatalogueItem(box, scope, "payroll", (i) => i.policy?.openForRequests === true);
+      await awaitCatalogItem(box, scope, "payroll", (i) => i.policy?.openForRequests === true);
 
       expect((await closeResource(scope, "payroll")).kind).toBe("ok");
 
-      const item = await awaitCatalogueItem(
+      const item = await awaitCatalogItem(
         box,
         scope,
         "payroll",
@@ -108,7 +108,7 @@ describe("ResourceCatalogueProjection should", () => {
     expect((await closeResource(scope, "payroll")).kind).toBe("ok");
 
     // Version 3: created (1) -> opened (2) -> closed (3).
-    const item = await awaitCatalogueItem(
+    const item = await awaitCatalogItem(
       box,
       scope,
       "payroll",

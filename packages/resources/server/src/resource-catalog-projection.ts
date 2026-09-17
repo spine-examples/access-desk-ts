@@ -33,7 +33,7 @@ import {
   type ResourceOpenedForRequests,
 } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
 import { type ResourceId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
-import { ResourceCatalogueItemSchema } from "@access-desk/resources-model/generated/access_desk/resources/resource_pb.js";
+import { ResourceCatalogItemSchema } from "@access-desk/resources-model/generated/access_desk/resources/resource_pb.js";
 
 type PolicyEvent =
   | ResourceCreated
@@ -41,23 +41,23 @@ type PolicyEvent =
   | ResourceClosedForRequests;
 
 /**
- * The organization's catalogue of resources, each with the access rules
- * currently in force, answering catalogue and detail queries.
+ * The organization's catalog of resources, each with the access rules
+ * currently in force, answering catalog and detail queries.
  */
-export class ResourceCatalogueProjection extends Projection<
+export class ResourceCatalogProjection extends Projection<
   ResourceId,
-  typeof ResourceCatalogueItemSchema,
+  typeof ResourceCatalogItemSchema,
   bigint
 > {
   /**
-   * Starts a catalogue entry from the resource's complete creation fact.
+   * Starts a catalog entry from the resource's complete creation fact.
    */
   @Subscribe
   onResourceCreated(event: ResourceCreated): void {
     this.apply(event, event.name, event.description, event.category);
   }
 
-  /** Removes a deleted resource from catalogue queries. */
+  /** Removes a deleted resource from catalog queries. */
   @Subscribe
   onResourceDeleted(_event: ResourceDeleted): void {
     if (this.isDeleted) {
@@ -67,7 +67,7 @@ export class ResourceCatalogueProjection extends Projection<
   }
 
   /**
-   * Updates the catalogue policy when the resource becomes requestable.
+   * Updates the catalog policy when the resource becomes requestable.
    */
   @Subscribe
   onResourceOpenedForRequests(event: ResourceOpenedForRequests): void {
@@ -75,7 +75,7 @@ export class ResourceCatalogueProjection extends Projection<
   }
 
   /**
-   * Updates the catalogue policy when the resource stops accepting requests.
+   * Updates the catalog policy when the resource stops accepting requests.
    */
   @Subscribe
   onResourceClosedForRequests(event: ResourceClosedForRequests): void {
@@ -85,7 +85,7 @@ export class ResourceCatalogueProjection extends Projection<
   /**
    * Applies a complete policy fact without allowing an older version to roll back the view.
    *
-   * Creation supplies the immutable catalogue fields; later events omit them and
+   * Creation supplies the immutable catalog fields; later events omit them and
    * intentionally retain their projected values.
    *
    * @param event The policy-bearing event to apply.
@@ -107,7 +107,7 @@ export class ResourceCatalogueProjection extends Projection<
     this.update((draft) => {
       Object.assign(
         draft,
-        create(ResourceCatalogueItemSchema, {
+        create(ResourceCatalogItemSchema, {
           id: event.id ?? this.id,
           name: name ?? this.state.name,
           description: description ?? this.state.description,
