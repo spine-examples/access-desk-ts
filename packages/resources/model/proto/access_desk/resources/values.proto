@@ -41,8 +41,14 @@ message OrganizationMember {
   // The person who belongs to the organization.
   access_desk.identity.PersonId person = 1 [(required) = true, (validate) = true];
 
+  // The member's display name.
+  string name = 2 [(required) = true];
+
   // Whether the person is currently an active member.
-  bool active = 2;
+  bool active = 3;
+
+  // The monotonically increasing revision of this person's membership activity.
+  uint64 membership_version = 4 [(min).value = "1"];
 }
 
 // A resource owned by an organization.

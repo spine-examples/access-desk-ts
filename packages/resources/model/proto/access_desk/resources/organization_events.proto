@@ -54,8 +54,40 @@ message OrganizationMemberAdded {
   // The member described by this fact.
   access_desk.identity.PersonId person = 2 [(required) = true, (validate) = true];
 
+  // The member's display name.
+  string name = 3 [(required) = true];
+
   // Whether the membership is active.
-  bool active = 3;
+  bool active = 4;
+
+  // The first revision of this member's activity.
+  uint64 membership_version = 5 [(min).value = "1"];
+}
+
+// An organization member was reactivated at its next membership revision.
+message OrganizationMemberActivated {
+
+  // The organization that owns this membership.
+  OrganizationId organization_id = 1 [(required) = true, (validate) = true];
+
+  // The member that became active.
+  access_desk.identity.PersonId person = 2 [(required) = true, (validate) = true];
+
+  // The next monotonically increasing membership revision.
+  uint64 membership_version = 3 [(min).value = "1"];
+}
+
+// An organization member was deactivated at its next membership revision.
+message OrganizationMemberDeactivated {
+
+  // The organization that owns this membership.
+  OrganizationId organization_id = 1 [(required) = true, (validate) = true];
+
+  // The member that became inactive.
+  access_desk.identity.PersonId person = 2 [(required) = true, (validate) = true];
+
+  // The next monotonically increasing membership revision.
+  uint64 membership_version = 3 [(min).value = "1"];
 }
 
 // A resource was recorded as one of an organization's resources.

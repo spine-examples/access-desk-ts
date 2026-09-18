@@ -29,12 +29,16 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import {
   OrganizationCreatedSchema,
+  OrganizationMemberActivatedSchema,
   OrganizationMemberAddedSchema,
+  OrganizationMemberDeactivatedSchema,
   ResourceAddedSchema,
 } from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
 import {
   OrganizationAlreadyExistsSchema,
+  OrganizationMemberAlreadyActiveSchema,
   OrganizationMemberAlreadyAddedSchema,
+  OrganizationMemberAlreadyInactiveSchema,
   OrganizationResourceNameAlreadyUsedSchema,
 } from "@access-desk/resources-model/generated/access_desk/resources/organization_rejections_pb.js";
 
@@ -46,8 +50,10 @@ import {
   resourcesBlackBox,
 } from "./given/resources-context.js";
 import {
+  activateOrganizationMember,
   addOrganizationMember,
   addResource,
+  deactivateOrganizationMember,
   awaitOrganizationView,
   createOrganization,
   readOrganizationViews,
@@ -100,7 +106,9 @@ describe("OrganizationAggregate should", () => {
         create(OrganizationMemberAddedSchema, {
           organizationId: { uuid: organizationId },
           person: { uuid: "maya" },
+          name: "maya",
           active: true,
+          membershipVersion: 1n,
         }),
       );
       await events.cancel();
@@ -114,6 +122,76 @@ describe("OrganizationAggregate should", () => {
 
       await expectRejection(box, scope, OrganizationMemberAlreadyAddedSchema, () =>
         addOrganizationMember(scope, "maya"),
+      );
+    });
+  });
+
+  describe("handle 'ActivateOrganizationMember', and", () => {
+    it("emit 'OrganizationMemberActivated' when reactivating, advancing the revision again", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      expect((await createOrganization(scope)).kind).toBe("ok");
+      expect((await addOrganizationMember(scope, "maya")).kind).toBe("ok");
+      expect((await deactivateOrganizationMember(scope, "maya")).kind).toBe("ok");
+      const events = await recordEvents(scope, OrganizationMemberActivatedSchema);
+
+      expect((await activateOrganizationMember(scope, "maya")).kind).toBe("ok");
+
+      const event = await events.waitFor(box);
+      expect(event).toEqual(
+        create(OrganizationMemberActivatedSchema, {
+          organizationId: { uuid: organizationId },
+          person: { uuid: "maya" },
+          membershipVersion: 3n,
+        }),
+      );
+      await events.cancel();
+    });
+
+    it("reject reactivating an already-active member with 'OrganizationMemberAlreadyActive'", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      expect((await createOrganization(scope)).kind).toBe("ok");
+      expect((await addOrganizationMember(scope, "maya")).kind).toBe("ok");
+
+      // The member is added active, so activating again changes nothing.
+      await expectRejection(box, scope, OrganizationMemberAlreadyActiveSchema, () =>
+        activateOrganizationMember(scope, "maya"),
+      );
+    });
+  });
+
+  describe("handle 'DeactivateOrganizationMember', and", () => {
+    it("emit 'OrganizationMemberDeactivated' at the next revision", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      expect((await createOrganization(scope)).kind).toBe("ok");
+      expect((await addOrganizationMember(scope, "maya")).kind).toBe("ok");
+      const events = await recordEvents(scope, OrganizationMemberDeactivatedSchema);
+
+      expect((await deactivateOrganizationMember(scope, "maya")).kind).toBe("ok");
+
+      const event = await events.waitFor(box);
+      expect(event).toEqual(
+        create(OrganizationMemberDeactivatedSchema, {
+          organizationId: {uuid: organizationId},
+          person: {uuid: "maya"},
+          membershipVersion: 2n,
+        }),
+      );
+      await events.cancel();
+    });
+
+    it("reject deactivating an already-inactive member with 'OrganizationMemberAlreadyInactive'", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      expect((await createOrganization(scope)).kind).toBe("ok");
+      expect((await addOrganizationMember(scope, "maya")).kind).toBe("ok");
+      expect((await deactivateOrganizationMember(scope, "maya")).kind).toBe("ok");
+
+      // The member is already inactive, so deactivating again changes nothing.
+      await expectRejection(box, scope, OrganizationMemberAlreadyInactiveSchema, () =>
+        deactivateOrganizationMember(scope, "maya"),
       );
     });
   });

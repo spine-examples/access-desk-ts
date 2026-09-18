@@ -28,9 +28,11 @@ import { create } from "@bufbuild/protobuf";
 import { type BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
 
 import {
+  ActivateOrganizationMemberSchema,
   AddOrganizationMemberSchema,
   AddResourceSchema,
   CreateOrganizationSchema,
+  DeactivateOrganizationMemberSchema,
 } from "@access-desk/resources-model/generated/access_desk/resources/organization_commands_pb.js";
 import {
   OrganizationViewSchema,
@@ -47,11 +49,34 @@ export function createOrganization(scope: BlackBoxScope, name = "Acme") {
   );
 }
 
-/** Posts `AddOrganizationMember` for the person with the given identifier. */
-export function addOrganizationMember(scope: BlackBoxScope, person: string) {
+/** Posts `AddOrganizationMember` for the person with the given identifier and name. */
+export function addOrganizationMember(scope: BlackBoxScope, person: string, name: string = person) {
   return scope.post(
     AddOrganizationMemberSchema,
     create(AddOrganizationMemberSchema, {
+      organizationId: { uuid: organizationId },
+      person: { uuid: person },
+      name,
+    }),
+  );
+}
+
+/** Posts `ActivateOrganizationMember` for the given member. */
+export function activateOrganizationMember(scope: BlackBoxScope, person: string) {
+  return scope.post(
+    ActivateOrganizationMemberSchema,
+    create(ActivateOrganizationMemberSchema, {
+      organizationId: { uuid: organizationId },
+      person: { uuid: person },
+    }),
+  );
+}
+
+/** Posts `DeactivateOrganizationMember` for the given member. */
+export function deactivateOrganizationMember(scope: BlackBoxScope, person: string) {
+  return scope.post(
+    DeactivateOrganizationMemberSchema,
+    create(DeactivateOrganizationMemberSchema, {
       organizationId: { uuid: organizationId },
       person: { uuid: person },
     }),

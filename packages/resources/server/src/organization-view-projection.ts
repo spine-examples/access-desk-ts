@@ -26,10 +26,17 @@
 
 import { create } from "@bufbuild/protobuf";
 import { Projection, Subscribe } from "@spine-event-engine/server";
-import { type OrganizationId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
+import {
+  ResourceIdSchema,
+  type OrganizationId,
+} from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
+import { PersonIdSchema } from "@access-desk/identity-model/generated/access_desk/identity/identifiers_pb.js";
+import { equals } from "@access-desk/base";
 import {
   type OrganizationCreated,
+  type OrganizationMemberActivated,
   type OrganizationMemberAdded,
+  type OrganizationMemberDeactivated,
   type ResourceAdded,
 } from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
 import { OrganizationViewSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_pb.js";
@@ -69,12 +76,55 @@ export class OrganizationViewProjection extends Projection<
     }
     this.update((draft) => {
       draft.id = event.organizationId ?? this.id;
-      if (!draft.member.some((existing) => existing.person?.uuid === person.uuid)) {
+      if (!draft.member.some((existing) => equals(PersonIdSchema, existing.person, person))) {
         draft.member = [
           ...draft.member,
-          create(OrganizationMemberSchema, { person, active: event.active }),
+          create(OrganizationMemberSchema, {
+            person,
+            active: event.active,
+            membershipVersion: event.membershipVersion,
+            name: event.name,
+          }),
         ];
       }
+    });
+  }
+
+  /**
+   * Marks one member active at its complete newer version.
+   */
+  @Subscribe
+  onOrganizationMemberActivated(event: OrganizationMemberActivated): void {
+    this.applyActivity(event.person, true, event.membershipVersion);
+  }
+
+  /**
+   * Marks one member inactive at its complete newer version.
+   */
+  @Subscribe
+  onOrganizationMemberDeactivated(event: OrganizationMemberDeactivated): void {
+    this.applyActivity(event.person, false, event.membershipVersion);
+  }
+
+  private applyActivity(
+    person: OrganizationMemberAdded["person"],
+    active: boolean,
+    membershipVersion: bigint,
+  ): void {
+    if (person === undefined) {
+      return;
+    }
+    this.update((draft) => {
+      draft.member = draft.member.map((member) =>
+        equals(PersonIdSchema, member.person, person)
+          ? create(OrganizationMemberSchema, {
+              person,
+              active,
+              membershipVersion,
+              name: member.name,
+            })
+          : member,
+      );
     });
   }
 
@@ -89,7 +139,7 @@ export class OrganizationViewProjection extends Projection<
     }
     this.update((draft) => {
       draft.id = event.organizationId ?? this.id;
-      if (!draft.resource.some((existing) => existing.id?.uuid === resourceId.uuid)) {
+      if (!draft.resource.some((existing) => equals(ResourceIdSchema, existing.id, resourceId))) {
         draft.resource = [
           ...draft.resource,
           create(OrganizationResourceSchema, { id: resourceId, name: event.name }),

@@ -34,10 +34,12 @@ import {
   resourcesBlackBox,
 } from "./given/resources-context.js";
 import {
+  activateOrganizationMember,
   addOrganizationMember,
   addResource,
   awaitOrganizationView,
   createOrganization,
+  deactivateOrganizationMember,
 } from "./given/organization.js";
 
 beforeAll(loadResourcesContext, 30_000);
@@ -87,6 +89,62 @@ describe("OrganizationViewProjection should", () => {
         v.member.some((member) => member.person?.uuid === "noah"),
       );
       expect(view?.member.map((member) => member.person?.uuid)).toEqual(["maya", "noah"]);
+    });
+  });
+
+  describe("react on member activity, and", () => {
+    it("reflect a member's deactivation, advancing the version and keeping the name", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      expect((await createOrganization(scope)).kind).toBe("ok");
+      expect((await addOrganizationMember(scope, "maya", "Maya")).kind).toBe("ok");
+
+      expect((await deactivateOrganizationMember(scope, "maya")).kind).toBe("ok");
+
+      const [view] = await awaitOrganizationView(box, scope, (v) =>
+        v.member.some((member) => member.person?.uuid === "maya" && !member.active),
+      );
+      const maya = view?.member.find((member) => member.person?.uuid === "maya");
+      expect(maya?.active).toBe(false);
+      expect(maya?.membershipVersion).toBe(2n);
+      expect(maya?.name).toBe("Maya");
+    });
+
+    it("reflect a member's reactivation, advancing the version again", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      expect((await createOrganization(scope)).kind).toBe("ok");
+      expect((await addOrganizationMember(scope, "maya")).kind).toBe("ok");
+      expect((await deactivateOrganizationMember(scope, "maya")).kind).toBe("ok");
+
+      expect((await activateOrganizationMember(scope, "maya")).kind).toBe("ok");
+
+      const [view] = await awaitOrganizationView(box, scope, (v) =>
+        v.member.some(
+          (member) =>
+            member.person?.uuid === "maya" && member.active && member.membershipVersion === 3n,
+        ),
+      );
+      const maya = view?.member.find((member) => member.person?.uuid === "maya");
+      expect(maya?.active).toBe(true);
+      expect(maya?.membershipVersion).toBe(3n);
+    });
+
+    it("change only the affected member's activity", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      expect((await createOrganization(scope)).kind).toBe("ok");
+      expect((await addOrganizationMember(scope, "maya")).kind).toBe("ok");
+      expect((await addOrganizationMember(scope, "noah")).kind).toBe("ok");
+
+      expect((await deactivateOrganizationMember(scope, "maya")).kind).toBe("ok");
+
+      const [view] = await awaitOrganizationView(box, scope, (v) =>
+        v.member.some((member) => member.person?.uuid === "maya" && !member.active),
+      );
+      const noah = view?.member.find((member) => member.person?.uuid === "noah");
+      expect(noah?.active).toBe(true);
+      expect(noah?.membershipVersion).toBe(1n);
     });
   });
 

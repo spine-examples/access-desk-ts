@@ -58,6 +58,29 @@ message AddOrganizationMember {
 
   // The person to add as a member.
   access_desk.identity.PersonId person = 2 [(required) = true, (validate) = true];
+
+  // The member's display name.
+  string name = 3 [(required) = true];
+}
+
+// Reactivates a currently inactive organization member.
+message ActivateOrganizationMember {
+
+  // The organization whose membership changes.
+  OrganizationId organization_id = 1 [(validate) = true];
+
+  // The member to activate.
+  access_desk.identity.PersonId person = 2 [(required) = true, (validate) = true];
+}
+
+// Deactivates a currently active organization member.
+message DeactivateOrganizationMember {
+
+  // The organization whose membership changes.
+  OrganizationId organization_id = 1 [(validate) = true];
+
+  // The member to deactivate.
+  access_desk.identity.PersonId person = 2 [(required) = true, (validate) = true];
 }
 
 // Records a newly created resource as one of an organization's resources.

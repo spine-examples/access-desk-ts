@@ -26,28 +26,45 @@
 
 import { create } from "@bufbuild/protobuf";
 import { Aggregate, Assign, Throws } from "@spine-event-engine/server";
-import { type OrganizationId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
 import {
+  ResourceIdSchema,
+  type OrganizationId,
+} from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
+import {
+  PersonIdSchema,
+  type PersonId,
+} from "@access-desk/identity-model/generated/access_desk/identity/identifiers_pb.js";
+import { equals } from "@access-desk/base";
+import {
+  type ActivateOrganizationMember,
   type AddOrganizationMember,
   type AddResource,
   type CreateOrganization,
+  type DeactivateOrganizationMember,
 } from "@access-desk/resources-model/generated/access_desk/resources/organization_commands_pb.js";
 import {
   OrganizationCreatedSchema,
+  OrganizationMemberActivatedSchema,
   OrganizationMemberAddedSchema,
+  OrganizationMemberDeactivatedSchema,
   ResourceAddedSchema,
   type OrganizationCreated,
+  type OrganizationMemberActivated,
   type OrganizationMemberAdded,
+  type OrganizationMemberDeactivated,
   type ResourceAdded,
 } from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
 import { OrganizationSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_pb.js";
 import {
   OrganizationMemberSchema,
   OrganizationResourceSchema,
+  type OrganizationMember,
 } from "@access-desk/resources-model/generated/access_desk/resources/values_pb.js";
 import {
   OrganizationAlreadyExists,
+  OrganizationMemberAlreadyActive,
   OrganizationMemberAlreadyAdded,
+  OrganizationMemberAlreadyInactive,
   OrganizationResourceNameAlreadyUsed,
 } from "@access-desk/resources-model/generated/access_desk/resources/organization_rejections.js";
 
@@ -85,20 +102,104 @@ export class OrganizationAggregate extends Aggregate<
     if (person === undefined) {
       throw new Error("AddOrganizationMember requires a person.");
     }
-    if (this.state.membership.some((item) => item.person?.uuid === person.uuid)) {
+    if (this.state.membership.some((item) => equals(PersonIdSchema, item.person, person))) {
       throw OrganizationMemberAlreadyAdded.create({ organizationId: this.id, person });
     }
     this.update((draft) => {
       draft.membership = [
         ...draft.membership,
-        create(OrganizationMemberSchema, { person, active: true }),
+        create(OrganizationMemberSchema, {
+          person,
+          name: command.name,
+          active: true,
+          membershipVersion: 1n,
+        }),
       ];
     });
     return create(OrganizationMemberAddedSchema, {
       organizationId: this.id,
       person,
+      name: command.name,
       active: true,
+      membershipVersion: 1n,
     });
+  }
+
+  /**
+   * Reactivates an inactive member and advances their activity revision.
+   */
+  @Assign
+  @Throws(OrganizationMemberAlreadyActive)
+  activateOrganizationMember(command: ActivateOrganizationMember): OrganizationMemberActivated {
+    const person = command.person;
+    if (person === undefined) {
+      throw new Error("ActivateOrganizationMember requires a member.");
+    }
+    const current = this.memberOf(person);
+    if (current.active) {
+      throw OrganizationMemberAlreadyActive.create({ organizationId: this.id, person });
+    }
+    const membershipVersion = this.advanceActivity(current, person, true);
+    return create(OrganizationMemberActivatedSchema, {
+      organizationId: this.id,
+      person,
+      membershipVersion,
+    });
+  }
+
+  /**
+   * Deactivates an active member and advances their activity revision.
+   */
+  @Assign
+  @Throws(OrganizationMemberAlreadyInactive)
+  deactivateOrganizationMember(
+    command: DeactivateOrganizationMember,
+  ): OrganizationMemberDeactivated {
+    const person = command.person;
+    if (person === undefined) {
+      throw new Error("DeactivateOrganizationMember requires a member.");
+    }
+    const current = this.memberOf(person);
+    if (!current.active) {
+      throw OrganizationMemberAlreadyInactive.create({ organizationId: this.id, person });
+    }
+    const membershipVersion = this.advanceActivity(current, person, false);
+    return create(OrganizationMemberDeactivatedSchema, {
+      organizationId: this.id,
+      person,
+      membershipVersion,
+    });
+  }
+
+  /** Finds an existing member, or fails when the person is not a member. */
+  private memberOf(person: PersonId) {
+    const current = this.state.membership.find((item) => equals(PersonIdSchema, item.person, person));
+    if (current === undefined) {
+      throw new Error("An activity change requires an existing member.");
+    }
+    return current;
+  }
+
+  /** Sets the member's activity, advances their revision, and returns the new revision. */
+  private advanceActivity(
+    current: OrganizationMember,
+    person: PersonId,
+    active: boolean,
+  ): bigint {
+    const membershipVersion = current.membershipVersion + 1n;
+    this.update((draft) => {
+      draft.membership = draft.membership.map((item) =>
+        equals(PersonIdSchema, item.person, person)
+          ? create(OrganizationMemberSchema, {
+              person,
+              active,
+              membershipVersion,
+              name: current.name,
+            })
+          : item,
+      );
+    });
+    return membershipVersion;
   }
 
   /**
@@ -111,7 +212,7 @@ export class OrganizationAggregate extends Aggregate<
     if (resourceId === undefined) {
       throw new Error("AddResource requires a resource id.");
     }
-    const existing = this.state.resource.find((reserved) => reserved.id?.uuid === resourceId.uuid);
+    const existing = this.state.resource.find((reserved) => equals(ResourceIdSchema, reserved.id, resourceId));
     if (existing === undefined) {
       const requestedName = normalizeName(command.name);
       const nameTaken = this.state.resource.some(
