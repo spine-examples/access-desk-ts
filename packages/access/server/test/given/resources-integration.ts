@@ -45,7 +45,7 @@ export function resourcePolicy(
   return create(ResourcePolicySchema, {
     openForRequests: false,
     sensitivity: Sensitivity.RESTRICTED,
-    manager: [{ uuid: "manager" }],
+    manager: [{ uuid: "primary" }, { uuid: "fallback" }],
     accessLevel: [create(AccessLevelSchema, { name: "Read", rank: 1 })],
     maximumDuration: { seconds: 3600n },
     policyVersion: 1n,

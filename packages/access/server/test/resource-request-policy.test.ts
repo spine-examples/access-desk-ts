@@ -36,7 +36,7 @@ import { Sensitivity } from "@access-desk/resources-model/generated/access_desk/
 import {
   ResourceRequestPolicySchema,
   type ResourceRequestPolicy,
-} from "@access-desk/access-model/generated/access_desk/access/resource_request_policy_pb.js";
+} from "@access-desk/access-model/generated/access_desk/access/resources_integration_pb.js";
 
 import {
   accessBlackBox,
@@ -98,7 +98,7 @@ describe("ResourceRequestPolicyProjection should", () => {
       sensitivity: Sensitivity.RESTRICTED,
       policyVersion: 3n,
     });
-    expect(rows[0]?.policy?.manager.map((person) => person.uuid)).toEqual(["manager"]);
+    expect(rows[0]?.policy?.manager.map((person) => person.uuid)).toEqual(["primary", "fallback"]);
     expect(rows[0]?.policy?.accessLevel).toMatchObject([{ name: "Read", rank: 1 }]);
   });
 

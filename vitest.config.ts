@@ -29,6 +29,15 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     include: ["packages/*/test/**/*.test.ts", "packages/*/*/test/**/*.test.ts"],
+    // BlackBox tests drive asynchronous cross-entity delivery and use bounded
+    // `eventually` waits; multi-hop reconciliation needs headroom over the 5s
+    // default.
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
+    // Each BlackBox test starts its own in-process server; running whole test
+    // files in parallel starves delivery and makes multi-hop flows flaky. Run
+    // files sequentially so each gets the CPU it needs.
+    fileParallelism: false,
     server: {
       deps: {
         external: [/[/\\]dist[/\\]/],

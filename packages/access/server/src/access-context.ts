@@ -28,10 +28,20 @@ import { BoundedContext, EventRouting } from "@spine-event-engine/server";
 import {
   ResourceClosedForRequestsSchema,
   ResourceCreatedSchema,
-  ResourceOpenedForRequestsSchema,
   ResourceDeletedSchema,
+  ResourceOpenedForRequestsSchema,
 } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
+import {
+  OrganizationMemberActivatedSchema,
+  OrganizationMemberAddedSchema,
+  OrganizationMemberDeactivatedSchema,
+} from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
 import { type ResourceId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
+import { type PersonId } from "@access-desk/identity-model/generated/access_desk/identity/identifiers_pb.js";
+import { AccessRequestAggregate } from "./access-request-aggregate.js";
+import { AccessRequestSubmissionProcessManager } from "./access-request-submission-process.js";
+import { ApprovalInboxProjection, MyAccessRequestProjection } from "./access-request-projections.js";
+import { OrganizationMembershipProjection } from "./organization-membership-projection.js";
 import { ResourceRequestPolicyProjection } from "./resource-request-policy-projection.js";
 
 /**
@@ -40,13 +50,22 @@ import { ResourceRequestPolicyProjection } from "./resource-request-policy-proje
  * @returns The assembled Access bounded context.
  */
 export async function createAccessContext(): Promise<BoundedContext> {
-  const eventRouting = EventRouting.create<ResourceId>()
+  const policyRouting = EventRouting.create<ResourceId>()
     .route(ResourceCreatedSchema, (event) => (event.id === undefined ? [] : [event.id]))
     .route(ResourceOpenedForRequestsSchema, (event) => (event.id === undefined ? [] : [event.id]))
     .route(ResourceClosedForRequestsSchema, (event) => (event.id === undefined ? [] : [event.id]))
     .route(ResourceDeletedSchema, (event) => (event.id === undefined ? [] : [event.id]));
+  const membershipRouting = EventRouting.create<PersonId>()
+    .route(OrganizationMemberAddedSchema, (event) => (event.person === undefined ? [] : [event.person]))
+    .route(OrganizationMemberActivatedSchema, (event) => event.person === undefined ? [] : [event.person])
+    .route(OrganizationMemberDeactivatedSchema, (event) => event.person === undefined ? [] : [event.person]);
   const builder = BoundedContext.multitenant("Access")
     .withGeneratedRegistryRoot(new URL("..", import.meta.url))
-    .add(ResourceRequestPolicyProjection, { eventRouting });
+    .add(ResourceRequestPolicyProjection, { eventRouting: policyRouting })
+    .add(OrganizationMembershipProjection, { eventRouting: membershipRouting })
+    .add(AccessRequestAggregate)
+    .add(AccessRequestSubmissionProcessManager)
+    .add(MyAccessRequestProjection)
+    .add(ApprovalInboxProjection)
   return builder.buildAsync();
 }

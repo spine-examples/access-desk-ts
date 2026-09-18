@@ -25,9 +25,9 @@
 //
 
 syntax = "proto3";
-
 package access_desk.access;
 
+import "access_desk/identity/identifiers.proto";
 import "access_desk/resources/identifiers.proto";
 import "access_desk/resources/values.proto";
 import "spine/options.proto";
@@ -48,4 +48,24 @@ message ResourceRequestPolicy {
 
   // The complete current resource request policy, as published by Resources.
   access_desk.resources.ResourcePolicy policy = 2 [(required) = true];
+}
+
+// A member's current activity as Access has durably learned it.
+//
+// Access keeps its own copy, mirrored from the membership facts the Resources
+// context publishes, so it can pick an active manager without reaching back to
+// Resources.
+//
+message OrganizationMembership {
+  option (entity).kind = PROJECTION;
+  option (entity).visibility = FULL;
+
+  // The member this activity describes.
+  access_desk.identity.PersonId id = 1 [(validate) = true, (set_once) = true];
+
+  // Whether the person is active.
+  bool active = 2;
+
+  // The latest membership revision this local copy has applied.
+  uint32 membership_version = 3;
 }

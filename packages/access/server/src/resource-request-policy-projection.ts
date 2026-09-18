@@ -33,7 +33,7 @@ import {
   type ResourceDeleted,
 } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
 import { type ResourceId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
-import { ResourceRequestPolicySchema } from "@access-desk/access-model/generated/access_desk/access/resource_request_policy_pb.js";
+import { ResourceRequestPolicySchema } from "@access-desk/access-model/generated/access_desk/access/resources_integration_pb.js";
 
 type PolicyEvent = ResourceCreated | ResourceOpenedForRequests | ResourceClosedForRequests;
 
