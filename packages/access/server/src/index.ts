@@ -29,3 +29,7 @@
  */
 export { createAccessContext } from "./access-context.js";
 export { ResourceRequestPolicyProjection } from "./resource-request-policy-projection.js";
+export { OrganizationMembershipProjection } from "./organization-membership-projection.js";
+export { AccessRequestAggregate } from "./access-request-aggregate.js";
+export { AccessRequestSubmissionProcessManager } from "./access-request-submission-process.js";
+export { AccessDecisionAssignmentProjection } from "./access-decision-assignment-projection.js";

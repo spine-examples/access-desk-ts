@@ -83,20 +83,16 @@ describe("OrganizationMembershipProjection should", () => {
       () => readMemberships(scope),
       (rows) => rows.length === 2,
     );
-    expect(memberships).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          id: expect.objectContaining({ uuid: "maya" }),
-          active: true,
-          membershipVersion: 1,
-        }),
-        expect.objectContaining({
-          id: expect.objectContaining({ uuid: "noah" }),
-          active: false,
-          membershipVersion: 1,
-        }),
-      ]),
-    );
+    expect(
+      memberships.some(
+        (row) => row.id?.uuid === "maya" && row.active && row.membershipVersion === 1,
+      ),
+    ).toBe(true);
+    expect(
+      memberships.some(
+        (row) => row.id?.uuid === "noah" && !row.active && row.membershipVersion === 1,
+      ),
+    ).toBe(true);
   });
 
   it("applies activation and deactivation in their membership revision order", async () => {

@@ -1,13 +1,35 @@
 {
   "formatVersion": 2,
-  "generationId": "cbe8ac9b-5a3b-44e4-8795-022236afa035",
+  "generationId": "b7125853-1260-4be5-be31-b914ed786dcd",
   "packageName": "@access-desk/access-model",
   "packageVersion": "0.0.0",
   "protoFiles": [
-    "access_desk/access/resource_request_policy.proto"
+    "access_desk/access/access_decision_assignment.proto",
+    "access_desk/access/access_request.proto",
+    "access_desk/access/access_request_commands.proto",
+    "access_desk/access/access_request_events.proto",
+    "access_desk/access/access_request_rejections.proto",
+    "access_desk/access/access_request_submission.proto",
+    "access_desk/access/access_request_submission_commands.proto",
+    "access_desk/access/access_request_submission_events.proto",
+    "access_desk/access/access_request_submission_rejections.proto",
+    "access_desk/access/identifiers.proto",
+    "access_desk/access/resources_integration.proto",
+    "access_desk/access/values.proto"
   ],
   "generatedExports": {
-    "access_desk/access/resource_request_policy.proto": "generated/access_desk/access/resource_request_policy_pb.js"
+    "access_desk/access/access_decision_assignment.proto": "generated/access_desk/access/access_decision_assignment_pb.js",
+    "access_desk/access/access_request.proto": "generated/access_desk/access/access_request_pb.js",
+    "access_desk/access/access_request_commands.proto": "generated/access_desk/access/access_request_commands_pb.js",
+    "access_desk/access/access_request_events.proto": "generated/access_desk/access/access_request_events_pb.js",
+    "access_desk/access/access_request_rejections.proto": "generated/access_desk/access/access_request_rejections_pb.js",
+    "access_desk/access/access_request_submission.proto": "generated/access_desk/access/access_request_submission_pb.js",
+    "access_desk/access/access_request_submission_commands.proto": "generated/access_desk/access/access_request_submission_commands_pb.js",
+    "access_desk/access/access_request_submission_events.proto": "generated/access_desk/access/access_request_submission_events_pb.js",
+    "access_desk/access/access_request_submission_rejections.proto": "generated/access_desk/access/access_request_submission_rejections_pb.js",
+    "access_desk/access/identifiers.proto": "generated/access_desk/access/identifiers_pb.js",
+    "access_desk/access/resources_integration.proto": "generated/access_desk/access/resources_integration_pb.js",
+    "access_desk/access/values.proto": "generated/access_desk/access/values_pb.js"
   },
   "dependencies": [
     "@access-desk/identity-model",
