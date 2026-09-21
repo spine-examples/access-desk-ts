@@ -105,7 +105,7 @@ Projection inputs and outputs drawn on the board:
 
 | Owner                 | Trigger (actor/event)          | Command                                | Event(s)                            | Rejections        |
 | --------------------- | ------------------------------ | -------------------------------------- | ----------------------------------- | ----------------- |
-| Access Grant          | Access Administrator           | Revoke Access Grant                    | Access Grant Revoked                | Access Not Active |
+| Access Grant          | Resource Manager               | Revoke Access Grant                    | Access Grant Revoked                | Access Not Active |
 | Grant Expiration (PM) | on Access Grant Revoked        | Cancel Scheduled Command (Optional)    | —                                   | —                 |
 | Grant Expiration (PM) | on Scheduled Command Cancelled | —                                      | Access Grant Expiration Cancelled   | —                 |
 | Grant Expiration (PM) | on Access Grant Activated      | Schedule Command (Expire Access Grant) | —                                   | —                 |

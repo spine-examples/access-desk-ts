@@ -155,7 +155,7 @@ before the affected identity change is considered fully delivered.
 ## Resources and policy ownership
 
 Resources is authoritative for organizations, membership, resources, and
-resource policy. A resource carries descriptive catalogue attributes — its
+resource policy. A resource carries descriptive catalog attributes — its
 identity, description, and category — that describe it for browsing but are not
 access decision rules.
 

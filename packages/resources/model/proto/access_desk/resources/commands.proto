@@ -49,7 +49,7 @@ message CreateResource {
   // The human-readable resource description.
   string description = 3 [(required) = true];
 
-  // The catalogue category the resource belongs to.
+  // The catalog category the resource belongs to.
   string category = 4 [(required) = true];
 
   // The data-sensitivity classification of the resource.

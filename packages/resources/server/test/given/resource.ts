@@ -35,8 +35,8 @@ import {
 } from "@access-desk/resources-model/generated/access_desk/resources/commands_pb.js";
 import { RegisterResourceSchema } from "@access-desk/resources-model/generated/access_desk/resources/resource_registration_commands_pb.js";
 import {
-  ResourceCatalogueItemSchema,
-  type ResourceCatalogueItem,
+  ResourceCatalogItemSchema,
+  type ResourceCatalogItem,
 } from "@access-desk/resources-model/generated/access_desk/resources/resource_pb.js";
 import {
   AccessLevelSchema,
@@ -127,27 +127,27 @@ export function closeResource(scope: BlackBoxScope, resource: string) {
   );
 }
 
-/** Reads every `ResourceCatalogueItem` in the organization's tenant. */
-export function readCatalogue(scope: BlackBoxScope): Promise<readonly ResourceCatalogueItem[]> {
-  return readAll(scope, ResourceCatalogueItemSchema, "query-resource-catalogue");
+/** Reads every `ResourceCatalogItem` in the organization's tenant. */
+export function readCatalog(scope: BlackBoxScope): Promise<readonly ResourceCatalogItem[]> {
+  return readAll(scope, ResourceCatalogItemSchema, "query-resource-catalog");
 }
 
-/** Waits until the catalogue item with the given id satisfies the predicate. */
-export async function awaitCatalogueItem(
+/** Waits until the catalog item with the given id satisfies the predicate. */
+export async function awaitCatalogItem(
   box: BlackBox,
   scope: BlackBoxScope,
   resource: string,
-  accept: (item: ResourceCatalogueItem) => boolean = () => true,
-): Promise<ResourceCatalogueItem> {
-  const matches = (item: ResourceCatalogueItem): boolean =>
+  accept: (item: ResourceCatalogItem) => boolean = () => true,
+): Promise<ResourceCatalogItem> {
+  const matches = (item: ResourceCatalogItem): boolean =>
     item.id?.uuid === resource && accept(item);
   const items = await box.eventually(
-    () => readCatalogue(scope),
+    () => readCatalog(scope),
     (rows) => rows.some(matches),
   );
   const found = items.find(matches);
   if (found === undefined) {
-    throw new Error(`Catalogue item "${resource}" not found.`);
+    throw new Error(`Catalog item "${resource}" not found.`);
   }
   return found;
 }

@@ -37,7 +37,7 @@ import {
 import {
   ResourceAlreadyClosedForRequestsSchema,
   ResourceAlreadyExistsSchema,
-  ResourceAlreadyOpenedForRequestsSchema,
+  ResourceAlreadyOpenForRequestsSchema,
 } from "@access-desk/resources-model/generated/access_desk/resources/rejections_pb.js";
 
 import {
@@ -127,7 +127,7 @@ describe("ResourceAggregate should", () => {
       expect((await createResource(scope, "payroll")).kind).toBe("ok");
       expect((await openResource(scope, "payroll")).kind).toBe("ok");
 
-      await expectRejection(box, scope, ResourceAlreadyOpenedForRequestsSchema, () =>
+      await expectRejection(box, scope, ResourceAlreadyOpenForRequestsSchema, () =>
         openResource(scope, "payroll"),
       );
     });

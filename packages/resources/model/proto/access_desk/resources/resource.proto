@@ -53,17 +53,17 @@ message Resource {
   // A human-readable summary of what the resource is.
   string description = 3;
 
-  // The catalogue category the resource is listed under.
+  // The catalog category the resource is listed under.
   string category = 4;
 
   // The rules that govern access to the resource.
   ResourcePolicy policy = 5;
 }
 
-// A resource as it appears in its organization's access catalogue: what it is
+// A resource as it appears in its organization's access catalog: what it is
 // and the access rules currently in force for it.
 //
-message ResourceCatalogueItem {
+message ResourceCatalogItem {
   option (entity).kind = PROJECTION;
   option (entity).visibility = FULL;
 
@@ -77,7 +77,7 @@ message ResourceCatalogueItem {
   // A human-readable summary of what the resource is.
   string description = 3 [(required) = true];
 
-  // The catalogue category the resource is listed under.
+  // The catalog category the resource is listed under.
   string category = 4 [(required) = true];
 
   // The rules that govern access to the resource.

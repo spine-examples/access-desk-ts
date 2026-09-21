@@ -127,7 +127,7 @@ It is a complete demonstration of the decision-making and tracking workflow arou
 
 It should show:
 
-- A catalogue of resources that can be requested.
+- A catalog of resources that can be requested.
 - A form for requesting access.
 - An approval inbox.
 - Approval and denial decisions.
@@ -174,7 +174,7 @@ Maya is a developer at a fictional company named Northstar Labs.
 
 She needs seven days of read-only access to the Production Logs resource while investigating a customer problem.
 
-Maya opens the catalogue and selects Production Logs. The system tells her:
+Maya opens the catalog and selects Production Logs. The system tells her:
 
 - The resource contains sensitive operational information.
 - Only read-only access can be requested through this demonstration.
@@ -272,7 +272,7 @@ The owner can:
 
 ## 5.4 Access administrator
 
-The administrator maintains the requestable-resource catalogue.
+The administrator maintains the requestable-resource catalog.
 
 The administrator can:
 
@@ -694,7 +694,7 @@ Maya needs Viewer access to Production Logs for seven days.
 
 ### Steps
 
-1. Maya opens the resource catalogue.
+1. Maya opens the resource catalog.
 2. She filters by the **Operations** category.
 3. She opens **Production Logs**.
 4. She selects **Viewer**.
@@ -1026,7 +1026,7 @@ The main navigation changes slightly according to role, but the basic structure 
 ```text
 Access Desk
 ├── Home
-├── Catalogue
+├── Catalog
 ├── My Requests
 ├── My Access
 ├── Approvals             [approvers only]
@@ -1042,7 +1042,7 @@ Access Desk
 │ Access Desk     Search resources…                   🔔  Maya Chen ▾        │
 ├───────────────┬────────────────────────────────────────────────────────────┤
 │ Home          │                                                            │
-│ Catalogue     │  Page title                              Primary action    │
+│ Catalog     │  Page title                              Primary action    │
 │ My Requests   │  Short explanation                                        │
 │ My Access     │                                                            │
 │               │  Filters                                                   │
@@ -1128,7 +1128,7 @@ Recent activity
 • Mobile App Repository access activated
 ```
 
-## 14.2 Resource catalogue
+## 14.2 Resource catalog
 
 ### Purpose
 
@@ -1239,7 +1239,7 @@ After submission, route to the request detail page and show:
 
 Useful secondary actions:
 
-- Return to catalogue.
+- Return to catalog.
 - View all my requests.
 - Copy a link to the request.
 
@@ -1453,7 +1453,7 @@ From this screen, an owner can open a grant and revoke it with a reason.
 
 ### Purpose
 
-Maintain the small catalogue used in the demonstration.
+Maintain the small catalog used in the demonstration.
 
 ### Resource form
 
@@ -1513,7 +1513,7 @@ The main UI should not expose raw serialized messages by default. A developer-on
 
 ```mermaid
 flowchart TD
-    A["Home"] --> B["Resource catalogue"]
+    A["Home"] --> B["Resource catalog"]
     B --> C["Resource details"]
     C --> D["New access request"]
     D --> E["Review and submit"]
@@ -1577,7 +1577,7 @@ Useful empty states explain what the screen is for.
 
 Example for My Access:
 
-> You do not have active access yet. Browse the catalogue to request a resource.
+> You do not have active access yet. Browse the catalog to request a resource.
 
 Example for Approval Inbox:
 
@@ -1817,7 +1817,7 @@ Names below are suggestions, not a frozen public API.
 
 | Command | Meaning |
 |---|---|
-| `CreateResource` | Add a resource to the catalogue. |
+| `CreateResource` | Add a resource to the catalog. |
 | `OpenResourceForRequests` | Allow new requests. |
 | `CloseResourceForRequests` | Pause new requests. |
 | `SubmitAccessRequest` | Ask for an access level and period. |
@@ -1882,9 +1882,9 @@ Avoid technical names such as `UpdateStatus` because they hide the business mean
 
 The following views are sufficient for a strong demonstration.
 
-## 20.1 `ResourceCatalogueItem`
+## 20.1 `ResourceCatalogItem`
 
-Used by the catalogue.
+Used by the catalog.
 
 Contains:
 
@@ -2018,7 +2018,7 @@ Say:
 
 > Maya needs temporary access to Production Logs. Today, this might happen through chat and remain active forever. Access Desk gives the request a clear owner, decision, expiration, and history.
 
-Show the resource catalogue briefly.
+Show the resource catalog briefly.
 
 ## Minute 1–3: Submit the request
 
@@ -2127,7 +2127,7 @@ The minimum version should be large enough to prove Spine's value but small enou
 
 ### UI
 
-- Resource Catalogue.
+- Resource Catalog.
 - New Request.
 - My Requests.
 - Request Details with timeline.
@@ -2336,7 +2336,7 @@ Deliverable:
 
 ## Phase 4: Build read models
 
-1. Resource Catalogue.
+1. Resource Catalog.
 2. My Requests.
 3. Approval Inbox.
 4. My Access.
@@ -2350,7 +2350,7 @@ Deliverable:
 ## Phase 5: Build the browser experience
 
 1. Application shell and development sign-in.
-2. Catalogue and request form.
+2. Catalog and request form.
 3. Requester pages.
 4. Approver inbox and decision dialogs.
 5. Owner access dashboard.

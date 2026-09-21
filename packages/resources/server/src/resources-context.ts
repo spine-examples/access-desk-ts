@@ -33,7 +33,7 @@ import { type ResourceId } from "@access-desk/resources-model/generated/access_d
 import { OrganizationAggregate } from "./organization-aggregate.js";
 import { OrganizationViewProjection } from "./organization-view-projection.js";
 import { ResourceAggregate } from "./resource-aggregate.js";
-import { ResourceCatalogueProjection } from "./resource-catalogue-projection.js";
+import { ResourceCatalogProjection } from "./resource-catalog-projection.js";
 import { ResourceRegistrationProcessManager } from "./resource-registration-process.js";
 
 /**
@@ -62,6 +62,6 @@ export async function createResourcesContext(): Promise<BoundedContext> {
     .add(OrganizationViewProjection)
     .add(ResourceRegistrationProcessManager, { eventRouting: resourceRegistrationProcmanRouting })
     .add(ResourceAggregate)
-    .add(ResourceCatalogueProjection);
+    .add(ResourceCatalogProjection);
   return builder.buildAsync();
 }

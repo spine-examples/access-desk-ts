@@ -43,7 +43,7 @@ import {
   resourcesBlackBox,
   testActorContext,
 } from "./given/resources-context.js";
-import { awaitCatalogueItem, readCatalogue, registerResource } from "./given/resource.js";
+import { awaitCatalogItem, readCatalog, registerResource } from "./given/resource.js";
 import {
   awaitOrganizationView,
   createOrganization,
@@ -53,7 +53,7 @@ import {
 const { expectRejection, recordEvents } = eventRecording(testActorContext);
 
 // The process manager is NONE-visibility, so it is observed through the resource
-// it brings into the catalogue rather than by reading its own state.
+// it brings into the catalog rather than by reading its own state.
 beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
 
@@ -73,8 +73,8 @@ describe("ResourceRegistrationProcessManager should", () => {
 
       expect((await requested.waitFor(box)).id?.uuid).toBe("payroll");
       expect((await created.waitFor(box)).policy?.policyVersion).toBe(1n);
-      const catalogueItem = await awaitCatalogueItem(box, scope, "payroll");
-      expect(catalogueItem).toMatchObject({
+      const catalogItem = await awaitCatalogItem(box, scope, "payroll");
+      expect(catalogItem).toMatchObject({
         id: { uuid: "payroll" },
         name: "payroll",
         policy: { policyVersion: 1n },
@@ -106,7 +106,7 @@ describe("ResourceRegistrationProcessManager should", () => {
 
     // The first resource reserves the name "payroll" in the organization.
     expect((await registerResource(scope, "payroll-1", "payroll")).kind).toBe("ok");
-    await awaitCatalogueItem(box, scope, "payroll-1");
+    await awaitCatalogItem(box, scope, "payroll-1");
     await awaitOrganizationView(box, scope, (view) =>
       view.resource.some((resource) => resource.id?.uuid === "payroll-1"),
     );
@@ -120,14 +120,14 @@ describe("ResourceRegistrationProcessManager should", () => {
       );
       expect((await failed.waitFor(box)).id?.uuid).toBe("payroll-2");
 
-      // The compensated resource must leave the catalogue, while the organization
+      // The compensated resource must leave the catalog, while the organization
       // keeps only the first resource under the reserved name.
-      const catalogue = await box.eventually(
-        () => readCatalogue(scope),
+      const catalog = await box.eventually(
+        () => readCatalog(scope),
         (rows) => !rows.some((item) => item.id?.uuid === "payroll-2"),
       );
-      expect(catalogue.some((item) => item.id?.uuid === "payroll-2")).toBe(false);
-      expect(catalogue.some((item) => item.id?.uuid === "payroll-1")).toBe(true);
+      expect(catalog.some((item) => item.id?.uuid === "payroll-2")).toBe(false);
+      expect(catalog.some((item) => item.id?.uuid === "payroll-1")).toBe(true);
 
       const views = await readOrganizationViews(scope);
       expect(views[0]?.resource).toMatchObject([{ id: { uuid: "payroll-1" }, name: "payroll" }]);
