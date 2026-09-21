@@ -33,22 +33,24 @@ the board.
 
 ### Resources
 
-| Owner                      | Trigger (actor/event)              | Command                     | Event(s)                        | Rejections                           |
-| -------------------------- | ---------------------------------- | --------------------------- | ------------------------------- | ------------------------------------ |
-| Organization               | Platform Operator                  | Create Organization         | Organization Created            | Organization Already Exists          |
-| Organization               | Organization Owner                 | Add Organization Member     | Organization Member Added       | Organization Member Already Added    |
-| Resource Registration (PM) | Organization Owner                 | Register Resource           | Resource Registration Requested | Resource Already Exists              |
-| Resource Registration (PM) | on Resource Already Exists         | —                           | Resource Registration Failed    | —                                    |
-| Resource Registration (PM) | on Resource Registration Requested | Create Resource             | —                               | —                                    |
-| Resource                   | Resource Registration (PM)         | Create Resource             | Resource Created                | —                                    |
-| Resource Registration (PM) | on Resource Created                | Add Resource                | —                               | —                                    |
-| Organization               | Resource Registration (PM)         | Add Resource                | Resource Added                  | Resource Name Already Used           |
-| Resource Registration (PM) | on Resource Name Already Used      | Delete Resource             | —                               | —                                    |
-| Resource                   | Resource Registration (PM)         | Delete Resource             | Resource Deleted                | —                                    |
-| Resource Registration (PM) | on Resource Added                  | —                           | Resource Registered             | —                                    |
-| Resource Registration (PM) | on Resource Deleted                | —                           | Resource Registration Failed    | —                                    |
-| Resource                   | Resource Manager                   | Open Resource For Requests  | Resource Opened For Requests    | Resource Already Opened For Requests |
-| Resource                   | Resource Manager                   | Close Resource For Requests | Resource Closed For Requests    | Resource Already Closed For Requests |
+| Owner                      | Trigger (actor/event)              | Command                        | Event(s)                        | Rejections                          |
+| -------------------------- | ---------------------------------- | ------------------------------ | ------------------------------- | ----------------------------------- |
+| Organization               | Platform Operator                  | Create Organization            | Organization Created            | Organization Already Exists         |
+| Organization               | Platform Operator                  | Add Organization Member        | Organization Member Added       | Organization Member Already Added   |
+| Organization               | Platform Operator                  | Activate Organization Member   | Organization Member Activated   | Organization Member Already Active  |
+| Organization               | Platform Operator                  | Deactivate Organization Member | Organization Member Deactivated | Organization Member Already Inactive |
+| Resource Registration (PM) | Platform Operator                  | Register Resource              | Resource Registration Requested | —                                   |
+| Resource Registration (PM) | on Resource Registration Requested | Create Resource                | —                               | —                                   |
+| Resource                   | Resource Registration (PM)         | Create Resource                | Resource Created                | Resource Already Exists             |
+| Resource Registration (PM) | on Resource Already Exists         | —                              | Resource Registration Failed    | —                                   |
+| Resource Registration (PM) | on Resource Created                | Add Resource                   | —                               | —                                   |
+| Organization               | Resource Registration (PM)         | Add Resource                   | Resource Added                  | Resource Name Already Used          |
+| Resource Registration (PM) | on Resource Name Already Used      | Delete Resource                | —                               | —                                   |
+| Resource                   | Resource Registration (PM)         | Delete Resource                | Resource Deleted                | —                                   |
+| Resource Registration (PM) | on Resource Added                  | —                              | Resource Registered             | —                                   |
+| Resource Registration (PM) | on Resource Deleted                | —                              | Resource Registration Failed    | —                                   |
+| Resource                   | Resource Manager                   | Open Resource For Requests     | Resource Opened For Requests    | Resource Already Open For Requests  |
+| Resource                   | Resource Manager                   | Close Resource For Requests    | Resource Closed For Requests    | Resource Already Closed For Requests |
 
 Process: **Resource Registration** runs `Register Resource → Resource
 Registration Requested → Create Resource → Resource Created → Add Resource →
@@ -57,25 +59,35 @@ If `Add Resource` rejects `Resource Name Already Used`, it runs `Delete Resource
 → Resource Deleted → Resource Registration Failed`, then completes.
 
 Projections: **Organization View** receives Organization Created, Organization
-Member Added, and Resource Added; **Resource Catalogue Item** and **Resource
-Request Policy** receive Resource Created and each policy event (Opened/Closed For
-Requests).
+Member Added, Organization Member Activated, Organization Member Deactivated,
+and Resource Added. **Organization Membership** receives the three member
+events. **Resource Request Policy** and **Resource Catalog Item** receive
+Resource Created, Resource Deleted, Resource Opened For Requests, and Resource
+Closed For Requests.
 
 ### Access
 
-### Request & approval — Access Request aggregate
+### Request & approval
 
-| Owner          | Trigger (actor/event) | Command                         | Event(s)                           | Rejections                                                                                                                    |
-| -------------- | --------------------- | ------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Access Request | Requester             | Submit Access Request           | Access Request Submitted           | Resource Not Requestable; Access Level Not Available; Access Duration Too Long; Duplicate Access Request; Access Already Held |
-| Access Request | Requester             | Submit Access Extension Request | Access Extension Request Submitted | Access Duration Too Long                                                                                                      |
-| Access Request | Requester             | Cancel Access Request           | Access Request Cancelled           | Request Already Decided                                                                                                       |
-| Access Request | Resource Manager      | Approve Access Request          | Access Request Approved            | Request Already Decided; Self Approval Not Allowed                                                                            |
-| Access Request | Resource Manager      | Deny Access Request             | Access Request Denied              | Request Already Decided; Self Approval Not Allowed                                                                            |
+The two submission commands converge on the same admission event and then share
+the `Create Access Request → Access Request Created → Access Request Submitted`
+flow.
 
-Projection: **Approval Task** — the managers' pending-decision read model, built
-from **Resource Request Policy** so a resource's managers see the requests they
-may decide.
+| Owner                          | Trigger (actor/event)            | Command                         | Event(s)                          | Rejections                                                                                                                      |
+|--------------------------------|----------------------------------| ------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Access Request Submission (PM) | Requester                        | Submit Access Request           | Access Request Admission Accepted | Resource Not Requestable; Access Level Not Available; Access Duration Too Long; Duplicate Access Request; No Manager Eligible   |
+| Access Request Submission (PM) | Requester                        | Submit Access Extension Request | Access Request Admission Accepted | Resource Not Requestable; Access Duration Too Long; No Manager Eligible                                                         |
+| Access Request Submission (PM) | on Access Request Admission Accepted | Create Access Request           | —                                 | —                                                                                                                               |
+| Access Request                 | Access Request Submission (PM)   | Create Access Request           | Access Request Created            | —                                                                                                                               |
+| Access Request Submission (PM) | on Access Request Created        | —                               | Access Request Submitted          | —                                                                                                                               |
+| Access Request                 | Requester                        | Cancel Access Request           | Access Request Cancelled          | Request Already Decided                                                                                                         |
+| Access Request                 | Manager                          | Approve Access Request          | Access Request Approved           | Request Already Decided                                                                                                         |
+| Access Request                 | Manager                         | Deny Access Request             | Access Request Denied             | Request Already Decided                                                                                                         |
+
+Projection inputs and outputs drawn on the board:
+
+- **Access Decision Assignment** receives Access Request Created and Access
+  Request Canceled.
 
 ### Grant issuance — Grant Issuance PM, Access Grant aggregate
 
@@ -89,11 +101,11 @@ may decide.
 | Grant Issuance (PM) | on Command Scheduled                  | —                                                                   | Access Grant Activation Scheduled |
 | Access Grant        | Scheduling, due                       | Activate Access Grant                                               | Access Grant Activated            |
 
-### Revocation & expiration — Access Grant aggregate, Grant Expiration PM
+### Revocation & expiration
 
 | Owner                 | Trigger (actor/event)          | Command                                | Event(s)                            | Rejections        |
 | --------------------- | ------------------------------ | -------------------------------------- | ----------------------------------- | ----------------- |
-| Access Grant          | Resource Manager               | Revoke Access Grant                    | Access Grant Revoked                | Access Not Active |
+| Access Grant          | Access Administrator           | Revoke Access Grant                    | Access Grant Revoked                | Access Not Active |
 | Grant Expiration (PM) | on Access Grant Revoked        | Cancel Scheduled Command (Optional)    | —                                   | —                 |
 | Grant Expiration (PM) | on Scheduled Command Cancelled | —                                      | Access Grant Expiration Cancelled   | —                 |
 | Grant Expiration (PM) | on Access Grant Activated      | Schedule Command (Expire Access Grant) | —                                   | —                 |

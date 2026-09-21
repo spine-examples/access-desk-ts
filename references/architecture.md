@@ -235,15 +235,15 @@ business rejection. Immediate requests retain a duration; overlap that can only
 be known after an approval time is established must be revalidated before a
 grant is created.
 
-Any current manager of the resource may decide a pending request; no approver is
-assigned, because every manager is already eligible. The decider's current
-organization membership must be active. Self-approval is forbidden: a manager who
-is the requester of a request may not decide it, so a resource whose sole manager
-raises a request needs another manager to decide it. Because a resource always
-has at least one manager, a request never becomes undecidable for lack of an
-approver. Approval or denial is terminal and happens at most once. Denial requires
-a reason. Concurrent decisions are resolved by the aggregate transaction so only
-one fact is accepted.
+Any current manager captured in the admitted pool may decide a pending request;
+no approver is assigned. Admission captures active nonrequester managers in
+policy order. The decider's current organization membership must be active.
+Self-approval is forbidden: a manager who is the requester of a request
+may not decide it, so a resource whose sole manager raises a request needs
+another active manager to decide it. Admission rejects a request when no active
+nonrequester manager remains. Approval or denial is terminal and happens
+at most once. Denial requires a reason. Concurrent decisions are resolved
+by the aggregate transaction so only one fact is accepted.
 
 ## Request and grant lifecycles
 
@@ -266,7 +266,7 @@ no-op.
 An extension:
 
 - is allowed only for an active grant;
-- proposes a later end and changes no other grant field;
+- proposes an additional duration and changes no other grant field;
 - requires a separate approval task and decision;
 - is capped by the resource's maximum **total grant lifetime**, not an
   independent duration per extension;
