@@ -33,6 +33,7 @@ import {
   closeAccessBlackBoxes,
   loadAccessContext,
   readAll,
+  resourceUuid,
 } from "./given/access-context.js";
 import {
   approveAccessRequest,
@@ -40,7 +41,7 @@ import {
   createAccessRequest,
   denyAccessRequest,
 } from "./given/access-request.js";
-import { decisionTasks, managerHasTask, resourceUuid } from "./given/access-flow.js";
+import { decisionTasks, managerHasTask } from "./given/access-decision-assignment.js";
 
 // The projection reacts to the request aggregate's facts. Each event is produced
 // by posting the aggregate command directly, so the projection is exercised on

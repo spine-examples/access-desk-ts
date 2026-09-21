@@ -52,7 +52,7 @@ import {
   denyAccessRequest,
   givenCreatedRequest,
 } from "./given/access-request.js";
-import { expectRejection, recordEvents } from "../../../resources/server/test/given/events.js";
+import { expectRejection, recordEvents } from "./given/events.js";
 
 // The aggregate's commands are posted directly, bypassing the submission process,
 // so each handler's own event and rejections are verified in isolation.

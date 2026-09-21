@@ -41,6 +41,9 @@ import { BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
 export const organizationId = "acme";
 export const actor = "access-user";
 
+/** The stable resource used across the Access tests. */
+export const resourceUuid = "payroll";
+
 const signalMetadata = new SignalMetadata();
 
 /** The actor context for reads in the organization's tenant. */
