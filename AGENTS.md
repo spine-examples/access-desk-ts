@@ -19,10 +19,6 @@ the smallest relevant set:
   framework behavior, and source-of-truth lookup order.
 - `references/development.md` for change classification, delivery flow, review
   lanes, and verification.
-- `references/testing.md` for how server tests are organized (one file per
-  entity plus one process integration), the `given/` layout, and the shared
-  `@access-desk/base/testing` helpers. Read it before adding or restructuring
-  tests; `packages/resources/server/test` is the reference layout.
 - `PRD.md` for rough product background. Do not edit it unless the user's
   current prompt explicitly asks.
 
