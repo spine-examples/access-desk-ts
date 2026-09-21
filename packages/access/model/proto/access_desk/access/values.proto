@@ -44,7 +44,7 @@ enum AccessRequestStatus {
   // The unset request status.
   ARS_UNSPECIFIED = 0;
 
-  // The request awaits an approver's decision.
+  // The request awaits a manager's decision.
   PENDING = 1;
 
   // The request was approved.
