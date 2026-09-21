@@ -42,7 +42,7 @@ import type {
   AccessRequestCreated,
   AccessRequestDenied,
 } from "@access-desk/access-model/generated/access_desk/access/access_request_events_pb.js";
-import { equals } from "@access-desk/base";
+import { equals } from "@access-desk/base/proto";
 
 /**
  * One manager's queue of access requests awaiting their decision.

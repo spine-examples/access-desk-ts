@@ -25,6 +25,6 @@
  */
 
 /**
- * Base utilities shared across the application's contexts.
+ * Shared test utilities for BlackBox-based bounded-context tests.
  */
-export { equals } from "./equals.js";
+export { eventRecording, type EventRecorder, type EventRecording } from "./events.js";

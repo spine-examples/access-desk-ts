@@ -25,6 +25,7 @@
  */
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { eventRecording } from "@access-desk/base/testing";
 
 import { ResourceAddedSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
 import { ResourceCreatedSchema } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
@@ -40,6 +41,7 @@ import {
   closeResourcesBlackBoxes,
   loadResourcesContext,
   resourcesBlackBox,
+  testActorContext,
 } from "./given/resources-context.js";
 import { awaitCatalogueItem, readCatalogue, registerResource } from "./given/resource.js";
 import {
@@ -47,7 +49,8 @@ import {
   createOrganization,
   readOrganizationViews,
 } from "./given/organization.js";
-import { expectRejection, recordEvents } from "./given/events.js";
+
+const { expectRejection, recordEvents } = eventRecording(testActorContext);
 
 // The process manager is NONE-visibility, so it is observed through the resource
 // it brings into the catalogue rather than by reading its own state.

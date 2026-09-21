@@ -26,6 +26,7 @@
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { type BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
+import { eventRecording } from "@access-desk/base/testing";
 
 import {
   AccessRequestApprovedSchema,
@@ -44,6 +45,7 @@ import {
   actor,
   closeAccessBlackBoxes,
   loadAccessContext,
+  testActorContext,
 } from "./given/access-context.js";
 import {
   approveAccessRequest,
@@ -52,7 +54,8 @@ import {
   denyAccessRequest,
   givenCreatedRequest,
 } from "./given/access-request.js";
-import { expectRejection, recordEvents } from "./given/events.js";
+
+const { expectRejection, recordEvents } = eventRecording(testActorContext);
 
 // The aggregate's commands are posted directly, bypassing the submission process,
 // so each handler's own event and rejections are verified in isolation.
@@ -83,15 +86,21 @@ describe("AccessRequestAggregate should", () => {
       const events = await recordEvents(requester, AccessRequestCreatedSchema);
       try {
         expect(
-          (await createAccessRequest(requester, "req-create", { candidateManager: ["primary", "fallback"] }))
-            .kind,
+          (
+            await createAccessRequest(requester, "req-create", {
+              candidateManager: ["primary", "fallback"],
+            })
+          ).kind,
         ).toBe("ok");
 
         const event = await events.waitFor(box, (candidate) => candidate.id?.uuid === "req-create");
         expect(event.snapshot?.requester?.uuid).toBe(actor);
         expect(event.snapshot?.justification).toBe("Need payroll review");
         expect(event.snapshot?.kind.case).toBe("newRequest");
-        expect(event.candidateManager.map((manager) => manager.uuid)).toEqual(["primary", "fallback"]);
+        expect(event.candidateManager.map((manager) => manager.uuid)).toEqual([
+          "primary",
+          "fallback",
+        ]);
       } finally {
         await events.cancel();
       }
@@ -108,7 +117,10 @@ describe("AccessRequestAggregate should", () => {
       try {
         expect((await approveAccessRequest(manager, "req-approve", "primary")).kind).toBe("ok");
 
-        const event = await events.waitFor(box, (candidate) => candidate.id?.uuid === "req-approve");
+        const event = await events.waitFor(
+          box,
+          (candidate) => candidate.id?.uuid === "req-approve",
+        );
         expect(event.decidedBy?.uuid).toBe("primary");
         expect(event.candidateManager.map((who) => who.uuid)).toEqual(["primary"]);
       } finally {
@@ -119,7 +131,9 @@ describe("AccessRequestAggregate should", () => {
     it("reject a decider outside the candidate pool with 'ManagerNotEligible'", async () => {
       const box = await accessBlackBox();
       const requester = box.onBehalfOf(actor);
-      await givenCreatedRequest(box, requester, "req-approve-outsider", { candidateManager: ["primary"] });
+      await givenCreatedRequest(box, requester, "req-approve-outsider", {
+        candidateManager: ["primary"],
+      });
       const outsider = box.onBehalfOf("outsider");
 
       await expectRejection(box, outsider, ManagerNotEligibleSchema, () =>
@@ -130,7 +144,9 @@ describe("AccessRequestAggregate should", () => {
     it("reject the requester deciding their own request with 'SelfApprovalNotAllowed'", async () => {
       const box = await accessBlackBox();
       const requester = box.onBehalfOf(actor);
-      await givenCreatedRequest(box, requester, "req-approve-self", { candidateManager: ["primary"] });
+      await givenCreatedRequest(box, requester, "req-approve-self", {
+        candidateManager: ["primary"],
+      });
 
       await expectRejection(box, requester, SelfApprovalNotAllowedSchema, () =>
         approveAccessRequest(requester, "req-approve-self", actor),
@@ -140,7 +156,9 @@ describe("AccessRequestAggregate should", () => {
     it("reject a decision on an already-decided request with 'RequestAlreadyDecided'", async () => {
       const box = await accessBlackBox();
       const requester = box.onBehalfOf(actor);
-      await givenCreatedRequest(box, requester, "req-approve-twice", { candidateManager: ["primary"] });
+      await givenCreatedRequest(box, requester, "req-approve-twice", {
+        candidateManager: ["primary"],
+      });
       const manager = box.onBehalfOf("primary");
       await givenApproved(box, manager, "req-approve-twice", "primary");
 
@@ -159,7 +177,8 @@ describe("AccessRequestAggregate should", () => {
       const events = await recordEvents(manager, AccessRequestDeniedSchema);
       try {
         expect(
-          (await denyAccessRequest(manager, "req-deny", "primary", "Insufficient justification.")).kind,
+          (await denyAccessRequest(manager, "req-deny", "primary", "Insufficient justification."))
+            .kind,
         ).toBe("ok");
 
         const event = await events.waitFor(box, (candidate) => candidate.id?.uuid === "req-deny");
@@ -173,7 +192,9 @@ describe("AccessRequestAggregate should", () => {
     it("reject a decider outside the candidate pool with 'ManagerNotEligible'", async () => {
       const box = await accessBlackBox();
       const requester = box.onBehalfOf(actor);
-      await givenCreatedRequest(box, requester, "req-deny-outsider", { candidateManager: ["primary"] });
+      await givenCreatedRequest(box, requester, "req-deny-outsider", {
+        candidateManager: ["primary"],
+      });
       const outsider = box.onBehalfOf("outsider");
 
       await expectRejection(box, outsider, ManagerNotEligibleSchema, () =>
@@ -194,7 +215,9 @@ describe("AccessRequestAggregate should", () => {
     it("reject a decision on an already-decided request with 'RequestAlreadyDecided'", async () => {
       const box = await accessBlackBox();
       const requester = box.onBehalfOf(actor);
-      await givenCreatedRequest(box, requester, "req-deny-twice", { candidateManager: ["primary"] });
+      await givenCreatedRequest(box, requester, "req-deny-twice", {
+        candidateManager: ["primary"],
+      });
       const manager = box.onBehalfOf("primary");
       await givenApproved(box, manager, "req-deny-twice", "primary");
 
@@ -224,7 +247,9 @@ describe("AccessRequestAggregate should", () => {
     it("reject cancelling an already-decided request with 'RequestAlreadyDecided'", async () => {
       const box = await accessBlackBox();
       const requester = box.onBehalfOf(actor);
-      await givenCreatedRequest(box, requester, "req-cancel-decided", { candidateManager: ["primary"] });
+      await givenCreatedRequest(box, requester, "req-cancel-decided", {
+        candidateManager: ["primary"],
+      });
       await givenApproved(box, box.onBehalfOf("primary"), "req-cancel-decided", "primary");
 
       await expectRejection(box, requester, RequestAlreadyDecidedSchema, () =>

@@ -46,12 +46,15 @@ import {
   PersonIdSchema,
   type PersonId,
 } from "@access-desk/identity-model/generated/access_desk/identity/identifiers_pb.js";
-import { ResourceIdSchema, type ResourceId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
+import {
+  ResourceIdSchema,
+  type ResourceId,
+} from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
 import {
   type AccessLevel,
   type ResourcePolicy,
 } from "@access-desk/resources-model/generated/access_desk/resources/values_pb.js";
-import { equals } from "@access-desk/base";
+import { equals } from "@access-desk/base/proto";
 import {
   CreateAccessRequestSchema,
   type CreateAccessRequest,
@@ -144,7 +147,9 @@ export class AccessRequestSubmissionProcessManager extends ProcessManager<
       duration === undefined ||
       resource === undefined
     ) {
-      throw new Error("SubmitAccessExtensionRequest requires a requester, grant, duration, and resource.");
+      throw new Error(
+        "SubmitAccessExtensionRequest requires a requester, grant, duration, and resource.",
+      );
     }
     // An extension renews an existing grant: its level is implied by the grant, so
     // it is neither re-validated against the policy nor treated as a duplicate of a
@@ -185,7 +190,10 @@ export class AccessRequestSubmissionProcessManager extends ProcessManager<
   }
 
   /** The resource's current policy, or `ResourceNotRequestable` when it is closed. */
-  private async requestablePolicy(id: AccessRequestId, resource: ResourceId): Promise<ResourcePolicy> {
+  private async requestablePolicy(
+    id: AccessRequestId,
+    resource: ResourceId,
+  ): Promise<ResourcePolicy> {
     const policy = (await this.select(ResourceRequestPolicySchema, {}).findById(resource as never))
       ?.policy;
     if (!policy?.openForRequests) {
@@ -285,7 +293,8 @@ export class AccessRequestSubmissionProcessManager extends ProcessManager<
       }
       // Only a first-time request names a resource; an extension implies it
       // through the grant, so it never duplicates a resource-scoped request.
-      const requested = snapshot.kind.case === "newRequest" ? snapshot.kind.value.resource : undefined;
+      const requested =
+        snapshot.kind.case === "newRequest" ? snapshot.kind.value.resource : undefined;
       return requested !== undefined && equals(ResourceIdSchema, requested, resource);
     });
   }

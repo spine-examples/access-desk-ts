@@ -25,6 +25,7 @@
  */
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { eventRecording } from "@access-desk/base/testing";
 import { AccessRequestCreatedSchema } from "@access-desk/access-model/generated/access_desk/access/access_request_events_pb.js";
 import {
   AccessRequestAdmissionAcceptedSchema,
@@ -43,8 +44,8 @@ import {
   actor,
   closeAccessBlackBoxes,
   loadAccessContext,
+  testActorContext,
 } from "./given/access-context.js";
-import { expectRejection, recordEvents } from "./given/events.js";
 import {
   seed,
   submitAndAssign,
@@ -58,6 +59,8 @@ import {
 import { cancelAccessRequest, statusOf } from "./given/access-request.js";
 import { managerHasTask } from "./given/access-decision-assignment.js";
 
+const { expectRejection, recordEvents } = eventRecording(testActorContext);
+
 // The process manager keeps no queryable state, so each handler is observed
 // through the facts it emits and the rejections it throws.
 beforeAll(loadAccessContext, 30_000);
@@ -70,7 +73,13 @@ describe("AccessRequestSubmissionProcessManager should", () => {
       await seed(box, [actor, "primary", "second", { person: "inactive", active: false }], {
         policy: {
           accessLevel: [{ name: "Reader", rank: 4, description: "View payroll entries." }],
-          manager: [{ uuid: "second" }, { uuid: "primary" }, { uuid: "inactive" }, { uuid: "second" }, { uuid: actor }],
+          manager: [
+            { uuid: "second" },
+            { uuid: "primary" },
+            { uuid: "inactive" },
+            { uuid: "second" },
+            { uuid: actor },
+          ],
         },
       });
       const requester = box.onBehalfOf(actor);
@@ -87,7 +96,10 @@ describe("AccessRequestSubmissionProcessManager should", () => {
 
         const event = await admitted.waitFor(box, (candidate) => candidate.id?.uuid === "req-ok");
         // Managers keep policy order, drop the duplicate, the inactive member, and the requester.
-        expect(event.candidateManager.map((manager) => manager.uuid)).toEqual(["second", "primary"]);
+        expect(event.candidateManager.map((manager) => manager.uuid)).toEqual([
+          "second",
+          "primary",
+        ]);
         const kind = event.snapshot?.kind;
         expect(kind?.case).toBe("newRequest");
         if (kind?.case === "newRequest") {
@@ -143,7 +155,10 @@ describe("AccessRequestSubmissionProcessManager should", () => {
           SubmitAccessRequestSchema,
           submitRequest("req-scheduled-long", {
             period: {
-              kind: { case: "scheduled", value: { start: { seconds: 0n }, end: { seconds: 7200n } } },
+              kind: {
+                case: "scheduled",
+                value: { start: { seconds: 0n }, end: { seconds: 7200n } },
+              },
             },
           }),
         ),
@@ -194,8 +209,12 @@ describe("AccessRequestSubmissionProcessManager should", () => {
       const admitted = await recordEvents(requester, AccessRequestAdmissionAcceptedSchema);
       try {
         expect(
-          (await requester.post(SubmitAccessExtensionRequestSchema, submitExtensionRequest("ext-ok")))
-            .kind,
+          (
+            await requester.post(
+              SubmitAccessExtensionRequestSchema,
+              submitExtensionRequest("ext-ok"),
+            )
+          ).kind,
         ).toBe("ok");
 
         const event = await admitted.waitFor(box, (candidate) => candidate.id?.uuid === "ext-ok");
@@ -250,7 +269,10 @@ describe("AccessRequestSubmissionProcessManager should", () => {
       const created = await recordEvents(requester, AccessRequestCreatedSchema);
       try {
         await requester.post(SubmitAccessRequestSchema, submitRequest("req-create"));
-        const event = await created.waitFor(box, (candidate) => candidate.id?.uuid === "req-create");
+        const event = await created.waitFor(
+          box,
+          (candidate) => candidate.id?.uuid === "req-create",
+        );
         expect(event.snapshot?.requester?.uuid).toBe(actor);
         expect(event.candidateManager.map((manager) => manager.uuid)).toEqual(["primary"]);
       } finally {
@@ -267,9 +289,9 @@ describe("AccessRequestSubmissionProcessManager should", () => {
       const submitted = await recordEvents(requester, AccessRequestSubmittedSchema);
       try {
         await requester.post(SubmitAccessRequestSchema, submitRequest("req-submit"));
-        expect((await submitted.waitFor(box, (event) => event.id?.uuid === "req-submit")).id?.uuid).toBe(
-          "req-submit",
-        );
+        expect(
+          (await submitted.waitFor(box, (event) => event.id?.uuid === "req-submit")).id?.uuid,
+        ).toBe("req-submit");
       } finally {
         await submitted.cancel();
       }

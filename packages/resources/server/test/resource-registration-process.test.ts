@@ -25,6 +25,7 @@
  */
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { eventRecording } from "@access-desk/base/testing";
 
 import { ResourceAddedSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
 import { ResourceCreatedSchema } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
@@ -42,10 +43,12 @@ import {
   loadResourcesContext,
   organizationId,
   resourcesBlackBox,
+  testActorContext,
 } from "./given/resources-context.js";
-import { expectRejection, recordEvents } from "./given/events.js";
 import { awaitOrganizationView, createOrganization } from "./given/organization.js";
 import { awaitCatalogueItem, createResource, registerResource } from "./given/resource.js";
+
+const { expectRejection, recordEvents } = eventRecording(testActorContext);
 
 // The process manager is NONE-visibility, so each handler is observed through
 // the domain facts and projections it produces.

@@ -26,6 +26,7 @@
 
 import { create } from "@bufbuild/protobuf";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { eventRecording } from "@access-desk/base/testing";
 
 import {
   OrganizationCreatedSchema,
@@ -48,6 +49,7 @@ import {
   loadResourcesContext,
   organizationId,
   resourcesBlackBox,
+  testActorContext,
 } from "./given/resources-context.js";
 import {
   activateOrganizationMember,
@@ -58,7 +60,8 @@ import {
   createOrganization,
   readOrganizationViews,
 } from "./given/organization.js";
-import { expectRejection, recordEvents } from "./given/events.js";
+
+const { expectRejection, recordEvents } = eventRecording(testActorContext);
 
 // The Organization aggregate is NONE-visibility, so each command handler is
 // verified through the fact it publishes.
@@ -174,8 +177,8 @@ describe("OrganizationAggregate should", () => {
       const event = await events.waitFor(box);
       expect(event).toEqual(
         create(OrganizationMemberDeactivatedSchema, {
-          organizationId: {uuid: organizationId},
-          person: {uuid: "maya"},
+          organizationId: { uuid: organizationId },
+          person: { uuid: "maya" },
           membershipVersion: 2n,
         }),
       );

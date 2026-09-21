@@ -272,9 +272,24 @@ importers:
         specifier: 2.12.1
         version: 2.12.1
     devDependencies:
+      '@spine-event-engine/core':
+        specifier: 2.0.0-snapshot.11
+        version: 2.0.0-snapshot.11
+      '@spine-event-engine/proto':
+        specifier: 2.0.0-snapshot.11
+        version: 2.0.0-snapshot.11
+      '@spine-event-engine/testing':
+        specifier: 2.0.0-snapshot.11
+        version: 2.0.0-snapshot.11(@spine-event-engine/auth@2.0.0-snapshot.11)
+      '@types/node':
+        specifier: 24.13.2
+        version: 24.13.2
       typescript:
         specifier: 6.0.3
         version: 6.0.3
+      vitest:
+        specifier: 4.1.9
+        version: 4.1.9(@types/node@24.13.2)(@vitest/coverage-v8@4.1.9)(vite@8.2.2(@types/node@24.13.2))
 
   packages/identity/model:
     dependencies:

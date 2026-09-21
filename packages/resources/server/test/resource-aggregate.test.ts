@@ -25,6 +25,7 @@
  */
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { eventRecording } from "@access-desk/base/testing";
 
 import { Sensitivity } from "@access-desk/resources-model/generated/access_desk/resources/values_pb.js";
 import {
@@ -44,14 +45,11 @@ import {
   closeResourcesBlackBoxes,
   loadResourcesContext,
   resourcesBlackBox,
+  testActorContext,
 } from "./given/resources-context.js";
-import {
-  closeResource,
-  createResource,
-  deleteResource,
-  openResource,
-} from "./given/resource.js";
-import { expectRejection, recordEvents } from "./given/events.js";
+import { closeResource, createResource, deleteResource, openResource } from "./given/resource.js";
+
+const { expectRejection, recordEvents } = eventRecording(testActorContext);
 
 // The Resource aggregate is NONE-visibility, so each command handler is verified
 // only through the policy fact it publishes.

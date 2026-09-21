@@ -34,7 +34,7 @@ import {
   PersonIdSchema,
   type PersonId,
 } from "@access-desk/identity-model/generated/access_desk/identity/identifiers_pb.js";
-import { equals } from "@access-desk/base";
+import { equals } from "@access-desk/base/proto";
 import {
   type ActivateOrganizationMember,
   type AddOrganizationMember,
@@ -173,7 +173,9 @@ export class OrganizationAggregate extends Aggregate<
 
   /** Finds an existing member, or fails when the person is not a member. */
   private memberOf(person: PersonId) {
-    const current = this.state.membership.find((item) => equals(PersonIdSchema, item.person, person));
+    const current = this.state.membership.find((item) =>
+      equals(PersonIdSchema, item.person, person),
+    );
     if (current === undefined) {
       throw new Error("An activity change requires an existing member.");
     }
@@ -181,11 +183,7 @@ export class OrganizationAggregate extends Aggregate<
   }
 
   /** Sets the member's activity, advances their revision, and returns the new revision. */
-  private advanceActivity(
-    current: OrganizationMember,
-    person: PersonId,
-    active: boolean,
-  ): bigint {
+  private advanceActivity(current: OrganizationMember, person: PersonId, active: boolean): bigint {
     const membershipVersion = current.membershipVersion + 1n;
     this.update((draft) => {
       draft.membership = draft.membership.map((item) =>
@@ -212,7 +210,9 @@ export class OrganizationAggregate extends Aggregate<
     if (resourceId === undefined) {
       throw new Error("AddResource requires a resource id.");
     }
-    const existing = this.state.resource.find((reserved) => equals(ResourceIdSchema, reserved.id, resourceId));
+    const existing = this.state.resource.find((reserved) =>
+      equals(ResourceIdSchema, reserved.id, resourceId),
+    );
     if (existing === undefined) {
       const requestedName = normalizeName(command.name);
       const nameTaken = this.state.resource.some(

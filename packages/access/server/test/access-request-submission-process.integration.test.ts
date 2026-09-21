@@ -25,6 +25,7 @@
  */
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { eventRecording } from "@access-desk/base/testing";
 import { AccessRequestCreatedSchema } from "@access-desk/access-model/generated/access_desk/access/access_request_events_pb.js";
 import {
   AccessRequestAdmissionAcceptedSchema,
@@ -40,15 +41,13 @@ import {
   actor,
   closeAccessBlackBoxes,
   loadAccessContext,
+  testActorContext,
 } from "./given/access-context.js";
-import { recordEvents } from "./given/events.js";
-import {
-  seed,
-  submitExtensionRequest,
-  submitRequest,
-} from "./given/access-request-submission.js";
+import { seed, submitExtensionRequest, submitRequest } from "./given/access-request-submission.js";
 import { approveAccessRequest, readRequests, statusOf } from "./given/access-request.js";
 import { managerHasTask, readAssignments } from "./given/access-decision-assignment.js";
+
+const { recordEvents } = eventRecording(testActorContext);
 
 // These exercise the whole submission-and-decision choreography end to end —
 // process manager, request aggregate, and decision-queue projection — from the
@@ -74,10 +73,14 @@ describe("AccessRequestSubmissionProcessManager should", () => {
 
       // The three choreography facts fire in order: admitted, created, submitted.
       const admission = await admitted.waitFor(box, (event) => event.id?.uuid === "req-int");
-      expect(admission.candidateManager.map((manager) => manager.uuid)).toEqual(["primary", "second"]);
-      expect((await created.waitFor(box, (event) => event.id?.uuid === "req-int")).snapshot?.requester?.uuid).toBe(
-        actor,
-      );
+      expect(admission.candidateManager.map((manager) => manager.uuid)).toEqual([
+        "primary",
+        "second",
+      ]);
+      expect(
+        (await created.waitFor(box, (event) => event.id?.uuid === "req-int")).snapshot?.requester
+          ?.uuid,
+      ).toBe(actor);
       await submitted.waitFor(box, (event) => event.id?.uuid === "req-int");
 
       // The request is retrievable through its own query.

@@ -9,7 +9,7 @@ import {
   PersonIdSchema,
   type PersonId,
 } from "@access-desk/identity-model/generated/access_desk/identity/identifiers_pb.js";
-import { equals } from "@access-desk/base";
+import { equals } from "@access-desk/base/proto";
 import {
   AccessRequestStatus,
   type AccessRequestSnapshot,
@@ -157,7 +157,9 @@ export class AccessRequestAggregate extends Aggregate<
     if (requester !== undefined && equals(PersonIdSchema, requester, decidedBy)) {
       throw SelfApprovalNotAllowed.create({ id: id ?? this.id });
     }
-    if (!this.state.candidateManager.some((manager) => equals(PersonIdSchema, manager, decidedBy))) {
+    if (
+      !this.state.candidateManager.some((manager) => equals(PersonIdSchema, manager, decidedBy))
+    ) {
       throw ManagerNotEligible.create({ id: id ?? this.id });
     }
     return decidedBy;

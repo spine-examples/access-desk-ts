@@ -31,7 +31,7 @@ import {
   type OrganizationId,
 } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
 import { PersonIdSchema } from "@access-desk/identity-model/generated/access_desk/identity/identifiers_pb.js";
-import { equals } from "@access-desk/base";
+import { equals } from "@access-desk/base/proto";
 import {
   type OrganizationCreated,
   type OrganizationMemberActivated,
