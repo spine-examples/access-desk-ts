@@ -67,7 +67,42 @@ lint (`no-non-null-assertion`); use an `=== undefined` guard, which also handles
 the field-absent case the assertion silently ignores. Depth in
 `references/spine-ts.md` (Bounded contexts and handlers).
 
+## Reading another entity's state
+
+A PM or projection reads other entities with `this.select(Schema, {})`:
+`.findById(id as never)` for one, or `.byId(...ids).read()` / `.all()` for many —
+**one query, not a loop of `findById`.** It reads any **query-visible** entity's
+state from the same stand the public client queries — a projection **or a
+visible aggregate** (default `AGGREGATE` visibility is queryable). Prefer reading
+the owning aggregate over adding a projection that only mirrors it. Reads are
+eventually consistent; the caller already waited on delivery, so the state is
+present.
+
+## Declare only the rejections a handler can produce
+
+`@Throws` lists exactly the rejections that handler can actually raise. When two
+commands share a validation helper but one variant skips a check (an extension
+renews an existing grant, so it skips the level and duplicate checks a first-time
+request runs), its handler must run only the applicable checks and list only
+their rejections — do not copy the sibling's `@Throws`. A rejection that "can't
+happen in theory" for a variant should be impossible to reach, not merely
+unlikely.
+
+## Identity comes from the command, not the context
+
+Put the acting person on the command as an explicit `PersonId` field (the
+requester on a submit command, the deciding manager on approve/deny) and read
+`command.<field>`. Do not derive identity from `CommandContext.actorContext`.
+`@Assign`/`@React` methods take `context` only when they truly need it; drop the
+parameter when they don't (as the aggregate's decision handlers do).
+
 ## Traps that cost time (avoid all of these)
+
+- **Handler codegen needs the model *built*, not just generated.** `spine-proto
+  handlers` resolves handler signatures against the model package's compiled
+  types, so run the model package's `build` (`spine-proto generate && tsc -b`),
+  not only `generate`, before `compose`/`handlers` in the server — otherwise it
+  reports `INVALID_SIGNAL_TYPE`/`UNSUPPORTED_RETURN_TYPE` against current code.
 
 - **Business rejections ack `ok`.** Delivery is deferred; a thrown generated
   rejection fires async and never reaches the post outcome. Prove it by no-change

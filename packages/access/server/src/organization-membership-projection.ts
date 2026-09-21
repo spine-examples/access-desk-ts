@@ -45,25 +45,25 @@ export class OrganizationMembershipProjection extends Projection<
   /** Records the initial active membership at revision one. */
   @Subscribe
   onOrganizationMemberAdded(event: External<OrganizationMemberAdded>): void {
-    this.apply(event.person, event.active, Number(event.membershipVersion));
+    this.apply(event.person, event.active, event.membershipVersion);
   }
 
   /** Records a member becoming active at a complete newer revision. */
   @Subscribe
   onOrganizationMemberActivated(event: External<OrganizationMemberActivated>): void {
-    this.apply(event.person, true, Number(event.membershipVersion));
+    this.apply(event.person, true, event.membershipVersion);
   }
 
   /** Records a member becoming inactive at a complete newer revision. */
   @Subscribe
   onOrganizationMemberDeactivated(event: External<OrganizationMemberDeactivated>): void {
-    this.apply(event.person, false, Number(event.membershipVersion));
+    this.apply(event.person, false, event.membershipVersion);
   }
 
   private apply(
     person: OrganizationMemberAdded["person"],
     active: boolean,
-    membershipVersion: number,
+    membershipVersion: bigint,
   ): void {
     if (person === undefined) {
       return;

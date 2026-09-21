@@ -32,4 +32,5 @@ export { ResourceRequestPolicyProjection } from "./resource-request-policy-proje
 export { OrganizationMembershipProjection } from "./organization-membership-projection.js";
 export { AccessRequestAggregate } from "./access-request-aggregate.js";
 export { AccessRequestSubmissionProcessManager } from "./access-request-submission-process.js";
+export { AccessRequestViewProjection } from "./access-request-view-projection.js";
 export { AccessDecisionAssignmentProjection } from "./access-decision-assignment-projection.js";

@@ -114,6 +114,14 @@ export class OrganizationViewProjection extends Projection<
     if (person === undefined) {
       return;
     }
+    const current = this.state.member.find((member) =>
+      equals(PersonIdSchema, member.person, person),
+    );
+    // A stale or replayed activity fact never rolls a member back to an earlier
+    // revision; only a strictly newer revision applies.
+    if (current === undefined || membershipVersion <= current.membershipVersion) {
+      return;
+    }
     this.update((draft) => {
       draft.member = draft.member.map((member) =>
         equals(PersonIdSchema, member.person, person)

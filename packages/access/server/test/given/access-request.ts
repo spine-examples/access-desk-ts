@@ -34,9 +34,9 @@ import {
   DenyAccessRequestSchema,
 } from "@access-desk/access-model/generated/access_desk/access/access_request_commands_pb.js";
 import {
-  AccessRequestSchema,
-  type AccessRequest,
-} from "@access-desk/access-model/generated/access_desk/access/access_request_pb.js";
+  AccessRequestViewSchema,
+  type AccessRequestView,
+} from "@access-desk/access-model/generated/access_desk/access/access_request_view_pb.js";
 import {
   AccessRequestSnapshotSchema,
   AccessRequestStatus,
@@ -79,7 +79,9 @@ export function requestSnapshot(
       value: {
         resource: { uuid: details.resource },
         accessLevel: details.accessLevel,
-        period: { kind: { case: "immediateDuration", value: { seconds: details.durationSeconds } } },
+        period: {
+          kind: { case: "immediateDuration", value: { seconds: details.durationSeconds } },
+        },
       },
     },
   });
@@ -118,9 +120,11 @@ export async function givenCreatedRequest(
 ): Promise<void> {
   await createAccessRequest(scope, id, options);
   await box.eventually(
-    () => readAll(scope, AccessRequestSchema, `created-${id}`),
+    () => readAll(scope, AccessRequestViewSchema, `created-${id}`),
     (requests) =>
-      requests.some((request) => request.id?.uuid === id && request.status === AccessRequestStatus.PENDING),
+      requests.some(
+        (request) => request.id?.uuid === id && request.status === AccessRequestStatus.PENDING,
+      ),
   );
 }
 
@@ -133,7 +137,12 @@ export function approveAccessRequest(scope: BlackBoxScope, id: string, manager: 
 }
 
 /** Posts `DenyAccessRequest` with a reason, naming `manager` as the deciding manager. */
-export function denyAccessRequest(scope: BlackBoxScope, id: string, manager: string, reason: string) {
+export function denyAccessRequest(
+  scope: BlackBoxScope,
+  id: string,
+  manager: string,
+  reason: string,
+) {
   return scope.post(
     DenyAccessRequestSchema,
     create(DenyAccessRequestSchema, { id: { uuid: id }, manager: { uuid: manager }, reason }),
@@ -149,8 +158,8 @@ export function cancelAccessRequest(scope: BlackBoxScope, id: string) {
 }
 
 /** Every access request visible to the reader. */
-export function readRequests(reader: BlackBoxScope): Promise<AccessRequest[]> {
-  return readAll(reader, AccessRequestSchema, "requests");
+export function readRequests(reader: BlackBoxScope): Promise<AccessRequestView[]> {
+  return readAll(reader, AccessRequestViewSchema, "requests");
 }
 
 /** The lifecycle status of one request, or `undefined` when it is absent. */

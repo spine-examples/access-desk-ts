@@ -39,7 +39,11 @@ import {
 
 import { actor, organizationId, readAll, resourceUuid } from "./access-context.js";
 import { managerHasTask } from "./access-decision-assignment.js";
-import { publishResourceFact, resourcePolicy, resourcesSystemActor } from "./resources-integration.js";
+import {
+  publishResourceFact,
+  resourcePolicy,
+  resourcesSystemActor,
+} from "./resources-integration.js";
 
 /** One organization member and their initial activity. */
 export interface Member {

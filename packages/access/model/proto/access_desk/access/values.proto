@@ -53,8 +53,8 @@ enum AccessRequestStatus {
   // The request was denied.
   DENIED = 3;
 
-  // The requester cancelled the request.
-  CANCELLED = 4;
+  // The requester canceled the request.
+  CANCELED = 4;
 }
 
 // A scheduled half-open access interval.

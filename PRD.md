@@ -490,10 +490,10 @@ stateDiagram-v2
     [*] --> Pending: Request submitted
     Pending --> Approved: Approver approves
     Pending --> Denied: Approver denies
-    Pending --> Cancelled: Requester cancels
+    Pending --> Canceled: Requester cancels
     Approved --> [*]
     Denied --> [*]
-    Cancelled --> [*]
+    Canceled --> [*]
 ```
 
 ## 8.1 Pending
@@ -526,7 +526,7 @@ The approver declined the request.
 
 A denial should contain a useful reason. The requester may create a new request after correcting the problem, but the denied request remains unchanged.
 
-## 8.4 Cancelled
+## 8.4 Canceled
 
 The requester withdrew the request before a decision.
 
@@ -825,12 +825,12 @@ Maya realizes she selected the wrong resource.
 
 1. Maya opens the pending request.
 2. She chooses **Cancel request**.
-3. The UI explains that cancelled requests cannot be reopened.
+3. The UI explains that canceled requests cannot be reopened.
 4. Maya confirms.
 
 ### Expected result
 
-- The request becomes cancelled.
+- The request becomes canceled.
 - It disappears from Noah's pending inbox.
 - It remains visible under Maya's request history.
 - No grant is created.
@@ -997,7 +997,7 @@ Suggested notifications include:
 Examples of useful live changes:
 
 - The approval-inbox count increases when a request arrives.
-- A pending inbox item disappears when it is cancelled.
+- A pending inbox item disappears when it is canceled.
 - The request detail changes from pending to approved while the requester is viewing it.
 - An active-access card moves to history when it expires.
 - The resource owner count changes after activation or revocation.
@@ -1520,7 +1520,7 @@ flowchart TD
     E --> F["Pending request details"]
     F -->|"Approved"| G["Active access details"]
     F -->|"Denied"| H["Decision and reason"]
-    F -->|"Cancelled"| I["Cancelled request history"]
+    F -->|"Canceled"| I["Canceled request history"]
 ```
 
 ## 15.2 Approver flow
@@ -1839,7 +1839,7 @@ Names below are suggestions, not a frozen public API.
 | `ResourceOpenedForRequests` | New requests became allowed. |
 | `ResourceClosedForRequests` | New requests were paused. |
 | `AccessRequestSubmitted` | A requester submitted a valid proposal. |
-| `AccessRequestCancelled` | The requester withdrew it. |
+| `AccessRequestCanceled` | The requester withdrew it. |
 | `AccessRequestApproved` | The approver accepted it. |
 | `AccessRequestDenied` | The approver declined it. |
 | `AccessGrantScheduled` | Approved access will start later. |

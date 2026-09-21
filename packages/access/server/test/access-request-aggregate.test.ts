@@ -30,7 +30,7 @@ import { eventRecording } from "@access-desk/base/testing";
 
 import {
   AccessRequestApprovedSchema,
-  AccessRequestCancelledSchema,
+  AccessRequestCanceledSchema,
   AccessRequestCreatedSchema,
   AccessRequestDeniedSchema,
 } from "@access-desk/access-model/generated/access_desk/access/access_request_events_pb.js";
@@ -228,11 +228,11 @@ describe("AccessRequestAggregate should", () => {
   });
 
   describe("handle 'CancelAccessRequest', and", () => {
-    it("emit 'AccessRequestCancelled' retaining the request snapshot", async () => {
+    it("emit 'AccessRequestCanceled' retaining the request snapshot", async () => {
       const box = await accessBlackBox();
       const requester = box.onBehalfOf(actor);
       await givenCreatedRequest(box, requester, "req-cancel", { candidateManager: ["primary"] });
-      const events = await recordEvents(requester, AccessRequestCancelledSchema);
+      const events = await recordEvents(requester, AccessRequestCanceledSchema);
       try {
         expect((await cancelAccessRequest(requester, "req-cancel")).kind).toBe("ok");
 
@@ -244,7 +244,7 @@ describe("AccessRequestAggregate should", () => {
       }
     });
 
-    it("reject cancelling an already-decided request with 'RequestAlreadyDecided'", async () => {
+    it("reject canceling an already-decided request with 'RequestAlreadyDecided'", async () => {
       const box = await accessBlackBox();
       const requester = box.onBehalfOf(actor);
       await givenCreatedRequest(box, requester, "req-cancel-decided", {

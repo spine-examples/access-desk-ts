@@ -193,7 +193,7 @@ describe("AccessRequestSubmissionProcessManager should", () => {
       await cancelAccessRequest(requester, "req-original");
       await box.eventually(
         () => statusOf(requester, "req-original"),
-        (status) => status === AccessRequestStatus.CANCELLED,
+        (status) => status === AccessRequestStatus.CANCELED,
       );
 
       await submitAndAssign(box, requester, "req-resubmit", "primary");

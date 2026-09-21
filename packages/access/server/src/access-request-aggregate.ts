@@ -24,11 +24,11 @@ import type {
 } from "@access-desk/access-model/generated/access_desk/access/access_request_commands_pb.js";
 import {
   AccessRequestApprovedSchema,
-  AccessRequestCancelledSchema,
+  AccessRequestCanceledSchema,
   AccessRequestCreatedSchema,
   AccessRequestDeniedSchema,
   type AccessRequestApproved,
-  type AccessRequestCancelled,
+  type AccessRequestCanceled,
   type AccessRequestCreated,
   type AccessRequestDenied,
 } from "@access-desk/access-model/generated/access_desk/access/access_request_events_pb.js";
@@ -102,13 +102,13 @@ export class AccessRequestAggregate extends Aggregate<
   /** Cancels a request that has not yet been decided. */
   @Assign
   @Throws(RequestAlreadyDecided)
-  cancelAccessRequest(command: CancelAccessRequest): AccessRequestCancelled {
+  cancelAccessRequest(command: CancelAccessRequest): AccessRequestCanceled {
     this.assertPending(command.id);
     const snapshot = this.requireSnapshot();
     this.update((draft) => {
-      draft.status = AccessRequestStatus.CANCELLED;
+      draft.status = AccessRequestStatus.CANCELED;
     });
-    return create(AccessRequestCancelledSchema, {
+    return create(AccessRequestCanceledSchema, {
       id: this.id,
       snapshot,
       candidateManager: this.state.candidateManager,

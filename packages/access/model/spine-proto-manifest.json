@@ -1,6 +1,6 @@
 {
   "formatVersion": 2,
-  "generationId": "b7125853-1260-4be5-be31-b914ed786dcd",
+  "generationId": "2da1df9e-b37b-42dd-9924-25184b73985d",
   "packageName": "@access-desk/access-model",
   "packageVersion": "0.0.0",
   "protoFiles": [
@@ -13,6 +13,7 @@
     "access_desk/access/access_request_submission_commands.proto",
     "access_desk/access/access_request_submission_events.proto",
     "access_desk/access/access_request_submission_rejections.proto",
+    "access_desk/access/access_request_view.proto",
     "access_desk/access/identifiers.proto",
     "access_desk/access/resources_integration.proto",
     "access_desk/access/values.proto"
@@ -27,6 +28,7 @@
     "access_desk/access/access_request_submission_commands.proto": "generated/access_desk/access/access_request_submission_commands_pb.js",
     "access_desk/access/access_request_submission_events.proto": "generated/access_desk/access/access_request_submission_events_pb.js",
     "access_desk/access/access_request_submission_rejections.proto": "generated/access_desk/access/access_request_submission_rejections_pb.js",
+    "access_desk/access/access_request_view.proto": "generated/access_desk/access/access_request_view_pb.js",
     "access_desk/access/identifiers.proto": "generated/access_desk/access/identifiers_pb.js",
     "access_desk/access/resources_integration.proto": "generated/access_desk/access/resources_integration_pb.js",
     "access_desk/access/values.proto": "generated/access_desk/access/values_pb.js"

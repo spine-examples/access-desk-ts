@@ -85,12 +85,12 @@ describe("OrganizationMembershipProjection should", () => {
     );
     expect(
       memberships.some(
-        (row) => row.id?.uuid === "maya" && row.active && row.membershipVersion === 1,
+        (row) => row.id?.uuid === "maya" && row.active && row.membershipVersion === 1n,
       ),
     ).toBe(true);
     expect(
       memberships.some(
-        (row) => row.id?.uuid === "noah" && !row.active && row.membershipVersion === 1,
+        (row) => row.id?.uuid === "noah" && !row.active && row.membershipVersion === 1n,
       ),
     ).toBe(true);
   });
@@ -108,7 +108,7 @@ describe("OrganizationMembershipProjection should", () => {
     await box.eventually(
       () => readMemberships(scope),
       (rows) =>
-        rows.some((row) => row.id?.uuid === "maya" && !row.active && row.membershipVersion === 1),
+        rows.some((row) => row.id?.uuid === "maya" && !row.active && row.membershipVersion === 1n),
     );
 
     await publishResourceFact(resourcesScope, OrganizationMemberActivatedSchema, {
@@ -119,7 +119,7 @@ describe("OrganizationMembershipProjection should", () => {
     await box.eventually(
       () => readMemberships(scope),
       (rows) =>
-        rows.some((row) => row.id?.uuid === "maya" && row.active && row.membershipVersion === 2),
+        rows.some((row) => row.id?.uuid === "maya" && row.active && row.membershipVersion === 2n),
     );
 
     await publishResourceFact(resourcesScope, OrganizationMemberDeactivatedSchema, {
@@ -130,11 +130,11 @@ describe("OrganizationMembershipProjection should", () => {
     const memberships = await box.eventually(
       () => readMemberships(scope),
       (rows) =>
-        rows.some((row) => row.id?.uuid === "maya" && !row.active && row.membershipVersion === 3),
+        rows.some((row) => row.id?.uuid === "maya" && !row.active && row.membershipVersion === 3n),
     );
     expect(memberships.find((row) => row.id?.uuid === "maya")).toMatchObject({
       active: false,
-      membershipVersion: 3,
+      membershipVersion: 3n,
     });
   });
 
@@ -151,7 +151,7 @@ describe("OrganizationMembershipProjection should", () => {
     await box.eventually(
       () => readMemberships(scope),
       (rows) =>
-        rows.some((row) => row.id?.uuid === "maya" && row.active && row.membershipVersion === 1),
+        rows.some((row) => row.id?.uuid === "maya" && row.active && row.membershipVersion === 1n),
     );
     await publishResourceFact(resourcesScope, OrganizationMemberDeactivatedSchema, {
       organizationId: { uuid: organizationId },
@@ -161,7 +161,7 @@ describe("OrganizationMembershipProjection should", () => {
     await box.eventually(
       () => readMemberships(scope),
       (rows) =>
-        rows.some((row) => row.id?.uuid === "maya" && !row.active && row.membershipVersion === 2),
+        rows.some((row) => row.id?.uuid === "maya" && !row.active && row.membershipVersion === 2n),
     );
 
     await publishResourceFact(resourcesScope, OrganizationMemberActivatedSchema, {
@@ -183,11 +183,11 @@ describe("OrganizationMembershipProjection should", () => {
     const memberships = await box.eventually(
       () => readMemberships(scope),
       (rows) =>
-        rows.some((row) => row.id?.uuid === "delivery-fence" && row.membershipVersion === 1),
+        rows.some((row) => row.id?.uuid === "delivery-fence" && row.membershipVersion === 1n),
     );
     expect(memberships.find((row) => row.id?.uuid === "maya")).toMatchObject({
       active: false,
-      membershipVersion: 2,
+      membershipVersion: 2n,
     });
   });
 });

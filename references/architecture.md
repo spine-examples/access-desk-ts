@@ -213,7 +213,7 @@ same-or-stronger access checks; it is not a universal permissions language.
 ## Request and approval invariants
 
 A submitted request is immutable. Changing resource, level, justification, or
-time requires cancelling/closing the existing request and submitting a new one.
+time requires canceling/closing the existing request and submitting a new one.
 
 Submission must enforce all the following:
 
@@ -222,6 +222,9 @@ Submission must enforce all the following:
   accepted.
 - The requested level is offered by that resource.
 - The justification is meaningful.
+- The access period is canonical and positive: immediate durations and scheduled
+  endpoints use whole-minute precision, and a scheduled interval has a strictly
+  later exclusive end.
 - The time specification is valid and within the maximum duration.
 - The requester does not already hold same-or-stronger access for the relevant
   interval.
@@ -251,7 +254,7 @@ Requests and grants are separate aggregates and lifecycles. Approval records a
 decision; it does not by itself prove that access is active or durably
 scheduled.
 
-Required request outcomes are pending, approved, denied, and cancelled. Required
+Required request outcomes are pending, approved, denied, and canceled. Required
 grant outcomes are pending scheduling, scheduled, active, expired, expired
 without activation, and revoked. Contract design may use more precise internal
 substates, but the UI must never claim scheduled or active access before the
@@ -309,7 +312,7 @@ injected clock is now at or after the requested end `E`, Access atomically
 records the existing expired-without-activation terminal outcome exactly once.
 It neither activates the grant nor creates activation or expiration scheduling
 work. Duplicate commands after that terminal outcome, and stale, revision-mismatched,
-cancelled, revoked, or otherwise terminal commands, are successful no-ops.
+canceled, revoked, or otherwise terminal commands, are successful no-ops.
 All time-based code uses an injected clock; tests must not depend on arbitrary
 sleeping.
 
@@ -349,7 +352,7 @@ The required choreography is:
 
 The process accepts `ScheduleCommand`, `RescheduleCommand`, and
 `CancelScheduledCommand`, and emits `CommandScheduled`, `CommandRescheduled`,
-and `ScheduledCommandCancelled`. Extension approval is a genuine Access fact
+and `ScheduledCommandCanceled`. Extension approval is a genuine Access fact
 consumed by Scheduling, which reschedules domestically and confirms it; Access
 applies the extension only after confirmation. Revocation is authoritative in
 Access and emits a fact that Scheduling consumes to cancel domestically.

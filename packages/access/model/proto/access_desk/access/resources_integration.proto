@@ -67,5 +67,5 @@ message OrganizationMembership {
   bool active = 2;
 
   // The latest membership revision this local copy has applied.
-  uint32 membership_version = 3;
+  uint64 membership_version = 3;
 }

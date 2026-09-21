@@ -136,6 +136,20 @@ message OrganizationCreated {
   value objects it serves (`values.proto`). Give an enum its own file only when
   it is _special_ — carrying custom options and helper logic. Rule of
   thumb: options → own file; optionless → the general file.
+- **Nested messages.** A value message used only as the repeated element of one
+  entity's state (a queue's task, a list's row) is declared **inside** that state
+  message, not at package top level. Generated TS names it `Parent_Child` with
+  schema `Parent_ChildSchema`; its type URL becomes `pkg.Parent.Child`. Keep a
+  message top-level when more than one entity uses it, or when it is a
+  command/event/rejection field shared across files.
+
+## Identity as a command field
+
+The acting person is an explicit `PersonId` field on the command (the requester
+on a submit command, the deciding manager on approve/deny) — not read from the
+`CommandContext` actor. Keep the entity id first; the acting-person field comes
+right after it. Handlers then read `command.<field>` (see the `spine-handlers`
+skill).
 
 ## Field naming & order
 

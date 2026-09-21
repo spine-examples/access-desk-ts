@@ -50,12 +50,7 @@ beforeAll(loadAccessContext, 30_000);
 afterEach(closeAccessBlackBoxes);
 
 /** Waits until `manager`'s queue holds (or drops) a task for `id`. */
-function awaitTask(
-  box: BlackBox,
-  manager: string,
-  id: string,
-  present: boolean,
-): Promise<boolean> {
+function awaitTask(box: BlackBox, manager: string, id: string, present: boolean): Promise<boolean> {
   const requester = box.onBehalfOf(actor);
   return box.eventually(
     () => managerHasTask(requester, manager, id),
@@ -125,20 +120,20 @@ describe("AccessDecisionAssignmentProjection should", () => {
     });
   });
 
-  describe("on 'AccessRequestCancelled'", () => {
+  describe("on 'AccessRequestCanceled'", () => {
     it("remove the task from every manager's queue", async () => {
       const box = await accessBlackBox();
       const requester = box.onBehalfOf(actor);
-      await createAccessRequest(requester, "req-cancelled", {
+      await createAccessRequest(requester, "req-canceled", {
         candidateManager: ["primary", "second"],
       });
-      await awaitTask(box, "primary", "req-cancelled", true);
-      await awaitTask(box, "second", "req-cancelled", true);
+      await awaitTask(box, "primary", "req-canceled", true);
+      await awaitTask(box, "second", "req-canceled", true);
 
-      await cancelAccessRequest(requester, "req-cancelled");
+      await cancelAccessRequest(requester, "req-canceled");
 
-      await awaitTask(box, "primary", "req-cancelled", false);
-      await awaitTask(box, "second", "req-cancelled", false);
+      await awaitTask(box, "primary", "req-canceled", false);
+      await awaitTask(box, "second", "req-canceled", false);
     });
   });
 

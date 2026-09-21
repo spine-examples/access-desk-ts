@@ -47,13 +47,13 @@ message AccessRequestCreated {
   repeated access_desk.identity.PersonId candidate_manager = 3 [(required) = true, (validate) = true];
 }
 
-// A request was cancelled by its requester.
-message AccessRequestCancelled {
+// A request was canceled by its requester.
+message AccessRequestCanceled {
 
   // The terminal request.
   AccessRequestId id = 1 [(required) = true, (validate) = true];
 
-  // The immutable request details, retained after cancellation.
+  // The immutable request details, retained after cancelation.
   AccessRequestSnapshot snapshot = 2 [(required) = true];
 
   // The managers whose decision task this terminal fact clears.

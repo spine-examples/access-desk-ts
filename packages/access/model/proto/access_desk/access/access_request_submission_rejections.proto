@@ -56,12 +56,6 @@ message DuplicateAccessRequest {
   AccessRequestId id = 1;
 }
 
-// The requester already holds equal or stronger access.
-message AccessAlreadyHeld {
-
-  AccessRequestId id = 1;
-}
-
 // No active manager is eligible to decide the request.
 message NoManagersEligible {
 

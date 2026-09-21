@@ -38,7 +38,7 @@ import type { AccessRequestSnapshot } from "@access-desk/access-model/generated/
 import type { PersonId } from "@access-desk/identity-model/generated/access_desk/identity/identifiers_pb.js";
 import type {
   AccessRequestApproved,
-  AccessRequestCancelled,
+  AccessRequestCanceled,
   AccessRequestCreated,
   AccessRequestDenied,
 } from "@access-desk/access-model/generated/access_desk/access/access_request_events_pb.js";
@@ -75,9 +75,9 @@ export class AccessDecisionAssignmentProjection extends Projection<
     this.close(event.id);
   }
 
-  /** Clears a cancelled request from this manager's decision queue. */
+  /** Clears a canceled request from this manager's decision queue. */
   @Subscribe
-  onAccessRequestCancelled(event: AccessRequestCancelled): void {
+  onAccessRequestCanceled(event: AccessRequestCanceled): void {
     this.close(event.id);
   }
 
