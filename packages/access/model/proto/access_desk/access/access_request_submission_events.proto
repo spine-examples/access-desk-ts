@@ -36,9 +36,9 @@ option (type_url_prefix) = "type.access-desk.access";
 
 // A request for access passed the resource rules and has eligible managers who
 // may decide it.
-message AccessRequestAdmissionAccepted {
+message AccessRequestAdmitted {
 
-  // The request that was accepted.
+  // The admitted request.
   AccessRequestId id = 1 [(required) = true, (validate) = true];
 
   // The immutable request details.

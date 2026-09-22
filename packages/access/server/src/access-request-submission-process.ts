@@ -65,9 +65,9 @@ import {
 } from "@access-desk/access-model/generated/access_desk/access/access_request_submission_commands_pb.js";
 import { type AccessRequestCreated } from "@access-desk/access-model/generated/access_desk/access/access_request_events_pb.js";
 import {
-  AccessRequestAdmissionAcceptedSchema,
+  AccessRequestAdmittedSchema,
   AccessRequestSubmittedSchema,
-  type AccessRequestAdmissionAccepted,
+  type AccessRequestAdmitted,
   type AccessRequestSubmitted,
 } from "@access-desk/access-model/generated/access_desk/access/access_request_submission_events_pb.js";
 import {
@@ -103,7 +103,7 @@ export class AccessRequestSubmissionProcessManager extends ProcessManager<
     DuplicateAccessRequest,
     NoManagersEligible,
   )
-  async submitAccessRequest(command: SubmitAccessRequest): Promise<AccessRequestAdmissionAccepted> {
+  async submitAccessRequest(command: SubmitAccessRequest): Promise<AccessRequestAdmitted> {
     const id = command.id ?? this.id;
     const requester = command.requester;
     const resource = command.resource;
@@ -127,7 +127,7 @@ export class AccessRequestSubmissionProcessManager extends ProcessManager<
       justification: command.justification,
       kind: { case: "newRequest", value: { resource, accessLevel: level, period } },
     });
-    return create(AccessRequestAdmissionAcceptedSchema, { id, snapshot, candidateManager });
+    return create(AccessRequestAdmittedSchema, { id, snapshot, candidateManager });
   }
 
   /** Validates an access-extension request and, when it passes, accepts it. */
@@ -135,7 +135,7 @@ export class AccessRequestSubmissionProcessManager extends ProcessManager<
   @Throws(ResourceNotRequestable, AccessDurationTooLong, NoManagersEligible)
   async submitAccessExtensionRequest(
     command: SubmitAccessExtensionRequest,
-  ): Promise<AccessRequestAdmissionAccepted> {
+  ): Promise<AccessRequestAdmitted> {
     const id = command.id ?? this.id;
     const requester = command.requester;
     const grant = command.grant;
@@ -166,12 +166,12 @@ export class AccessRequestSubmissionProcessManager extends ProcessManager<
       justification: command.justification,
       kind: { case: "extension", value: { grant, duration } },
     });
-    return create(AccessRequestAdmissionAcceptedSchema, { id, snapshot, candidateManager });
+    return create(AccessRequestAdmittedSchema, { id, snapshot, candidateManager });
   }
 
   /** Turns an accepted request into the command that records it. */
   @Command
-  onAccessRequestAdmissionAccepted(event: AccessRequestAdmissionAccepted): CreateAccessRequest {
+  onAccessRequestAdmitted(event: AccessRequestAdmitted): CreateAccessRequest {
     return create(CreateAccessRequestSchema, {
       id: event.id,
       snapshot: event.snapshot,

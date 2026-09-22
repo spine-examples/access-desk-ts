@@ -69,15 +69,15 @@ Closed For Requests.
 
 ### Request & approval
 
-The two submission commands validate into the same admission event and then
-share the `Create Access Request → Access Request Created → Access Request
-Submitted` flow.
+The two submission commands validate into the same `Access Request Admitted`
+event and then share the `Create Access Request → Access Request Created →
+Access Request Submitted` flow.
 
 | Owner                          | Trigger (actor/event)                | Command                         | Event(s)                          | Rejections                                                                                                                    |
 | ------------------------------ | ------------------------------------ | ------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Access Request Submission (PM) | Requester                            | Submit Access Request           | Access Request Admission Accepted | Resource Not Requestable; Access Level Not Available; Access Duration Too Long; Duplicate Access Request; No Manager Eligible |
-| Access Request Submission (PM) | Requester                            | Submit Access Extension Request | Access Request Admission Accepted | Resource Not Requestable; Access Duration Too Long; No Manager Eligible                                                       |
-| Access Request Submission (PM) | on Access Request Admission Accepted | Create Access Request           | —                                 | —                                                                                                                             |
+| Access Request Submission (PM) | Requester                            | Submit Access Request           | Access Request Admitted | Resource Not Requestable; Access Level Not Available; Access Duration Too Long; Duplicate Access Request; No Managers Eligible |
+| Access Request Submission (PM) | Requester                            | Submit Access Extension Request | Access Request Admitted | Resource Not Requestable; Access Duration Too Long; No Managers Eligible                                                       |
+| Access Request Submission (PM) | on Access Request Admitted | Create Access Request           | —                                 | —                                                                                                                             |
 | Access Request                 | Access Request Submission (PM)       | Create Access Request           | Access Request Created            | —                                                                                                                             |
 | Access Request Submission (PM) | on Access Request Created            | —                               | Access Request Submitted          | —                                                                                                                             |
 | Access Request                 | Requester                            | Cancel Access Request           | Access Request Canceled           | Request Already Decided                                                                                                       |

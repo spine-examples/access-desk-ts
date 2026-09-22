@@ -28,7 +28,7 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { eventRecording } from "@access-desk/base/testing";
 import { AccessRequestCreatedSchema } from "@access-desk/access-model/generated/access_desk/access/access_request_events_pb.js";
 import {
-  AccessRequestAdmissionAcceptedSchema,
+  AccessRequestAdmittedSchema,
   AccessRequestSubmittedSchema,
 } from "@access-desk/access-model/generated/access_desk/access/access_request_submission_events_pb.js";
 import {
@@ -83,7 +83,7 @@ describe("AccessRequestSubmissionProcessManager should", () => {
         },
       });
       const requester = box.onBehalfOf(actor);
-      const admitted = await recordEvents(requester, AccessRequestAdmissionAcceptedSchema);
+      const admitted = await recordEvents(requester, AccessRequestAdmittedSchema);
       try {
         expect(
           (
@@ -202,11 +202,11 @@ describe("AccessRequestSubmissionProcessManager should", () => {
   });
 
   describe("handle 'SubmitAccessExtensionRequest', and", () => {
-    it("admit a renewal, emitting 'AccessRequestAdmissionAccepted' with the extension snapshot", async () => {
+    it("admit a renewal, emitting 'AccessRequestAdmitted' with the extension snapshot", async () => {
       const box = await accessBlackBox();
       await seed(box, [actor, "primary"]);
       const requester = box.onBehalfOf(actor);
-      const admitted = await recordEvents(requester, AccessRequestAdmissionAcceptedSchema);
+      const admitted = await recordEvents(requester, AccessRequestAdmittedSchema);
       try {
         expect(
           (
@@ -261,7 +261,7 @@ describe("AccessRequestSubmissionProcessManager should", () => {
     });
   });
 
-  describe("handle 'AccessRequestAdmissionAccepted', and", () => {
+  describe("handle 'AccessRequestAdmitted', and", () => {
     it("command the request aggregate to create the accepted request", async () => {
       const box = await accessBlackBox();
       await seed(box, [actor, "primary"]);

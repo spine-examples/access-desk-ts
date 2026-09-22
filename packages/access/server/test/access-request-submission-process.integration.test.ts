@@ -28,7 +28,7 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { eventRecording } from "@access-desk/base/testing";
 import { AccessRequestCreatedSchema } from "@access-desk/access-model/generated/access_desk/access/access_request_events_pb.js";
 import {
-  AccessRequestAdmissionAcceptedSchema,
+  AccessRequestAdmittedSchema,
   AccessRequestSubmittedSchema,
 } from "@access-desk/access-model/generated/access_desk/access/access_request_submission_events_pb.js";
 import {
@@ -63,7 +63,7 @@ describe("AccessRequestSubmissionProcessManager should", () => {
       policy: { manager: [{ uuid: "primary" }, { uuid: "second" }] },
     });
 
-    const admitted = await recordEvents(requester, AccessRequestAdmissionAcceptedSchema);
+    const admitted = await recordEvents(requester, AccessRequestAdmittedSchema);
     const created = await recordEvents(requester, AccessRequestCreatedSchema);
     const submitted = await recordEvents(requester, AccessRequestSubmittedSchema);
     try {
