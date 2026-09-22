@@ -69,13 +69,13 @@ Closed For Requests.
 
 ### Request & approval
 
-| Owner               | Trigger (actor/event)  | Command                         | Event(s)                           | Rejections                                                                                                                     |
-|---------------------|------------------------| ------------------------------- |------------------------------------|--------------------------------------------------------------------------------------------------------------------------------|
-| Access Request (PM) | Requester              | Submit Access Request           | Access Request Submitted           | Resource Not Requestable; Access Level Not Available; Access Duration Too Long; Duplicate Access Request; No Managers Eligible |
-| Access Request (PM) | Requester              | Submit Access Extension Request | Access Extension Request Submitted | Resource Not Requestable; Access Duration Too Long; No Managers Eligible                                                       |
-| Access Request (PM) | Manager                | Approve Access Request          | Access Request Approved            | Request Already Decided; Self Decision Not Allowed; Manager Not Eligible                                                       |
-| Access Request (PM) | Manager                | Deny Access Request             | Access Request Denied              | Request Already Decided; Self Decision Not Allowed; Manager Not Eligible                                                       |
-| Access Request (PM) | Requester              | Cancel Access Request           | Access Request Canceled            | Request Already Decided                                                                                                        |
+| Owner               | Trigger (actor/event) | Command                         | Event(s)                           | Rejections                                                                                                                     |
+| ------------------- | --------------------- | ------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Access Request (PM) | Requester             | Submit Access Request           | Access Request Submitted           | Resource Not Requestable; Access Level Not Available; Access Duration Too Long; Duplicate Access Request; No Managers Eligible |
+| Access Request (PM) | Requester             | Submit Access Extension Request | Access Extension Request Submitted | Resource Not Requestable; Access Duration Too Long; Duplicate Access Request; No Managers Eligible                             |
+| Access Request (PM) | Manager               | Approve Access Request          | Access Request Approved            | Request Already Decided; Self Decision Not Allowed; Manager Not Eligible                                                       |
+| Access Request (PM) | Manager               | Deny Access Request             | Access Request Denied              | Request Already Decided; Self Decision Not Allowed; Manager Not Eligible                                                       |
+| Access Request (PM) | Requester             | Cancel Access Request           | Access Request Canceled            | Request Already Decided                                                                                                        |
 
 Submission already excludes the requester and every inactive manager from the
 candidate pool, so a decision by an eligible manager normally only risks

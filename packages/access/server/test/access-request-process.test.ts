@@ -121,7 +121,10 @@ describe("AccessRequestProcessManager should", () => {
 
         const event = await submitted.waitFor(box, (candidate) => candidate.id?.uuid === "req-ok");
         // Managers keep policy order, drop the duplicate, the inactive member, and the requester.
-        expect(event.candidateManager.map((manager) => manager.uuid)).toEqual(["second", "primary"]);
+        expect(event.candidateManager.map((manager) => manager.uuid)).toEqual([
+          "second",
+          "primary",
+        ]);
         const kind = event.snapshot?.kind;
         expect(kind?.case).toBe("newRequest");
         if (kind?.case === "newRequest") {
@@ -177,7 +180,10 @@ describe("AccessRequestProcessManager should", () => {
           SubmitAccessRequestSchema,
           submitRequest("req-scheduled-long", {
             period: {
-              kind: { case: "scheduled", value: { start: { seconds: 0n }, end: { seconds: 7200n } } },
+              kind: {
+                case: "scheduled",
+                value: { start: { seconds: 0n }, end: { seconds: 7200n } },
+              },
             },
           }),
         ),
@@ -224,8 +230,12 @@ describe("AccessRequestProcessManager should", () => {
       const submitted = await recordEvents(requester, AccessExtensionRequestSubmittedSchema);
       try {
         expect(
-          (await requester.post(SubmitAccessExtensionRequestSchema, submitExtensionRequest("ext-ok")))
-            .kind,
+          (
+            await requester.post(
+              SubmitAccessExtensionRequestSchema,
+              submitExtensionRequest("ext-ok"),
+            )
+          ).kind,
         ).toBe("ok");
 
         const event = await submitted.waitFor(box, (candidate) => candidate.id?.uuid === "ext-ok");
@@ -262,6 +272,28 @@ describe("AccessRequestProcessManager should", () => {
       );
     });
 
+    it("reject a second pending extension for the same requester and grant ('DuplicateAccessRequest')", async () => {
+      const box = await accessBlackBox();
+      await seed(box, [actor, "primary"]);
+      const requester = box.onBehalfOf(actor);
+      expect(
+        (
+          await requester.post(
+            SubmitAccessExtensionRequestSchema,
+            submitExtensionRequest("ext-first"),
+          )
+        ).kind,
+      ).toBe("ok");
+      await box.eventually(
+        () => statusOf(requester, "ext-first"),
+        (status) => status === AccessRequestStatus.PENDING,
+      );
+
+      await expectRejection(box, requester, DuplicateAccessRequestSchema, () =>
+        requester.post(SubmitAccessExtensionRequestSchema, submitExtensionRequest("ext-second")),
+      );
+    });
+
     it("reject a renewal when no active manager is eligible ('NoManagersEligible')", async () => {
       const box = await accessBlackBox();
       await seed(box, [actor], { policy: { manager: [{ uuid: actor }] } });
@@ -279,7 +311,10 @@ describe("AccessRequestProcessManager should", () => {
       const approved = await recordEvents(requester, AccessRequestApprovedSchema);
       try {
         expect((await approveAccessRequest(requester, "req-approve", "primary")).kind).toBe("ok");
-        const event = await approved.waitFor(box, (candidate) => candidate.id?.uuid === "req-approve");
+        const event = await approved.waitFor(
+          box,
+          (candidate) => candidate.id?.uuid === "req-approve",
+        );
         expect(event.decidedBy?.uuid).toBe("primary");
       } finally {
         await approved.cancel();

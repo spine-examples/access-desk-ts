@@ -53,7 +53,9 @@ import {
   type AccessRequestSnapshot,
 } from "@access-desk/access-model/generated/access_desk/access/values_pb.js";
 import {
+  AccessGrantIdSchema,
   AccessRequestIdSchema,
+  type AccessGrantId,
   type AccessRequestId,
 } from "@access-desk/access-model/generated/access_desk/access/identifiers_pb.js";
 import type {
@@ -142,7 +144,7 @@ export class AccessRequestProcessManager extends ProcessManager<
 
   /** Validates an access-extension request and, when it passes, submits it. */
   @Assign
-  @Throws(ResourceNotRequestable, AccessDurationTooLong, NoManagersEligible)
+  @Throws(ResourceNotRequestable, AccessDurationTooLong, DuplicateAccessRequest, NoManagersEligible)
   async submitAccessExtensionRequest(
     command: SubmitAccessExtensionRequest,
   ): Promise<AccessExtensionRequestSubmitted> {
@@ -157,15 +159,17 @@ export class AccessRequestProcessManager extends ProcessManager<
       duration === undefined ||
       resource === undefined
     ) {
-      throw new Error("SubmitAccessExtensionRequest requires a requester, grant, duration, and resource.");
+      throw new Error(
+        "SubmitAccessExtensionRequest requires a requester, grant, duration, and resource.",
+      );
     }
-    // An extension renews an existing grant: its level is implied by the grant, so
-    // it is neither re-validated nor treated as a duplicate of a first-time request.
+    // An extension renews an existing grant, so its level is implied by the grant.
     const period = create(AccessPeriodSchema, {
       kind: { case: "immediateDuration", value: duration },
     });
     const policy = await this.requestablePolicy(id, resource);
     this.assertWithinMaxDuration(id, policy, period);
+    await this.assertNoDuplicate(id, requester, resource, grant);
     const candidateManager = await this.eligibleManagers(id, requester, policy);
     const snapshot = create(AccessRequestSnapshotSchema, {
       requester,
@@ -284,13 +288,14 @@ export class AccessRequestProcessManager extends ProcessManager<
     }
   }
 
-  /** Rejects a first-time request when one is already pending for this requester and resource. */
+  /** Rejects a request that conflicts with one already pending for this requester. */
   private async assertNoDuplicate(
     id: AccessRequestId,
     requester: PersonId,
     resource: ResourceId,
+    grant?: AccessGrantId,
   ): Promise<void> {
-    if (await this.hasPendingRequest(requester, resource, id)) {
+    if (await this.hasPendingRequest(requester, resource, id, grant)) {
       throw DuplicateAccessRequest.create({ id });
     }
   }
@@ -323,11 +328,12 @@ export class AccessRequestProcessManager extends ProcessManager<
     return candidateManager;
   }
 
-  /** Whether a first-time request for the same requester and resource is already pending. */
+  /** Whether an equivalent request from the same requester is already pending. */
   private async hasPendingRequest(
     requester: PersonId,
     resource: ResourceId,
     thisRequest: AccessRequestId,
+    grant?: AccessGrantId,
   ): Promise<boolean> {
     const requests = await this.select(AccessRequestViewSchema, {}).all();
     return requests.some((request) => {
@@ -341,11 +347,15 @@ export class AccessRequestProcessManager extends ProcessManager<
       if (snapshot === undefined || !equals(PersonIdSchema, snapshot.requester, requester)) {
         return false;
       }
-      // Only a first-time request names a resource; an extension implies it
-      // through the grant, so it never duplicates a resource-scoped request.
-      const requested =
-        snapshot.kind.case === "newRequest" ? snapshot.kind.value.resource : undefined;
-      return requested !== undefined && equals(ResourceIdSchema, requested, resource);
+      if (snapshot.kind.case === "newRequest") {
+        const requested = snapshot.kind.value.resource;
+        return requested !== undefined && equals(ResourceIdSchema, requested, resource);
+      }
+      if (snapshot.kind.case === "extension" && grant !== undefined) {
+        const extended = snapshot.kind.value.grant;
+        return extended !== undefined && equals(AccessGrantIdSchema, extended, grant);
+      }
+      return false;
     });
   }
 
@@ -420,7 +430,9 @@ export class AccessRequestProcessManager extends ProcessManager<
     if (requester !== undefined && equals(PersonIdSchema, requester, decidedBy)) {
       throw SelfDecisionNotAllowed.create({ id: id ?? this.id });
     }
-    if (!this.state.candidateManager.some((manager) => equals(PersonIdSchema, manager, decidedBy))) {
+    if (
+      !this.state.candidateManager.some((manager) => equals(PersonIdSchema, manager, decidedBy))
+    ) {
       throw ManagerNotEligible.create({ id: id ?? this.id });
     }
     return decidedBy;
