@@ -25,23 +25,8 @@
  */
 
 import { create } from "@bufbuild/protobuf";
-import { Assign, Command, ProcessManager, React, Throws } from "@spine-event-engine/server";
-import { AccessRequestSubmissionSchema } from "@access-desk/access-model/generated/access_desk/access/access_request_submission_pb.js";
-import {
-  OrganizationMembershipSchema,
-  ResourceRequestPolicySchema,
-} from "@access-desk/access-model/generated/access_desk/access/resources_integration_pb.js";
-import { AccessRequestSchema } from "@access-desk/access-model/generated/access_desk/access/access_request_pb.js";
-import {
-  AccessPeriodSchema,
-  AccessRequestSnapshotSchema,
-  AccessRequestStatus,
-  type AccessPeriod,
-} from "@access-desk/access-model/generated/access_desk/access/values_pb.js";
-import {
-  AccessRequestIdSchema,
-  type AccessRequestId,
-} from "@access-desk/access-model/generated/access_desk/access/identifiers_pb.js";
+import { Assign, ProcessManager, Throws } from "@spine-event-engine/server";
+import { equals } from "@access-desk/base/proto";
 import {
   PersonIdSchema,
   type PersonId,
@@ -54,47 +39,71 @@ import {
   type AccessLevel,
   type ResourcePolicy,
 } from "@access-desk/resources-model/generated/access_desk/resources/values_pb.js";
-import { equals } from "@access-desk/base/proto";
+import { AccessRequestSchema } from "@access-desk/access-model/generated/access_desk/access/access_request_pb.js";
+import { AccessRequestViewSchema } from "@access-desk/access-model/generated/access_desk/access/access_request_view_pb.js";
 import {
-  CreateAccessRequestSchema,
-  type CreateAccessRequest,
+  OrganizationMembershipSchema,
+  ResourceRequestPolicySchema,
+} from "@access-desk/access-model/generated/access_desk/access/resources_integration_pb.js";
+import {
+  AccessPeriodSchema,
+  AccessRequestSnapshotSchema,
+  AccessRequestStatus,
+  type AccessPeriod,
+  type AccessRequestSnapshot,
+} from "@access-desk/access-model/generated/access_desk/access/values_pb.js";
+import {
+  AccessRequestIdSchema,
+  type AccessRequestId,
+} from "@access-desk/access-model/generated/access_desk/access/identifiers_pb.js";
+import type {
+  ApproveAccessRequest,
+  CancelAccessRequest,
+  DenyAccessRequest,
+  SubmitAccessExtensionRequest,
+  SubmitAccessRequest,
 } from "@access-desk/access-model/generated/access_desk/access/access_request_commands_pb.js";
 import {
-  type SubmitAccessExtensionRequest,
-  type SubmitAccessRequest,
-} from "@access-desk/access-model/generated/access_desk/access/access_request_submission_commands_pb.js";
-import { type AccessRequestCreated } from "@access-desk/access-model/generated/access_desk/access/access_request_events_pb.js";
-import {
-  AccessRequestAdmittedSchema,
+  AccessExtensionRequestSubmittedSchema,
+  AccessRequestApprovedSchema,
+  AccessRequestCanceledSchema,
+  AccessRequestDeniedSchema,
   AccessRequestSubmittedSchema,
-  type AccessRequestAdmitted,
+  type AccessExtensionRequestSubmitted,
+  type AccessRequestApproved,
+  type AccessRequestCanceled,
+  type AccessRequestDenied,
   type AccessRequestSubmitted,
-} from "@access-desk/access-model/generated/access_desk/access/access_request_submission_events_pb.js";
+} from "@access-desk/access-model/generated/access_desk/access/access_request_events_pb.js";
 import {
   AccessDurationTooLong,
   AccessLevelNotAvailable,
   DuplicateAccessRequest,
+  ManagerNotEligible,
   NoManagersEligible,
+  RequestAlreadyDecided,
   ResourceNotRequestable,
-} from "@access-desk/access-model/generated/access_desk/access/access_request_submission_rejections.js";
+  SelfApprovalNotAllowed,
+} from "@access-desk/access-model/generated/access_desk/access/access_request_rejections.js";
 
 /**
- * Drives one access request (or access-extension request) through submission.
+ * One access request for a protected resource, driven from submission to a
+ * terminal decision.
  *
- * 1. Validate the submission against the resource's request policy and the
- *    current membership, and identify the active managers who may decide it.
- * 2. Record the accepted request so it enters its decision lifecycle.
- * 3. Once created, submit it — assigning it to those managers for a decision.
+ * 1. Validate a submission against the resource's request policy and the current
+ *    membership, and capture the active managers who may decide it.
+ * 2. Assign the accepted request to those managers for a decision.
+ * 3. A manager approves or denies it, or the requester cancels it — once.
  *
- * A first-time request and an extension request differ only in what the client
- * submits and in the snapshot's `kind`; everything downstream is shared.
+ * A first-time request and an access-extension request differ only in what the
+ * client submits and in the snapshot's `kind`; everything downstream is shared.
  */
-export class AccessRequestSubmissionProcessManager extends ProcessManager<
+export class AccessRequestProcessManager extends ProcessManager<
   AccessRequestId,
-  typeof AccessRequestSubmissionSchema,
+  typeof AccessRequestSchema,
   bigint
 > {
-  /** Validates a first-time access request and, when it passes, accepts it. */
+  /** Validates a first-time access request and, when it passes, submits it. */
   @Assign
   @Throws(
     ResourceNotRequestable,
@@ -103,7 +112,7 @@ export class AccessRequestSubmissionProcessManager extends ProcessManager<
     DuplicateAccessRequest,
     NoManagersEligible,
   )
-  async submitAccessRequest(command: SubmitAccessRequest): Promise<AccessRequestAdmitted> {
+  async submitAccessRequest(command: SubmitAccessRequest): Promise<AccessRequestSubmitted> {
     const id = command.id ?? this.id;
     const requester = command.requester;
     const resource = command.resource;
@@ -127,15 +136,16 @@ export class AccessRequestSubmissionProcessManager extends ProcessManager<
       justification: command.justification,
       kind: { case: "newRequest", value: { resource, accessLevel: level, period } },
     });
-    return create(AccessRequestAdmittedSchema, { id, snapshot, candidateManager });
+    this.store(snapshot, candidateManager);
+    return create(AccessRequestSubmittedSchema, { id, snapshot, candidateManager });
   }
 
-  /** Validates an access-extension request and, when it passes, accepts it. */
+  /** Validates an access-extension request and, when it passes, submits it. */
   @Assign
   @Throws(ResourceNotRequestable, AccessDurationTooLong, NoManagersEligible)
   async submitAccessExtensionRequest(
     command: SubmitAccessExtensionRequest,
-  ): Promise<AccessRequestAdmitted> {
+  ): Promise<AccessExtensionRequestSubmitted> {
     const id = command.id ?? this.id;
     const requester = command.requester;
     const grant = command.grant;
@@ -147,14 +157,10 @@ export class AccessRequestSubmissionProcessManager extends ProcessManager<
       duration === undefined ||
       resource === undefined
     ) {
-      throw new Error(
-        "SubmitAccessExtensionRequest requires a requester, grant, duration, and resource.",
-      );
+      throw new Error("SubmitAccessExtensionRequest requires a requester, grant, duration, and resource.");
     }
     // An extension renews an existing grant: its level is implied by the grant, so
-    // it is neither re-validated against the policy nor treated as a duplicate of a
-    // first-time request. Only an open resource, the added duration, and an
-    // eligible manager gate it. The resource is used solely to find those managers.
+    // it is neither re-validated nor treated as a duplicate of a first-time request.
     const period = create(AccessPeriodSchema, {
       kind: { case: "immediateDuration", value: duration },
     });
@@ -166,26 +172,70 @@ export class AccessRequestSubmissionProcessManager extends ProcessManager<
       justification: command.justification,
       kind: { case: "extension", value: { grant, duration } },
     });
-    return create(AccessRequestAdmittedSchema, { id, snapshot, candidateManager });
+    this.store(snapshot, candidateManager);
+    return create(AccessExtensionRequestSubmittedSchema, { id, snapshot, candidateManager });
   }
 
-  /** Turns an accepted request into the command that records it. */
-  @Command
-  onAccessRequestAdmitted(event: AccessRequestAdmitted): CreateAccessRequest {
-    return create(CreateAccessRequestSchema, {
-      id: event.id,
-      snapshot: event.snapshot,
-      candidateManager: event.candidateManager,
+  /** Approves a request that has not yet been decided. */
+  @Assign
+  @Throws(RequestAlreadyDecided, SelfApprovalNotAllowed, ManagerNotEligible)
+  approveAccessRequest(command: ApproveAccessRequest): AccessRequestApproved {
+    this.assertPending(command.id);
+    const snapshot = this.requireSnapshot();
+    const decidedBy = this.assertEligibleDecider(command.id, snapshot.requester, command.manager);
+    this.update((draft) => {
+      draft.status = AccessRequestStatus.APPROVED;
+    });
+    return create(AccessRequestApprovedSchema, {
+      id: this.id,
+      snapshot,
+      decidedBy,
+      candidateManager: this.state.candidateManager,
     });
   }
 
-  /** Submits a created request, assigning it to its managers for a decision. */
-  @React
-  onAccessRequestCreated(event: AccessRequestCreated): AccessRequestSubmitted {
-    return create(AccessRequestSubmittedSchema, {
-      id: event.id,
-      snapshot: event.snapshot,
-      candidateManager: event.candidateManager,
+  /** Denies a request, with a reason, when it has not yet been decided. */
+  @Assign
+  @Throws(RequestAlreadyDecided, SelfApprovalNotAllowed, ManagerNotEligible)
+  denyAccessRequest(command: DenyAccessRequest): AccessRequestDenied {
+    this.assertPending(command.id);
+    const snapshot = this.requireSnapshot();
+    const decidedBy = this.assertEligibleDecider(command.id, snapshot.requester, command.manager);
+    this.update((draft) => {
+      draft.status = AccessRequestStatus.DENIED;
+    });
+    return create(AccessRequestDeniedSchema, {
+      id: this.id,
+      snapshot,
+      decidedBy,
+      reason: command.reason,
+      candidateManager: this.state.candidateManager,
+    });
+  }
+
+  /** Cancels a request that has not yet been decided. */
+  @Assign
+  @Throws(RequestAlreadyDecided)
+  cancelAccessRequest(command: CancelAccessRequest): AccessRequestCanceled {
+    this.assertPending(command.id);
+    const snapshot = this.requireSnapshot();
+    this.update((draft) => {
+      draft.status = AccessRequestStatus.CANCELED;
+    });
+    return create(AccessRequestCanceledSchema, {
+      id: this.id,
+      snapshot,
+      candidateManager: this.state.candidateManager,
+    });
+  }
+
+  /** Stores the immutable request details and its eligible manager pool as pending. */
+  private store(snapshot: AccessRequestSnapshot, candidateManager: readonly PersonId[]): void {
+    this.update((draft) => {
+      draft.id = this.id;
+      draft.snapshot = snapshot;
+      draft.candidateManager = [...candidateManager];
+      draft.status = AccessRequestStatus.PENDING;
     });
   }
 
@@ -265,7 +315,6 @@ export class AccessRequestSubmissionProcessManager extends ProcessManager<
       seen.add(manager.uuid);
       managers.push(manager);
     }
-    // One query retrieves every candidate manager's membership at once.
     const active = await this.activeMembers(managers);
     const candidateManager = managers.filter((manager) => active.has(manager.uuid));
     if (candidateManager.length === 0) {
@@ -274,12 +323,13 @@ export class AccessRequestSubmissionProcessManager extends ProcessManager<
     return candidateManager;
   }
 
+  /** Whether a first-time request for the same requester and resource is already pending. */
   private async hasPendingRequest(
     requester: PersonId,
     resource: ResourceId,
     thisRequest: AccessRequestId,
   ): Promise<boolean> {
-    const requests = await this.select(AccessRequestSchema, {}).all();
+    const requests = await this.select(AccessRequestViewSchema, {}).all();
     return requests.some((request) => {
       if (equals(AccessRequestIdSchema, request.id, thisRequest)) {
         return false;
@@ -299,11 +349,7 @@ export class AccessRequestSubmissionProcessManager extends ProcessManager<
     });
   }
 
-  /**
-   * Reads the membership of every candidate manager in a single query.
-   *
-   * @returns The ids of the candidates that are currently active members.
-   */
+  /** Reads the membership of every candidate manager in a single query. */
   private async activeMembers(candidates: readonly PersonId[]): Promise<ReadonlySet<string>> {
     if (candidates.length === 0) {
       return new Set();
@@ -347,5 +393,36 @@ export class AccessRequestSubmissionProcessManager extends ProcessManager<
       return { seconds: end.seconds - start.seconds, nanos: end.nanos - start.nanos };
     }
     return undefined;
+  }
+
+  private assertPending(id: AccessRequestId | undefined): void {
+    if (this.state.status !== AccessRequestStatus.PENDING) {
+      throw RequestAlreadyDecided.create({ id: id ?? this.id });
+    }
+  }
+
+  private requireSnapshot(): AccessRequestSnapshot {
+    const snapshot = this.state.snapshot;
+    if (snapshot === undefined) {
+      throw new Error("A pending request must retain its immutable snapshot.");
+    }
+    return snapshot;
+  }
+
+  private assertEligibleDecider(
+    id: AccessRequestId | undefined,
+    requester: PersonId | undefined,
+    decidedBy: PersonId | undefined,
+  ): PersonId {
+    if (decidedBy === undefined || decidedBy.uuid.trim() === "") {
+      throw ManagerNotEligible.create({ id: id ?? this.id });
+    }
+    if (requester !== undefined && equals(PersonIdSchema, requester, decidedBy)) {
+      throw SelfApprovalNotAllowed.create({ id: id ?? this.id });
+    }
+    if (!this.state.candidateManager.some((manager) => equals(PersonIdSchema, manager, decidedBy))) {
+      throw ManagerNotEligible.create({ id: id ?? this.id });
+    }
+    return decidedBy;
   }
 }

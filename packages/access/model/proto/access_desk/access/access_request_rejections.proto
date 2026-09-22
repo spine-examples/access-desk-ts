@@ -32,6 +32,36 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.access-desk.access";
 
+// The requested resource is not open for requests.
+message ResourceNotRequestable {
+
+  AccessRequestId id = 1;
+}
+
+// The requested access level is not offered by the resource.
+message AccessLevelNotAvailable {
+
+  AccessRequestId id = 1;
+}
+
+// The requested duration exceeds the resource's maximum.
+message AccessDurationTooLong {
+
+  AccessRequestId id = 1;
+}
+
+// A conflicting request for the same requester and resource is already pending.
+message DuplicateAccessRequest {
+
+  AccessRequestId id = 1;
+}
+
+// No active manager is eligible to decide the request.
+message NoManagersEligible {
+
+  AccessRequestId id = 1;
+}
+
 // The request has already reached a terminal decision.
 message RequestAlreadyDecided {
 

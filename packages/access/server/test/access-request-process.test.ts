@@ -25,19 +25,28 @@
  */
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { type BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
 import { eventRecording } from "@access-desk/base/testing";
-import { AccessRequestCreatedSchema } from "@access-desk/access-model/generated/access_desk/access/access_request_events_pb.js";
 import {
-  AccessRequestAdmittedSchema,
+  AccessExtensionRequestSubmittedSchema,
+  AccessRequestApprovedSchema,
+  AccessRequestDeniedSchema,
   AccessRequestSubmittedSchema,
-} from "@access-desk/access-model/generated/access_desk/access/access_request_submission_events_pb.js";
+} from "@access-desk/access-model/generated/access_desk/access/access_request_events_pb.js";
 import {
   AccessDurationTooLongSchema,
   AccessLevelNotAvailableSchema,
   DuplicateAccessRequestSchema,
+  ManagerNotEligibleSchema,
   NoManagersEligibleSchema,
+  RequestAlreadyDecidedSchema,
   ResourceNotRequestableSchema,
-} from "@access-desk/access-model/generated/access_desk/access/access_request_submission_rejections_pb.js";
+  SelfApprovalNotAllowedSchema,
+} from "@access-desk/access-model/generated/access_desk/access/access_request_rejections_pb.js";
+import {
+  SubmitAccessExtensionRequestSchema,
+  SubmitAccessRequestSchema,
+} from "@access-desk/access-model/generated/access_desk/access/access_request_commands_pb.js";
 import { AccessRequestStatus } from "@access-desk/access-model/generated/access_desk/access/values_pb.js";
 import {
   accessBlackBox,
@@ -47,16 +56,15 @@ import {
   testActorContext,
 } from "./given/access-context.js";
 import {
+  approveAccessRequest,
+  cancelAccessRequest,
+  denyAccessRequest,
   seed,
+  statusOf,
   submitAndAssign,
   submitExtensionRequest,
   submitRequest,
-} from "./given/access-request-submission.js";
-import {
-  SubmitAccessExtensionRequestSchema,
-  SubmitAccessRequestSchema,
-} from "@access-desk/access-model/generated/access_desk/access/access_request_submission_commands_pb.js";
-import { cancelAccessRequest, statusOf } from "./given/access-request.js";
+} from "./given/access-request.js";
 import { managerHasTask } from "./given/access-decision-assignment.js";
 
 const { expectRejection, recordEvents } = eventRecording(testActorContext);
@@ -66,9 +74,26 @@ const { expectRejection, recordEvents } = eventRecording(testActorContext);
 beforeAll(loadAccessContext, 30_000);
 afterEach(closeAccessBlackBoxes);
 
-describe("AccessRequestSubmissionProcessManager should", () => {
+/** Seeds one manager, submits a first-time request, and waits until it is assigned. */
+async function givenPending(box: BlackBox, id: string): Promise<BlackBoxScope> {
+  const requester = box.onBehalfOf(actor);
+  await seed(box, [actor, "primary"]);
+  await submitAndAssign(box, requester, id, "primary");
+  return requester;
+}
+
+/** Approves a request and waits until it is terminal. */
+async function givenApproved(box: BlackBox, requester: BlackBoxScope, id: string): Promise<void> {
+  await approveAccessRequest(requester, id, "primary");
+  await box.eventually(
+    () => statusOf(requester, id),
+    (status) => status === AccessRequestStatus.APPROVED,
+  );
+}
+
+describe("AccessRequestProcessManager should", () => {
   describe("handle 'SubmitAccessRequest', and", () => {
-    it("admit a request with the authoritative level and the deduped, active, non-requester managers", async () => {
+    it("submit a request, emitting 'AccessRequestSubmitted' with the authoritative level and the deduped, active, non-requester managers", async () => {
       const box = await accessBlackBox();
       await seed(box, [actor, "primary", "second", { person: "inactive", active: false }], {
         policy: {
@@ -83,7 +108,7 @@ describe("AccessRequestSubmissionProcessManager should", () => {
         },
       });
       const requester = box.onBehalfOf(actor);
-      const admitted = await recordEvents(requester, AccessRequestAdmittedSchema);
+      const submitted = await recordEvents(requester, AccessRequestSubmittedSchema);
       try {
         expect(
           (
@@ -94,12 +119,9 @@ describe("AccessRequestSubmissionProcessManager should", () => {
           ).kind,
         ).toBe("ok");
 
-        const event = await admitted.waitFor(box, (candidate) => candidate.id?.uuid === "req-ok");
+        const event = await submitted.waitFor(box, (candidate) => candidate.id?.uuid === "req-ok");
         // Managers keep policy order, drop the duplicate, the inactive member, and the requester.
-        expect(event.candidateManager.map((manager) => manager.uuid)).toEqual([
-          "second",
-          "primary",
-        ]);
+        expect(event.candidateManager.map((manager) => manager.uuid)).toEqual(["second", "primary"]);
         const kind = event.snapshot?.kind;
         expect(kind?.case).toBe("newRequest");
         if (kind?.case === "newRequest") {
@@ -107,11 +129,11 @@ describe("AccessRequestSubmissionProcessManager should", () => {
           expect(kind.value.accessLevel?.name).toBe("Reader");
         }
       } finally {
-        await admitted.cancel();
+        await submitted.cancel();
       }
     });
 
-    it("reject a resource that is not open", async () => {
+    it("reject a resource that is not open ('ResourceNotRequestable')", async () => {
       const box = await accessBlackBox();
       await seed(box, [actor, "primary"], { openForRequests: false });
       const requester = box.onBehalfOf(actor);
@@ -120,7 +142,7 @@ describe("AccessRequestSubmissionProcessManager should", () => {
       );
     });
 
-    it("reject a level the policy does not offer", async () => {
+    it("reject a level the policy does not offer ('AccessLevelNotAvailable')", async () => {
       const box = await accessBlackBox();
       await seed(box, [actor, "primary"]);
       const requester = box.onBehalfOf(actor);
@@ -132,7 +154,7 @@ describe("AccessRequestSubmissionProcessManager should", () => {
       );
     });
 
-    it("reject an immediate duration beyond the maximum", async () => {
+    it("reject an immediate duration beyond the maximum ('AccessDurationTooLong')", async () => {
       const box = await accessBlackBox();
       await seed(box, [actor, "primary"]); // default maximumDuration is 3600s
       const requester = box.onBehalfOf(actor);
@@ -146,7 +168,7 @@ describe("AccessRequestSubmissionProcessManager should", () => {
       );
     });
 
-    it("reject a scheduled interval beyond the maximum", async () => {
+    it("reject a scheduled interval beyond the maximum ('AccessDurationTooLong')", async () => {
       const box = await accessBlackBox();
       await seed(box, [actor, "primary"]); // default maximumDuration is 3600s
       const requester = box.onBehalfOf(actor);
@@ -155,27 +177,22 @@ describe("AccessRequestSubmissionProcessManager should", () => {
           SubmitAccessRequestSchema,
           submitRequest("req-scheduled-long", {
             period: {
-              kind: {
-                case: "scheduled",
-                value: { start: { seconds: 0n }, end: { seconds: 7200n } },
-              },
+              kind: { case: "scheduled", value: { start: { seconds: 0n }, end: { seconds: 7200n } } },
             },
           }),
         ),
       );
     });
 
-    it("reject a second pending request for the same requester and resource", async () => {
+    it("reject a second pending request for the same requester and resource ('DuplicateAccessRequest')", async () => {
       const box = await accessBlackBox();
-      await seed(box, [actor, "primary"]);
-      const requester = box.onBehalfOf(actor);
-      await submitAndAssign(box, requester, "req-first", "primary");
+      const requester = await givenPending(box, "req-first");
       await expectRejection(box, requester, DuplicateAccessRequestSchema, () =>
         requester.post(SubmitAccessRequestSchema, submitRequest("req-second")),
       );
     });
 
-    it("reject a request when no active manager is eligible", async () => {
+    it("reject a request when no active manager is eligible ('NoManagersEligible')", async () => {
       const box = await accessBlackBox();
       // The only member is the requester, who is also the resource's sole manager.
       await seed(box, [actor], { policy: { manager: [{ uuid: actor }] } });
@@ -187,9 +204,7 @@ describe("AccessRequestSubmissionProcessManager should", () => {
 
     it("free the requester and resource after a cancellation so a resubmission is admitted", async () => {
       const box = await accessBlackBox();
-      await seed(box, [actor, "primary"]);
-      const requester = box.onBehalfOf(actor);
-      await submitAndAssign(box, requester, "req-original", "primary");
+      const requester = await givenPending(box, "req-original");
       await cancelAccessRequest(requester, "req-original");
       await box.eventually(
         () => statusOf(requester, "req-original"),
@@ -202,22 +217,18 @@ describe("AccessRequestSubmissionProcessManager should", () => {
   });
 
   describe("handle 'SubmitAccessExtensionRequest', and", () => {
-    it("admit a renewal, emitting 'AccessRequestAdmitted' with the extension snapshot", async () => {
+    it("submit a renewal, emitting 'AccessExtensionRequestSubmitted' with the extension snapshot", async () => {
       const box = await accessBlackBox();
       await seed(box, [actor, "primary"]);
       const requester = box.onBehalfOf(actor);
-      const admitted = await recordEvents(requester, AccessRequestAdmittedSchema);
+      const submitted = await recordEvents(requester, AccessExtensionRequestSubmittedSchema);
       try {
         expect(
-          (
-            await requester.post(
-              SubmitAccessExtensionRequestSchema,
-              submitExtensionRequest("ext-ok"),
-            )
-          ).kind,
+          (await requester.post(SubmitAccessExtensionRequestSchema, submitExtensionRequest("ext-ok")))
+            .kind,
         ).toBe("ok");
 
-        const event = await admitted.waitFor(box, (candidate) => candidate.id?.uuid === "ext-ok");
+        const event = await submitted.waitFor(box, (candidate) => candidate.id?.uuid === "ext-ok");
         expect(event.candidateManager.map((manager) => manager.uuid)).toEqual(["primary"]);
         const kind = event.snapshot?.kind;
         expect(kind?.case).toBe("extension");
@@ -226,11 +237,11 @@ describe("AccessRequestSubmissionProcessManager should", () => {
           expect(kind.value.duration?.seconds).toBe(120n);
         }
       } finally {
-        await admitted.cancel();
+        await submitted.cancel();
       }
     });
 
-    it("reject a resource that is not open", async () => {
+    it("reject a resource that is not open ('ResourceNotRequestable')", async () => {
       const box = await accessBlackBox();
       await seed(box, [actor, "primary"], { openForRequests: false });
       const requester = box.onBehalfOf(actor);
@@ -239,7 +250,7 @@ describe("AccessRequestSubmissionProcessManager should", () => {
       );
     });
 
-    it("reject an added duration beyond the maximum", async () => {
+    it("reject an added duration beyond the maximum ('AccessDurationTooLong')", async () => {
       const box = await accessBlackBox();
       await seed(box, [actor, "primary"]); // default maximumDuration is 3600s
       const requester = box.onBehalfOf(actor);
@@ -251,7 +262,7 @@ describe("AccessRequestSubmissionProcessManager should", () => {
       );
     });
 
-    it("reject a renewal when no active manager is eligible", async () => {
+    it("reject a renewal when no active manager is eligible ('NoManagersEligible')", async () => {
       const box = await accessBlackBox();
       await seed(box, [actor], { policy: { manager: [{ uuid: actor }] } });
       const requester = box.onBehalfOf(actor);
@@ -261,40 +272,106 @@ describe("AccessRequestSubmissionProcessManager should", () => {
     });
   });
 
-  describe("handle 'AccessRequestAdmitted', and", () => {
-    it("command the request aggregate to create the accepted request", async () => {
+  describe("handle 'ApproveAccessRequest', and", () => {
+    it("emit 'AccessRequestApproved' recording the deciding manager", async () => {
       const box = await accessBlackBox();
-      await seed(box, [actor, "primary"]);
-      const requester = box.onBehalfOf(actor);
-      const created = await recordEvents(requester, AccessRequestCreatedSchema);
+      const requester = await givenPending(box, "req-approve");
+      const approved = await recordEvents(requester, AccessRequestApprovedSchema);
       try {
-        await requester.post(SubmitAccessRequestSchema, submitRequest("req-create"));
-        const event = await created.waitFor(
-          box,
-          (candidate) => candidate.id?.uuid === "req-create",
-        );
-        expect(event.snapshot?.requester?.uuid).toBe(actor);
-        expect(event.candidateManager.map((manager) => manager.uuid)).toEqual(["primary"]);
+        expect((await approveAccessRequest(requester, "req-approve", "primary")).kind).toBe("ok");
+        const event = await approved.waitFor(box, (candidate) => candidate.id?.uuid === "req-approve");
+        expect(event.decidedBy?.uuid).toBe("primary");
       } finally {
-        await created.cancel();
+        await approved.cancel();
       }
+    });
+
+    it("reject a decider outside the candidate pool ('ManagerNotEligible')", async () => {
+      const box = await accessBlackBox();
+      const requester = await givenPending(box, "req-outsider");
+      await expectRejection(box, requester, ManagerNotEligibleSchema, () =>
+        approveAccessRequest(requester, "req-outsider", "outsider"),
+      );
+    });
+
+    it("reject the requester deciding their own request ('SelfApprovalNotAllowed')", async () => {
+      const box = await accessBlackBox();
+      const requester = await givenPending(box, "req-self");
+      await expectRejection(box, requester, SelfApprovalNotAllowedSchema, () =>
+        approveAccessRequest(requester, "req-self", actor),
+      );
+    });
+
+    it("reject a decision on an already-decided request ('RequestAlreadyDecided')", async () => {
+      const box = await accessBlackBox();
+      const requester = await givenPending(box, "req-twice");
+      await givenApproved(box, requester, "req-twice");
+      await expectRejection(box, requester, RequestAlreadyDecidedSchema, () =>
+        approveAccessRequest(requester, "req-twice", "primary"),
+      );
     });
   });
 
-  describe("handle 'AccessRequestCreated', and", () => {
-    it("emit 'AccessRequestSubmitted' to complete the submission", async () => {
+  describe("handle 'DenyAccessRequest', and", () => {
+    it("emit 'AccessRequestDenied' carrying the reason and the deciding manager", async () => {
       const box = await accessBlackBox();
-      await seed(box, [actor, "primary"]);
-      const requester = box.onBehalfOf(actor);
-      const submitted = await recordEvents(requester, AccessRequestSubmittedSchema);
+      const requester = await givenPending(box, "req-deny");
+      const denied = await recordEvents(requester, AccessRequestDeniedSchema);
       try {
-        await requester.post(SubmitAccessRequestSchema, submitRequest("req-submit"));
         expect(
-          (await submitted.waitFor(box, (event) => event.id?.uuid === "req-submit")).id?.uuid,
-        ).toBe("req-submit");
+          (await denyAccessRequest(requester, "req-deny", "primary", "Insufficient justification."))
+            .kind,
+        ).toBe("ok");
+        const event = await denied.waitFor(box, (candidate) => candidate.id?.uuid === "req-deny");
+        expect(event.decidedBy?.uuid).toBe("primary");
+        expect(event.reason).toBe("Insufficient justification.");
       } finally {
-        await submitted.cancel();
+        await denied.cancel();
       }
+    });
+
+    it("reject the requester deciding their own request ('SelfApprovalNotAllowed')", async () => {
+      const box = await accessBlackBox();
+      const requester = await givenPending(box, "req-deny-self");
+      await expectRejection(box, requester, SelfApprovalNotAllowedSchema, () =>
+        denyAccessRequest(requester, "req-deny-self", actor, "Changed my mind."),
+      );
+    });
+
+    it("reject a decision on an already-decided request ('RequestAlreadyDecided')", async () => {
+      const box = await accessBlackBox();
+      const requester = await givenPending(box, "req-deny-twice");
+      await givenApproved(box, requester, "req-deny-twice");
+      await expectRejection(box, requester, RequestAlreadyDecidedSchema, () =>
+        denyAccessRequest(requester, "req-deny-twice", "primary", "Too late."),
+      );
+    });
+  });
+
+  describe("handle 'CancelAccessRequest', and", () => {
+    it("cancel a pending request and clear its decision task", async () => {
+      const box = await accessBlackBox();
+      const requester = await givenPending(box, "req-cancel");
+
+      await cancelAccessRequest(requester, "req-cancel");
+
+      await box.eventually(
+        () => statusOf(requester, "req-cancel"),
+        (status) => status === AccessRequestStatus.CANCELED,
+      );
+      await box.eventually(
+        () => managerHasTask(requester, "primary", "req-cancel"),
+        (present) => !present,
+      );
+    });
+
+    it("reject cancelling an already-decided request ('RequestAlreadyDecided')", async () => {
+      const box = await accessBlackBox();
+      const requester = await givenPending(box, "req-cancel-decided");
+      await givenApproved(box, requester, "req-cancel-decided");
+      await expectRejection(box, requester, RequestAlreadyDecidedSchema, () =>
+        cancelAccessRequest(requester, "req-cancel-decided"),
+      );
     });
   });
 });

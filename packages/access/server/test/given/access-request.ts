@@ -26,105 +26,131 @@
 
 import { create, type MessageShape } from "@bufbuild/protobuf";
 import { type BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
-
+import { OrganizationMemberAddedSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
+import { ResourceCreatedSchema } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
+import {
+  OrganizationMembershipSchema,
+  ResourceRequestPolicySchema,
+} from "@access-desk/access-model/generated/access_desk/access/resources_integration_pb.js";
 import {
   ApproveAccessRequestSchema,
   CancelAccessRequestSchema,
-  CreateAccessRequestSchema,
   DenyAccessRequestSchema,
+  SubmitAccessExtensionRequestSchema,
+  SubmitAccessRequestSchema,
 } from "@access-desk/access-model/generated/access_desk/access/access_request_commands_pb.js";
 import {
   AccessRequestViewSchema,
   type AccessRequestView,
 } from "@access-desk/access-model/generated/access_desk/access/access_request_view_pb.js";
+import { AccessRequestStatus } from "@access-desk/access-model/generated/access_desk/access/values_pb.js";
+
+import { actor, organizationId, readAll, resourceUuid } from "./access-context.js";
+import { managerHasTask } from "./access-decision-assignment.js";
 import {
-  AccessRequestSnapshotSchema,
-  AccessRequestStatus,
-} from "@access-desk/access-model/generated/access_desk/access/values_pb.js";
+  publishResourceFact,
+  resourcePolicy,
+  resourcesSystemActor,
+} from "./resources-integration.js";
 
-import { actor, readAll, resourceUuid } from "./access-context.js";
-
-/** The requester used for a created request unless a spec names another. */
-export const requesterId = actor;
-
-/** The candidate manager eligible to decide a created request by default. */
-export const managerId = "primary";
-
-/** The descriptive and target fields of a first-time request snapshot. */
-export interface RequestDetails {
-  readonly requester: string;
-  readonly justification: string;
-  readonly resource: string;
-  readonly accessLevel: { readonly name: string; readonly rank: number };
-  readonly durationSeconds: bigint;
-}
-
-/** Builds an immutable first-time-request snapshot with sensible defaults. */
-export function requestSnapshot(
-  overrides: Partial<RequestDetails> = {},
-): MessageShape<typeof AccessRequestSnapshotSchema> {
-  const details: RequestDetails = {
-    requester: requesterId,
-    justification: "Need payroll review",
-    resource: resourceUuid,
-    accessLevel: { name: "Read", rank: 1 },
-    durationSeconds: 60n,
-    ...overrides,
-  };
-  return create(AccessRequestSnapshotSchema, {
-    requester: { uuid: details.requester },
-    justification: details.justification,
-    kind: {
-      case: "newRequest",
-      value: {
-        resource: { uuid: details.resource },
-        accessLevel: details.accessLevel,
-        period: {
-          kind: { case: "immediateDuration", value: { seconds: details.durationSeconds } },
-        },
-      },
-    },
-  });
-}
-
-/** The fields that shape a `CreateAccessRequest` command. */
-export interface CreateOptions extends Partial<RequestDetails> {
-  /** The active managers eligible to decide the request; at least one. */
-  readonly candidateManager?: readonly string[];
+/** One organization member and their initial activity. */
+export interface Member {
+  readonly person: string;
+  readonly active?: boolean;
 }
 
 /**
- * Posts `CreateAccessRequest` directly to the aggregate.
- *
- * This bypasses the submission process manager, so the aggregate handler is
- * exercised on its own with an already-accepted snapshot and manager pool.
+ * Seeds Access's local membership and policy facts for the resource, then waits
+ * until both mirrored projections are visible.
  */
-export function createAccessRequest(scope: BlackBoxScope, id: string, options: CreateOptions = {}) {
-  const { candidateManager = [managerId], ...details } = options;
-  return scope.post(
-    CreateAccessRequestSchema,
-    create(CreateAccessRequestSchema, {
-      id: { uuid: id },
-      snapshot: requestSnapshot(details),
-      candidateManager: candidateManager.map((uuid) => ({ uuid })),
+export async function seed(
+  box: BlackBox,
+  members: readonly (string | Member)[],
+  options: { openForRequests?: boolean; policy?: Record<string, unknown> } = {},
+): Promise<void> {
+  const resources = box.onBehalfOf(resourcesSystemActor);
+  const normalized = members.map((m) => (typeof m === "string" ? { person: m, active: true } : m));
+  for (const member of normalized) {
+    await resources.postExternalEvent(
+      OrganizationMemberAddedSchema,
+      create(OrganizationMemberAddedSchema, {
+        organizationId: { uuid: organizationId },
+        person: { uuid: member.person },
+        active: member.active ?? true,
+        membershipVersion: 1n,
+        name: member.person,
+      }),
+    );
+  }
+  await publishResourceFact(resources, ResourceCreatedSchema, {
+    id: { uuid: resourceUuid },
+    name: "payroll",
+    description: "Payroll",
+    category: "system",
+    policy: resourcePolicy({
+      openForRequests: options.openForRequests ?? true,
+      policyVersion: 1n,
+      ...options.policy,
     }),
+  });
+  const scope = box.onBehalfOf(actor);
+  await box.eventually(
+    () => readAll(scope, OrganizationMembershipSchema, "seed-members"),
+    (items) => items.length === normalized.length,
+  );
+  await box.eventually(
+    () => readAll(scope, ResourceRequestPolicySchema, "seed-policy"),
+    (items) => items.length === 1,
   );
 }
 
-/** Creates a request and waits until it is stored and pending a decision. */
-export async function givenCreatedRequest(
-  box: BlackBox,
-  scope: BlackBoxScope,
+/** Builds a `SubmitAccessRequest` with defaults for one immediate first-time request. */
+export function submitRequest(
   id: string,
-  options: CreateOptions = {},
+  overrides: Record<string, unknown> = {},
+): MessageShape<typeof SubmitAccessRequestSchema> {
+  return create(SubmitAccessRequestSchema, {
+    id: { uuid: id },
+    requester: { uuid: actor },
+    resource: { uuid: resourceUuid },
+    accessLevel: { name: "Read", rank: 1 },
+    justification: "Need payroll review",
+    period: { kind: { case: "immediateDuration", value: { seconds: 60n } } },
+    ...overrides,
+  });
+}
+
+/** Builds a `SubmitAccessExtensionRequest` renewing an existing grant. */
+export function submitExtensionRequest(
+  id: string,
+  overrides: Record<string, unknown> = {},
+): MessageShape<typeof SubmitAccessExtensionRequestSchema> {
+  return create(SubmitAccessExtensionRequestSchema, {
+    id: { uuid: id },
+    requester: { uuid: actor },
+    grant: { uuid: "grant-1" },
+    resource: { uuid: resourceUuid },
+    duration: { seconds: 120n },
+    justification: "Keep payroll access a little longer",
+    ...overrides,
+  });
+}
+
+/** Submits a first-time request and waits until every named manager holds its task. */
+export async function submitAndAssign(
+  box: BlackBox,
+  requester: BlackBoxScope,
+  id: string,
+  candidateManager: string | readonly string[],
+  overrides: Record<string, unknown> = {},
 ): Promise<void> {
-  await createAccessRequest(scope, id, options);
+  await requester.post(SubmitAccessRequestSchema, submitRequest(id, overrides));
+  const managers: readonly string[] =
+    typeof candidateManager === "string" ? [candidateManager] : candidateManager;
   await box.eventually(
-    () => readAll(scope, AccessRequestViewSchema, `created-${id}`),
-    (requests) =>
-      requests.some(
-        (request) => request.id?.uuid === id && request.status === AccessRequestStatus.PENDING,
-      ),
+    () => Promise.all(managers.map((manager) => managerHasTask(requester, manager, id))),
+    (held) => held.every(Boolean),
+    { timeoutMs: 20000, intervalMs: 50 },
   );
 }
 

@@ -34,29 +34,31 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.access-desk.access";
 
-// An accepted request was recorded together with the managers who may decide it.
-message AccessRequestCreated {
+// A first-time request passed the resource rules and was assigned to its
+// managers for a decision.
+message AccessRequestSubmitted {
 
-  // The ID of the request.
+  // The submitted request.
   AccessRequestId id = 1 [(required) = true, (validate) = true];
 
   // The immutable request details.
   AccessRequestSnapshot snapshot = 2 [(required) = true];
 
-  // The active resource managers eligible to decide the request.
+  // The active resource managers assigned to decide the request.
   repeated access_desk.identity.PersonId candidate_manager = 3 [(required) = true, (validate) = true];
 }
 
-// A request was canceled by its requester.
-message AccessRequestCanceled {
+// An access-extension request passed the resource rules and was assigned to its
+// managers for a decision.
+message AccessExtensionRequestSubmitted {
 
-  // The terminal request.
+  // The submitted extension request.
   AccessRequestId id = 1 [(required) = true, (validate) = true];
 
-  // The immutable request details, retained after cancelation.
+  // The immutable request details.
   AccessRequestSnapshot snapshot = 2 [(required) = true];
 
-  // The managers whose decision task this terminal fact clears.
+  // The active resource managers assigned to decide the request.
   repeated access_desk.identity.PersonId candidate_manager = 3 [(required) = true, (validate) = true];
 }
 
@@ -93,4 +95,17 @@ message AccessRequestDenied {
 
   // The managers whose decision task this terminal fact clears.
   repeated access_desk.identity.PersonId candidate_manager = 5 [(required) = true, (validate) = true];
+}
+
+// A request was canceled by its requester.
+message AccessRequestCanceled {
+
+  // The terminal request.
+  AccessRequestId id = 1 [(required) = true, (validate) = true];
+
+  // The immutable request details, retained after cancelation.
+  AccessRequestSnapshot snapshot = 2 [(required) = true];
+
+  // The managers whose decision task this terminal fact clears.
+  repeated access_desk.identity.PersonId candidate_manager = 3 [(required) = true, (validate) = true];
 }

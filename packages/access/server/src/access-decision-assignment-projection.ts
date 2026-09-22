@@ -37,17 +37,18 @@ import {
 import type { AccessRequestSnapshot } from "@access-desk/access-model/generated/access_desk/access/values_pb.js";
 import type { PersonId } from "@access-desk/identity-model/generated/access_desk/identity/identifiers_pb.js";
 import type {
+  AccessExtensionRequestSubmitted,
   AccessRequestApproved,
   AccessRequestCanceled,
-  AccessRequestCreated,
   AccessRequestDenied,
+  AccessRequestSubmitted,
 } from "@access-desk/access-model/generated/access_desk/access/access_request_events_pb.js";
 import { equals } from "@access-desk/base/proto";
 
 /**
  * One manager's queue of access requests awaiting their decision.
  *
- * Keyed by the manager; the organization is the tenant. A created request —
+ * Keyed by the manager; the organization is the tenant. A submitted request —
  * whether a first-time request or an extension — is added as a task carrying the
  * full request snapshot, for each of its eligible managers, and leaves every
  * manager's queue as soon as the request reaches a terminal decision.
@@ -57,9 +58,15 @@ export class AccessDecisionAssignmentProjection extends Projection<
   typeof AccessDecisionAssignmentSchema,
   bigint
 > {
-  /** Adds a newly created request to this manager's decision queue. */
+  /** Adds a newly submitted first-time request to this manager's decision queue. */
   @Subscribe
-  onAccessRequestCreated(event: AccessRequestCreated): void {
+  onAccessRequestSubmitted(event: AccessRequestSubmitted): void {
+    this.assign(event.id, event.snapshot);
+  }
+
+  /** Adds a newly submitted extension request to this manager's decision queue. */
+  @Subscribe
+  onAccessExtensionRequestSubmitted(event: AccessExtensionRequestSubmitted): void {
     this.assign(event.id, event.snapshot);
   }
 

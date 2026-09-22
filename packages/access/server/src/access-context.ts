@@ -37,15 +37,15 @@ import {
   OrganizationMemberDeactivatedSchema,
 } from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
 import {
+  AccessExtensionRequestSubmittedSchema,
   AccessRequestApprovedSchema,
   AccessRequestCanceledSchema,
-  AccessRequestCreatedSchema,
   AccessRequestDeniedSchema,
+  AccessRequestSubmittedSchema,
 } from "@access-desk/access-model/generated/access_desk/access/access_request_events_pb.js";
 import { type ResourceId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
 import { type PersonId } from "@access-desk/identity-model/generated/access_desk/identity/identifiers_pb.js";
-import { AccessRequestAggregate } from "./access-request-aggregate.js";
-import { AccessRequestSubmissionProcessManager } from "./access-request-submission-process.js";
+import { AccessRequestProcessManager } from "./access-request-process.js";
 import { AccessRequestViewProjection } from "./access-request-view-projection.js";
 import { AccessDecisionAssignmentProjection } from "./access-decision-assignment-projection.js";
 import { OrganizationMembershipProjection } from "./organization-membership-projection.js";
@@ -73,7 +73,8 @@ export async function createAccessContext(): Promise<BoundedContext> {
       event.person === undefined ? [] : [event.person],
     );
   const decisionRouting = EventRouting.create<PersonId>()
-    .route(AccessRequestCreatedSchema, (event) => event.candidateManager)
+    .route(AccessRequestSubmittedSchema, (event) => event.candidateManager)
+    .route(AccessExtensionRequestSubmittedSchema, (event) => event.candidateManager)
     .route(AccessRequestApprovedSchema, (event) => event.candidateManager)
     .route(AccessRequestDeniedSchema, (event) => event.candidateManager)
     .route(AccessRequestCanceledSchema, (event) => event.candidateManager);
@@ -81,8 +82,7 @@ export async function createAccessContext(): Promise<BoundedContext> {
     .withGeneratedRegistryRoot(new URL("..", import.meta.url))
     .add(ResourceRequestPolicyProjection, { eventRouting: policyRouting })
     .add(OrganizationMembershipProjection, { eventRouting: membershipRouting })
-    .add(AccessRequestAggregate)
-    .add(AccessRequestSubmissionProcessManager)
+    .add(AccessRequestProcessManager)
     .add(AccessRequestViewProjection)
     .add(AccessDecisionAssignmentProjection, { eventRouting: decisionRouting });
   return builder.buildAsync();

@@ -37,15 +37,15 @@ import {
 import {
   approveAccessRequest,
   cancelAccessRequest,
-  createAccessRequest,
   denyAccessRequest,
   readRequests,
+  seed,
   statusOf,
+  submitAndAssign,
 } from "./given/access-request.js";
 
-// The view reacts to the request aggregate's own lifecycle facts. Each event is
-// produced by posting the aggregate command directly, so the view is exercised
-// on its own, without the submission process, resource policy, or membership.
+// The view reacts to the request's own lifecycle facts, produced here through
+// the real submission-and-decision path.
 beforeAll(loadAccessContext, 30_000);
 afterEach(closeAccessBlackBoxes);
 
@@ -63,17 +63,17 @@ function awaitStatus(
 }
 
 describe("AccessRequestViewProjection should", () => {
-  it("on 'AccessRequestCreated' expose the request as pending with its details", async () => {
+  it("on 'AccessRequestSubmitted' expose the request as pending with its details", async () => {
     const box = await accessBlackBox();
     const requester = box.onBehalfOf(actor);
-
-    await createAccessRequest(requester, "view-created", {
-      candidateManager: ["primary", "second"],
-      resource: resourceUuid,
+    await seed(box, [actor, "primary", "second"], {
+      policy: { manager: [{ uuid: "primary" }, { uuid: "second" }] },
     });
 
-    await awaitStatus(box, requester, "view-created", AccessRequestStatus.PENDING);
-    const row = (await readRequests(requester)).find((r) => r.id?.uuid === "view-created");
+    await submitAndAssign(box, requester, "view-submitted", ["primary", "second"]);
+
+    await awaitStatus(box, requester, "view-submitted", AccessRequestStatus.PENDING);
+    const row = (await readRequests(requester)).find((r) => r.id?.uuid === "view-submitted");
     expect(row?.snapshot?.requester?.uuid).toBe(actor);
     expect(row?.candidateManager.map((m) => m.uuid)).toEqual(["primary", "second"]);
     const kind = row?.snapshot?.kind;
@@ -86,8 +86,8 @@ describe("AccessRequestViewProjection should", () => {
   it("on 'AccessRequestApproved' move the request to approved", async () => {
     const box = await accessBlackBox();
     const requester = box.onBehalfOf(actor);
-    await createAccessRequest(requester, "view-approved", { candidateManager: ["primary"] });
-    await awaitStatus(box, requester, "view-approved", AccessRequestStatus.PENDING);
+    await seed(box, [actor, "primary"]);
+    await submitAndAssign(box, requester, "view-approved", "primary");
 
     await approveAccessRequest(requester, "view-approved", "primary");
 
@@ -97,8 +97,8 @@ describe("AccessRequestViewProjection should", () => {
   it("on 'AccessRequestDenied' move the request to denied", async () => {
     const box = await accessBlackBox();
     const requester = box.onBehalfOf(actor);
-    await createAccessRequest(requester, "view-denied", { candidateManager: ["primary"] });
-    await awaitStatus(box, requester, "view-denied", AccessRequestStatus.PENDING);
+    await seed(box, [actor, "primary"]);
+    await submitAndAssign(box, requester, "view-denied", "primary");
 
     await denyAccessRequest(requester, "view-denied", "primary", "Insufficient justification.");
 
@@ -108,8 +108,8 @@ describe("AccessRequestViewProjection should", () => {
   it("on 'AccessRequestCanceled' move the request to canceled", async () => {
     const box = await accessBlackBox();
     const requester = box.onBehalfOf(actor);
-    await createAccessRequest(requester, "view-canceled", { candidateManager: ["primary"] });
-    await awaitStatus(box, requester, "view-canceled", AccessRequestStatus.PENDING);
+    await seed(box, [actor, "primary"]);
+    await submitAndAssign(box, requester, "view-canceled", "primary");
 
     await cancelAccessRequest(requester, "view-canceled");
 

@@ -31,36 +31,37 @@ import {
   type AccessRequestSnapshot,
 } from "@access-desk/access-model/generated/access_desk/access/values_pb.js";
 import type { AccessRequestId } from "@access-desk/access-model/generated/access_desk/access/identifiers_pb.js";
+import type { PersonId } from "@access-desk/identity-model/generated/access_desk/identity/identifiers_pb.js";
 import type {
+  AccessExtensionRequestSubmitted,
   AccessRequestApproved,
   AccessRequestCanceled,
-  AccessRequestCreated,
   AccessRequestDenied,
+  AccessRequestSubmitted,
 } from "@access-desk/access-model/generated/access_desk/access/access_request_events_pb.js";
 
 /**
  * Each access request as clients read it, from submission to a terminal decision.
  *
- * Built from the request aggregate's own lifecycle facts so a requester can list
- * requests and follow their status without querying the aggregate. A created
- * request is seeded as pending, and each terminal fact moves it to its outcome.
+ * Built from the request's own lifecycle facts so a requester can list requests
+ * and follow their status. A submitted request — first-time or extension — is
+ * seeded as pending, and each terminal fact moves it to its outcome.
  */
 export class AccessRequestViewProjection extends Projection<
   AccessRequestId,
   typeof AccessRequestViewSchema,
   bigint
 > {
-  /** Seeds a newly created request as pending a decision. */
+  /** Seeds a newly submitted first-time request as pending a decision. */
   @Subscribe
-  onAccessRequestCreated(event: AccessRequestCreated): void {
-    if (event.snapshot !== undefined) {
-      this.update((draft) => {
-        draft.id = this.id;
-        draft.snapshot = event.snapshot;
-        draft.candidateManager = [...event.candidateManager];
-        draft.status = AccessRequestStatus.PENDING;
-      });
-    }
+  onAccessRequestSubmitted(event: AccessRequestSubmitted): void {
+    this.seedPending(event.snapshot, event.candidateManager);
+  }
+
+  /** Seeds a newly submitted extension request as pending a decision. */
+  @Subscribe
+  onAccessExtensionRequestSubmitted(event: AccessExtensionRequestSubmitted): void {
+    this.seedPending(event.snapshot, event.candidateManager);
   }
 
   /** Records an approved request as its terminal outcome. */
@@ -79,6 +80,21 @@ export class AccessRequestViewProjection extends Projection<
   @Subscribe
   onAccessRequestCanceled(event: AccessRequestCanceled): void {
     this.settle(AccessRequestStatus.CANCELED, event.snapshot);
+  }
+
+  private seedPending(
+    snapshot: AccessRequestSnapshot | undefined,
+    candidateManager: readonly PersonId[],
+  ): void {
+    if (snapshot === undefined) {
+      return;
+    }
+    this.update((draft) => {
+      draft.id = this.id;
+      draft.snapshot = snapshot;
+      draft.candidateManager = [...candidateManager];
+      draft.status = AccessRequestStatus.PENDING;
+    });
   }
 
   private settle(status: AccessRequestStatus, snapshot: AccessRequestSnapshot | undefined): void {

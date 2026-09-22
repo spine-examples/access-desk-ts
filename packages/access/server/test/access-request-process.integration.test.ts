@@ -26,15 +26,11 @@
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { eventRecording } from "@access-desk/base/testing";
-import { AccessRequestCreatedSchema } from "@access-desk/access-model/generated/access_desk/access/access_request_events_pb.js";
-import {
-  AccessRequestAdmittedSchema,
-  AccessRequestSubmittedSchema,
-} from "@access-desk/access-model/generated/access_desk/access/access_request_submission_events_pb.js";
+import { AccessRequestSubmittedSchema } from "@access-desk/access-model/generated/access_desk/access/access_request_events_pb.js";
 import {
   SubmitAccessExtensionRequestSchema,
   SubmitAccessRequestSchema,
-} from "@access-desk/access-model/generated/access_desk/access/access_request_submission_commands_pb.js";
+} from "@access-desk/access-model/generated/access_desk/access/access_request_commands_pb.js";
 import { AccessRequestStatus } from "@access-desk/access-model/generated/access_desk/access/values_pb.js";
 import {
   accessBlackBox,
@@ -43,19 +39,25 @@ import {
   loadAccessContext,
   testActorContext,
 } from "./given/access-context.js";
-import { seed, submitExtensionRequest, submitRequest } from "./given/access-request-submission.js";
-import { approveAccessRequest, readRequests, statusOf } from "./given/access-request.js";
+import {
+  approveAccessRequest,
+  readRequests,
+  seed,
+  statusOf,
+  submitExtensionRequest,
+  submitRequest,
+} from "./given/access-request.js";
 import { managerHasTask, readAssignments } from "./given/access-decision-assignment.js";
 
 const { recordEvents } = eventRecording(testActorContext);
 
-// These exercise the whole submission-and-decision choreography end to end —
-// process manager, request aggregate, and decision-queue projection — from the
-// client command to the client queries a browser would issue.
+// These exercise the whole request lifecycle end to end — the process manager,
+// the decision-queue projection, and the request view — from the client command
+// to the client queries a browser would issue.
 beforeAll(loadAccessContext, 30_000);
 afterEach(closeAccessBlackBoxes);
 
-describe("AccessRequestSubmissionProcessManager should", () => {
+describe("AccessRequestProcessManager should", () => {
   it("submit a request end to end and expose it through the request and queue queries", async () => {
     const box = await accessBlackBox();
     const requester = box.onBehalfOf(actor);
@@ -63,31 +65,20 @@ describe("AccessRequestSubmissionProcessManager should", () => {
       policy: { manager: [{ uuid: "primary" }, { uuid: "second" }] },
     });
 
-    const admitted = await recordEvents(requester, AccessRequestAdmittedSchema);
-    const created = await recordEvents(requester, AccessRequestCreatedSchema);
     const submitted = await recordEvents(requester, AccessRequestSubmittedSchema);
     try {
       expect((await requester.post(SubmitAccessRequestSchema, submitRequest("req-int"))).kind).toBe(
         "ok",
       );
 
-      // The three choreography facts fire in order: admitted, created, submitted.
-      const admission = await admitted.waitFor(box, (event) => event.id?.uuid === "req-int");
-      expect(admission.candidateManager.map((manager) => manager.uuid)).toEqual([
-        "primary",
-        "second",
-      ]);
-      expect(
-        (await created.waitFor(box, (event) => event.id?.uuid === "req-int")).snapshot?.requester
-          ?.uuid,
-      ).toBe(actor);
-      await submitted.waitFor(box, (event) => event.id?.uuid === "req-int");
+      const event = await submitted.waitFor(box, (candidate) => candidate.id?.uuid === "req-int");
+      expect(event.candidateManager.map((manager) => manager.uuid)).toEqual(["primary", "second"]);
+      expect(event.snapshot?.requester?.uuid).toBe(actor);
 
       // The request is retrievable through its own query.
       const requests = await box.eventually(
         () => readRequests(requester),
-        (rows) =>
-          rows.some((r) => r.id?.uuid === "req-int" && r.status === AccessRequestStatus.PENDING),
+        (rows) => rows.some((r) => r.id?.uuid === "req-int" && r.status === AccessRequestStatus.PENDING),
       );
       expect(
         requests.find((r) => r.id?.uuid === "req-int")?.candidateManager.map((m) => m.uuid),
@@ -102,7 +93,7 @@ describe("AccessRequestSubmissionProcessManager should", () => {
         ?.task.find((candidate) => candidate.request?.uuid === "req-int");
       expect(task?.snapshot?.requester?.uuid).toBe(actor);
     } finally {
-      await Promise.all([admitted.cancel(), created.cancel(), submitted.cancel()]);
+      await submitted.cancel();
     }
   });
 
@@ -132,9 +123,7 @@ describe("AccessRequestSubmissionProcessManager should", () => {
     }
 
     // The manager approves; the decision is exposed and the task is cleared.
-    expect((await approveAccessRequest(box.onBehalfOf("primary"), "ext-int", "primary")).kind).toBe(
-      "ok",
-    );
+    expect((await approveAccessRequest(requester, "ext-int", "primary")).kind).toBe("ok");
     await box.eventually(
       () => statusOf(requester, "ext-int"),
       (status) => status === AccessRequestStatus.APPROVED,

@@ -34,9 +34,9 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.access-desk.access";
 
-// An immutable request for access to one protected resource.
+// One access request for a protected resource.
 message AccessRequest {
-  option (entity).kind = AGGREGATE;
+  option (entity).kind = PROCESS_MANAGER;
 
   // The ID of the request.
   AccessRequestId id = 1 [(validate) = true, (set_once) = true];

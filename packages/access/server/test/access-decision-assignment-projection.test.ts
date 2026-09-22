@@ -38,16 +38,18 @@ import {
 import {
   approveAccessRequest,
   cancelAccessRequest,
-  createAccessRequest,
   denyAccessRequest,
+  seed,
+  submitAndAssign,
 } from "./given/access-request.js";
 import { decisionTasks, managerHasTask } from "./given/access-decision-assignment.js";
 
-// The projection reacts to the request aggregate's facts. Each event is produced
-// by posting the aggregate command directly, so the projection is exercised on
-// its own, without the submission process, resource policy, or membership.
+// The projection reacts to the request's lifecycle facts, produced here through
+// the real submission-and-decision path (the only way to create a request now).
 beforeAll(loadAccessContext, 30_000);
 afterEach(closeAccessBlackBoxes);
+
+const twoManagers = { policy: { manager: [{ uuid: "primary" }, { uuid: "second" }] } };
 
 /** Waits until `manager`'s queue holds (or drops) a task for `id`. */
 function awaitTask(box: BlackBox, manager: string, id: string, present: boolean): Promise<boolean> {
@@ -59,22 +61,18 @@ function awaitTask(box: BlackBox, manager: string, id: string, present: boolean)
 }
 
 describe("AccessDecisionAssignmentProjection should", () => {
-  describe("on 'AccessRequestCreated'", () => {
+  describe("on 'AccessRequestSubmitted'", () => {
     it("add the request as a rich task to every candidate manager's queue", async () => {
       const box = await accessBlackBox();
       const requester = box.onBehalfOf(actor);
+      await seed(box, [actor, "primary", "second"], twoManagers);
 
-      await createAccessRequest(requester, "req-created", {
-        candidateManager: ["primary", "second"],
-        resource: resourceUuid,
-      });
+      await submitAndAssign(box, requester, "req-submitted", ["primary", "second"]);
 
-      await awaitTask(box, "primary", "req-created", true);
-      await awaitTask(box, "second", "req-created", true);
-      const rows = await readAll(requester, AccessDecisionAssignmentSchema, "assign-created");
+      const rows = await readAll(requester, AccessDecisionAssignmentSchema, "assign-submitted");
       const task = rows
         .find((row) => row.id?.uuid === "primary")
-        ?.task.find((candidate) => candidate.request?.uuid === "req-created");
+        ?.task.find((candidate) => candidate.request?.uuid === "req-submitted");
       expect(task?.snapshot?.requester?.uuid).toBe(actor);
       // A first-time request carries its resource and level, not an extension.
       const kind = task?.snapshot?.kind;
@@ -83,6 +81,7 @@ describe("AccessDecisionAssignmentProjection should", () => {
         expect(kind.value.resource?.uuid).toBe(resourceUuid);
         expect(kind.value.accessLevel?.name).toBe("Read");
       }
+      expect(await managerHasTask(requester, "second", "req-submitted")).toBe(true);
     });
   });
 
@@ -90,11 +89,8 @@ describe("AccessDecisionAssignmentProjection should", () => {
     it("remove the task from every manager's queue", async () => {
       const box = await accessBlackBox();
       const requester = box.onBehalfOf(actor);
-      await createAccessRequest(requester, "req-approved", {
-        candidateManager: ["primary", "second"],
-      });
-      await awaitTask(box, "primary", "req-approved", true);
-      await awaitTask(box, "second", "req-approved", true);
+      await seed(box, [actor, "primary", "second"], twoManagers);
+      await submitAndAssign(box, requester, "req-approved", ["primary", "second"]);
 
       await approveAccessRequest(requester, "req-approved", "primary");
 
@@ -107,11 +103,8 @@ describe("AccessDecisionAssignmentProjection should", () => {
     it("remove the task from every manager's queue", async () => {
       const box = await accessBlackBox();
       const requester = box.onBehalfOf(actor);
-      await createAccessRequest(requester, "req-denied", {
-        candidateManager: ["primary", "second"],
-      });
-      await awaitTask(box, "primary", "req-denied", true);
-      await awaitTask(box, "second", "req-denied", true);
+      await seed(box, [actor, "primary", "second"], twoManagers);
+      await submitAndAssign(box, requester, "req-denied", ["primary", "second"]);
 
       await denyAccessRequest(requester, "req-denied", "primary", "Insufficient justification.");
 
@@ -124,11 +117,8 @@ describe("AccessDecisionAssignmentProjection should", () => {
     it("remove the task from every manager's queue", async () => {
       const box = await accessBlackBox();
       const requester = box.onBehalfOf(actor);
-      await createAccessRequest(requester, "req-canceled", {
-        candidateManager: ["primary", "second"],
-      });
-      await awaitTask(box, "primary", "req-canceled", true);
-      await awaitTask(box, "second", "req-canceled", true);
+      await seed(box, [actor, "primary", "second"], twoManagers);
+      await submitAndAssign(box, requester, "req-canceled", ["primary", "second"]);
 
       await cancelAccessRequest(requester, "req-canceled");
 
@@ -140,12 +130,11 @@ describe("AccessDecisionAssignmentProjection should", () => {
   it("clears only the decided request, keeping a manager's other tasks", async () => {
     const box = await accessBlackBox();
     const requester = box.onBehalfOf(actor);
-    await createAccessRequest(requester, "req-a", { candidateManager: ["primary"] });
-    await createAccessRequest(requester, "req-b", { candidateManager: ["primary"] });
-    await box.eventually(
-      () => decisionTasks(requester, "primary"),
-      (tasks) => tasks.includes("req-a") && tasks.includes("req-b"),
-    );
+    const teammate = box.onBehalfOf("teammate");
+    await seed(box, [actor, "teammate", "primary"], { policy: { manager: [{ uuid: "primary" }] } });
+    await submitAndAssign(box, requester, "req-a", "primary");
+    // A second requester keeps the same manager busy with an independent request.
+    await submitAndAssign(box, teammate, "req-b", "primary", { requester: { uuid: "teammate" } });
 
     await denyAccessRequest(requester, "req-a", "primary", "Not this time.");
 

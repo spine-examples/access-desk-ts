@@ -69,34 +69,28 @@ Closed For Requests.
 
 ### Request & approval
 
-The two submission commands validate into the same `Access Request Admitted`
-event and then share the `Create Access Request → Access Request Created →
-Access Request Submitted` flow.
+| Owner               | Trigger (actor/event)  | Command                         | Event(s)                           | Rejections                                                                                                                     |
+|---------------------|------------------------| ------------------------------- |------------------------------------|--------------------------------------------------------------------------------------------------------------------------------|
+| Access Request (PM) | Requester              | Submit Access Request           | Access Request Submitted           | Resource Not Requestable; Access Level Not Available; Access Duration Too Long; Duplicate Access Request; No Managers Eligible |
+| Access Request (PM) | Requester              | Submit Access Extension Request | Access Extension Request Submitted | Resource Not Requestable; Access Duration Too Long; No Managers Eligible                                                       |
+| Access Request (PM) | Manager                | Approve Access Request          | Access Request Approved            | Request Already Decided; Self Approval Not Allowed; Manager Not Eligible                                                       |
+| Access Request (PM) | Manager                | Deny Access Request             | Access Request Denied              | Request Already Decided; Self Approval Not Allowed; Manager Not Eligible                                                       |
+| Access Request (PM) | Requester              | Cancel Access Request           | Access Request Canceled            | Request Already Decided                                                                                                        |
 
-| Owner                          | Trigger (actor/event)                | Command                         | Event(s)                          | Rejections                                                                                                                    |
-| ------------------------------ | ------------------------------------ | ------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Access Request Submission (PM) | Requester                            | Submit Access Request           | Access Request Admitted | Resource Not Requestable; Access Level Not Available; Access Duration Too Long; Duplicate Access Request; No Managers Eligible |
-| Access Request Submission (PM) | Requester                            | Submit Access Extension Request | Access Request Admitted | Resource Not Requestable; Access Duration Too Long; No Managers Eligible                                                       |
-| Access Request Submission (PM) | on Access Request Admitted | Create Access Request           | —                                 | —                                                                                                                             |
-| Access Request                 | Access Request Submission (PM)       | Create Access Request           | Access Request Created            | —                                                                                                                             |
-| Access Request Submission (PM) | on Access Request Created            | —                               | Access Request Submitted          | —                                                                                                                             |
-| Access Request                 | Requester                            | Cancel Access Request           | Access Request Canceled           | Request Already Decided                                                                                                       |
-| Access Request                 | Manager                              | Approve Access Request          | Access Request Approved           | Request Already Decided; Self Approval Not Allowed; Manager Not Eligible                                                      |
-| Access Request                 | Manager                              | Deny Access Request             | Access Request Denied             | Request Already Decided; Self Approval Not Allowed; Manager Not Eligible                                                      |
-
-Admission already excludes the requester and every inactive manager from the
+Submission already excludes the requester and every inactive manager from the
 candidate pool, so a decision by an eligible manager normally only risks
-`Request Already Decided`. The aggregate still re-checks the decider against the
+`Request Already Decided`. The process still re-checks the decider against the
 captured pool, so `Self Approval Not Allowed` and `Manager Not Eligible` remain
-as defense-in-depth against a decision command that bypasses admission.
+as defense-in-depth.
 
 Projection inputs and outputs drawn on the board:
 
-- **Access Request View** receives Access Request Created, Access Request
-  Approved, Access Request Denied, and Access Request Canceled — the requester's
-  read model of each request and its status.
-- **Access Decision Assignment** receives Access Request Created, Access Request
-  Approved, Access Request Denied, and Access Request Canceled.
+- **Access Request View** receives Access Request Submitted, Access Extension
+  Request Submitted, Access Request Approved, Access Request Denied, and Access
+  Request Canceled — the requester's read model of each request and its status.
+- **Access Decision Assignment** receives Access Request Submitted, Access
+  Extension Request Submitted, Access Request Approved, Access Request Denied,
+  and Access Request Canceled.
 
 ### Grant issuance — Grant Issuance PM, Access Grant aggregate
 
