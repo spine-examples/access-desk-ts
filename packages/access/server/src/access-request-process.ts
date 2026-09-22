@@ -83,7 +83,7 @@ import {
   NoManagersEligible,
   RequestAlreadyDecided,
   ResourceNotRequestable,
-  SelfApprovalNotAllowed,
+  SelfDecisionNotAllowed,
 } from "@access-desk/access-model/generated/access_desk/access/access_request_rejections.js";
 
 /**
@@ -178,7 +178,7 @@ export class AccessRequestProcessManager extends ProcessManager<
 
   /** Approves a request that has not yet been decided. */
   @Assign
-  @Throws(RequestAlreadyDecided, SelfApprovalNotAllowed, ManagerNotEligible)
+  @Throws(RequestAlreadyDecided, SelfDecisionNotAllowed, ManagerNotEligible)
   approveAccessRequest(command: ApproveAccessRequest): AccessRequestApproved {
     this.assertPending(command.id);
     const snapshot = this.requireSnapshot();
@@ -196,7 +196,7 @@ export class AccessRequestProcessManager extends ProcessManager<
 
   /** Denies a request, with a reason, when it has not yet been decided. */
   @Assign
-  @Throws(RequestAlreadyDecided, SelfApprovalNotAllowed, ManagerNotEligible)
+  @Throws(RequestAlreadyDecided, SelfDecisionNotAllowed, ManagerNotEligible)
   denyAccessRequest(command: DenyAccessRequest): AccessRequestDenied {
     this.assertPending(command.id);
     const snapshot = this.requireSnapshot();
@@ -418,7 +418,7 @@ export class AccessRequestProcessManager extends ProcessManager<
       throw ManagerNotEligible.create({ id: id ?? this.id });
     }
     if (requester !== undefined && equals(PersonIdSchema, requester, decidedBy)) {
-      throw SelfApprovalNotAllowed.create({ id: id ?? this.id });
+      throw SelfDecisionNotAllowed.create({ id: id ?? this.id });
     }
     if (!this.state.candidateManager.some((manager) => equals(PersonIdSchema, manager, decidedBy))) {
       throw ManagerNotEligible.create({ id: id ?? this.id });

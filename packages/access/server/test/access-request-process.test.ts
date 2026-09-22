@@ -41,7 +41,7 @@ import {
   NoManagersEligibleSchema,
   RequestAlreadyDecidedSchema,
   ResourceNotRequestableSchema,
-  SelfApprovalNotAllowedSchema,
+  SelfDecisionNotAllowedSchema,
 } from "@access-desk/access-model/generated/access_desk/access/access_request_rejections_pb.js";
 import {
   SubmitAccessExtensionRequestSchema,
@@ -294,10 +294,10 @@ describe("AccessRequestProcessManager should", () => {
       );
     });
 
-    it("reject the requester deciding their own request ('SelfApprovalNotAllowed')", async () => {
+    it("reject the requester deciding their own request ('SelfDecisionNotAllowed')", async () => {
       const box = await accessBlackBox();
       const requester = await givenPending(box, "req-self");
-      await expectRejection(box, requester, SelfApprovalNotAllowedSchema, () =>
+      await expectRejection(box, requester, SelfDecisionNotAllowedSchema, () =>
         approveAccessRequest(requester, "req-self", actor),
       );
     });
@@ -330,10 +330,10 @@ describe("AccessRequestProcessManager should", () => {
       }
     });
 
-    it("reject the requester deciding their own request ('SelfApprovalNotAllowed')", async () => {
+    it("reject the requester deciding their own request ('SelfDecisionNotAllowed')", async () => {
       const box = await accessBlackBox();
       const requester = await givenPending(box, "req-deny-self");
-      await expectRejection(box, requester, SelfApprovalNotAllowedSchema, () =>
+      await expectRejection(box, requester, SelfDecisionNotAllowedSchema, () =>
         denyAccessRequest(requester, "req-deny-self", actor, "Changed my mind."),
       );
     });
