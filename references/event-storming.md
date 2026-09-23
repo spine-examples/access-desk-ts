@@ -10,10 +10,9 @@ rejections from the Event Storming board. Architecture details belong in
 
 - Identity
 - Resources
-- Audit
 
 Resources owns organizations, membership, resources, policies, requests,
-decisions, grants, and scheduling.
+decisions, grants, scheduling, and audit projections.
 
 ## Identity
 
@@ -100,7 +99,7 @@ Projection inputs and outputs drawn on the board:
 | Grant Expiration (PM) | on Command Rescheduled        | —                                      | Access Grant Expiration Rescheduled | —                 |
 | Access Grant          | Scheduling, due               | Expire Access Grant                    | Access Grant Expired                | —                 |
 
-#### Scheduling (internal Resources component, forward design)
+#### Scheduling
 
 | Owner           | Trigger (actor/event) | Command                            | Event(s)                   |
 | --------------- | --------------------- | ---------------------------------- | -------------------------- |
@@ -112,7 +111,7 @@ Projection inputs and outputs drawn on the board:
 Stored command values carried in the "Schedule Command" sub-notes: **Activate
 Access Grant** and **Expire Access Grant**.
 
-### Audit
+#### Audit
 
 Projections over durable facts, retained in history and redacted. Details in
 `references/architecture.md`.

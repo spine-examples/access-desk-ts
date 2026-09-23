@@ -19,7 +19,7 @@ import {
   type OrganizationId,
 } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
 import { PersonIdSchema } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
-import { equals } from "@access-desk/base/proto";
+import { equals } from "../proto/equals.js";
 import {
   type OrganizationCreated,
   type OrganizationMemberAdded,

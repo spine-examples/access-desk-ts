@@ -15,7 +15,7 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { create } from "@bufbuild/protobuf";
 import { type BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
-import { eventRecording } from "@access-desk/base/testing";
+import { eventRecording } from "../../given/event-recording.js";
 import {
   AccessExtensionRequestSubmittedSchema,
   AccessRequestApprovedSchema,

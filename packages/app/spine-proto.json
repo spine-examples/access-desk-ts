@@ -3,8 +3,7 @@
   "mode": "application",
   "modelPackages": [
     "@access-desk/identity-model",
-    "@access-desk/resources-model",
-    "@access-desk/audit-model"
+    "@access-desk/resources-model"
   ],
   "registryOutput": "generated/model-registry.ts"
 }

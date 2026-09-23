@@ -14,7 +14,7 @@
 
 import { create } from "@bufbuild/protobuf";
 import { Assign, ProcessManager, Throws } from "@spine-event-engine/server";
-import { equals } from "@access-desk/base/proto";
+import { equals } from "../../proto/equals.js";
 import {
   PersonIdSchema,
   type PersonId,

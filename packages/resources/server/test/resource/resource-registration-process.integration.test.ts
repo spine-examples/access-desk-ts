@@ -13,7 +13,7 @@
  */
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { eventRecording } from "@access-desk/base/testing";
+import { eventRecording } from "../given/event-recording.js";
 
 import { ResourceAddedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
 import { ResourceCreatedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/events_pb.js";

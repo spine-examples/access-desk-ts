@@ -31,7 +31,7 @@ import type {
   AccessRequestDenied,
   AccessRequestSubmitted,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
-import { equals } from "@access-desk/base/proto";
+import { equals } from "../../proto/equals.js";
 
 /**
  * One manager's queue of access requests awaiting their decision.

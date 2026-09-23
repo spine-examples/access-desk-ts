@@ -46,12 +46,13 @@ Keep the context fixture under `test/given/`:
 - `<context>-context.ts` — context loading, BlackBox setup, shared identifiers,
   and common reads.
 
-## Reuse shared helpers from `@access-desk/base`
+## Reuse the local helpers
 
-Never copy these across contexts:
+Reuse these instead of re-implementing them per test:
 
-- `@access-desk/base/proto` — `equals(schema, a, b)` for value-message equality.
-- `@access-desk/base/testing` — `eventRecording(actorContext)` returns
+- `src/proto/equals.ts` — `equals(schema, a, b)` for value-message equality
+  (a production helper, also handy in assertions).
+- `test/given/event-recording.ts` — `eventRecording(actorContext)` returns
   `{ recordEvents, expectRejection }`. Bind it once per context with that
   context's `testActorContext`:
   `const { recordEvents, expectRejection } = eventRecording(testActorContext);`.
