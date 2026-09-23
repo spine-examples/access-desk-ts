@@ -25,16 +25,27 @@
  */
 
 import { BoundedContext, EventRouting } from "@spine-event-engine/server";
-import { ResourceAddedSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_events_pb.js";
-import { ResourceDeletedSchema } from "@access-desk/resources-model/generated/access_desk/resources/events_pb.js";
-import { ResourceAlreadyExistsSchema } from "@access-desk/resources-model/generated/access_desk/resources/rejections_pb.js";
-import { OrganizationResourceNameAlreadyUsedSchema } from "@access-desk/resources-model/generated/access_desk/resources/organization_rejections_pb.js";
-import { type ResourceId } from "@access-desk/resources-model/generated/access_desk/resources/identifiers_pb.js";
-import { OrganizationAggregate } from "./organization-aggregate.js";
-import { OrganizationViewProjection } from "./organization-view-projection.js";
-import { ResourceAggregate } from "./resource-aggregate.js";
-import { ResourceCatalogProjection } from "./resource-catalog-projection.js";
-import { ResourceRegistrationProcessManager } from "./resource-registration-process.js";
+import { ResourceAddedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_events_pb.js";
+import { ResourceDeletedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_events_pb.js";
+import { ResourceAlreadyExistsSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_rejections_pb.js";
+import { OrganizationResourceNameAlreadyUsedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_rejections_pb.js";
+import {
+  AccessExtensionRequestSubmittedSchema,
+  AccessRequestApprovedSchema,
+  AccessRequestCanceledSchema,
+  AccessRequestDeniedSchema,
+  AccessRequestSubmittedSchema,
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_events_pb.js";
+import { type ResourceId } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
+import { type PersonId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
+import { OrganizationAggregate } from "./organization/organization-aggregate.js";
+import { OrganizationViewProjection } from "./organization/organization-view-projection.js";
+import { ResourceAggregate } from "./resource/resource-aggregate.js";
+import { ResourceCatalogProjection } from "./resource/resource-catalog-projection.js";
+import { ResourceRegistrationProcessManager } from "./resource/resource-registration-process.js";
+import { AccessRequestProcessManager } from "./access/request/access-request-process.js";
+import { AccessRequestViewProjection } from "./access/request/access-request-view-projection.js";
+import { AccessDecisionAssignmentProjection } from "./access/request/access-decision-assignment-projection.js";
 
 /**
  * Builds the multitenant Resources bounded context.
@@ -56,12 +67,21 @@ export async function createResourcesContext(): Promise<BoundedContext> {
       rejection.resourceId === undefined ? [] : [rejection.resourceId],
     )
     .route(ResourceDeletedSchema, (event) => (event.id === undefined ? [] : [event.id]));
+  const decisionRouting = EventRouting.create<PersonId>()
+    .route(AccessRequestSubmittedSchema, (event) => event.manager)
+    .route(AccessExtensionRequestSubmittedSchema, (event) => event.manager)
+    .route(AccessRequestApprovedSchema, (event) => event.manager)
+    .route(AccessRequestDeniedSchema, (event) => event.manager)
+    .route(AccessRequestCanceledSchema, (event) => event.manager);
   const builder = BoundedContext.multitenant("Resources")
     .withGeneratedRegistryRoot(new URL("..", import.meta.url))
     .add(OrganizationAggregate)
     .add(OrganizationViewProjection)
     .add(ResourceRegistrationProcessManager, { eventRouting: resourceRegistrationProcmanRouting })
     .add(ResourceAggregate)
-    .add(ResourceCatalogProjection);
+    .add(ResourceCatalogProjection)
+    .add(AccessRequestProcessManager)
+    .add(AccessRequestViewProjection)
+    .add(AccessDecisionAssignmentProjection, { eventRouting: decisionRouting });
   return builder.buildAsync();
 }

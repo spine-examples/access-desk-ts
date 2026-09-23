@@ -33,17 +33,21 @@ runtime baseline is Node.js 24 or newer, pnpm 11.9, strict TypeScript, and ESM.
 
 ## System shape
 
-The system has five bounded contexts:
+The system has three bounded contexts:
 
-| Bounded context | Owns                                                                                            | Tenant mode                        |
-| --------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------- |
-| Identity        | Global users, registration, authentication identity, user activity                              | Global/single-tenant control plane |
-| Resources       | Organizations, memberships, resources, ordered access levels, resource managers, request policy | Organization-scoped                |
-| Access          | Requests, approval decisions, grants, extensions, revocation, access-facing projections         | Organization-scoped                |
-| Scheduling      | Durable, universal dispatch of allowlisted application commands                                 | Organization-scoped                |
-| Audit           | Immutable, redacted audit projections built from durable integration facts                      | Organization-scoped                |
+| Bounded context | Owns                                                                                                                                                                                                    | Tenant mode                        |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| Identity        | Global users, registration, authentication identity, user activity                                                                                                                                      | Global/single-tenant control plane |
+| Resources       | Organizations, memberships, resources, ordered access levels, resource managers, request policy, requests, approval decisions, grants, extensions, revocation, and the durable scheduling those rely on | Organization-scoped                |
+| Audit           | Immutable, redacted audit projections built from durable integration facts                                                                                                                              | Organization-scoped                |
 
-An initial deployment may co-host all five contexts in one Node.js application.
+Resources is a single organization-scoped context that owns the whole request-
+and-approval domain. What earlier drafts split into separate Access and
+Scheduling contexts is now internal to Resources: the request, approval, grant,
+extension, and revocation lifecycles, and the durable command scheduling that
+serves them, are components of Resources rather than contexts of their own.
+
+An initial deployment may co-host all three contexts in one Node.js application.
 Co-location does not weaken the boundaries: each context must have its own model
 package, generated module, `BoundedContext` instance, repositories, storage
 layout, handlers, and ownership. Direct cross-context entity, repository, or
@@ -53,20 +57,15 @@ application-service calls are forbidden.
 flowchart LR
   Identity -->|global identity facts| Fanout[Tenant fan-out adapter]
   Fanout -->|tenant-scoped identity facts| Resources
-  Resources -->|policy and membership facts| Access
-  Access -->|grant facts and scheduling intents| Scheduling
-  Scheduling -->|schedule confirmations| Access
   Fanout -->|tenant-scoped identity facts| Audit
   Resources -->|durable facts| Audit
-  Access -->|durable facts| Audit
-  Scheduling -->|durable facts| Audit
 ```
 
 Cross-context state propagation and lifecycle choreography use versioned
 external events. Commands are domestic to their receiving context. Sending a
-due command is the explicit exception to event-based integration: the
-`Scheduling` process posts it through the supplied same-server client, and it
-re-enters the target through normal command ingress. Shared packages may contain
+due scheduled command is the explicit exception to event-based integration: the
+Resources scheduling component posts it through the supplied same-server client,
+and it re-enters its target through normal command ingress. Shared packages may contain
 wire contracts and value types, but never another context's behavior or mutable
 state. Each context owns its cross-context event contracts in its own model
 package; a consumer depends on the publishing context's model for those schemas
@@ -77,7 +76,7 @@ and declares its external-event receptors internally.
 Organization is the tenant.
 
 - `PersonId` is globally stable and is not an email address.
-- A user may have active memberships in multiple organizations.
+- A user may have memberships in multiple organizations.
 - Every tenant-scoped request, query, subscription, scheduled item, inbox row,
   outbox row, and audit record carries exactly one `OrganizationId` represented
   at the Spine boundary as the authoritative `TenantId`.
@@ -87,9 +86,8 @@ Organization is the tenant.
 - A trusted gateway resolves the opaque server-side session into the actor and
   active organization. Client command fields must not be trusted as actor or
   tenant authority.
-- Resources, Access, Scheduling, and Audit are multitenant. Identity remains a
-  global context and publishes global identity facts to durable integration
-  infrastructure.
+- Resources and Audit are multitenant. Identity remains a global context and
+  publishes global identity facts to durable integration infrastructure.
 - Roles and permissions are organization-scoped. A role in one organization
   confers no authority in another.
 - Storage namespaces and context-prefixed kinds provide defense in depth; they
@@ -107,7 +105,7 @@ Authority in Access Desk takes two forms, both organization-scoped.
 
 A **role** is standing authority a person holds in the organization itself,
 independent of any single resource or request. The roles are Organization
-Member — the baseline active participant, who may act as a requester — Auditor,
+Member — the baseline participant, who may act as a requester — Auditor,
 with read-only access to the audit timeline, and an organization administration
 role that provisions the organization and its membership. This is role-based
 access control.
@@ -136,16 +134,15 @@ domain invariant, and a caller-supplied identifier is never authority.
 
 A single-tenant Spine event has no tenant and cannot be delivered directly to a
 multitenant entity handler. Raw Identity events therefore never flow directly
-into Resources, Access, Scheduling, or Audit.
+into Resources or Audit.
 
 The durable integration layer maintains a technical `PersonId` to
 `OrganizationId` fan-out index from tenant-scoped Resources membership facts.
-When Identity publishes a relevant global activity/disablement fact, the
-adapter emits one derived, tenant-scoped integration fact for each known active
-membership. Each derivative has a stable ID based on the source integration ID
-and organization, so retries are idempotent. Resources consumes that external
-fact and issues a domestic command to update its authoritative membership;
-Access consumes only the resulting tenant-scoped Resources membership facts.
+When Identity publishes a relevant global identity fact, the adapter emits one
+derived, tenant-scoped integration fact for each known membership. Each
+derivative has a stable ID based on the source integration ID and organization,
+so retries are idempotent. Resources and Audit consume those facts where their
+domain behavior requires them; membership has no separate activity lifecycle.
 
 This adapter is an anti-corruption/routing component, not a sixth domain bounded
 context. It owns no membership policy and cannot invent organizations. Missing
@@ -180,14 +177,14 @@ If resource creation itself reports `Resource Already Exists`, it emits the same
 failure fact and deletes its process state. The rejected resource is never
 recorded in the organization.
 
-Its **policy** is the access decision rules that Access consumes, and includes:
+Its **policy** is the access decision rules the request-and-approval process
+consumes, and includes:
 
 - whether new requests are open;
 - the data-sensitivity classification;
 - one or more resource managers;
 - ordered, resource-specific access levels;
-- maximum permitted duration;
-- a monotonically increasing policy version.
+- maximum permitted duration.
 
 A resource's **managers** are its resource-scoped relation: any manager may decide
 the resource's access requests, revoke and remediate its grants, and open or close
@@ -197,15 +194,15 @@ resource is created and always number at least one. Authority is scoped to the
 resource, never the organization; there is no organization-wide access
 administrator.
 
-Resources publishes complete policy and membership facts; policy facts carry a
-monotonically increasing version. Access maintains local monotonic projections
-and must not query Resources synchronously while deciding a command. Stale or
-duplicate policy facts cannot roll a local projection back.
+Because requests, approvals, and policy live in one context, the
+request-and-approval process reads `ResourceCatalogItem` directly rather than
+mirroring policy from external facts. The request captures the policy facts it
+needs at admission so a later decision does not depend on subsequent policy
+changes.
 
 Closing a resource prevents new requests. Requests already accepted while the
 resource was open remain eligible for decision. The request captures the policy
-facts necessary to explain and complete that decision; current membership and
-actor activity are still rechecked for actions that require current authority.
+facts necessary to explain and complete that decision.
 
 Access levels are ordered only within their resource. The ordering supports
 same-or-stronger access checks; it is not a universal permissions language.
@@ -217,7 +214,7 @@ time requires canceling/closing the existing request and submitting a new one.
 
 Submission must enforce all the following:
 
-- The requester is an active member of the tenant organization.
+- The requester is a member of the tenant organization.
 - The resource belongs to that organization and was open when the request was
   accepted.
 - The requested level is offered by that resource.
@@ -238,15 +235,12 @@ business rejection. Immediate requests retain a duration; overlap that can only
 be known after an approval time is established must be revalidated before a
 grant is created.
 
-Any current manager captured in the admitted pool may decide a pending request;
-no approver is assigned. Admission captures active nonrequester managers in
-policy order. The decider's current organization membership must be active.
-Self-approval is forbidden: a manager who is the requester of a request
-may not decide it, so a resource whose sole manager raises a request needs
-another active manager to decide it. Admission rejects a request when no active
-nonrequester manager remains. Approval or denial is terminal and happens
-at most once. Denial requires a reason. Concurrent decisions are resolved
-by the aggregate transaction so only one fact is accepted.
+Any manager captured from the resource policy may decide a pending request; no
+approver is assigned. Admission preserves policy order and removes duplicate
+manager identifiers. A requester who is also a manager may decide their own
+request. Approval or denial is terminal and happens at most once. Denial
+requires a reason. Concurrent decisions are resolved by the aggregate
+transaction so only one fact is accepted.
 
 ## Request and grant lifecycles
 
@@ -262,9 +256,9 @@ required facts exist.
 
 Scheduled and active grants may be revoked by any current manager of the granting
 resource. Revocation authority is scoped to that resource, not the organization.
-Revocation requires a reason. Revoked or expired grants never reactivate. Access
-is authoritative: a stale due command after revocation or expiry is an idempotent
-no-op.
+Revocation requires a reason. Revoked or expired grants never reactivate. The
+grant lifecycle is authoritative: a stale due command after revocation or expiry
+is an idempotent no-op.
 
 An extension:
 
@@ -297,9 +291,9 @@ A scheduled request stores an explicit requested interval `[S,E)`. When
 approval is accepted at `A`:
 
 - `A < S`: create the grant pending scheduling; it becomes scheduled only after
-  Scheduling confirms persistence.
+  the scheduling component confirms persistence.
 - `S <= A < E`: activation is due immediately and uses the same direct domestic
-  activation command as an immediate request, not the Scheduling context.
+  activation command as an immediate request, not the scheduling component.
   Preserve requested `S` and `E` for history, but effective access begins at `A`
   and ends at `E`.
 - `A >= E`: create the explicit expired-without-activation outcome. Never
@@ -308,7 +302,7 @@ approval is accepted at `A`:
 Normal expiration and expiration without activation are distinct facts. When a
 due activation command is current and tenant-valid, with matching schedule ID,
 schedule revision, and dispatch ID, and its grant is still eligible, but the
-injected clock is now at or after the requested end `E`, Access atomically
+injected clock is now at or after the requested end `E`, Resources atomically
 records the existing expired-without-activation terminal outcome exactly once.
 It neither activates the grant nor creates activation or expiration scheduling
 work. Duplicate commands after that terminal outcome, and stale, revision-mismatched,
@@ -320,11 +314,13 @@ For maximum-total-lifetime checks after a delayed scheduled approval, use the
 actual effective activation time through the proposed new end, while preserving
 the originally requested interval for audit.
 
-## Scheduling bounded context
+## Scheduling (internal Resources component)
 
-Scheduling is a separate multitenant bounded context with a single stateful
-`Scheduling` Process Manager that owns one planned command and manages its
-scheduling lifecycle.
+Scheduling is an internal component of Resources, not a context of its own: a
+single stateful `Scheduling` Process Manager that owns one planned command and
+manages its scheduling lifecycle. Because it lives inside Resources, the grant
+facts it reacts to and the scheduling facts it emits are domestic Resources
+events rather than cross-context integration facts.
 
 The process persists an allowlisted **application command value** in Protobuf
 `Any` together with its schedule ID, authoritative organization, approved
@@ -335,16 +331,16 @@ never supplies a trusted tenant, actor, target route, or credentials.
 
 The required choreography is:
 
-1. Access commits a genuine fact such as `AccessGrantCreated` with a
+1. Resources commits a genuine fact such as `AccessGrantCreated` with a
    pending-scheduling status and activation/expiration scheduling intents.
-2. The `Scheduling` process consumes that external Access fact and accepts the
+2. The `Scheduling` process reacts to that Resources fact and accepts the
    corresponding domestic `ScheduleCommand`.
 3. The process persists the planned command and emits `CommandScheduled` only
    after that state is durable.
-4. Access consumes the scheduling confirmation and establishes scheduled state
-   only after every required schedule is confirmed. Active state additionally
-   requires successful handling and the resulting fact from the target
-   activation command.
+4. The grant lifecycle consumes the scheduling confirmation and establishes
+   scheduled state only after every required schedule is confirmed. Active state
+   additionally requires successful handling and the resulting fact from the
+   target activation command.
 5. When the due time passes, the same `Scheduling` process sends its stored
    command through the tenant-aware client supplied by the application. The
    client sends the command to the same server, and the target receives an
@@ -352,10 +348,11 @@ The required choreography is:
 
 The process accepts `ScheduleCommand`, `RescheduleCommand`, and
 `CancelScheduledCommand`, and emits `CommandScheduled`, `CommandRescheduled`,
-and `ScheduledCommandCanceled`. Extension approval is a genuine Access fact
-consumed by Scheduling, which reschedules domestically and confirms it; Access
-applies the extension only after confirmation. Revocation is authoritative in
-Access and emits a fact that Scheduling consumes to cancel domestically.
+and `ScheduledCommandCanceled`. Extension approval is a genuine grant fact the
+`Scheduling` process reacts to, rescheduling domestically and confirming it; the
+grant applies the extension only after confirmation. Revocation is authoritative
+in the grant lifecycle and emits a fact the `Scheduling` process reacts to,
+canceling domestically.
 
 The allowlist fixes the command schema and target route for each approved type
 and purpose. The payload cannot select an endpoint, context, actor, or tenant.
@@ -371,8 +368,9 @@ schedule/reschedule/cancel and direct activate/expire commands; the capability
 is purpose-bound to the fixed route.
 
 No item may be named or presented as scheduled before the `Scheduling` process
-has persisted it. A suffix such as "requested" is unnecessary for Access facts;
-they should describe the real Access state that caused a scheduling intent.
+has persisted it. A suffix such as "requested" is unnecessary for the grant
+facts that drive scheduling; they should describe the real grant state that
+caused a scheduling intent.
 
 ## Audit
 

@@ -11,8 +11,8 @@
   "scripts": {
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "generate:models": "pnpm --dir packages/identity/model run generate && pnpm --dir packages/resources/model run generate && pnpm --dir packages/access/model run generate && pnpm --dir packages/scheduling/model run generate && pnpm --dir packages/audit/model run generate",
-    "generate:contexts": "pnpm --dir packages/identity/server run compose && pnpm --dir packages/identity/server run handlers && pnpm --dir packages/resources/server run compose && pnpm --dir packages/resources/server run handlers && pnpm --dir packages/access/server run compose && pnpm --dir packages/access/server run handlers && pnpm --dir packages/scheduling/server run compose && pnpm --dir packages/scheduling/server run handlers && pnpm --dir packages/audit/server run compose && pnpm --dir packages/audit/server run handlers",
+    "generate:models": "pnpm --dir packages/identity/model run build && pnpm --dir packages/resources/model run build && pnpm --dir packages/audit/model run build",
+    "generate:contexts": "pnpm --dir packages/identity/server run compose && pnpm --dir packages/identity/server run handlers && pnpm --dir packages/resources/server run compose && pnpm --dir packages/resources/server run handlers && pnpm --dir packages/audit/server run compose && pnpm --dir packages/audit/server run handlers",
     "generate:app": "pnpm --dir packages/app run compose",
     "generate": "pnpm run generate:models && pnpm run generate:contexts && pnpm run generate:app",
     "build": "pnpm -r run build",

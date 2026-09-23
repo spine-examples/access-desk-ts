@@ -1,0 +1,107 @@
+//
+// Copyright 2026, TeamDev. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Redistribution and use in source and/or binary forms, with or without
+// modification, must retain the above copyright notice and the following
+// disclaimer.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+
+syntax = "proto3";
+
+package accessdesk.resources.access.request;
+
+import "accessdesk/resources/identifiers.proto";
+import "accessdesk/resources/values.proto";
+import "accessdesk/identity/identifiers.proto";
+import "spine/options.proto";
+
+option (type_url_prefix) = "type.accessdesk";
+
+// One access request for a protected resource, driven from submission to a
+// terminal decision.
+//
+// 1. A submission is validated against the resource's request policy, and the
+//    resource managers who may decide it are captured.
+// 2. The accepted request is assigned to those managers for a decision.
+// 3. A manager approves or denies it, or the requester cancels it.
+//
+message AccessRequest {
+  option (entity).kind = PROCESS_MANAGER;
+
+  // The ID of the request.
+  accessdesk.resources.AccessRequestId id = 1;
+
+  // The immutable request details.
+  accessdesk.resources.AccessRequestSnapshot snapshot = 2;
+
+  // The resource managers who may decide this request.
+  repeated accessdesk.identity.PersonId manager = 3;
+
+  // The lifecycle status.
+  accessdesk.resources.AccessRequestStatus status = 4;
+}
+
+// One access request as clients read it, tracking its lifecycle from submission
+// to a terminal decision.
+message AccessRequestView {
+  option (entity).kind = PROJECTION;
+  option (entity).visibility = FULL;
+
+  // The request this view describes.
+  accessdesk.resources.AccessRequestId id = 1;
+
+  // The immutable request details.
+  accessdesk.resources.AccessRequestSnapshot snapshot = 2;
+
+  // The resource managers who may decide this request.
+  repeated accessdesk.identity.PersonId manager = 3;
+
+  // The lifecycle status.
+  accessdesk.resources.AccessRequestStatus status = 4;
+}
+
+// The pending decisions assigned to one manager.
+//
+// A manager's queue of requests to decide, keyed by the manager; the
+// organization is the tenant. A request appears in the queue while it is
+// pending and leaves it as soon as the request reaches a terminal decision.
+//
+message AccessDecisionAssignment {
+  option (entity).kind = PROJECTION;
+  option (entity).visibility = FULL;
+
+  // The manager who must decide these requests.
+  accessdesk.identity.PersonId id = 1;
+
+  // The requests currently awaiting this manager's decision.
+  repeated AccessDecisionTask task = 2;
+
+  // One request awaiting a manager's approval decision.
+  message AccessDecisionTask {
+
+    // The request to decide.
+    accessdesk.resources.AccessRequestId request = 1 [(required) = true];
+
+    // The full immutable request details — resource, level, justification,
+    // period, requester, and (for an extension request) the grant it extends.
+    accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
+  }
+}

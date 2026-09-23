@@ -34,7 +34,10 @@ the **first** parameter, e.g. `@Subscribe onX(e: External<SomeEvent>)`.
    PROJECTION | PROCESS_MANAGER` (use the `protobuf-style` skill). The entity id
    is the **first field**; a message id can be a primitive wrapper or any value
    object.
-2. Generate the model, then write the decorated class in `packages/<ctx>/server/src`.
+2. Generate the model, then write the decorated class under the matching domain
+   path in `packages/<ctx>/server/src` (for example,
+   `src/access/request/access-request-process.ts` mirrors
+   `model/proto/accessdesk/resources/access/request/`).
 3. Register it in the context factory: `.add(EntityClass)` (or
    `.add(EntityClass, { eventRouting })` for exact routing). Re-run the context
    `server`'s `compose` + `handlers`.

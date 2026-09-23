@@ -12,15 +12,18 @@ Runtime baseline: **Node ≥ 24, pnpm 11.9, strict TypeScript, ESM**.
 
 ## Bounded contexts
 
-Five contexts (`references/architecture.md`):
+Three contexts (`references/architecture.md`):
 
-| Context    | Owns                                                    | Tenancy                  |
-| ---------- | ------------------------------------------------------- | ------------------------ |
-| Identity   | Global users, registration, auth identity               | Global / single-tenant   |
-| Resources  | Organizations, membership, resources, policy, managers  | Org-scoped (multitenant) |
-| Access     | Requests, approvals, grants, extensions, revocation     | Org-scoped (multitenant) |
-| Scheduling | Durable dispatch of allowlisted commands                | Org-scoped (multitenant) |
-| Audit      | Immutable, redacted audit projections                   | Org-scoped (multitenant) |
+| Context    | Owns                                                                                                                   | Tenancy                  |
+| ---------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| Identity   | Global users, registration, auth identity                                                                             | Global / single-tenant   |
+| Resources  | Organizations, membership, resources, policy, managers, requests, approvals, grants, extensions, revocation, scheduling | Org-scoped (multitenant) |
+| Audit      | Immutable, redacted audit projections                                                                                 | Org-scoped (multitenant) |
+
+Resources owns the whole request-and-approval domain. What earlier drafts split
+into separate Access and Scheduling contexts is now internal to Resources; the
+request-and-approval process reads Resources' own read models directly rather
+than mirroring them.
 
 **Organization = tenant:** every tenant-scoped message carries one `OrganizationId`
 as the `TenantId`. `CreateOrganization` is issued in the tenant scope of the org it
@@ -34,22 +37,27 @@ Each context is **two packages** under `packages/<context>/`:
 packages/
   identity/    { model, server }      # global / single-tenant
   resources/   { model, server }
-  access/      { model, server }
-  scheduling/  { model, server }
   audit/       { model, server }
   app/                                # composition root: complete registry + (later) Server assembly, gateway, fan-out
   web/                                # React + Vite browser client (later iterations)
 ```
 
 - **`<context>/model`** — `@access-desk/<context>-model`, `spine-proto.json` `mode: "model"`.
-  Owns canonical `.proto` under `proto/access_desk/<context>/` and the generated
-  `ProtoModule`. Pure wire contracts, no behavior.
+  Owns canonical `.proto` under `proto/accessdesk/<context>/` and the generated
+  `ProtoModule`. Pure wire contracts, no behavior. Resources subdivides its protos
+  into per-area folders (`organization/`, `resource/`, `access/request/`), each its
+  own proto sub-package under `accessdesk.resources.*`, with shared `identifiers.proto`
+  and `values.proto` at the top level. Entity-owned filenames remain fully
+  qualified inside those folders, such as `resource/resource_commands.proto` and
+  `resource/resource_registration.proto`.
 - **`<context>/server`** — `@access-desk/<context>-server`, `spine-proto.json`
-  `mode: "application"`. Holds the context's decorated handlers (aggregates,
-  projections, process managers) in `src/`, its `create<Context>Context()` factory,
-  and its BlackBox tests in `test/`. It is an _application_ package because
+  `mode: "application"`. Its `src/` and `test/` directories mirror the model's
+  domain folders; only the context factory, public index, and context-wide test
+  helpers remain at their roots. It holds decorated handlers (aggregates,
+  projections, process managers), its `create<Context>Context()` factory, and
+  BlackBox tests. It is an _application_ package because
   `spine-proto handlers` discovers decorated classes only in the package that runs it.
-- **`app`** — `@access-desk/app`, `mode: "application"`, composes **all five** context
+- **`app`** — `@access-desk/app`, `mode: "application"`, composes **all three** context
   models into the complete application `TypeRegistry`; will assemble the `Server`
   (`Server.add(ctx)` per context), the gateway, and the Identity→tenant fan-out.
 - **`web`** — `@access-desk/web`, the React/Vite client.
@@ -92,7 +100,8 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
 ## Testing model
 
 - BlackBox tests (`@spine-event-engine/testing`) exercise one built context through a
-  local server and the public client. They live in `packages/<ctx>/server/test/*.test.ts`.
+  local server and the public client. They live under the matching domain path in
+  `packages/<ctx>/server/test/`.
 - **They import the context from compiled `dist/`** (`await import("../dist/src/index.js")`)
   because vitest cannot execute Spine's standard decorators from raw TypeScript source.
 - The **root `vitest.config.ts`** is the only vitest config: it includes all packages'

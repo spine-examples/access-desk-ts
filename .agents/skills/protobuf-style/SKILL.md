@@ -9,16 +9,16 @@ description: >
 # Protobuf Style
 
 Conventions for every `.proto` in
-`packages/<context>/model/proto/access_desk/<context>/`.
+`packages/<context>/model/proto/accessdesk/<context>/`.
 
 ## File layout (in this order)
 
 1. Single-line `//` copyright header (see below).
 2. blank line, then `syntax = "proto3";`
-3. blank line, then `package access_desk.<context>;`
+3. blank line, then `package accessdesk.<context>;`
 4. blank line, then imports — one per line (`google/...` first, then `spine/...`
-   and cross-file `access_desk/...`).
-5. blank line, then `option (type_url_prefix) = "type.access-desk.<context>";`
+   and cross-file `accessdesk/...`).
+5. blank line, then `option (type_url_prefix) = "type.accessdesk";`
 6. blank line, then the messages.
 
 - **2-space** indentation.
@@ -65,8 +65,8 @@ proto-only.)
 
 ## `type_url_prefix`
 
-`type.access-desk.<context-name>` — e.g. `type.access-desk.resources`. Present
-only in files that declare messages.
+Use the shared prefix `type.accessdesk` in every file that declares messages.
+Do not append a bounded-context, package, or other type suffix.
 
 ## Documentation comments
 
@@ -104,7 +104,7 @@ Multi-line doc (trailing `//`):
 message CreateOrganization {
 
   // The identifier of the organization to create.
-  OrganizationId id = 1 [(validate) = true];
+  OrganizationId id = 1;
 }
 ```
 
@@ -120,18 +120,15 @@ message OrganizationCreated {
 ## File naming
 
 - Split contracts by role **and by aggregate/purpose**, not one file per role.
-  The context's **main** entity — the one whose name matches the context — uses
-  the bare `commands.proto` / `events.proto` / `rejections.proto` (Resource in the
-  Resources context). Every other aggregate or process takes a prefix:
-  `<name>_commands.proto`, `<name>_events.proto`, `<name>_rejections.proto` (e.g.
-  `organization_commands.proto`, `resource_creation_commands.proto`). Plus shared
-  `identifiers.proto` / `values.proto` and a state file per entity
-  (`organization.proto`, `resource.proto`, `resource_creation.proto`). Group a
-  command/event with the aggregate that handles/emits it (`AddResource` and
-  `ResourceAdded` are the Organization's, so they live in the `organization_*`
-  files). The framework classifies by file **suffix** — `commands`/`_commands`,
-  `events`/`_events`, `rejections`/`_rejections` — so the prefix is free but the
-  suffix is load-bearing.
+  Every entity-owned filename includes the entity's full name even when its
+  directory already carries that name: `organization.proto`,
+  `organization_commands.proto`, `organization_events.proto`, and
+  `organization_rejections.proto`; `resource_registration.proto` rather than
+  `registration.proto`. Shared `identifiers.proto` and `values.proto` are the
+  exceptions. Group a command/event with the aggregate that handles/emits it
+  (`AddResource` and `ResourceAdded` are the Organization's, so they live in the
+  `organization_*` files). The framework classifies by the `_commands`,
+  `_events`, and `_rejections` suffixes, so those suffixes are load-bearing.
 - **Where an enum lives.** A plain enum goes in the general shared file with the
   value objects it serves (`values.proto`). Give an enum its own file only when
   it is _special_ — carrying custom options and helper logic. Rule of
@@ -173,8 +170,10 @@ skill).
   more fields, as rich as the identity needs. **Name each field for what it
   holds:** `uuid` for an opaque, system-generated id, `value` for a human-readable
   dash-case slug, or a composite of several fields for a naturally compound identity.
-- Aggregate state: `option (entity).kind = AGGREGATE;`, id
-  `[(validate) = true, (set_once) = true]`.
+- Aggregate state: `option (entity).kind = AGGREGATE;`.
+- Do not put `(validate)` on ID-typed fields. Presence may still be expressed
+  with `(required)` where the contract requires it.
+- Do not use `(set_once)` on any field.
 - Projection state: `option (entity).kind = PROJECTION;` and
   `option (entity).visibility = FULL;`; put `(column) = true` only on fields that
   real queries filter or sort by.
@@ -183,8 +182,8 @@ skill).
 
 ## Evolution & generation
 
-- **Append-only.** Never reuse or renumber a field number or enum value; on
-  removal, reserve the number **and** the name inside the owning message/enum.
+- Until the first deployed compatibility baseline, keep fields and enum values
+  in sequential numeric order after every change.
 - **Never hand-edit generated output** (`generated/`, `spine-proto-manifest.json`).
   Regenerate via the pipeline after any `.proto` change (`pnpm run generate`, or
   `pnpm run verify`). Generated files intentionally carry no copyright header.

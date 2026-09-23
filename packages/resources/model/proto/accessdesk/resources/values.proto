@@ -1,0 +1,214 @@
+//
+// Copyright 2026, TeamDev. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Redistribution and use in source and/or binary forms, with or without
+// modification, must retain the above copyright notice and the following
+// disclaimer.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+
+syntax = "proto3";
+
+package accessdesk.resources;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "accessdesk/resources/identifiers.proto";
+import "accessdesk/identity/identifiers.proto";
+import "spine/options.proto";
+
+option (type_url_prefix) = "type.accessdesk";
+
+// A person's membership in an organization.
+message OrganizationMember {
+  // The person who belongs to the organization.
+  accessdesk.identity.PersonId person = 1 [(required) = true];
+
+  // The member's display name.
+  string name = 2 [(required) = true];
+
+}
+
+// A resource owned by an organization.
+message OrganizationResource {
+
+  // The owned resource.
+  ResourceId id = 1 [(required) = true];
+
+  // The resource's display name.
+  string name = 2 [(required) = true];
+}
+
+// A named degree of access that one resource grants.
+//
+// Access levels are resource-specific: each resource defines its own levels and
+// their ordering. They are ranked only against the other levels of the same
+// resource, from weakest to strongest, which supports same-or-stronger checks.
+//
+message AccessLevel {
+
+  // The level's name, unique within its resource and compared
+  // case-insensitively - for example "Viewer", "Contributor", or "Administrator".
+  //
+  string name = 1 [(required) = true];
+
+  // The level's strength within its resource; a higher rank is stronger.
+  //
+  // Ranks are meaningful only among one resource's own levels and impose no
+  // ordering across resources.
+  //
+  uint32 rank = 2 [(min).value = "1"];
+
+  // A plain description of what the level permits, shown when a requester
+  // chooses a level.
+  //
+  string description = 3;
+}
+
+// The rules that govern access to a resource.
+message ResourcePolicy {
+  // Whether the resource is currently accepting new access requests.
+  bool open_for_requests = 1;
+
+  // The data-sensitivity classification of the resource.
+  Sensitivity sensitivity = 2;
+
+  // The people who manage the resource: any one of them may decide its access
+  // requests and revoke its grants.
+  //
+  // A resource always has at least one manager, set when the resource is created.
+  //
+  repeated accessdesk.identity.PersonId manager = 3 [(required) = true];
+
+  // The access levels the resource offers, ordered from weakest to strongest.
+  repeated AccessLevel access_level = 4 [(required) = true, (validate) = true];
+
+  // The longest access grant the resource permits, at one-minute granularity.
+  google.protobuf.Duration maximum_duration = 5 [(required) = true];
+
+}
+
+// The data-sensitivity classification of a resource.
+enum Sensitivity {
+
+  // The unset sensitivity.
+  S_UNSPECIFIED = 0;
+
+  // Internal information, the least sensitive class.
+  INTERNAL = 1;
+
+  // Restricted information.
+  RESTRICTED = 2;
+
+  // Confidential information, the most sensitive class.
+  CONFIDENTIAL = 3;
+}
+
+// The lifecycle outcome of an access request.
+enum AccessRequestStatus {
+
+  // The unset request status.
+  ARS_UNSPECIFIED = 0;
+
+  // The request awaits a manager's decision.
+  PENDING = 1;
+
+  // The request was approved.
+  APPROVED = 2;
+
+  // The request was denied.
+  DENIED = 3;
+
+  // The requester canceled the request.
+  CANCELED = 4;
+}
+
+// A scheduled half-open access interval.
+message ScheduledAccessPeriod {
+
+  // The inclusive scheduled start.
+  google.protobuf.Timestamp start = 1;
+
+  // The exclusive scheduled end.
+  google.protobuf.Timestamp end = 2;
+}
+
+// The requested access period, either immediate or scheduled.
+message AccessPeriod {
+
+  // The mutually exclusive period kind.
+  oneof kind {
+
+    // The fixed scheduled half-open interval.
+    ScheduledAccessPeriod scheduled = 1;
+
+    // The requested duration for access beginning after approval.
+    google.protobuf.Duration immediate_duration = 2;
+  }
+}
+
+// The details specific to a first-time request for access to a resource.
+message NewAccessRequest {
+
+  // The requested resource.
+  ResourceId resource = 1 [(required) = true];
+
+  // The authoritative resource-specific level accepted from the resource policy.
+  AccessLevel access_level = 2 [(required) = true, (validate) = true];
+
+  // The requested access period.
+  AccessPeriod period = 3 [(required) = true];
+}
+
+// The details specific to a request to extend access already granted.
+message AccessExtension {
+
+  // The grant whose access this request extends.
+  AccessGrantId grant = 1 [(required) = true];
+
+  // The additional access duration requested.
+  google.protobuf.Duration duration = 2 [(required) = true];
+}
+
+// The immutable business details of an accepted access request.
+//
+// The requester and justification are common to every request. The `kind`
+// captures the details unique to each: a first-time access request carries a
+// resource, level, and period; an access-extension request carries the grant it
+// extends and the additional duration.
+//
+message AccessRequestSnapshot {
+
+  // The person requesting access.
+  accessdesk.identity.PersonId requester = 1 [(required) = true];
+
+  // The requester's meaningful business justification.
+  string justification = 2 [(required) = true];
+
+  // The kind-specific request details.
+  oneof kind {
+
+    // A first-time request for access.
+    NewAccessRequest new_request = 3 [(validate) = true];
+
+    // A request to extend access already granted.
+    AccessExtension extension = 4 [(validate) = true];
+  }
+}

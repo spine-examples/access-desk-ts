@@ -63,8 +63,6 @@ reasonable starting shape is:
 packages/
   identity/{model,server}/
   resources/{model,server}/
-  access/{model,server}/
-  scheduling/{model,server}/
   audit/{model,server}/
   app/
   web/
@@ -85,7 +83,7 @@ Generate dependencies first. From each affected `mode: "model"` package, in
 dependency order, run generation from that package's working directory:
 
 ```sh
-(cd packages/access/model && spine-proto generate)
+(cd packages/resources/model && spine-proto generate)
 ```
 
 After the required model manifests exist, generate each affected context's
@@ -93,8 +91,8 @@ handlers from its `server` package, then compose the complete application
 TypeRegistry from the `app` package:
 
 ```sh
-(cd packages/access/server && spine-proto compose)
-(cd packages/access/server && spine-proto handlers)
+(cd packages/resources/server && spine-proto compose)
+(cd packages/resources/server && spine-proto handlers)
 (cd packages/app && spine-proto compose)
 ```
 
@@ -115,7 +113,7 @@ For one model to import another's `.proto` (e.g. Resources using Identity's
 the consumer model's `spine-proto.json` `dependencies` **and** to its
 `package.json` `dependencies`, then `pnpm install`; declare
 transitive proto deps too (Access declares both Resources and Identity).
-Reference cross-package types by full proto path (`access_desk.identity.PersonId`).
+Reference cross-package types by full proto path (`accessdesk.identity.PersonId`).
 Authored helper TS (e.g. enum-option accessors) lives in a model's `src/`; add
 `src/**/*.ts` to that package's tsconfig `include` and an `exports` subpath.
 
@@ -134,7 +132,7 @@ fires asynchronously and never reaches the post outcome. Validation errors ack
 
 **Declare every rejection a command handler may throw with `@Throws(Companion)`**
 — the generated rejection companion, e.g. `@Throws(ResourceNameAlreadyUsed)`, on
-the `@Assign`/`@Command` method. The runtime refuses an *undeclared* thrown
+the `@Assign`/`@Command` method. The runtime refuses an _undeclared_ thrown
 rejection, so a handler's `@Throws` must list all of them. A declared rejection
 becomes a first-class produced signal, so a client can **subscribe to the
 rejection type directly**. Prove a rejection in BlackBox by subscribing to its type,
@@ -144,8 +142,8 @@ is delivered. (`box.assertEvents()` does not include rejection events; subscribe
 ## Bounded contexts and handlers
 
 Choose `BoundedContext.singleTenant()` or `.multitenant()` explicitly. Access
-Desk uses a single-tenant Identity context and multitenant Resources, Access,
-Scheduling, and Audit contexts.
+Desk uses a single-tenant Identity context and multitenant Resources and Audit
+contexts.
 
 Use generated handler metadata with bare `@Assign`, `@Command`, `@React`, and
 `@Subscribe` decorators. Aggregates protect one consistency boundary;
@@ -240,7 +238,7 @@ A single-tenant producer's event has no tenant, while a multitenant entity
 handler requires one. Global Identity events therefore pass through the
 documented durable tenant fan-out adapter, which derives stable tenant-scoped
 integration facts. Do not wire a raw single-tenant Identity event directly to a
-multitenant Resources, Access, Scheduling, or Audit handler.
+multitenant Resources or Audit handler.
 
 ## Protobuf Any and type registries
 

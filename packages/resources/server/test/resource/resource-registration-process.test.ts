@@ -1,0 +1,162 @@
+/*
+ * Copyright 2026, TeamDev. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Redistribution and use in source and/or binary forms, with or without
+ * modification, must retain the above copyright notice and the following
+ * disclaimer.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { eventRecording } from "@access-desk/base/testing";
+
+import { ResourceAddedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_events_pb.js";
+import { ResourceCreatedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_events_pb.js";
+import {
+  ResourceRegisteredSchema,
+  ResourceRegistrationFailedSchema,
+  ResourceRegistrationRequestedSchema,
+} from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_registration_events_pb.js";
+import { ResourceAlreadyExistsSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_rejections_pb.js";
+import { OrganizationResourceNameAlreadyUsedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_rejections_pb.js";
+
+import {
+  actor,
+  closeResourcesBlackBoxes,
+  loadResourcesContext,
+  organizationId,
+  resourcesBlackBox,
+  testActorContext,
+} from "../given/resources-context.js";
+import { awaitOrganizationView, createOrganization } from "../organization/given/organization.js";
+import { awaitCatalogItem, createResource, registerResource } from "./given/resource.js";
+
+const { expectRejection, recordEvents } = eventRecording(testActorContext);
+
+// The process manager is NONE-visibility, so each handler is observed through
+// the domain facts and projections it produces.
+beforeAll(loadResourcesContext, 30_000);
+afterEach(closeResourcesBlackBoxes);
+
+describe("ResourceRegistrationProcessManager should", () => {
+  describe("handle 'RegisterResource', and", () => {
+    it("admit a free name and emit 'ResourceRegistrationRequested'", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      const requested = await recordEvents(scope, ResourceRegistrationRequestedSchema);
+      try {
+        expect((await registerResource(scope, "payroll")).kind).toBe("ok");
+        expect((await requested.waitFor(box)).id?.uuid).toBe("payroll");
+      } finally {
+        await requested.cancel();
+      }
+    });
+
+    it("reject recording a name already used in the organization", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      expect((await createOrganization(scope)).kind).toBe("ok");
+      expect((await registerResource(scope, "payroll-1", "Payroll")).kind).toBe("ok");
+      await awaitOrganizationView(box, scope, (view) =>
+        view.resource.some((resource) => resource.id?.uuid === "payroll-1"),
+      );
+
+      const failed = await recordEvents(scope, ResourceRegistrationFailedSchema);
+      await expectRejection(box, scope, OrganizationResourceNameAlreadyUsedSchema, () =>
+        registerResource(scope, "payroll-2", "payroll"),
+      );
+      try {
+        expect((await failed.waitFor(box)).id?.uuid).toBe("payroll-2");
+      } finally {
+        await failed.cancel();
+      }
+    });
+
+    it("emit ResourceRegistrationFailed when the resource already exists", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      expect((await createResource(scope, "payroll")).kind).toBe("ok");
+
+      const failed = await recordEvents(scope, ResourceRegistrationFailedSchema);
+      try {
+        await expectRejection(box, scope, ResourceAlreadyExistsSchema, () =>
+          registerResource(scope, "payroll"),
+        );
+        expect((await failed.waitFor(box)).id?.uuid).toBe("payroll");
+      } finally {
+        await failed.cancel();
+      }
+    });
+  });
+
+  describe("handle 'ResourceRegistrationRequested', and", () => {
+    it("create the requested resource with its initial policy", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      const created = await recordEvents(scope, ResourceCreatedSchema);
+      try {
+        expect((await registerResource(scope, "payroll")).kind).toBe("ok");
+        const event = await created.waitFor(box);
+        expect(event.id?.uuid).toBe("payroll");
+        expect(event.policy?.openForRequests).toBe(false);
+      } finally {
+        await created.cancel();
+      }
+    });
+  });
+
+  describe("handle 'ResourceCreated', and", () => {
+    it("emit 'ResourceAdded' for the organization that owns the resource", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      expect((await createOrganization(scope)).kind).toBe("ok");
+
+      const added = await recordEvents(scope, ResourceAddedSchema);
+      try {
+        expect((await registerResource(scope, "payroll")).kind).toBe("ok");
+        expect(await added.waitFor(box)).toMatchObject({
+          organizationId: { uuid: organizationId },
+          resourceId: { uuid: "payroll" },
+          name: "payroll",
+        });
+      } finally {
+        await added.cancel();
+      }
+    });
+  });
+
+  describe("handle 'ResourceAdded', and", () => {
+    it("emit ResourceRegistered and complete once the resource is recorded", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      expect((await createOrganization(scope)).kind).toBe("ok");
+
+      const registered = await recordEvents(scope, ResourceRegisteredSchema);
+      try {
+        expect((await registerResource(scope, "payroll")).kind).toBe("ok");
+        const item = await awaitCatalogItem(box, scope, "payroll");
+        expect(item.name).toBe("payroll");
+        expect((await registered.waitFor(box)).id?.uuid).toBe("payroll");
+      } finally {
+        await registered.cancel();
+      }
+    });
+  });
+});

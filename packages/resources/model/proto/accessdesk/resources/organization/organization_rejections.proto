@@ -1,0 +1,62 @@
+//
+// Copyright 2026, TeamDev. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Redistribution and use in source and/or binary forms, with or without
+// modification, must retain the above copyright notice and the following
+// disclaimer.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+
+syntax = "proto3";
+
+package accessdesk.resources.organization;
+
+import "accessdesk/resources/identifiers.proto";
+import "accessdesk/identity/identifiers.proto";
+import "spine/options.proto";
+
+option (type_url_prefix) = "type.accessdesk";
+
+// An organization that already exists.
+message OrganizationAlreadyExists {
+
+  // The organization that already exists.
+  accessdesk.resources.OrganizationId id = 1 [(required) = true];
+}
+
+// A person who is already a member of an organization.
+message OrganizationMemberAlreadyAdded {
+
+  // The organization where the person is already a member.
+  accessdesk.resources.OrganizationId organization_id = 1 [(required) = true];
+
+  // The person who is already a member.
+  accessdesk.identity.PersonId person = 2 [(required) = true];
+}
+
+// A resource name already reserved by a different resource in this organization.
+message OrganizationResourceNameAlreadyUsed {
+
+  // The resource whose organization recording was refused.
+  accessdesk.resources.ResourceId resource_id = 1 [(required) = true];
+
+  // The already-reserved resource name.
+  string name = 2 [(required) = true];
+}

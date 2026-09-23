@@ -19,7 +19,9 @@ context.
 
 ## File layout — one file per entity, plus one process integration
 
-Mirror Resources for each bounded context:
+Mirror the model's domain directories under `test/`. For example, access-request
+tests live under `test/access/request/`, resource tests under `test/resource/`,
+and organization tests under `test/organization/`:
 
 - `<entity>-aggregate.test.ts` — every command handler, its emitted event, and
   each `@Throws` rejection and business rule.
@@ -42,10 +44,11 @@ lives in the one integration test. Remove the rest.
 
 ## `given/` — one file per entity, plus general helpers
 
-Each `given/` file is named after its entity and holds that entity's command
-posters, message builders, and read-model reads. A projection's reads live in
-that projection's `given/` file (its reads are its read model), even when
-another entity's helper waits on it. Plus general files:
+Each domain directory has its own `given/` directory. Each helper is named after
+its entity and holds that entity's command posters, message builders, and
+read-model reads. A projection's reads live in that projection's helper, even
+when another entity's helper waits on it. Context-wide helpers remain under the
+root `test/given/` directory. General files include:
 
 - `<context>-context.ts` — `loadContext`/`blackBox`/`closeBlackBoxes`, the
   tenant/actor/resource constants, `readAll`, and `testActorContext()`.

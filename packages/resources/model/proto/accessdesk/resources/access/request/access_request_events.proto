@@ -1,0 +1,112 @@
+//
+// Copyright 2026, TeamDev. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Redistribution and use in source and/or binary forms, with or without
+// modification, must retain the above copyright notice and the following
+// disclaimer.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+
+syntax = "proto3";
+
+package accessdesk.resources.access.request;
+
+import "accessdesk/resources/identifiers.proto";
+import "accessdesk/resources/values.proto";
+import "accessdesk/identity/identifiers.proto";
+import "spine/options.proto";
+
+option (type_url_prefix) = "type.accessdesk";
+
+// A first-time request passed the resource rules and was assigned to its
+// managers for a decision.
+message AccessRequestSubmitted {
+
+  // The submitted request.
+  accessdesk.resources.AccessRequestId id = 1 [(required) = true];
+
+  // The immutable request details.
+  accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
+
+  // The resource managers who may decide the request.
+  repeated accessdesk.identity.PersonId manager = 3 [(required) = true];
+}
+
+// An access-extension request passed the resource rules and was assigned to its
+// managers for a decision.
+message AccessExtensionRequestSubmitted {
+
+  // The submitted extension request.
+  accessdesk.resources.AccessRequestId id = 1 [(required) = true];
+
+  // The immutable request details.
+  accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
+
+  // The resource managers who may decide the request.
+  repeated accessdesk.identity.PersonId manager = 3 [(required) = true];
+}
+
+// A request was approved.
+message AccessRequestApproved {
+
+  // The terminal request.
+  accessdesk.resources.AccessRequestId id = 1 [(required) = true];
+
+  // The approved immutable request details.
+  accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
+
+  // The manager who approved the request.
+  accessdesk.identity.PersonId decided_by = 3 [(required) = true];
+
+  // The managers whose decision task this terminal fact clears.
+  repeated accessdesk.identity.PersonId manager = 4 [(required) = true];
+}
+
+// A request was denied for a business reason.
+message AccessRequestDenied {
+
+  // The terminal request.
+  accessdesk.resources.AccessRequestId id = 1 [(required) = true];
+
+  // The denied immutable request details.
+  accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
+
+  // The manager who denied the request.
+  accessdesk.identity.PersonId decided_by = 3 [(required) = true];
+
+  // The business reason for denial.
+  string reason = 4 [(required) = true];
+
+  // The managers whose decision task this terminal fact clears.
+  repeated accessdesk.identity.PersonId manager = 5 [(required) = true];
+}
+
+// A request was canceled by its requester.
+message AccessRequestCanceled {
+
+  // The terminal request.
+  accessdesk.resources.AccessRequestId id = 1 [(required) = true];
+
+  // The immutable request details, retained after cancelation.
+  accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
+
+  // The managers whose decision task this terminal fact clears.
+  repeated accessdesk.identity.PersonId manager = 3 [(required) = true];
+}
