@@ -12,18 +12,17 @@ Runtime baseline: **Node ≥ 24, pnpm 11.9, strict TypeScript, ESM**.
 
 ## Bounded contexts
 
-Three contexts (`references/architecture.md`):
+Two contexts (`references/architecture.md`):
 
-| Context    | Owns                                                                                                                   | Tenancy                  |
-| ---------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| Identity   | Global users, registration, auth identity                                                                             | Global / single-tenant   |
-| Resources  | Organizations, membership, resources, policy, managers, requests, approvals, grants, extensions, revocation, scheduling | Org-scoped (multitenant) |
-| Audit      | Immutable, redacted audit projections                                                                                 | Org-scoped (multitenant) |
+| Context    | Owns                                                                                                                                    | Tenancy                  |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| Identity   | Global users, registration, auth identity                                                                                               | Global / single-tenant   |
+| Resources  | Organizations, membership, resources, policy, managers, requests, approvals, grants, extensions, revocation, scheduling, audit projections | Org-scoped (multitenant) |
 
 Resources owns the whole request-and-approval domain. What earlier drafts split
-into separate Access and Scheduling contexts is now internal to Resources; the
-request-and-approval process reads Resources' own read models directly rather
-than mirroring them.
+into separate Access, Scheduling, and Audit contexts is now internal to
+Resources; the request-and-approval process reads Resources' own read models
+directly rather than mirroring them.
 
 **Organization = tenant:** every tenant-scoped message carries one `OrganizationId`
 as the `TenantId`. `CreateOrganization` is issued in the tenant scope of the org it
@@ -37,7 +36,6 @@ Each context is **two packages** under `packages/<context>/`:
 packages/
   identity/    { model, server }      # global / single-tenant
   resources/   { model, server }
-  audit/       { model, server }
   app/                                # composition root: complete registry + (later) Server assembly, gateway, fan-out
   web/                                # React + Vite browser client (later iterations)
 ```
@@ -55,7 +53,7 @@ packages/
   projections, process managers), its `create<Context>Context()` factory, and
   BlackBox tests. It is an _application_ package because
   `spine-proto handlers` discovers decorated classes only in the package that runs it.
-- **`app`** — `@access-desk/app`, `mode: "application"`, composes **all three** context
+- **`app`** — `@access-desk/app`, `mode: "application"`, composes **both** context
   models into the complete application `TypeRegistry`; will assemble the `Server`
   (`Server.add(ctx)` per context), the gateway, and the Identity→tenant fan-out.
 - **`web`** — `@access-desk/web`, the React/Vite client.

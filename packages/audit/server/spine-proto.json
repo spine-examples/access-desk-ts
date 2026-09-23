@@ -1,6 +1,0 @@
-{
-  "formatVersion": 1,
-  "mode": "application",
-  "modelPackages": ["@access-desk/audit-model"],
-  "registryOutput": "generated/model-registry.ts"
-}

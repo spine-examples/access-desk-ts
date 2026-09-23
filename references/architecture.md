@@ -27,20 +27,20 @@ baseline: Node.js 24 or newer, pnpm 11.9, strict TypeScript, and ESM.
 
 ## System shape
 
-The system has three bounded contexts:
+The system has two bounded contexts:
 
-| Bounded context | Owns                                                                                                                                                                                                    | Tenant mode                        |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| Identity        | Global users, registration, authentication identity, user activity                                                                                                                                      | Global/single-tenant control plane |
-| Resources       | Organizations, memberships, resources, ordered access levels, resource managers, request policy, requests, approval decisions, grants, extensions, revocation, and the durable scheduling those rely on | Organization-scoped                |
-| Audit           | Immutable, redacted audit projections built from durable integration facts                                                                                                                              | Organization-scoped                |
+| Bounded context | Owns                                                                                                                                                                                                                       | Tenant mode                        |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- |
+| Identity        | Global users, registration, authentication identity, user activity                                                                                                                                                         | Global/single-tenant control plane |
+| Resources       | Organizations, memberships, resources, ordered access levels, resource managers, request policy, requests, approval decisions, grants, extensions, revocation, the durable scheduling those rely on, and audit projections | Organization-scoped                |
 
 Resources owns the whole request-and-approval domain. What earlier drafts split
-into separate Access and Scheduling contexts — the request, approval, grant,
-extension, and revocation lifecycles and the durable scheduling that serves them
-— is now internal to Resources, not contexts of their own.
+into separate Access, Scheduling, and Audit contexts — the request, approval,
+grant, extension, and revocation lifecycles, the durable scheduling that serves
+them, and the audit projections built from durable facts — is now internal to
+Resources, not contexts of their own.
 
-An initial deployment may co-host all three contexts in one Node.js application.
+An initial deployment may co-host both contexts in one Node.js application.
 Co-location does not weaken the boundaries: each context must have its own model
 package, generated module, `BoundedContext` instance, repositories, storage
 layout, handlers, and ownership. Direct cross-context entity, repository, or
@@ -50,8 +50,6 @@ application-service calls are forbidden.
 flowchart LR
   Identity -->|global identity facts| Fanout[Tenant fan-out adapter]
   Fanout -->|tenant-scoped identity facts| Resources
-  Fanout -->|tenant-scoped identity facts| Audit
-  Resources -->|durable facts| Audit
 ```
 
 Cross-context state propagation and lifecycle choreography use versioned
@@ -79,8 +77,8 @@ Organization is the tenant.
 - A trusted gateway resolves the opaque server-side session into the actor and
   active organization. Client command fields must not be trusted as actor or
   tenant authority.
-- Resources and Audit are multitenant. Identity remains a global context and
-  publishes global identity facts to durable integration infrastructure.
+- Resources is multitenant. Identity remains a global context and publishes
+  global identity facts to durable integration infrastructure.
 - Roles and permissions are organization-scoped. A role in one organization
   confers no authority in another.
 - Storage namespaces and context-prefixed kinds provide defense in depth; they
@@ -121,17 +119,17 @@ invariant, and a caller-supplied identifier is never authority.
 
 A single-tenant Spine event has no tenant and cannot be delivered directly to a
 multitenant entity handler. Raw Identity events therefore never flow directly
-into Resources or Audit.
+into Resources.
 
 The durable integration layer maintains a technical `PersonId` to
 `OrganizationId` fan-out index from tenant-scoped Resources membership facts.
 When Identity publishes a relevant global identity fact, the adapter emits one
 derived, tenant-scoped integration fact for each known membership. Each
 derivative has an ID based on the source integration ID and organization,
-so retries are idempotent. Resources and Audit consume those facts where their
-domain behavior requires them; membership has no separate activity lifecycle.
+so retries are idempotent. Resources consumes those facts where its domain
+behavior requires them; membership has no separate activity lifecycle.
 
-This adapter is an anti-corruption/routing component, not a sixth domain bounded
+This adapter is an anti-corruption/routing component, not a domain bounded
 context. It owns no membership policy and cannot invent organizations. Missing
 or stale fan-out state is repaired from durable Resources membership facts
 before the affected identity change is considered fully delivered.
@@ -351,14 +349,14 @@ has persisted it. A suffix such as "requested" is unnecessary for the grant
 facts that drive scheduling; they should describe the real grant state that
 caused a scheduling intent.
 
-## Audit
+## Audit (internal Resources component)
 
-Audit consumes the same durable integration route as other required consumers.
-It must be idempotent, immutable, organization-scoped, and rebuildable from
-durable facts. It records actor, time, reason, related identifiers, correlation,
-and causation while redacting secrets, credentials, and unnecessary payload
-data. Audit ingestion must not synchronously block the originating business
-command.
+Audit is an internal component of Resources, not a context of its own: audit
+projections built from Resources' durable facts. They must be idempotent,
+immutable, organization-scoped, and rebuildable from durable facts, recording
+actor, time, reason, related identifiers, correlation, and causation while
+redacting secrets, credentials, and unnecessary payload data. Audit ingestion
+must not synchronously block the originating business command.
 
 Audit projections and human-readable timelines are derived views, not editable
 sources of truth. Retention/export policy remains a deployment decision and

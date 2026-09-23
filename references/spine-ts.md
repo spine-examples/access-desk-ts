@@ -63,7 +63,6 @@ reasonable starting shape is:
 packages/
   identity/{model,server}/
   resources/{model,server}/
-  audit/{model,server}/
   app/
   web/
 ```
@@ -137,8 +136,7 @@ is delivered. (`box.assertEvents()` does not include rejection events; subscribe
 ## Bounded contexts and handlers
 
 Choose `BoundedContext.singleTenant()` or `.multitenant()` explicitly. Access
-Desk uses a single-tenant Identity context and multitenant Resources and Audit
-contexts.
+Desk uses a single-tenant Identity context and a multitenant Resources context.
 
 Use generated handler metadata with bare `@Assign`, `@Command`, `@React`, and
 `@Subscribe` decorators. Aggregates protect one consistency boundary;
@@ -233,7 +231,7 @@ A single-tenant producer's event has no tenant, while a multitenant entity
 handler requires one. Global Identity events therefore pass through the
 documented durable tenant fan-out adapter, which derives deterministic tenant-scoped
 integration facts. Do not wire a raw single-tenant Identity event directly to a
-multitenant Resources or Audit handler.
+multitenant Resources handler.
 
 ## Protobuf Any and type registries
 
