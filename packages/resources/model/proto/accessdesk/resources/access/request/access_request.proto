@@ -23,73 +23,59 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
-// One access request for a protected resource, driven from submission to a
-// terminal decision.
-//
-// 1. A submission is validated against the resource's request policy, and the
-//    resource managers who may decide it are captured.
-// 2. The accepted request is assigned to those managers for a decision.
-// 3. A manager approves or denies it, or the requester cancels it.
-//
+// An access request awaiting approval, denial, or cancellation.
 message AccessRequest {
   option (entity).kind = PROCESS_MANAGER;
 
-  // The ID of the request.
+  // The request identifier.
   accessdesk.resources.AccessRequestId id = 1;
 
-  // The immutable request details.
+  // The request details.
   accessdesk.resources.AccessRequestSnapshot snapshot = 2;
 
   // The resource managers who may decide this request.
   repeated accessdesk.identity.PersonId manager = 3;
 
-  // The lifecycle status.
+  // The request status.
   accessdesk.resources.AccessRequestStatus status = 4;
 }
 
-// One access request as clients read it, tracking its lifecycle from submission
-// to a terminal decision.
+// An access request and its current status.
 message AccessRequestView {
   option (entity).kind = PROJECTION;
   option (entity).visibility = FULL;
 
-  // The request this view describes.
+  // The request identifier.
   accessdesk.resources.AccessRequestId id = 1;
 
-  // The immutable request details.
+  // The request details.
   accessdesk.resources.AccessRequestSnapshot snapshot = 2;
 
   // The resource managers who may decide this request.
   repeated accessdesk.identity.PersonId manager = 3;
 
-  // The lifecycle status.
+  // The request status.
   accessdesk.resources.AccessRequestStatus status = 4;
 }
 
-// The pending decisions assigned to one manager.
-//
-// A manager's queue of requests to decide, keyed by the manager; the
-// organization is the tenant. A request appears in the queue while it is
-// pending and leaves it as soon as the request reaches a terminal decision.
-//
+// The pending access requests assigned to a manager.
 message AccessDecisionAssignment {
   option (entity).kind = PROJECTION;
   option (entity).visibility = FULL;
 
-  // The manager who must decide these requests.
+  // The assigned manager.
   accessdesk.identity.PersonId id = 1;
 
-  // The requests currently awaiting this manager's decision.
+  // The requests awaiting the manager's decision.
   repeated AccessDecisionTask task = 2;
 
-  // One request awaiting a manager's approval decision.
+  // A request awaiting the manager's decision.
   message AccessDecisionTask {
 
     // The request to decide.
     accessdesk.resources.AccessRequestId request = 1 [(required) = true];
 
-    // The full immutable request details — resource, level, justification,
-    // period, requester, and (for an extension request) the grant it extends.
+    // The request details.
     accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
   }
 }

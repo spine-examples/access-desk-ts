@@ -41,7 +41,7 @@ import {
   type ResourceDraft,
 } from "../../../resource/given/resource.js";
 
-/** The stable resource requested across the access-request tests. */
+/** The resource requested across the access-request tests. */
 export const resourceUuid = "payroll";
 
 /**

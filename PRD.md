@@ -345,7 +345,7 @@ Important information includes:
 - Application roles.
 - Whether the person is active.
 
-The system should use a stable identifier rather than an email address as the permanent identity. Email addresses can change.
+The system should use an identifier rather than an email address as the permanent identity. Email addresses can change.
 
 ## 6.3 Resource
 
@@ -1021,7 +1021,7 @@ The application should not assume that every intermediate notification was recei
 
 ## 13.1 Main navigation
 
-The main navigation changes slightly according to role, but the basic structure remains stable.
+The main navigation changes slightly according to role, but the basic structure remains consistent.
 
 ```text
 Access Desk
@@ -1699,7 +1699,7 @@ Important entities in this demonstration include:
 - Access Grant.
 - Resource.
 
-Each has a stable identifier and a current state derived from accepted changes.
+Each has an identifier and a current state derived from accepted changes.
 
 ## 18.4 Aggregate: the rule-enforcing entity
 
@@ -2004,7 +2004,7 @@ The initial data should make every main screen interesting:
 - One grant was revoked last week.
 - The audit explorer contains at least twenty timeline entries.
 
-Avoid random data that changes on every run. Stable seed data makes screenshots, documentation, and automated tests predictable.
+Avoid random data that changes on every run. Fixed seed data makes screenshots, documentation, and automated tests predictable.
 
 ---
 
@@ -2479,7 +2479,7 @@ Mitigation:
 | Black-box test | A test that uses the application's real business boundary. |
 | Business rejection | A clear refusal because an action is not allowed in the current situation. |
 | Command | A typed request for the application to change something. |
-| Entity | A thing with a stable identity and state that changes over time. |
+| Entity | A thing with an identity and state that changes over time. |
 | Event | A typed fact recording something that happened. |
 | Expiration | The automatic end of access at its planned time. |
 | Organization | A company or workspace whose data is kept separate. |

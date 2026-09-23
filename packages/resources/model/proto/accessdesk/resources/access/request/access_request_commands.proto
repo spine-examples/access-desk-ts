@@ -27,7 +27,7 @@ option (type_url_prefix) = "type.accessdesk";
 // Submits a request for access to a protected resource.
 message SubmitAccessRequest {
 
-  // The ID of the request.
+  // The request identifier.
   accessdesk.resources.AccessRequestId id = 1;
 
   // The person requesting access.
@@ -49,7 +49,7 @@ message SubmitAccessRequest {
 // Submits a request to extend access to a protected resource.
 message SubmitAccessExtensionRequest {
 
-  // The extension request identity.
+  // The request identifier.
   accessdesk.resources.AccessRequestId id = 1;
 
   // The person requesting the extension.
@@ -58,7 +58,7 @@ message SubmitAccessExtensionRequest {
   // The grant whose access is extended.
   accessdesk.resources.AccessGrantId grant = 3 [(required) = true];
 
-  // The resource whose access is extended; used only to find the deciding managers.
+  // The resource whose access is extended.
   accessdesk.resources.ResourceId resource = 4 [(required) = true];
 
   // The additional access duration requested.

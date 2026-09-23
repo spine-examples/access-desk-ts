@@ -2,34 +2,28 @@
 
 ## Status and authority
 
-This document is the canonical architectural baseline for Access Desk. It
-records the decisions accepted after the initial `PRD.md` draft and the current
-Event Storming session. The PRD remains useful product input but is not changed
-or silently treated as current when it conflicts with this document.
+This document is the canonical architectural baseline for Access Desk. The PRD
+remains product input but does not override this document where they conflict.
 
-`references/event-storming.md` is the canonical current model snapshot: the
-domain's aggregates, process managers, and their command→event transitions, read
-from the current board. This architecture and explicit user decisions govern
-where they differ from that model; they do not license rewriting what the board
-shows. A replacement image replaces the current snapshot rather than creating
-model history.
+`references/event-storming.md` is the canonical current model snapshot — the
+aggregates, process managers, and command→event transitions from the board. This
+architecture and explicit user decisions govern where they differ; they do not
+license rewriting the board.
 
-Normative words such as **must**, **must not**, and **required** identify
-architectural requirements. Exact message names remain contract-design choices
-unless this document says otherwise.
+**Must**, **must not**, and **required** mark architectural requirements. Exact
+message names remain contract-design choices unless stated otherwise.
 
 ## Product posture
 
-Access Desk is a demo-sized access request and approval application built with
-production-shaped architecture. It must be understandable and runnable as a
-demonstration, but its central domain boundaries, security, persistence,
-reliability, and tests must be suitable foundations for a production system.
-Disposable shortcuts are acceptable only in peripheral demo adapters, not in
-the domain or integration design.
+Access Desk is a demo-sized access request and approval application with
+production-shaped architecture. It must be runnable as a demonstration, but its
+domain boundaries, security, persistence, reliability, and tests must be
+production-suitable foundations. Disposable shortcuts are acceptable only in
+peripheral demo adapters, not in the domain or integration design.
 
-The repository is independent of the Spine TS source repository. It consumes
-published npm artifacts from one exact compatible snapshot family. The initial
-runtime baseline is Node.js 24 or newer, pnpm 11.9, strict TypeScript, and ESM.
+The repository is independent of the Spine TS source repository and consumes
+published npm artifacts from one exact compatible snapshot family. Runtime
+baseline: Node.js 24 or newer, pnpm 11.9, strict TypeScript, and ESM.
 
 ## System shape
 
@@ -41,11 +35,10 @@ The system has three bounded contexts:
 | Resources       | Organizations, memberships, resources, ordered access levels, resource managers, request policy, requests, approval decisions, grants, extensions, revocation, and the durable scheduling those rely on | Organization-scoped                |
 | Audit           | Immutable, redacted audit projections built from durable integration facts                                                                                                                              | Organization-scoped                |
 
-Resources is a single organization-scoped context that owns the whole request-
-and-approval domain. What earlier drafts split into separate Access and
-Scheduling contexts is now internal to Resources: the request, approval, grant,
-extension, and revocation lifecycles, and the durable command scheduling that
-serves them, are components of Resources rather than contexts of their own.
+Resources owns the whole request-and-approval domain. What earlier drafts split
+into separate Access and Scheduling contexts — the request, approval, grant,
+extension, and revocation lifecycles and the durable scheduling that serves them
+— is now internal to Resources, not contexts of their own.
 
 An initial deployment may co-host all three contexts in one Node.js application.
 Co-location does not weaken the boundaries: each context must have its own model
@@ -75,7 +68,7 @@ and declares its external-event receptors internally.
 
 Organization is the tenant.
 
-- `PersonId` is globally stable and is not an email address.
+- `PersonId` is global and is not an email address.
 - A user may have memberships in multiple organizations.
 - Every tenant-scoped request, query, subscription, scheduled item, inbox row,
   outbox row, and audit record carries exactly one `OrganizationId` represented
@@ -101,34 +94,28 @@ bounded contexts.
 
 ### Roles, relations, and fine-grained authorization
 
-Authority in Access Desk takes two forms, both organization-scoped.
+Authority takes two forms, both organization-scoped.
 
-A **role** is standing authority a person holds in the organization itself,
-independent of any single resource or request. The roles are Organization
-Member — the baseline participant, who may act as a requester — Auditor,
-with read-only access to the audit timeline, and an organization administration
-role that provisions the organization and its membership. This is role-based
-access control.
+A **role** is standing authority a person holds in the organization itself:
+Organization Member (the baseline participant, who may act as a requester),
+Auditor (read-only access to the audit timeline), and an organization
+administration role that provisions the organization and its membership.
 
-A **relation** is a position a person holds toward one specific entity, read
-from domain state rather than granted as a role: a **manager** of a resource and
-the **requester** of a request. A relation is the same mechanism as a role,
-attached to a domain entity instead of the organization — `resource#manager` and
-`request#requester` in relationship-based terms.
+A **relation** is a position toward one specific entity, read from domain state
+rather than granted as a role: the **manager** of a resource and the
+**requester** of a request (`resource#manager`, `request#requester`).
 
-A resource has one or more managers. Manager is a relation, not a role: no one is
-granted "manager" across the organization. A person manages a specific resource
-because they are named in that resource's managers when it is created, and any
-manager of a resource holds the same authority over it — there is no
-owner/administrator split and no approver-assignment priority.
+A resource has one or more managers, named when it is created. Manager is a
+relation, not an organization-wide role, and every manager of a resource holds
+the same authority — no owner/administrator split, no approver priority.
 
-Authorization is fine-grained and enforced as a domain invariant. The decisive
-check is made per entity — only a current manager of a resource may decide its
-access requests or revoke its grants — inside the `AccessRequest` and grant
-boundaries, not by a separate authorization service or a stored permission list.
-The trusted gateway still performs coarse role- and tenant-level authorization of
-every command, query, and subscription as defense in depth; it never replaces the
-domain invariant, and a caller-supplied identifier is never authority.
+Authorization is fine-grained and enforced as a domain invariant: only a current
+manager of a resource may decide its access requests or revoke its grants,
+checked per entity inside the `AccessRequest` and grant boundaries, not by a
+separate authorization service or stored permission list. The trusted gateway
+still performs coarse role- and tenant-level authorization of every command,
+query, and subscription as defense in depth; it never replaces the domain
+invariant, and a caller-supplied identifier is never authority.
 
 ### Global-to-tenant identity bridge
 
@@ -140,7 +127,7 @@ The durable integration layer maintains a technical `PersonId` to
 `OrganizationId` fan-out index from tenant-scoped Resources membership facts.
 When Identity publishes a relevant global identity fact, the adapter emits one
 derived, tenant-scoped integration fact for each known membership. Each
-derivative has a stable ID based on the source integration ID and organization,
+derivative has an ID based on the source integration ID and organization,
 so retries are idempotent. Resources and Audit consume those facts where their
 domain behavior requires them; membership has no separate activity lifecycle.
 
@@ -156,26 +143,22 @@ resource policy. A resource carries descriptive catalog attributes — its
 identity, description, and category — that describe it for browsing but are not
 access decision rules.
 
-Names are display attributes, not identifiers. An organization has a stable
-`OrganizationId` and a resource a stable, system-generated `ResourceId` UUID; the
+Names are display attributes, not identifiers. An organization has an
+`OrganizationId` and a resource a system-generated `ResourceId` UUID; the
 human-readable name is separate and may change. Organization names are unique
 across organizations, and resource names are unique within their organization.
 Both comparisons are case-insensitive, so "TeamDev" and "teamdev" denote the same
 organization. Access levels are named per resource and are likewise unique and
 case-insensitive within that resource.
 
-Resource-name uniqueness is a separate business rule enforced by the Organization
-aggregate, which owns the set of resource names and performs the authoritative,
-serialized name check when handling `Add Resource`. Because the `ResourceId` is a
-system-generated UUID, the name is only checked at that recording step, not at the
-request. If the aggregate rejects a newly created resource because another
-resource has the same case-insensitive name, Resource Registration compensates by
-issuing `Delete Resource`, emits `Resource Registration Failed` after receiving
-`Resource Deleted`, and deletes its process state. On successful recording, it
-emits `Resource Registered` after `Resource Added` and deletes its process state.
-If resource creation itself reports `Resource Already Exists`, it emits the same
-failure fact and deletes its process state. The rejected resource is never
-recorded in the organization.
+Resource-name uniqueness is enforced by the Organization aggregate, which owns
+the set of resource names and performs the authoritative, serialized check when
+handling `Add Resource`. Because the `ResourceId` is a system-generated UUID, the
+name is checked only at that recording step, not at the request. If recording is
+rejected for a duplicate name, Resource Registration compensates by deleting the
+created resource and reports `Resource Registration Failed`; the rejected
+resource is never recorded. On success it reports `Resource Registered`. (See
+`references/event-storming.md` for the full transition sequence.)
 
 Its **policy** is the access decision rules the request-and-approval process
 consumes, and includes:
@@ -299,16 +282,12 @@ approval is accepted at `A`:
 - `A >= E`: create the explicit expired-without-activation outcome. Never
   activate it.
 
-Normal expiration and expiration without activation are distinct facts. When a
-due activation command is current and tenant-valid, with matching schedule ID,
-schedule revision, and dispatch ID, and its grant is still eligible, but the
-injected clock is now at or after the requested end `E`, Resources atomically
-records the existing expired-without-activation terminal outcome exactly once.
-It neither activates the grant nor creates activation or expiration scheduling
-work. Duplicate commands after that terminal outcome, and stale, revision-mismatched,
-canceled, revoked, or otherwise terminal commands, are successful no-ops.
-All time-based code uses an injected clock; tests must not depend on arbitrary
-sleeping.
+Normal expiration and expiration without activation are distinct facts. If a
+valid due activation command arrives once the clock is at or after the requested
+end `E`, Resources records the expired-without-activation outcome exactly once
+instead of activating. Duplicate, stale, revision-mismatched, canceled, revoked,
+or otherwise terminal commands are successful no-ops. All time-based code uses an
+injected clock; tests must not depend on arbitrary sleeping.
 
 For maximum-total-lifetime checks after a delayed scheduled approval, use the
 actual effective activation time through the proposed new end, while preserving
@@ -404,12 +383,12 @@ and `@spine-event-engine/client-react`.
 
 ### Notifications and timeline
 
-The in-application notifications and timeline entries are derived read-side views.
-Pending manager decisions, requester request status, active-access changes, and the audit
-timeline are Projections over durable facts, surfaced through the same
-authenticated subscriptions and authoritative re-query as every other screen. A
-subscription is a best-effort hint; a missed notification is repaired by the
-next authoritative query, never assumed delivered by a guaranteed push. External
-channels such as email or mobile push are outside the accepted baseline; if
-added later they must consume durable integration facts and follow the same
-tenant, authorization, and redaction rules as Audit.
+In-application notifications and timeline entries are derived read-side views —
+pending manager decisions, request status, active-access changes, and the audit
+timeline — over durable facts, surfaced through the same authenticated
+subscriptions and authoritative re-query as every other screen. A subscription
+is a best-effort hint; a missed notification is repaired by the next
+authoritative query, never a guaranteed push. External channels such as email or
+mobile push are outside the baseline; if added they must consume durable
+integration facts and follow the same tenant, authorization, and redaction rules
+as Audit.

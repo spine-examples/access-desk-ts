@@ -22,16 +22,11 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
-// A protected internal source - a system, dataset, or tool - that people
-// request access to.
-//
-// It belongs to one organization, and its policy governs who
-// may access it, at what level, and for how long.
-//
+// A protected system, dataset, or tool that people request access to.
 message Resource {
   option (entity).kind = AGGREGATE;
 
-  // The resource's stable identity within its organization.
+  // The resource identifier.
   accessdesk.resources.ResourceId id = 1;
 
   // The resource's display name, unique within its organization and compared
@@ -48,18 +43,15 @@ message Resource {
   accessdesk.resources.ResourcePolicy policy = 5;
 }
 
-// A resource as it appears in its organization's access catalog: what it is
-// and the access rules currently in force for it.
-//
+// A resource listed with its access policy.
 message ResourceCatalogItem {
   option (entity).kind = PROJECTION;
   option (entity).visibility = FULL;
 
-  // The resource's stable identity within its organization.
+  // The resource identifier.
   accessdesk.resources.ResourceId id = 1;
 
-  // The resource's display name, unique within its organization and compared
-  // case-insensitively; queryable so a name can be looked up for uniqueness.
+  // The resource's display name, unique within its organization.
   string name = 2 [(required) = true, (column) = true];
 
   // A human-readable summary of what the resource is.

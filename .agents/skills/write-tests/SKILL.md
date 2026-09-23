@@ -5,17 +5,13 @@ description: >
   writing a `BlackBox` test for an aggregate, projection, or process manager,
   laying out a context's test files and `given/` helpers, asserting an emitted
   event or a business rejection, or deciding between an isolated and an
-  integration test. `references/testing.md` holds the authoritative detail and
-  `packages/resources/server/test` is the reference layout to copy.
+  integration test. `packages/resources/server/test` is the reference layout.
 ---
 
 # Write Tests
 
-Follow the Access Desk test conventions below instead of inventing a layout.
-`references/testing.md` is the source of truth for the detail; `references/spine-ts.md`
-(Testing boundaries) owns the Spine mechanics (`BlackBox`, `dist/` import,
-`External<T>`). Copy the shape of `packages/resources/server/test` for a new
-context.
+Mirror `packages/resources/server/test`. See `references/spine-ts.md` for
+`BlackBox` mechanics.
 
 ## File layout — one file per entity, plus one process integration
 
@@ -42,18 +38,13 @@ lives in the one integration test. Remove the rest.
 '<Command|Event>', and", () => it("emit '<Event>' …" | "reject … with
 '<Rejection>'")))`.
 
-## `given/` — one file per entity, plus general helpers
+## `given/` — entity and context fixtures
 
-Each domain directory has its own `given/` directory. Each helper is named after
-its entity and holds that entity's command posters, message builders, and
-read-model reads. A projection's reads live in that projection's helper, even
-when another entity's helper waits on it. Context-wide helpers remain under the
-root `test/given/` directory. General files include:
+Each domain directory has a `given/` directory with one fixture file per entity.
+Keep the context fixture under `test/given/`:
 
-- `<context>-context.ts` — `loadContext`/`blackBox`/`closeBlackBoxes`, the
-  tenant/actor/resource constants, `readAll`, and `testActorContext()`.
-- `resources-integration.ts` (or equivalent) — publishes the external facts a
-  consumer context mirrors.
+- `<context>-context.ts` — context loading, BlackBox setup, shared identifiers,
+  and common reads.
 
 ## Reuse shared helpers from `@access-desk/base`
 
@@ -90,4 +81,4 @@ rejection through the post outcome.
 
 `vitest.config.ts` sets `fileParallelism: false` and 30s timeouts because each
 `BlackBox` test starts its own in-process server — keep them. Give every query a
-stable id and reach for `box.eventually` only for genuinely asynchronous reads.
+fixed id and reach for `box.eventually` only for genuinely asynchronous reads.

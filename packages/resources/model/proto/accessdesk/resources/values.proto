@@ -31,7 +31,6 @@ message OrganizationMember {
 
   // The member's display name.
   string name = 2 [(required) = true];
-
 }
 
 // A resource owned by an organization.
@@ -44,29 +43,16 @@ message OrganizationResource {
   string name = 2 [(required) = true];
 }
 
-// A named degree of access that one resource grants.
-//
-// Access levels are resource-specific: each resource defines its own levels and
-// their ordering. They are ranked only against the other levels of the same
-// resource, from weakest to strongest, which supports same-or-stronger checks.
-//
+// A named degree of access offered by a resource.
 message AccessLevel {
 
-  // The level's name, unique within its resource and compared
-  // case-insensitively - for example "Viewer", "Contributor", or "Administrator".
-  //
+  // The level name, unique within its resource.
   string name = 1 [(required) = true];
 
-  // The level's strength within its resource; a higher rank is stronger.
-  //
-  // Ranks are meaningful only among one resource's own levels and impose no
-  // ordering across resources.
-  //
+  // The level's strength within its resource.
   uint32 rank = 2 [(min).value = "1"];
 
-  // A plain description of what the level permits, shown when a requester
-  // chooses a level.
-  //
+  // What the level permits.
   string description = 3;
 }
 
@@ -78,11 +64,7 @@ message ResourcePolicy {
   // The data-sensitivity classification of the resource.
   Sensitivity sensitivity = 2;
 
-  // The people who manage the resource: any one of them may decide its access
-  // requests and revoke its grants.
-  //
-  // A resource always has at least one manager, set when the resource is created.
-  //
+  // The people who may decide access requests and revoke grants.
   repeated accessdesk.identity.PersonId manager = 3 [(required) = true];
 
   // The access levels the resource offers, ordered from weakest to strongest.
@@ -90,7 +72,6 @@ message ResourcePolicy {
 
   // The longest access grant the resource permits, at one-minute granularity.
   google.protobuf.Duration maximum_duration = 5 [(required) = true];
-
 }
 
 // The data-sensitivity classification of a resource.
@@ -158,7 +139,7 @@ message NewAccessRequest {
   // The requested resource.
   ResourceId resource = 1 [(required) = true];
 
-  // The authoritative resource-specific level accepted from the resource policy.
+  // The requested access level.
   AccessLevel access_level = 2 [(required) = true, (validate) = true];
 
   // The requested access period.
@@ -175,13 +156,7 @@ message AccessExtension {
   google.protobuf.Duration duration = 2 [(required) = true];
 }
 
-// The immutable business details of an accepted access request.
-//
-// The requester and justification are common to every request. The `kind`
-// captures the details unique to each: a first-time access request carries a
-// resource, level, and period; an access-extension request carries the grant it
-// extends and the additional duration.
-//
+// The details of an accepted access request.
 message AccessRequestSnapshot {
 
   // The person requesting access.

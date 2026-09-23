@@ -93,7 +93,7 @@ function includeAll(schema: GenMessage<Message>, queryId: string): Query {
  *
  * @param scope The actor scope issuing the query.
  * @param schema The projection state schema to read.
- * @param queryId A stable identifier for the query.
+ * @param queryId An identifier for the query.
  * @returns The unpacked projection states.
  */
 export async function readAll<Schema extends GenMessage<Message>>(

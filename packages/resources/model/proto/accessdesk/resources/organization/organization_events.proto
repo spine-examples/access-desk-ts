@@ -38,23 +38,22 @@ message OrganizationMemberAdded {
   // The organization that owns this membership.
   accessdesk.resources.OrganizationId organization_id = 1 [(required) = true];
 
-  // The member described by this fact.
+  // The person added as a member.
   accessdesk.identity.PersonId person = 2 [(required) = true];
 
   // The member's display name.
   string name = 3 [(required) = true];
-
 }
 
-// A resource was recorded as one of an organization's resources.
+// A resource was added to an organization.
 message ResourceAdded {
 
-  // The organization that recorded it.
+  // The organization that owns the resource.
   accessdesk.resources.OrganizationId organization_id = 1 [(required) = true];
 
-  // The resource that was recorded.
+  // The resource that was added.
   accessdesk.resources.ResourceId resource_id = 2 [(required) = true];
 
-  // The recorded resource's display name.
+  // The resource's display name.
   string name = 3 [(required) = true];
 }

@@ -24,15 +24,7 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
-// The registration of a new resource in an organization.
-//
-// 1. A member registers the resource, and the request is remembered here.
-// 2. The resource is created with the requested policy.
-// 3. The created resource is recorded among the organization's resources.
-// 4. If the organization rejects the name, the created resource is deleted.
-// 5. The process emits a registration result and is deleted after the resource
-//    is recorded or deleted.
-//
+// The registration of a resource in an organization.
 message ResourceRegistration {
   option (entity).kind = PROCESS_MANAGER;
 

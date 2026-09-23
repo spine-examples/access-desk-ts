@@ -50,18 +50,9 @@ requirements/architecture pass and explicit acceptance criteria.
 
 ## Protobuf evolution
 
-The project has no deployed compatibility baseline yet. Keep message fields and
-enum values sequential after contract edits. Once a deployed baseline exists,
-establish an explicit compatibility and migration policy before making further
-wire-format changes. Treat a future message or Proto package rename as an `Any`
-type-URL compatibility change and plan its migration boundary deliberately.
-
-For every serialized-contract change, run a schema-breaking check against the
-approved compatibility baseline before generation. Keep byte fixtures proving
-that the new schema decodes retained old values and that compatible old
-consumers decode new values; cover enum and `Any` payloads when they are part of
-the contract. Record the selected baseline and migration-window evidence in the
-change report.
+The project has no deployed compatibility baseline. Keep message fields and
+enum values sequential. Define a compatibility policy before changing deployed
+wire contracts.
 
 ## Review lanes
 
@@ -98,16 +89,15 @@ convergence:
 Do not use arbitrary sleeps for domain-time tests. Use an injected clock and
 bounded eventual assertions only for truly asynchronous propagation.
 
-Cross-package contract changes need a clean build to be trusted. A package
-consumes another package through `node_modules`, not a TS project reference, so
-`tsc -b` (incremental) does not recompile it when only the _dependency's_
-`.proto`/`.d.ts` changed — it reports a misleading green against stale types.
-After any change to a `model` package's contracts, force-rebuild the dependents
-(`tsc -b --force`, or delete `dist/` and `*.tsbuildinfo`) before treating
-`verify` as authoritative. Diagnosing a rejection or delivery question by
-instrumenting `node_modules` is legitimate, but always restore the framework
-files and remove the debug afterwards; never commit or leave `node_modules`
-edits.
+Cross-package contract changes need a clean build to be trusted. Because a
+package consumes another through `node_modules` (not a TS project reference),
+`tsc -b` does not recompile it when only the dependency's `.proto`/`.d.ts`
+changed — reporting a misleading green against stale types. After a `model`
+package's contracts change, force-rebuild dependents (`tsc -b --force`, or delete
+`dist/` and `*.tsbuildinfo`) before trusting `verify`. Instrumenting
+`node_modules` to diagnose a rejection or delivery question is legitimate, but
+restore the files and remove the debug afterward; never commit or leave
+`node_modules` edits.
 
 Completion reports must name the commands run, outcomes, untested boundaries,
 and any follow-up decision. A passing local BlackBox test must not be described

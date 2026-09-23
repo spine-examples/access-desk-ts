@@ -22,12 +22,7 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
-// Establishes a new organization within which resources are owned and access to
-// them is granted.
-//
-// The organization is its own tenant: the command is issued in that tenant's
-// scope, so `id` and the command's `TenantId` carry the same value.
-//
+// Creates an organization for members and resources.
 message CreateOrganization {
 
   // The identifier of the organization to create.
@@ -51,13 +46,13 @@ message AddOrganizationMember {
   string name = 3 [(required) = true];
 }
 
-// Records a newly created resource as one of an organization's resources.
+// Adds a resource to an organization.
 message AddResource {
 
   // The organization the resource belongs to.
   accessdesk.resources.OrganizationId organization_id = 1;
 
-  // The resource being recorded.
+  // The resource to add.
   accessdesk.resources.ResourceId resource_id = 2 [(required) = true];
 
   // The resource's display name.

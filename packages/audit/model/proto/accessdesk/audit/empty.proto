@@ -15,5 +15,3 @@
 syntax = "proto3";
 
 package accessdesk.audit;
-
-// Reserves this model package's Proto namespace for future contracts.

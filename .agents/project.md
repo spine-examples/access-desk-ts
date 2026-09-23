@@ -43,13 +43,11 @@ packages/
 ```
 
 - **`<context>/model`** — `@access-desk/<context>-model`, `spine-proto.json` `mode: "model"`.
-  Owns canonical `.proto` under `proto/accessdesk/<context>/` and the generated
-  `ProtoModule`. Pure wire contracts, no behavior. Resources subdivides its protos
+  Canonical `.proto` under `proto/accessdesk/<context>/` plus the generated
+  `ProtoModule`; pure wire contracts, no behavior. Resources subdivides its protos
   into per-area folders (`organization/`, `resource/`, `access/request/`), each its
-  own proto sub-package under `accessdesk.resources.*`, with shared `identifiers.proto`
-  and `values.proto` at the top level. Entity-owned filenames remain fully
-  qualified inside those folders, such as `resource/resource_commands.proto` and
-  `resource/resource_registration.proto`.
+  own sub-package under `accessdesk.resources.*`, with shared `identifiers.proto`
+  and `values.proto` at the top level (filename conventions in the `protobuf-style` skill).
 - **`<context>/server`** — `@access-desk/<context>-server`, `spine-proto.json`
   `mode: "application"`. Its `src/` and `test/` directories mirror the model's
   domain folders; only the context factory, public index, and context-wide test
@@ -119,24 +117,10 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
 
 ## Conventions
 
-**Documentation is domain-first.** Every doc comment — `.proto` messages and
-fields, and TS entity/handler classes alike — opens with what the thing _is_ in
-the business, not how the software works. A resource is "a protected internal
-source people request access to"; an organization is "the boundary that owns
-resources and grants access within it"; never "stores the aggregate state" or
-"the read-side projection". Framework detail (routing, tenancy, delivery) comes
-after the domain sentence, or is left to the code entirely. A process or workflow
-describes its steps as a numbered list. Proto specifics are in the
-`protobuf-style` skill.
+**Documentation is domain-only.** Proto message and field comments state the
+business meaning in plain language. They do not describe handlers, routing,
+storage, queries, generated code, or other implementation mechanics. Keep them
+short; see the `protobuf-style` skill.
 
-**Copying messages (`clone`).** protobuf-es keeps the _same reference_ when you
-put a message inside another — `create(S, { field: msg })` and `draft.field = msg`
-both alias `msg` — and inbound signals (`this.id`, event/command fields) are
-framework-owned and read-only. `clone(schema, msg)` is the only independent copy.
-Clone **only right before you mutate a borrowed sub-message in place** (e.g. store
-an inbound `event.policy` in state, then bump a field on it). Routing callbacks,
-field reads, producing events/commands with `create(...)`, and one-shot
-`this.update` assignments all consume the value read-only or emit-then-forget, so
-they need **no** clone. Prefer building fresh with `create(...)` over mutating
-borrowed messages. Full scenarios: the `spine-handlers` skill and
-`references/spine-ts.md` (Bounded contexts and handlers).
+Message-copying rules live in the `spine-handlers` skill and
+`references/spine-ts.md`.

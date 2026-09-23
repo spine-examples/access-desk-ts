@@ -21,13 +21,9 @@ import "spine/options.proto";
 option (type_url_prefix) = "type.accessdesk";
 
 // Identifies an organization.
-//
-// The organization is also the tenant boundary; its identifier is the
-// `TenantId` for every tenant-scoped message.
-//
 message OrganizationId {
 
-  // The stable, system-generated organization UUID.
+  // The organization UUID.
   string uuid = 1 [(required) = true];
 }
 
@@ -40,17 +36,13 @@ message ResourceId {
 // Identifies an access request.
 message AccessRequestId {
 
-  // The stable request UUID.
+  // The request UUID.
   string uuid = 1 [(required) = true];
 }
 
 // Identifies an access grant.
-//
-// The grant lifecycle is not yet modeled; this identifier exists so an access
-// extension request can name the grant it extends.
-//
 message AccessGrantId {
 
-  // The stable grant UUID.
+  // The grant UUID.
   string uuid = 1 [(required) = true];
 }

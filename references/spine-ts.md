@@ -96,17 +96,12 @@ TypeRegistry from the `app` package:
 (cd packages/app && spine-proto compose)
 ```
 
-Replace the example package paths with the affected packages when the workspace
-is scaffolded. Re-run model generation after a model package's `.proto` or
-authored `spine-proto.json` changes; then re-run the affected context `server`'s
-`compose` + `handlers` and the `app`'s `compose` after any affected model
-manifest or `spine-proto.json` change, and re-run a context `server`'s
-`handlers` after its decorated handler source changes. Once scaffolding defines
-it, run each package's configured compile, typecheck, or build step after the
-generated work.
-Expose this dependency-first sequence through repository pnpm scripts once
-scaffolding exists. Generated sources, manifests, registries, declarations, and
-distribution output are never hand-edited.
+Re-run generation in dependency order after a change: a model's `generate` after
+its `.proto` or `spine-proto.json` changes; the affected `server`'s `compose` +
+`handlers` (and the `app`'s `compose`) after any model manifest change; a
+`server`'s `handlers` after its decorated handler source changes. Repository pnpm
+scripts should expose this sequence. Generated sources, manifests, registries,
+declarations, and build output are never hand-edited.
 
 For one model to import another's `.proto` (e.g. Resources using Identity's
 `PersonId`, or Access referencing Resources types), add the producer package to
@@ -236,7 +231,7 @@ Mark a cross-context event receptor with direct first-parameter
 
 A single-tenant producer's event has no tenant, while a multitenant entity
 handler requires one. Global Identity events therefore pass through the
-documented durable tenant fan-out adapter, which derives stable tenant-scoped
+documented durable tenant fan-out adapter, which derives deterministic tenant-scoped
 integration facts. Do not wire a raw single-tenant Identity event directly to a
 multitenant Resources or Audit handler.
 

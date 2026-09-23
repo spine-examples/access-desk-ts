@@ -23,28 +23,26 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
-// A first-time request passed the resource rules and was assigned to its
-// managers for a decision.
+// An access request was accepted for a manager decision.
 message AccessRequestSubmitted {
 
   // The submitted request.
   accessdesk.resources.AccessRequestId id = 1 [(required) = true];
 
-  // The immutable request details.
+  // The request details.
   accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
 
   // The resource managers who may decide the request.
   repeated accessdesk.identity.PersonId manager = 3 [(required) = true];
 }
 
-// An access-extension request passed the resource rules and was assigned to its
-// managers for a decision.
+// An access-extension request was accepted for a manager decision.
 message AccessExtensionRequestSubmitted {
 
   // The submitted extension request.
   accessdesk.resources.AccessRequestId id = 1 [(required) = true];
 
-  // The immutable request details.
+  // The request details.
   accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
 
   // The resource managers who may decide the request.
@@ -54,26 +52,26 @@ message AccessExtensionRequestSubmitted {
 // A request was approved.
 message AccessRequestApproved {
 
-  // The terminal request.
+  // The approved request.
   accessdesk.resources.AccessRequestId id = 1 [(required) = true];
 
-  // The approved immutable request details.
+  // The request details.
   accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
 
   // The manager who approved the request.
   accessdesk.identity.PersonId decided_by = 3 [(required) = true];
 
-  // The managers whose decision task this terminal fact clears.
+  // The managers responsible for the request.
   repeated accessdesk.identity.PersonId manager = 4 [(required) = true];
 }
 
 // A request was denied for a business reason.
 message AccessRequestDenied {
 
-  // The terminal request.
+  // The denied request.
   accessdesk.resources.AccessRequestId id = 1 [(required) = true];
 
-  // The denied immutable request details.
+  // The request details.
   accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
 
   // The manager who denied the request.
@@ -82,19 +80,19 @@ message AccessRequestDenied {
   // The business reason for denial.
   string reason = 4 [(required) = true];
 
-  // The managers whose decision task this terminal fact clears.
+  // The managers responsible for the request.
   repeated accessdesk.identity.PersonId manager = 5 [(required) = true];
 }
 
 // A request was canceled by its requester.
 message AccessRequestCanceled {
 
-  // The terminal request.
+  // The canceled request.
   accessdesk.resources.AccessRequestId id = 1 [(required) = true];
 
-  // The immutable request details, retained after cancelation.
+  // The request details.
   accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
 
-  // The managers whose decision task this terminal fact clears.
+  // The managers responsible for the request.
   repeated accessdesk.identity.PersonId manager = 3 [(required) = true];
 }

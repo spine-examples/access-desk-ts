@@ -22,12 +22,7 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
-// An organization that owns resources and within which its members request and
-// are granted access to them.
-//
-// Each organization is a self-contained boundary:
-// its members, resources, and access decisions never cross into another.
-//
+// An organization whose members request access to its resources.
 message Organization {
   option (entity).kind = AGGREGATE;
 
@@ -45,9 +40,7 @@ message Organization {
   repeated accessdesk.resources.OrganizationResource resource = 4;
 }
 
-// An organization together with its members and owned resources, as seen by
-// catalog queries.
-//
+// An organization with its members and resources.
 message OrganizationView {
   option (entity).kind = PROJECTION;
   option (entity).visibility = FULL;

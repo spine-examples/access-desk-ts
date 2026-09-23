@@ -39,12 +39,12 @@ message OrganizationMemberAlreadyAdded {
   accessdesk.identity.PersonId person = 2 [(required) = true];
 }
 
-// A resource name already reserved by a different resource in this organization.
+// A resource name already used in the organization.
 message OrganizationResourceNameAlreadyUsed {
 
-  // The resource whose organization recording was refused.
+  // The resource that could not be added.
   accessdesk.resources.ResourceId resource_id = 1 [(required) = true];
 
-  // The already-reserved resource name.
+  // The name already in use.
   string name = 2 [(required) = true];
 }

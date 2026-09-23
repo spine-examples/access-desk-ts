@@ -60,48 +60,17 @@ Do not append a bounded-context, package, or other type suffix.
 
 Use `//` line comments (never `/** */`). Document every message and every field.
 
-**Describe the domain first, the software second — or not at all.** Say what the
-thing _is_ in the business: a resource is "a protected internal source people
-request access to"; an organization is "the boundary that owns resources and
-grants access within it"; a policy is "the rules that govern access". Never lead
-with the storage or framework mechanism ("stores the aggregate state", "the
-read-side projection", "coordinates the process manager"). Mechanism detail
-(routing, tenancy, delivery) belongs _after_ the domain sentence, or in the
-handler code — never in place of it. This holds for TS entity/handler doc
-comments too, not only `.proto`.
-
-- **The first line is a single concise sentence** describing what the element is
-  in the domain. Never put two sentences on the first line.
-- **A process manager's state message (and any workflow) lists its steps as a
-  numbered list** — `1.` … `2.` … `3.` — after the opening sentence, describing
-  the domain steps, not the handlers.
-- Any further detail follows in later paragraphs, each separated by a blank `//`
-  line.
-- **If the documentation is more than one line, end it with a blank `//` line**
-  before the declaration. A single-line doc has **no** trailing blank `//`.
-- Keep comments concise.
-
-Multi-line doc (trailing `//`):
+Describe only the domain meaning. Do not mention handlers, entity kinds,
+routing, storage, queries, clients, generation, or why a field exists for an
+implementation. Prefer one short sentence. Add more only for a business rule
+that is not clear from the type and field names.
 
 ```proto
-// Creates a new organization.
-//
-// The organization is its own tenant; the command is issued in that
-// organization's tenant scope.
-//
+// Creates an organization for members and resources.
 message CreateOrganization {
 
-  // The identifier of the organization to create.
+  // The organization identifier.
   OrganizationId id = 1;
-}
-```
-
-Single-line doc (no trailing `//`):
-
-```proto
-// Records that an organization was created.
-message OrganizationCreated {
-  // ...
 }
 ```
 
