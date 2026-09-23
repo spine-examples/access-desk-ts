@@ -15,9 +15,9 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { eventRecording } from "@access-desk/base/testing";
 
-import { ResourceAddedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_events_pb.js";
-import { ResourceCreatedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_events_pb.js";
-import { OrganizationResourceNameAlreadyUsedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_rejections_pb.js";
+import { ResourceAddedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
+import { ResourceCreatedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/events_pb.js";
+import { OrganizationResourceNameAlreadyUsedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/rejections_pb.js";
 import {
   ResourceRegisteredSchema,
   ResourceRegistrationFailedSchema,

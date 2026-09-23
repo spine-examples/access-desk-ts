@@ -19,7 +19,7 @@ import {
   type CreateResource,
   type DeleteResource,
   type OpenResourceForRequests,
-} from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_commands_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/resource/commands_pb.js";
 import {
   type ResourceClosedForRequests,
   ResourceClosedForRequestsSchema,
@@ -29,14 +29,14 @@ import {
   ResourceDeletedSchema,
   type ResourceOpenedForRequests,
   ResourceOpenedForRequestsSchema,
-} from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_events_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/resource/events_pb.js";
 import { type ResourceId } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
 import { ResourceSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_pb.js";
 import {
   ResourceAlreadyClosedForRequests,
   ResourceAlreadyExists,
   ResourceAlreadyOpenForRequests,
-} from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_rejections.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/resource/rejections.js";
 import {
   ResourcePolicySchema,
   type ResourcePolicy,

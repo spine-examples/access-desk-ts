@@ -20,7 +20,7 @@ import {
   CreateResourceSchema,
   DeleteResourceSchema,
   OpenResourceForRequestsSchema,
-} from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_commands_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/resource/commands_pb.js";
 import { RegisterResourceSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_registration_commands_pb.js";
 import {
   ResourceCatalogItemSchema,

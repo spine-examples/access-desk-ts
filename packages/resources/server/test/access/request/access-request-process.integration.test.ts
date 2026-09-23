@@ -14,11 +14,11 @@
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { eventRecording } from "@access-desk/base/testing";
-import { AccessRequestSubmittedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_events_pb.js";
+import { AccessRequestSubmittedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
 import {
   SubmitAccessExtensionRequestSchema,
   SubmitAccessRequestSchema,
-} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_commands_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/commands_pb.js";
 import { AccessRequestStatus } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import {
   actor,

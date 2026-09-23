@@ -13,17 +13,17 @@
  */
 
 import { BoundedContext, EventRouting } from "@spine-event-engine/server";
-import { ResourceAddedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_events_pb.js";
-import { ResourceDeletedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_events_pb.js";
-import { ResourceAlreadyExistsSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_rejections_pb.js";
-import { OrganizationResourceNameAlreadyUsedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_rejections_pb.js";
+import { ResourceAddedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
+import { ResourceDeletedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/events_pb.js";
+import { ResourceAlreadyExistsSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/rejections_pb.js";
+import { OrganizationResourceNameAlreadyUsedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/rejections_pb.js";
 import {
   AccessExtensionRequestSubmittedSchema,
   AccessRequestApprovedSchema,
   AccessRequestCanceledSchema,
   AccessRequestDeniedSchema,
   AccessRequestSubmittedSchema,
-} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_events_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
 import { type ResourceId } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
 import { type PersonId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { OrganizationAggregate } from "./organization/organization-aggregate.js";

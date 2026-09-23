@@ -20,12 +20,12 @@ import {
   OrganizationCreatedSchema,
   OrganizationMemberAddedSchema,
   ResourceAddedSchema,
-} from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_events_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
 import {
   OrganizationAlreadyExistsSchema,
   OrganizationMemberAlreadyAddedSchema,
   OrganizationResourceNameAlreadyUsedSchema,
-} from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_rejections_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/organization/rejections_pb.js";
 
 import {
   actor,

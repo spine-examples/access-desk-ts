@@ -19,7 +19,7 @@ import {
   type ResourceCreated,
   type ResourceDeleted,
   type ResourceOpenedForRequests,
-} from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_events_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/resource/events_pb.js";
 import { type ResourceId } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
 import { ResourceCatalogItemSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_pb.js";
 

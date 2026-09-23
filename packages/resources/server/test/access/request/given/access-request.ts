@@ -20,7 +20,7 @@ import {
   DenyAccessRequestSchema,
   SubmitAccessExtensionRequestSchema,
   SubmitAccessRequestSchema,
-} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_commands_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/commands_pb.js";
 import {
   AccessRequestViewSchema,
   type AccessRequestView,

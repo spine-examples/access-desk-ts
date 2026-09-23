@@ -49,7 +49,7 @@ import type {
   DenyAccessRequest,
   SubmitAccessExtensionRequest,
   SubmitAccessRequest,
-} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_commands_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/commands_pb.js";
 import {
   AccessExtensionRequestSubmittedSchema,
   AccessRequestApprovedSchema,
@@ -61,7 +61,7 @@ import {
   type AccessRequestCanceled,
   type AccessRequestDenied,
   type AccessRequestSubmitted,
-} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_events_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
 import {
   AccessDurationTooLong,
   AccessLevelNotAvailable,
@@ -69,7 +69,7 @@ import {
   ManagerNotEligible,
   RequestAlreadyDecided,
   ResourceNotRequestable,
-} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_rejections.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/rejections.js";
 
 /**
  * One access request for a protected resource, driven from submission to a

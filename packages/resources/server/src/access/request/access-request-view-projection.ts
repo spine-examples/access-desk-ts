@@ -26,7 +26,7 @@ import type {
   AccessRequestCanceled,
   AccessRequestDenied,
   AccessRequestSubmitted,
-} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_events_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
 
 /**
  * Each access request as clients read it, from submission to a terminal decision.

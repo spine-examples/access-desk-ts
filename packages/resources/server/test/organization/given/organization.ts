@@ -19,7 +19,7 @@ import {
   AddOrganizationMemberSchema,
   AddResourceSchema,
   CreateOrganizationSchema,
-} from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_commands_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
 import {
   OrganizationViewSchema,
   type OrganizationView,

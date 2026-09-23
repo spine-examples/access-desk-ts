@@ -21,7 +21,7 @@ import {
   AccessRequestApprovedSchema,
   AccessRequestDeniedSchema,
   AccessRequestSubmittedSchema,
-} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_events_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
 import {
   AccessDurationTooLongSchema,
   AccessLevelNotAvailableSchema,
@@ -29,11 +29,11 @@ import {
   ManagerNotEligibleSchema,
   RequestAlreadyDecidedSchema,
   ResourceNotRequestableSchema,
-} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_rejections_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/rejections_pb.js";
 import {
   SubmitAccessExtensionRequestSchema,
   SubmitAccessRequestSchema,
-} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_commands_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/commands_pb.js";
 import {
   AccessLevelSchema,
   AccessRequestStatus,

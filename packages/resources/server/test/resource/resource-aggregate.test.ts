@@ -21,12 +21,12 @@ import {
   ResourceCreatedSchema,
   ResourceDeletedSchema,
   ResourceOpenedForRequestsSchema,
-} from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_events_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/resource/events_pb.js";
 import {
   ResourceAlreadyClosedForRequestsSchema,
   ResourceAlreadyExistsSchema,
   ResourceAlreadyOpenForRequestsSchema,
-} from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_rejections_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/resource/rejections_pb.js";
 
 import {
   actor,

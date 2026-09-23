@@ -24,7 +24,7 @@ import {
   type OrganizationCreated,
   type OrganizationMemberAdded,
   type ResourceAdded,
-} from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_events_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
 import { OrganizationViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
 import {
   OrganizationMemberSchema,

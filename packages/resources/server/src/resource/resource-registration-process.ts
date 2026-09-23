@@ -17,16 +17,16 @@ import { Assign, Command, ProcessManager, React } from "@spine-event-engine/serv
 import {
   AddResourceSchema,
   type AddResource,
-} from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_commands_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
 import {
   CreateResourceSchema,
   type CreateResource,
   DeleteResourceSchema,
   type DeleteResource,
-} from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_commands_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/resource/commands_pb.js";
 import { type RegisterResource } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_registration_commands_pb.js";
-import { type ResourceAdded } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_events_pb.js";
-import { type OrganizationResourceNameAlreadyUsed } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_rejections_pb.js";
+import { type ResourceAdded } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
+import { type OrganizationResourceNameAlreadyUsed } from "@access-desk/resources-model/generated/accessdesk/resources/organization/rejections_pb.js";
 import {
   ResourceRegistrationRequestedSchema,
   type ResourceRegistrationRequested,
@@ -38,10 +38,10 @@ import {
 import {
   type ResourceCreated,
   type ResourceDeleted,
-} from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_events_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/resource/events_pb.js";
 import { type ResourceId } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
 import { ResourceRegistrationSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_registration_pb.js";
-import { type ResourceAlreadyExists } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_rejections_pb.js";
+import { type ResourceAlreadyExists } from "@access-desk/resources-model/generated/accessdesk/resources/resource/rejections_pb.js";
 
 /**
  * The registration of a new resource in an organization, step by step:

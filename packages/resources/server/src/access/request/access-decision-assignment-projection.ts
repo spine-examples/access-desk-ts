@@ -30,7 +30,7 @@ import type {
   AccessRequestCanceled,
   AccessRequestDenied,
   AccessRequestSubmitted,
-} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_events_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
 import { equals } from "@access-desk/base/proto";
 
 /**

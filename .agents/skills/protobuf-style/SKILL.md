@@ -77,15 +77,24 @@ message CreateOrganization {
 ## File naming
 
 - Split contracts by role **and by aggregate/purpose**, not one file per role.
-  Every entity-owned filename includes the entity's full name even when its
-  directory already carries that name: `organization.proto`,
-  `organization_commands.proto`, `organization_events.proto`, and
-  `organization_rejections.proto`; `resource_registration.proto` rather than
-  `registration.proto`. Shared `identifiers.proto` and `values.proto` are the
-  exceptions. Group a command/event with the aggregate that handles/emits it
-  (`AddResource` and `ResourceAdded` are the Organization's, so they live in the
-  `organization_*` files). The framework classifies by the `_commands`,
-  `_events`, and `_rejections` suffixes, so those suffixes are load-bearing.
+  The framework classifies by the `_commands`, `_events`, and `_rejections`
+  suffixes, so those suffixes are load-bearing.
+- **Drop the directory's own prefix from its main entity's files.** Each entity
+  lives in a directory named for it (`organization/`, `resource/`,
+  `access/request/`); for that directory's main entity, omit the redundant
+  prefix. In `resource/`, the Resource aggregate's files are `resource.proto`,
+  `commands.proto`, `events.proto`, and `rejections.proto`. The state/aggregate
+  file keeps the entity's own name (`resource.proto`, `organization.proto`,
+  `access_request.proto`); its role files are the bare `commands.proto` /
+  `events.proto` / `rejections.proto`.
+- **A non-main entity in the same directory keeps its full prefix.**
+  `ResourceRegistration` is not the main entity of `resource/`, so its files stay
+  `resource_registration.proto`, `resource_registration_commands.proto`, and
+  `resource_registration_events.proto`.
+- Group a command/event with the aggregate that handles/emits it (`AddResource`
+  and `ResourceAdded` are the Organization's, so they live in `organization/`'s
+  `commands.proto` and `events.proto`). Shared `identifiers.proto` and
+  `values.proto` at the package root are the only unprefixed top-level files.
 - **Where an enum lives.** A plain enum goes in the general shared file with the
   value objects it serves (`values.proto`). Give an enum its own file only when
   it is _special_ — carrying custom options and helper logic. Rule of

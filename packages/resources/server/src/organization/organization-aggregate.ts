@@ -24,7 +24,7 @@ import {
   type AddOrganizationMember,
   type AddResource,
   type CreateOrganization,
-} from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_commands_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
 import {
   OrganizationCreatedSchema,
   OrganizationMemberAddedSchema,
@@ -32,7 +32,7 @@ import {
   type OrganizationCreated,
   type OrganizationMemberAdded,
   type ResourceAdded,
-} from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_events_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
 import { OrganizationSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
 import {
   OrganizationMemberSchema,
@@ -42,7 +42,7 @@ import {
   OrganizationAlreadyExists,
   OrganizationMemberAlreadyAdded,
   OrganizationResourceNameAlreadyUsed,
-} from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_rejections.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/organization/rejections.js";
 
 /**
  * One organization - the boundary that owns resources and members and within
