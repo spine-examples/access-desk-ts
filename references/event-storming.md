@@ -56,10 +56,10 @@ for policy; there is no separate request-policy mirror projection.
 
 | Owner               | Trigger (actor/event) | Command                         | Event(s)                           | Rejections                                                                                               |
 | ------------------- | --------------------- | ------------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Access Request (PM) | Requester             | Submit Access Request           | Access Request Submitted           | Resource Not Requestable; Access Level Not Available; Access Duration Too Long; Duplicate Access Request |
-| Access Request (PM) | Requester             | Submit Access Extension Request | Access Extension Request Submitted | Resource Not Requestable; Access Duration Too Long; Duplicate Access Request                             |
-| Access Request (PM) | Manager               | Approve Access Request          | Access Request Approved            | Request Already Decided; Manager Not Eligible                                                            |
-| Access Request (PM) | Manager               | Deny Access Request             | Access Request Denied              | Request Already Decided; Manager Not Eligible                                                            |
+| Access Request (PM) | Requester             | Submit Access Request           | Access Request Submitted           | Resource Not Open For Requests; Access Level Not Offered; Requested Duration Too Long; Request Already Pending |
+| Access Request (PM) | Requester             | Submit Access Extension Request | Access Extension Request Submitted | Resource Not Open For Requests; Requested Duration Too Long; Request Already Pending                             |
+| Access Request (PM) | Manager               | Approve Access Request          | Access Request Approved            | Request Already Decided; Not An Eligible Manager                                                            |
+| Access Request (PM) | Manager               | Deny Access Request             | Access Request Denied              | Request Already Decided; Not An Eligible Manager                                                            |
 | Access Request (PM) | Requester             | Cancel Access Request           | Access Request Canceled            | Request Already Decided                                                                                  |
 
 Submission captures managers in policy order and removes duplicates. A

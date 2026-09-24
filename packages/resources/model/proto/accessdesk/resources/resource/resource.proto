@@ -36,7 +36,7 @@ message Resource {
   // A human-readable summary of what the resource is.
   string description = 3;
 
-  // The catalog category the resource is listed under.
+  // The catalog category the resource.
   string category = 4;
 
   // The rules that govern access to the resource.
@@ -57,7 +57,7 @@ message ResourceCatalogItem {
   // A human-readable summary of what the resource is.
   string description = 3 [(required) = true];
 
-  // The catalog category the resource is listed under.
+  // The catalog category the resource.
   string category = 4 [(required) = true];
 
   // The rules that govern access to the resource.

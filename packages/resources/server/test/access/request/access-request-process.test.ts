@@ -23,12 +23,12 @@ import {
   AccessRequestSubmittedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
 import {
-  AccessDurationTooLongSchema,
-  AccessLevelNotAvailableSchema,
-  DuplicateAccessRequestSchema,
-  ManagerNotEligibleSchema,
+  RequestedDurationTooLongSchema,
+  AccessLevelNotOfferedSchema,
+  RequestAlreadyPendingSchema,
+  NotAnEligibleManagerSchema,
   RequestAlreadyDecidedSchema,
-  ResourceNotRequestableSchema,
+  ResourceNotOpenForRequestsSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/rejections_pb.js";
 import {
   SubmitAccessExtensionRequestSchema,
@@ -137,20 +137,20 @@ describe("AccessRequestProcessManager should", () => {
       }
     });
 
-    it("reject a resource that is not open ('ResourceNotRequestable')", async () => {
+    it("reject a resource that is not open ('ResourceNotOpenForRequests')", async () => {
       const box = await resourcesBlackBox();
       await seed(box, [actor, "primary"], { openForRequests: false });
       const requester = box.onBehalfOf(actor);
-      await expectRejection(box, requester, ResourceNotRequestableSchema, () =>
+      await expectRejection(box, requester, ResourceNotOpenForRequestsSchema, () =>
         requester.post(SubmitAccessRequestSchema, submitRequest("req-closed")),
       );
     });
 
-    it("reject a level the policy does not offer ('AccessLevelNotAvailable')", async () => {
+    it("reject a level the policy does not offer ('AccessLevelNotOffered')", async () => {
       const box = await resourcesBlackBox();
       await seed(box, [actor, "primary"]);
       const requester = box.onBehalfOf(actor);
-      await expectRejection(box, requester, AccessLevelNotAvailableSchema, () =>
+      await expectRejection(box, requester, AccessLevelNotOfferedSchema, () =>
         requester.post(
           SubmitAccessRequestSchema,
           submitRequest("req-level", { accessLevel: { name: "Admin", rank: 9 } }),
@@ -158,11 +158,11 @@ describe("AccessRequestProcessManager should", () => {
       );
     });
 
-    it("reject an immediate duration beyond the maximum ('AccessDurationTooLong')", async () => {
+    it("reject an immediate duration beyond the maximum ('RequestedDurationTooLong')", async () => {
       const box = await resourcesBlackBox();
       await seed(box, [actor, "primary"]); // default maximumDuration is 3600s
       const requester = box.onBehalfOf(actor);
-      await expectRejection(box, requester, AccessDurationTooLongSchema, () =>
+      await expectRejection(box, requester, RequestedDurationTooLongSchema, () =>
         requester.post(
           SubmitAccessRequestSchema,
           submitRequest("req-toolong", {
@@ -172,11 +172,11 @@ describe("AccessRequestProcessManager should", () => {
       );
     });
 
-    it("reject a scheduled interval beyond the maximum ('AccessDurationTooLong')", async () => {
+    it("reject a scheduled interval beyond the maximum ('RequestedDurationTooLong')", async () => {
       const box = await resourcesBlackBox();
       await seed(box, [actor, "primary"]); // default maximumDuration is 3600s
       const requester = box.onBehalfOf(actor);
-      await expectRejection(box, requester, AccessDurationTooLongSchema, () =>
+      await expectRejection(box, requester, RequestedDurationTooLongSchema, () =>
         requester.post(
           SubmitAccessRequestSchema,
           submitRequest("req-scheduled-long", {
@@ -191,10 +191,10 @@ describe("AccessRequestProcessManager should", () => {
       );
     });
 
-    it("reject a second pending request for the same requester and resource ('DuplicateAccessRequest')", async () => {
+    it("reject a second pending request for the same requester and resource ('RequestAlreadyPending')", async () => {
       const box = await resourcesBlackBox();
       const requester = await givenPending(box, "req-first");
-      await expectRejection(box, requester, DuplicateAccessRequestSchema, () =>
+      await expectRejection(box, requester, RequestAlreadyPendingSchema, () =>
         requester.post(SubmitAccessRequestSchema, submitRequest("req-second")),
       );
     });
@@ -264,20 +264,20 @@ describe("AccessRequestProcessManager should", () => {
       }
     });
 
-    it("reject a resource that is not open ('ResourceNotRequestable')", async () => {
+    it("reject a resource that is not open ('ResourceNotOpenForRequests')", async () => {
       const box = await resourcesBlackBox();
       await seed(box, [actor, "primary"], { openForRequests: false });
       const requester = box.onBehalfOf(actor);
-      await expectRejection(box, requester, ResourceNotRequestableSchema, () =>
+      await expectRejection(box, requester, ResourceNotOpenForRequestsSchema, () =>
         requester.post(SubmitAccessExtensionRequestSchema, submitExtensionRequest("ext-closed")),
       );
     });
 
-    it("reject an added duration beyond the maximum ('AccessDurationTooLong')", async () => {
+    it("reject an added duration beyond the maximum ('RequestedDurationTooLong')", async () => {
       const box = await resourcesBlackBox();
       await seed(box, [actor, "primary"]); // default maximumDuration is 3600s
       const requester = box.onBehalfOf(actor);
-      await expectRejection(box, requester, AccessDurationTooLongSchema, () =>
+      await expectRejection(box, requester, RequestedDurationTooLongSchema, () =>
         requester.post(
           SubmitAccessExtensionRequestSchema,
           submitExtensionRequest("ext-toolong", { duration: { seconds: 7200n } }),
@@ -285,7 +285,7 @@ describe("AccessRequestProcessManager should", () => {
       );
     });
 
-    it("reject a second pending extension for the same requester and grant ('DuplicateAccessRequest')", async () => {
+    it("reject a second pending extension for the same requester and grant ('RequestAlreadyPending')", async () => {
       const box = await resourcesBlackBox();
       await seed(box, [actor, "primary"]);
       const requester = box.onBehalfOf(actor);
@@ -302,7 +302,7 @@ describe("AccessRequestProcessManager should", () => {
         (status) => status === AccessRequestStatus.PENDING,
       );
 
-      await expectRejection(box, requester, DuplicateAccessRequestSchema, () =>
+      await expectRejection(box, requester, RequestAlreadyPendingSchema, () =>
         requester.post(SubmitAccessExtensionRequestSchema, submitExtensionRequest("ext-second")),
       );
     });
@@ -325,10 +325,10 @@ describe("AccessRequestProcessManager should", () => {
       }
     });
 
-    it("reject a decider outside the manager pool ('ManagerNotEligible')", async () => {
+    it("reject a decider outside the manager pool ('NotAnEligibleManager')", async () => {
       const box = await resourcesBlackBox();
       const requester = await givenPending(box, "req-outsider");
-      await expectRejection(box, requester, ManagerNotEligibleSchema, () =>
+      await expectRejection(box, requester, NotAnEligibleManagerSchema, () =>
         approveAccessRequest(requester, "req-outsider", "outsider"),
       );
     });

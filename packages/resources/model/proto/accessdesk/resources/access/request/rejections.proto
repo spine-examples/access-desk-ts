@@ -22,25 +22,25 @@ import "spine/options.proto";
 option (type_url_prefix) = "type.accessdesk";
 
 // The requested resource is not open for requests.
-message ResourceNotRequestable {
+message ResourceNotOpenForRequests {
 
   accessdesk.resources.AccessRequestId id = 1;
 }
 
 // The requested access level is not offered by the resource.
-message AccessLevelNotAvailable {
+message AccessLevelNotOffered {
 
   accessdesk.resources.AccessRequestId id = 1;
 }
 
 // The requested duration exceeds the resource's maximum.
-message AccessDurationTooLong {
+message RequestedDurationTooLong {
 
   accessdesk.resources.AccessRequestId id = 1;
 }
 
 // A conflicting request for the same requester and resource is already pending.
-message DuplicateAccessRequest {
+message RequestAlreadyPending {
 
   accessdesk.resources.AccessRequestId id = 1;
 }
@@ -52,7 +52,7 @@ message RequestAlreadyDecided {
 }
 
 // The person is not one of the request's eligible managers.
-message ManagerNotEligible {
+message NotAnEligibleManager {
 
   accessdesk.resources.AccessRequestId id = 1;
 }

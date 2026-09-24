@@ -53,7 +53,7 @@ message CreateResource {
   google.protobuf.Duration maximum_duration = 8 [(required) = true];
 }
 
-// Deletes a resource that must be removed from its organization.
+// Deletes a resource from its organization.
 message DeleteResource {
 
   // The resource to delete.

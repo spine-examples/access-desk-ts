@@ -26,6 +26,7 @@ option (type_url_prefix) = "type.accessdesk";
 
 // A person's membership in an organization.
 message OrganizationMember {
+
   // The person who belongs to the organization.
   accessdesk.identity.PersonId person = 1 [(required) = true];
 
@@ -36,7 +37,7 @@ message OrganizationMember {
 // A resource owned by an organization.
 message OrganizationResource {
 
-  // The owned resource.
+  // The resource's ID.
   ResourceId id = 1 [(required) = true];
 
   // The resource's display name.
@@ -58,6 +59,7 @@ message AccessLevel {
 
 // The rules that govern access to a resource.
 message ResourcePolicy {
+
   // Whether the resource is currently accepting new access requests.
   bool open_for_requests = 1;
 

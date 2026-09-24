@@ -23,7 +23,6 @@ option (type_url_prefix) = "type.accessdesk";
 // Identifies an organization.
 message OrganizationId {
 
-  // The organization UUID.
   string uuid = 1 [(required) = true];
 }
 
@@ -36,13 +35,11 @@ message ResourceId {
 // Identifies an access request.
 message AccessRequestId {
 
-  // The request UUID.
   string uuid = 1 [(required) = true];
 }
 
 // Identifies an access grant.
 message AccessGrantId {
 
-  // The grant UUID.
   string uuid = 1 [(required) = true];
 }

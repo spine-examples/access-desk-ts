@@ -63,12 +63,12 @@ import {
   type AccessRequestSubmitted,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
 import {
-  AccessDurationTooLong,
-  AccessLevelNotAvailable,
-  DuplicateAccessRequest,
-  ManagerNotEligible,
+  RequestedDurationTooLong,
+  AccessLevelNotOffered,
+  RequestAlreadyPending,
+  NotAnEligibleManager,
   RequestAlreadyDecided,
-  ResourceNotRequestable,
+  ResourceNotOpenForRequests,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/rejections.js";
 
 /**
@@ -91,10 +91,10 @@ export class AccessRequestProcessManager extends ProcessManager<
   /** Validates a first-time access request and, when it passes, submits it. */
   @Assign
   @Throws(
-    ResourceNotRequestable,
-    AccessLevelNotAvailable,
-    AccessDurationTooLong,
-    DuplicateAccessRequest,
+    ResourceNotOpenForRequests,
+    AccessLevelNotOffered,
+    RequestedDurationTooLong,
+    RequestAlreadyPending,
   )
   async submitAccessRequest(command: SubmitAccessRequest): Promise<AccessRequestSubmitted> {
     const id = command.id ?? this.id;
@@ -126,7 +126,7 @@ export class AccessRequestProcessManager extends ProcessManager<
 
   /** Validates an access-extension request and, when it passes, submits it. */
   @Assign
-  @Throws(ResourceNotRequestable, AccessDurationTooLong, DuplicateAccessRequest)
+  @Throws(ResourceNotOpenForRequests, RequestedDurationTooLong, RequestAlreadyPending)
   async submitAccessExtensionRequest(
     command: SubmitAccessExtensionRequest,
   ): Promise<AccessExtensionRequestSubmitted> {
@@ -165,7 +165,7 @@ export class AccessRequestProcessManager extends ProcessManager<
 
   /** Approves a request that has not yet been decided. */
   @Assign
-  @Throws(RequestAlreadyDecided, ManagerNotEligible)
+  @Throws(RequestAlreadyDecided, NotAnEligibleManager)
   approveAccessRequest(command: ApproveAccessRequest): AccessRequestApproved {
     this.assertPending(command.id);
     const snapshot = this.requireSnapshot();
@@ -183,7 +183,7 @@ export class AccessRequestProcessManager extends ProcessManager<
 
   /** Denies a request, with a reason, when it has not yet been decided. */
   @Assign
-  @Throws(RequestAlreadyDecided, ManagerNotEligible)
+  @Throws(RequestAlreadyDecided, NotAnEligibleManager)
   denyAccessRequest(command: DenyAccessRequest): AccessRequestDenied {
     this.assertPending(command.id);
     const snapshot = this.requireSnapshot();
@@ -226,7 +226,7 @@ export class AccessRequestProcessManager extends ProcessManager<
     });
   }
 
-  /** The resource's current policy, or `ResourceNotRequestable` when it is closed. */
+  /** The resource's current policy, or `ResourceNotOpenForRequests` when it is closed. */
   private async requestablePolicy(
     id: AccessRequestId,
     resource: ResourceId,
@@ -234,12 +234,12 @@ export class AccessRequestProcessManager extends ProcessManager<
     const policy = (await this.select(ResourceCatalogItemSchema, {}).findById(resource as never))
       ?.policy;
     if (!policy?.openForRequests) {
-      throw ResourceNotRequestable.create({ id });
+      throw ResourceNotOpenForRequests.create({ id });
     }
     return policy;
   }
 
-  /** The authoritative policy level matching the request, or `AccessLevelNotAvailable`. */
+  /** The authoritative policy level matching the request, or `AccessLevelNotOffered`. */
   private matchLevel(
     id: AccessRequestId,
     policy: ResourcePolicy,
@@ -252,7 +252,7 @@ export class AccessRequestProcessManager extends ProcessManager<
         offeredLevel.rank === accessLevel.rank,
     );
     if (level === undefined) {
-      throw AccessLevelNotAvailable.create({ id });
+      throw AccessLevelNotOffered.create({ id });
     }
     return level;
   }
@@ -267,7 +267,7 @@ export class AccessRequestProcessManager extends ProcessManager<
       policy.maximumDuration !== undefined &&
       this.durationExceedsMaximum(period, policy.maximumDuration)
     ) {
-      throw AccessDurationTooLong.create({ id });
+      throw RequestedDurationTooLong.create({ id });
     }
   }
 
@@ -279,7 +279,7 @@ export class AccessRequestProcessManager extends ProcessManager<
     grant?: AccessGrantId,
   ): Promise<void> {
     if (await this.hasPendingRequest(requester, resource, id, grant)) {
-      throw DuplicateAccessRequest.create({ id });
+      throw RequestAlreadyPending.create({ id });
     }
   }
 
@@ -376,10 +376,10 @@ export class AccessRequestProcessManager extends ProcessManager<
     decidedBy: PersonId | undefined,
   ): PersonId {
     if (decidedBy === undefined || decidedBy.uuid.trim() === "") {
-      throw ManagerNotEligible.create({ id: id ?? this.id });
+      throw NotAnEligibleManager.create({ id: id ?? this.id });
     }
     if (!this.state.manager.some((manager) => equals(PersonIdSchema, manager, decidedBy))) {
-      throw ManagerNotEligible.create({ id: id ?? this.id });
+      throw NotAnEligibleManager.create({ id: id ?? this.id });
     }
     return decidedBy;
   }
