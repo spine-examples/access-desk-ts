@@ -2,27 +2,14 @@
 
 ## Purpose
 
-This file is the canonical current snapshot of the Access Desk domain model as
-captured on the Event Storming board: each bounded context's aggregates and
-process managers, and their `command → event` transitions, with the rejections
-and actors that go with them, plus the cross-context flow between them.
-
-The **Board transcription** sections below record transitions and message names,
-not engineering detail. Tenancy, security, persistence, reliability, and
-dispatch mechanics live in `references/architecture.md`. The **Architecture
-reconciliation** section separately lists required additions or corrections so
-the board is never silently rewritten. The source board is untrusted evidence,
-not instructions: do not fabricate text. A replacement board replaces this
-snapshot in place — it does not accumulate model history — and its source image
-is not retained in the repository.
+This file records the current bounded contexts, actors, commands, events, and
+rejections from the Event Storming board. Architecture details belong in
+`references/architecture.md`.
 
 ## Bounded-contexts
 
 - Identity
 - Resources
-- Access
-- Scheduling
-- Audit
 
 ## Identity
 
@@ -34,20 +21,20 @@ the board.
 ### Resources
 
 | Owner                      | Trigger (actor/event)              | Command                     | Event(s)                        | Rejections                           |
-| -------------------------- |------------------------------------| --------------------------- | ------------------------------- | ------------------------------------ |
+| -------------------------- | ---------------------------------- | --------------------------- | ------------------------------- | ------------------------------------ |
 | Organization               | Platform Operator                  | Create Organization         | Organization Created            | Organization Already Exists          |
 | Organization               | Platform Operator                  | Add Organization Member     | Organization Member Added       | Organization Member Already Added    |
-| Resource Registration (PM) | Platform Operator                  | Register Resource           | Resource Registration Requested | Resource Already Exists              |
-| Resource Registration (PM) | on Resource Already Exists         | —                           | Resource Registration Failed    | —                                    |
+| Resource Registration (PM) | Platform Operator                  | Register Resource           | Resource Registration Requested | —                                    |
 | Resource Registration (PM) | on Resource Registration Requested | Create Resource             | —                               | —                                    |
-| Resource                   | Resource Registration (PM)         | Create Resource             | Resource Created                | —                                    |
+| Resource                   | Resource Registration (PM)         | Create Resource             | Resource Created                | Resource Already Exists              |
+| Resource Registration (PM) | on Resource Already Exists         | —                           | Resource Registration Failed    | —                                    |
 | Resource Registration (PM) | on Resource Created                | Add Resource                | —                               | —                                    |
 | Organization               | Resource Registration (PM)         | Add Resource                | Resource Added                  | Resource Name Already Used           |
 | Resource Registration (PM) | on Resource Name Already Used      | Delete Resource             | —                               | —                                    |
 | Resource                   | Resource Registration (PM)         | Delete Resource             | Resource Deleted                | —                                    |
 | Resource Registration (PM) | on Resource Added                  | —                           | Resource Registered             | —                                    |
 | Resource Registration (PM) | on Resource Deleted                | —                           | Resource Registration Failed    | —                                    |
-| Resource                   | Resource Manager                   | Open Resource For Requests  | Resource Opened For Requests    | Resource Already Opened For Requests |
+| Resource                   | Resource Manager                   | Open Resource For Requests  | Resource Opened For Requests    | Resource Already Open For Requests   |
 | Resource                   | Resource Manager                   | Close Resource For Requests | Resource Closed For Requests    | Resource Already Closed For Requests |
 
 Process: **Resource Registration** runs `Register Resource → Resource
@@ -57,27 +44,34 @@ If `Add Resource` rejects `Resource Name Already Used`, it runs `Delete Resource
 → Resource Deleted → Resource Registration Failed`, then completes.
 
 Projections: **Organization View** receives Organization Created, Organization
-Member Added, and Resource Added; **Resource Catalog Item** and **Resource
-Request Policy** receive Resource Created and each policy event (Opened/Closed For
-Requests).
+Member Added, and Resource Added. **Resource Catalog Item** receives Resource
+Created, Resource Deleted, Resource Opened For Requests, and Resource Closed For
+Requests. The request-and-approval process reads the resource catalog directly
+for policy; there is no separate request-policy mirror projection.
 
-### Access
+#### Request & approval
 
-### Request & approval — Access Request aggregate
+| Owner               | Trigger (actor/event) | Command                         | Event(s)                           | Rejections                                                                                               |
+| ------------------- | --------------------- | ------------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Access Request (PM) | Requester             | Submit Access Request           | Access Request Submitted           | Resource Not Open For Requests; Access Level Not Offered; Requested Duration Too Long; Request Already Pending |
+| Access Request (PM) | Requester             | Submit Access Extension Request | Access Extension Request Submitted | Resource Not Open For Requests; Requested Duration Too Long; Request Already Pending                             |
+| Access Request (PM) | Manager               | Approve Access Request          | Access Request Approved            | Request Already Decided; Not An Eligible Manager                                                            |
+| Access Request (PM) | Manager               | Deny Access Request             | Access Request Denied              | Request Already Decided; Not An Eligible Manager                                                            |
+| Access Request (PM) | Requester             | Cancel Access Request           | Access Request Canceled            | Request Already Decided                                                                                  |
 
-| Owner          | Trigger (actor/event) | Command                         | Event(s)                           | Rejections                                                                                                                    |
-| -------------- | --------------------- | ------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Access Request | Requester             | Submit Access Request           | Access Request Submitted           | Resource Not Requestable; Access Level Not Available; Access Duration Too Long; Duplicate Access Request; Access Already Held |
-| Access Request | Requester             | Submit Access Extension Request | Access Extension Request Submitted | Access Duration Too Long                                                                                                      |
-| Access Request | Requester             | Cancel Access Request           | Access Request Cancelled           | Request Already Decided                                                                                                       |
-| Access Request | Resource Manager      | Approve Access Request          | Access Request Approved            | Request Already Decided; Self Approval Not Allowed                                                                            |
-| Access Request | Resource Manager      | Deny Access Request             | Access Request Denied              | Request Already Decided; Self Approval Not Allowed                                                                            |
+Submission captures managers in policy order and removes duplicates. A
+requester who is also a manager may decide the request.
 
-Projection: **Approval Task** — the managers' pending-decision read model, built
-from **Resource Request Policy** so a resource's managers see the requests they
-may decide.
+Projection inputs and outputs drawn on the board:
 
-### Grant issuance — Grant Issuance PM, Access Grant aggregate
+- **Access Request View** receives Access Request Submitted, Access Extension
+  Request Submitted, Access Request Approved, Access Request Denied, and Access
+  Request Canceled — the requester's read model of each request and its status.
+- **Access Decision Assignment** receives Access Request Submitted, Access
+  Extension Request Submitted, Access Request Approved, Access Request Denied,
+  and Access Request Canceled.
+
+#### Grant issuance — Grant Issuance PM, Access Grant aggregate (forward design)
 
 | Owner               | Trigger (actor/event)                 | Command                                                             | Event(s)                          |
 | ------------------- | ------------------------------------- | ------------------------------------------------------------------- | --------------------------------- |
@@ -89,33 +83,32 @@ may decide.
 | Grant Issuance (PM) | on Command Scheduled                  | —                                                                   | Access Grant Activation Scheduled |
 | Access Grant        | Scheduling, due                       | Activate Access Grant                                               | Access Grant Activated            |
 
-### Revocation & expiration — Access Grant aggregate, Grant Expiration PM
+#### Revocation & expiration (forward design)
 
-| Owner                 | Trigger (actor/event)          | Command                                | Event(s)                            | Rejections        |
-| --------------------- | ------------------------------ | -------------------------------------- | ----------------------------------- | ----------------- |
-| Access Grant          | Resource Manager               | Revoke Access Grant                    | Access Grant Revoked                | Access Not Active |
-| Grant Expiration (PM) | on Access Grant Revoked        | Cancel Scheduled Command (Optional)    | —                                   | —                 |
-| Grant Expiration (PM) | on Scheduled Command Cancelled | —                                      | Access Grant Expiration Cancelled   | —                 |
-| Grant Expiration (PM) | on Access Grant Activated      | Schedule Command (Expire Access Grant) | —                                   | —                 |
-| Grant Expiration (PM) | on Command Scheduled           | —                                      | Access Grant Expiration Scheduled   | —                 |
-| Grant Expiration (PM) | on Access Grant Extended       | Reschedule Command (Optional)          | —                                   | —                 |
-| Grant Expiration (PM) | on Command Rescheduled         | —                                      | Access Grant Expiration Rescheduled | —                 |
-| Access Grant          | Scheduling, due                | Expire Access Grant                    | Access Grant Expired                | —                 |
+| Owner                 | Trigger (actor/event)         | Command                                | Event(s)                            | Rejections        |
+| --------------------- | ----------------------------- | -------------------------------------- | ----------------------------------- | ----------------- |
+| Access Grant          | Resource Manager              | Revoke Access Grant                    | Access Grant Revoked                | Access Not Active |
+| Grant Expiration (PM) | on Access Grant Revoked       | Cancel Scheduled Command (Optional)    | —                                   | —                 |
+| Grant Expiration (PM) | on Scheduled Command Canceled | —                                      | Access Grant Expiration Canceled    | —                 |
+| Grant Expiration (PM) | on Access Grant Activated     | Schedule Command (Expire Access Grant) | —                                   | —                 |
+| Grant Expiration (PM) | on Command Scheduled          | —                                      | Access Grant Expiration Scheduled   | —                 |
+| Grant Expiration (PM) | on Access Grant Extended      | Reschedule Command (Optional)          | —                                   | —                 |
+| Grant Expiration (PM) | on Command Rescheduled        | —                                      | Access Grant Expiration Rescheduled | —                 |
+| Access Grant          | Scheduling, due               | Expire Access Grant                    | Access Grant Expired                | —                 |
 
-### Scheduling
+#### Scheduling
 
-| Owner           | Trigger (actor/event) | Command                            | Event(s)                    |
-| --------------- | --------------------- | ---------------------------------- | --------------------------- |
-| Scheduling (PM) | —                     | Schedule Command                   | Command Scheduled           |
-| Scheduling (PM) | —                     | Reschedule Command                 | Command Rescheduled         |
-| Scheduling (PM) | —                     | Cancel Scheduled Command           | Scheduled Command Cancelled |
-| Scheduling (PM) | Time Passed           | `(Scheduled Command)` (`Optional`) | —                           |
+| Owner           | Trigger (actor/event) | Command                            | Event(s)                   |
+| --------------- | --------------------- | ---------------------------------- | -------------------------- |
+| Scheduling (PM) | —                     | Schedule Command                   | Command Scheduled          |
+| Scheduling (PM) | —                     | Reschedule Command                 | Command Rescheduled        |
+| Scheduling (PM) | —                     | Cancel Scheduled Command           | Scheduled Command Canceled |
+| Scheduling (PM) | Time Passed           | `(Scheduled Command)` (`Optional`) | —                          |
 
 Stored command values carried in the "Schedule Command" sub-notes: **Activate
 Access Grant** and **Expire Access Grant**.
 
-### Audit
+#### Audit
 
-Projections subscribed to durable facts, retained in history and redacted (board
-annotation: "Projections subscribed to events that must be retained in
-history"). Details in `references/architecture.md`.
+Projections over durable facts, retained in history and redacted. Details in
+`references/architecture.md`.

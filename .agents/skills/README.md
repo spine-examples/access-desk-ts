@@ -14,3 +14,7 @@ routing source of truth.
   or process manager under `packages/*/server/src`, avoiding the framework
   gotchas (value-object ids, `ok`-acking rejections, the same-server saga
   delivery gap).
+- `write-tests`: lay out and write server-side `BlackBox` tests under
+  `packages/*/server/test` — one file per entity plus one process integration,
+  `given/` fixtures, generic helper reuse, and event/rejection
+  assertions — following `references/testing.md` and the Resources layout.

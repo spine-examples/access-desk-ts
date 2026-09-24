@@ -1,6 +1,0 @@
-{
-  "formatVersion": 1,
-  "mode": "application",
-  "modelPackages": ["@access-desk/access-model"],
-  "registryOutput": "generated/model-registry.ts"
-}

@@ -35,7 +35,9 @@ yarn-error.log*
 !.env.example
 
 # --- Editor / IDE ---
-.idea/
+.idea/*
+!.idea/copyright/
+!.idea/copyright/**
 .vscode/
 *.swp
 *~

@@ -1,0 +1,70 @@
+//
+// Copyright 2026 CodeMatters, Lda.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+// except in compliance with the License. You may obtain a copy of the License at
+//
+// https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software distributed under
+// the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+// either express or implied. See the License for the specific language governing permissions
+// and limitations under the License.
+//
+
+syntax = "proto3";
+
+package accessdesk.resources.resource;
+
+import "accessdesk/resources/identifiers.proto";
+import "accessdesk/resources/values.proto";
+import "spine/options.proto";
+
+option (type_url_prefix) = "type.accessdesk";
+
+// A resource was created with its complete initial policy.
+message ResourceCreated {
+
+  // The created resource.
+  accessdesk.resources.ResourceId id = 1 [(required) = true];
+
+  // The resource's display name, unique within the organization and compared
+  // case-insensitively.
+  string name = 2 [(required) = true];
+
+  // The resource description.
+  string description = 3 [(required) = true];
+
+  // The catalog category.
+  string category = 4 [(required) = true];
+
+  // The complete resource policy established at creation.
+  accessdesk.resources.ResourcePolicy policy = 5 [(required) = true];
+}
+
+// A resource was deleted and can no longer receive access requests.
+message ResourceDeleted {
+
+  // The resource that was deleted.
+  accessdesk.resources.ResourceId id = 1 [(required) = true];
+}
+
+// A resource was opened to new access requests.
+message ResourceOpenedForRequests {
+
+  // The resource whose policy changed.
+  accessdesk.resources.ResourceId id = 1 [(required) = true];
+
+  // The complete current resource policy.
+  accessdesk.resources.ResourcePolicy policy = 2 [(required) = true];
+}
+
+// A resource was closed to new access requests.
+message ResourceClosedForRequests {
+
+  // The resource whose policy changed.
+  accessdesk.resources.ResourceId id = 1 [(required) = true];
+
+  // The complete current resource policy.
+  accessdesk.resources.ResourcePolicy policy = 2 [(required) = true];
+}

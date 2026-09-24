@@ -1,0 +1,60 @@
+//
+// Copyright 2026 CodeMatters, Lda.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+// except in compliance with the License. You may obtain a copy of the License at
+//
+// https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software distributed under
+// the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+// either express or implied. See the License for the specific language governing permissions
+// and limitations under the License.
+//
+
+syntax = "proto3";
+
+package accessdesk.resources.organization;
+
+import "accessdesk/resources/identifiers.proto";
+import "accessdesk/resources/values.proto";
+import "spine/options.proto";
+
+option (type_url_prefix) = "type.accessdesk";
+
+// An organization whose members request access to its resources.
+message Organization {
+  option (entity).kind = AGGREGATE;
+
+  // Identifies the organization.
+  accessdesk.resources.OrganizationId id = 1;
+
+  // The organization's display name, unique across organizations and compared
+  // case-insensitively.
+  string name = 2 [(required) = true];
+
+  // The people who belong to the organization.
+  repeated accessdesk.resources.OrganizationMember membership = 3;
+
+  // The resources the organization owns.
+  repeated accessdesk.resources.OrganizationResource resource = 4;
+}
+
+// An organization with its members and resources.
+message OrganizationView {
+  option (entity).kind = PROJECTION;
+  option (entity).visibility = FULL;
+
+  // Identifies the organization.
+  accessdesk.resources.OrganizationId id = 1;
+
+  // The organization's display name, unique across organizations and compared
+  // case-insensitively.
+  string name = 2 [(required) = true, (column) = true];
+
+  // The people who belong to the organization.
+  repeated accessdesk.resources.OrganizationMember member = 3;
+
+  // The resources the organization owns.
+  repeated accessdesk.resources.OrganizationResource resource = 4;
+}

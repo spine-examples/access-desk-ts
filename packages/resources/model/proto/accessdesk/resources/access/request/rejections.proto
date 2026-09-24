@@ -1,0 +1,58 @@
+//
+// Copyright 2026 CodeMatters, Lda.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+// except in compliance with the License. You may obtain a copy of the License at
+//
+// https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software distributed under
+// the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+// either express or implied. See the License for the specific language governing permissions
+// and limitations under the License.
+//
+
+syntax = "proto3";
+
+package accessdesk.resources.access.request;
+
+import "accessdesk/resources/identifiers.proto";
+import "spine/options.proto";
+
+option (type_url_prefix) = "type.accessdesk";
+
+// The requested resource is not open for requests.
+message ResourceNotOpenForRequests {
+
+  accessdesk.resources.AccessRequestId id = 1;
+}
+
+// The requested access level is not offered by the resource.
+message AccessLevelNotOffered {
+
+  accessdesk.resources.AccessRequestId id = 1;
+}
+
+// The requested duration exceeds the resource's maximum.
+message RequestedDurationTooLong {
+
+  accessdesk.resources.AccessRequestId id = 1;
+}
+
+// A conflicting request for the same requester and resource is already pending.
+message RequestAlreadyPending {
+
+  accessdesk.resources.AccessRequestId id = 1;
+}
+
+// The request has already reached a terminal decision.
+message RequestAlreadyDecided {
+
+  accessdesk.resources.AccessRequestId id = 1;
+}
+
+// The person is not one of the request's eligible managers.
+message NotAnEligibleManager {
+
+  accessdesk.resources.AccessRequestId id = 1;
+}

@@ -1,0 +1,99 @@
+//
+// Copyright 2026 CodeMatters, Lda.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+// except in compliance with the License. You may obtain a copy of the License at
+//
+// https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software distributed under
+// the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+// either express or implied. See the License for the specific language governing permissions
+// and limitations under the License.
+//
+
+syntax = "proto3";
+
+package accessdesk.resources.access.request;
+
+import "google/protobuf/duration.proto";
+import "accessdesk/resources/identifiers.proto";
+import "accessdesk/resources/values.proto";
+import "accessdesk/identity/identifiers.proto";
+import "spine/options.proto";
+
+option (type_url_prefix) = "type.accessdesk";
+
+// Submits a request for access to a protected resource.
+message SubmitAccessRequest {
+
+  // The request identifier.
+  accessdesk.resources.AccessRequestId id = 1;
+
+  // The person requesting access.
+  accessdesk.identity.PersonId requester = 2 [(required) = true];
+
+  // The resource being requested.
+  accessdesk.resources.ResourceId resource = 3 [(required) = true];
+
+  // The requested resource-specific access level.
+  accessdesk.resources.AccessLevel access_level = 4 [(required) = true, (validate) = true];
+
+  // The requester's stated business reason.
+  string justification = 5 [(required) = true];
+
+  // The requested period.
+  accessdesk.resources.AccessPeriod period = 6 [(required) = true];
+}
+
+// Submits a request to extend access to a protected resource.
+message SubmitAccessExtensionRequest {
+
+  // The request identifier.
+  accessdesk.resources.AccessRequestId id = 1;
+
+  // The person requesting the extension.
+  accessdesk.identity.PersonId requester = 2 [(required) = true];
+
+  // The grant whose access is extended.
+  accessdesk.resources.AccessGrantId grant = 3 [(required) = true];
+
+  // The resource whose access is extended.
+  accessdesk.resources.ResourceId resource = 4 [(required) = true];
+
+  // The additional access duration requested.
+  google.protobuf.Duration duration = 5 [(required) = true];
+
+  // The requester's business reason for extending access.
+  string justification = 6 [(required) = true];
+}
+
+// Approves a pending access request.
+message ApproveAccessRequest {
+
+  // The request to approve.
+  accessdesk.resources.AccessRequestId id = 1;
+
+  // The manager making the decision.
+  accessdesk.identity.PersonId manager = 2 [(required) = true];
+}
+
+// Denies a pending access request.
+message DenyAccessRequest {
+
+  // The request to deny.
+  accessdesk.resources.AccessRequestId id = 1;
+
+  // The manager making the decision.
+  accessdesk.identity.PersonId manager = 2 [(required) = true];
+
+  // The business reason for denial.
+  string reason = 3 [(required) = true];
+}
+
+// Cancels a still-pending access request.
+message CancelAccessRequest {
+
+  // The request to cancel.
+  accessdesk.resources.AccessRequestId id = 1;
+}

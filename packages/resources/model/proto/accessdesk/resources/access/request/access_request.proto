@@ -1,0 +1,81 @@
+//
+// Copyright 2026 CodeMatters, Lda.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+// except in compliance with the License. You may obtain a copy of the License at
+//
+// https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software distributed under
+// the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+// either express or implied. See the License for the specific language governing permissions
+// and limitations under the License.
+//
+
+syntax = "proto3";
+
+package accessdesk.resources.access.request;
+
+import "accessdesk/resources/identifiers.proto";
+import "accessdesk/resources/values.proto";
+import "accessdesk/identity/identifiers.proto";
+import "spine/options.proto";
+
+option (type_url_prefix) = "type.accessdesk";
+
+// An access request awaiting approval, denial, or cancellation.
+message AccessRequest {
+  option (entity).kind = PROCESS_MANAGER;
+
+  // The request identifier.
+  accessdesk.resources.AccessRequestId id = 1;
+
+  // The request details.
+  accessdesk.resources.AccessRequestSnapshot snapshot = 2;
+
+  // The resource managers who may decide this request.
+  repeated accessdesk.identity.PersonId manager = 3;
+
+  // The request status.
+  accessdesk.resources.AccessRequestStatus status = 4;
+}
+
+// An access request and its current status.
+message AccessRequestView {
+  option (entity).kind = PROJECTION;
+  option (entity).visibility = FULL;
+
+  // The request identifier.
+  accessdesk.resources.AccessRequestId id = 1;
+
+  // The request details.
+  accessdesk.resources.AccessRequestSnapshot snapshot = 2;
+
+  // The resource managers who may decide this request.
+  repeated accessdesk.identity.PersonId manager = 3;
+
+  // The request status.
+  accessdesk.resources.AccessRequestStatus status = 4;
+}
+
+// The pending access requests assigned to a manager.
+message AccessDecisionAssignment {
+  option (entity).kind = PROJECTION;
+  option (entity).visibility = FULL;
+
+  // The assigned manager.
+  accessdesk.identity.PersonId id = 1;
+
+  // The requests awaiting the manager's decision.
+  repeated AccessDecisionTask task = 2;
+
+  // A request awaiting the manager's decision.
+  message AccessDecisionTask {
+
+    // The request to decide.
+    accessdesk.resources.AccessRequestId request = 1 [(required) = true];
+
+    // The request details.
+    accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
+  }
+}

@@ -28,14 +28,8 @@
     "@spine-event-engine/storage-datastore": "2.0.0-snapshot.11",
     "@access-desk/identity-model": "0.0.0",
     "@access-desk/resources-model": "0.0.0",
-    "@access-desk/access-model": "0.0.0",
-    "@access-desk/scheduling-model": "0.0.0",
-    "@access-desk/audit-model": "0.0.0",
     "@access-desk/identity-server": "0.0.0",
-    "@access-desk/resources-server": "0.0.0",
-    "@access-desk/access-server": "0.0.0",
-    "@access-desk/scheduling-server": "0.0.0",
-    "@access-desk/audit-server": "0.0.0"
+    "@access-desk/resources-server": "0.0.0"
   },
   "devDependencies": {
     "@spine-event-engine/proto-tools": "2.0.0-snapshot.11",

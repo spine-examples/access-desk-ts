@@ -24,6 +24,7 @@
     "@spine-event-engine/proto": "2.0.0-snapshot.11",
     "@spine-event-engine/server": "2.0.0-snapshot.11",
     "@spine-event-engine/storage": "2.0.0-snapshot.11",
+    "@access-desk/identity-model": "0.0.0",
     "@access-desk/resources-model": "0.0.0"
   },
   "devDependencies": {

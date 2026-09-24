@@ -1,13 +1,13 @@
 {
   "formatVersion": 2,
-  "generationId": "a2de70aa-9d33-461e-be0f-e1cfeca7bebc",
+  "generationId": "5a2d05e7-34e5-4fe0-ad4f-4835ec4d0c3f",
   "packageName": "@access-desk/identity-model",
   "packageVersion": "0.0.0",
   "protoFiles": [
-    "access_desk/identity/identifiers.proto"
+    "accessdesk/identity/identifiers.proto"
   ],
   "generatedExports": {
-    "access_desk/identity/identifiers.proto": "generated/access_desk/identity/identifiers_pb.js"
+    "accessdesk/identity/identifiers.proto": "generated/accessdesk/identity/identifiers_pb.js"
   },
   "dependencies": [
     "@spine-event-engine/proto"

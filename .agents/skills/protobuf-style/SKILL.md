@@ -9,16 +9,16 @@ description: >
 # Protobuf Style
 
 Conventions for every `.proto` in
-`packages/<context>/model/proto/access_desk/<context>/`.
+`packages/<context>/model/proto/accessdesk/<context>/`.
 
 ## File layout (in this order)
 
 1. Single-line `//` copyright header (see below).
 2. blank line, then `syntax = "proto3";`
-3. blank line, then `package access_desk.<context>;`
+3. blank line, then `package accessdesk.<context>;`
 4. blank line, then imports — one per line (`google/...` first, then `spine/...`
-   and cross-file `access_desk/...`).
-5. blank line, then `option (type_url_prefix) = "type.access-desk.<context>";`
+   and cross-file `accessdesk/...`).
+5. blank line, then `option (type_url_prefix) = "type.accessdesk";`
 6. blank line, then the messages.
 
 - **2-space** indentation.
@@ -34,29 +34,17 @@ Use `//` line comments, **not** a `/* */` block. Open and close with a bare `//`
 
 ```proto
 //
-// Copyright 2026, TeamDev. All rights reserved.
+// Copyright 2026 CodeMatters, Lda.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+// except in compliance with the License. You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.apache.org/licenses/LICENSE-2.0
 //
-// Redistribution and use in source and/or binary forms, with or without
-// modification, must retain the above copyright notice and the following
-// disclaimer.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Unless required by applicable law or agreed to in writing, software distributed under
+// the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+// either express or implied. See the License for the specific language governing permissions
+// and limitations under the License.
 //
 ```
 
@@ -65,77 +53,58 @@ proto-only.)
 
 ## `type_url_prefix`
 
-`type.access-desk.<context-name>` — e.g. `type.access-desk.resources`. Present
-only in files that declare messages.
+Use the shared prefix `type.accessdesk` in every file that declares messages.
+Do not append a bounded-context, package, or other type suffix.
 
 ## Documentation comments
 
 Use `//` line comments (never `/** */`). Document every message and every field.
 
-**Describe the domain first, the software second — or not at all.** Say what the
-thing _is_ in the business: a resource is "a protected internal source people
-request access to"; an organization is "the boundary that owns resources and
-grants access within it"; a policy is "the rules that govern access". Never lead
-with the storage or framework mechanism ("stores the aggregate state", "the
-read-side projection", "coordinates the process manager"). Mechanism detail
-(routing, tenancy, delivery) belongs _after_ the domain sentence, or in the
-handler code — never in place of it. This holds for TS entity/handler doc
-comments too, not only `.proto`.
-
-- **The first line is a single concise sentence** describing what the element is
-  in the domain. Never put two sentences on the first line.
-- **A process manager's state message (and any workflow) lists its steps as a
-  numbered list** — `1.` … `2.` … `3.` — after the opening sentence, describing
-  the domain steps, not the handlers.
-- Any further detail follows in later paragraphs, each separated by a blank `//`
-  line.
-- **If the documentation is more than one line, end it with a blank `//` line**
-  before the declaration. A single-line doc has **no** trailing blank `//`.
-- Keep comments concise.
-
-Multi-line doc (trailing `//`):
+Describe only the domain meaning. Do not mention handlers, entity kinds,
+routing, storage, queries, clients, generation, or why a field exists for an
+implementation. Prefer one short sentence. Add more only for a business rule
+that is not clear from the type and field names.
 
 ```proto
-// Creates a new organization.
-//
-// The organization is its own tenant; the command is issued in that
-// organization's tenant scope.
-//
+// Creates an organization for members and resources.
 message CreateOrganization {
 
-  // The identifier of the organization to create.
-  OrganizationId id = 1 [(validate) = true];
-}
-```
-
-Single-line doc (no trailing `//`):
-
-```proto
-// Records that an organization was created.
-message OrganizationCreated {
-  // ...
+  // The organization identifier.
+  OrganizationId id = 1;
 }
 ```
 
 ## File naming
 
 - Split contracts by role **and by aggregate/purpose**, not one file per role.
-  The context's **main** entity — the one whose name matches the context — uses
-  the bare `commands.proto` / `events.proto` / `rejections.proto` (Resource in the
-  Resources context). Every other aggregate or process takes a prefix:
-  `<name>_commands.proto`, `<name>_events.proto`, `<name>_rejections.proto` (e.g.
-  `organization_commands.proto`, `resource_creation_commands.proto`). Plus shared
-  `identifiers.proto` / `values.proto` and a state file per entity
-  (`organization.proto`, `resource.proto`, `resource_creation.proto`). Group a
-  command/event with the aggregate that handles/emits it (`AddResource` and
-  `ResourceAdded` are the Organization's, so they live in the `organization_*`
-  files). The framework classifies by file **suffix** — `commands`/`_commands`,
-  `events`/`_events`, `rejections`/`_rejections` — so the prefix is free but the
-  suffix is load-bearing.
+  The framework classifies by the `_commands`, `_events`, and `_rejections`
+  suffixes, so those suffixes are load-bearing.
+- **Drop the directory's own prefix from its main entity's files.** Each entity
+  lives in a directory named for it (`organization/`, `resource/`,
+  `access/request/`); for that directory's main entity, omit the redundant
+  prefix. In `resource/`, the Resource aggregate's files are `resource.proto`,
+  `commands.proto`, `events.proto`, and `rejections.proto`. The state/aggregate
+  file keeps the entity's own name (`resource.proto`, `organization.proto`,
+  `access_request.proto`); its role files are the bare `commands.proto` /
+  `events.proto` / `rejections.proto`.
+- **A non-main entity in the same directory keeps its full prefix.**
+  `ResourceRegistration` is not the main entity of `resource/`, so its files stay
+  `resource_registration.proto`, `resource_registration_commands.proto`, and
+  `resource_registration_events.proto`.
+- Group a command/event with the aggregate that handles/emits it (`AddResource`
+  and `ResourceAdded` are the Organization's, so they live in `organization/`'s
+  `commands.proto` and `events.proto`). Shared `identifiers.proto` and
+  `values.proto` at the package root are the only unprefixed top-level files.
 - **Where an enum lives.** A plain enum goes in the general shared file with the
   value objects it serves (`values.proto`). Give an enum its own file only when
   it is _special_ — carrying custom options and helper logic. Rule of
   thumb: options → own file; optionless → the general file.
+- **Nested messages.** A value message used only as the repeated element of one
+  entity's state (a queue's task, a list's row) is declared **inside** that state
+  message, not at package top level. Generated TS names it `Parent_Child` with
+  schema `Parent_ChildSchema`; its type URL becomes `pkg.Parent.Child`. Keep a
+  message top-level when more than one entity uses it, or when it is a
+  command/event/rejection field shared across files.
 
 ## Field naming & order
 
@@ -159,8 +128,10 @@ message OrganizationCreated {
   more fields, as rich as the identity needs. **Name each field for what it
   holds:** `uuid` for an opaque, system-generated id, `value` for a human-readable
   dash-case slug, or a composite of several fields for a naturally compound identity.
-- Aggregate state: `option (entity).kind = AGGREGATE;`, id
-  `[(validate) = true, (set_once) = true]`.
+- Aggregate state: `option (entity).kind = AGGREGATE;`.
+- Do not put `(validate)` on ID-typed fields. Presence may still be expressed
+  with `(required)` where the contract requires it.
+- Do not use `(set_once)` on any field.
 - Projection state: `option (entity).kind = PROJECTION;` and
   `option (entity).visibility = FULL;`; put `(column) = true` only on fields that
   real queries filter or sort by.
@@ -169,8 +140,8 @@ message OrganizationCreated {
 
 ## Evolution & generation
 
-- **Append-only.** Never reuse or renumber a field number or enum value; on
-  removal, reserve the number **and** the name inside the owning message/enum.
+- Until the first deployed compatibility baseline, keep fields and enum values
+  in sequential numeric order after every change.
 - **Never hand-edit generated output** (`generated/`, `spine-proto-manifest.json`).
   Regenerate via the pipeline after any `.proto` change (`pnpm run generate`, or
   `pnpm run verify`). Generated files intentionally carry no copyright header.

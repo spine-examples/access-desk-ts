@@ -1,0 +1,75 @@
+//
+// Copyright 2026 CodeMatters, Lda.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+// except in compliance with the License. You may obtain a copy of the License at
+//
+// https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software distributed under
+// the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+// either express or implied. See the License for the specific language governing permissions
+// and limitations under the License.
+//
+
+syntax = "proto3";
+
+package accessdesk.resources.resource;
+
+import "google/protobuf/duration.proto";
+import "accessdesk/resources/identifiers.proto";
+import "accessdesk/resources/values.proto";
+import "accessdesk/identity/identifiers.proto";
+import "spine/options.proto";
+
+option (type_url_prefix) = "type.accessdesk";
+
+// Creates a resource with its complete initial policy, closed to requests.
+message CreateResource {
+
+  // The resource identifier.
+  accessdesk.resources.ResourceId id = 1;
+
+  // The resource's display name, unique within the organization and compared
+  // case-insensitively.
+  string name = 2 [(required) = true];
+
+  // The human-readable resource description.
+  string description = 3 [(required) = true];
+
+  // The catalog category the resource belongs to.
+  string category = 4 [(required) = true];
+
+  // The data-sensitivity classification of the resource.
+  accessdesk.resources.Sensitivity sensitivity = 5 [(required) = true];
+
+  // The people who manage the resource; at least one is required.
+  repeated accessdesk.identity.PersonId manager = 6 [(required) = true];
+
+  // The access levels offered by this resource, ordered from weakest to strongest.
+  repeated accessdesk.resources.AccessLevel access_level = 7 [(required) = true, (validate) = true];
+
+  // The maximum permitted access duration, at one-minute granularity.
+  google.protobuf.Duration maximum_duration = 8 [(required) = true];
+}
+
+// Deletes a resource from its organization.
+message DeleteResource {
+
+  // The resource to delete.
+  accessdesk.resources.ResourceId id = 1;
+}
+
+// Opens a resource to new access requests.
+message OpenResourceForRequests {
+
+  // The resource to open.
+  accessdesk.resources.ResourceId id = 1;
+}
+
+// Closes a resource to new access requests.
+message CloseResourceForRequests {
+
+  // The resource to close.
+  accessdesk.resources.ResourceId id = 1;
+}
