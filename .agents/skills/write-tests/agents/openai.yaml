@@ -1,4 +1,4 @@
 interface:
   display_name: "Write Tests"
-  short_description: "Lay out and write Access Desk server-side BlackBox tests, given/ helpers, and outcome assertions"
+  short_description: "Lay out and write Access Desk server-side BlackBox tests, given/, and outcome assertions"
   default_prompt: "Use $write-tests after reading AGENTS.md when adding or changing server-side tests under packages/*/server/test, following the Resources layout and the local test helpers."

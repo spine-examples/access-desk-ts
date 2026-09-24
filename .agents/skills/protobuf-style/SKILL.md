@@ -106,14 +106,6 @@ message CreateOrganization {
   message top-level when more than one entity uses it, or when it is a
   command/event/rejection field shared across files.
 
-## Identity as a command field
-
-The acting person is an explicit `PersonId` field on the command (the requester
-on a submit command, the deciding manager on approve/deny) — not read from the
-`CommandContext` actor. Keep the entity id first; the acting-person field comes
-right after it. Handlers then read `command.<field>` (see the `spine-handlers`
-skill).
-
 ## Field naming & order
 
 - **`snake_case`** field names.

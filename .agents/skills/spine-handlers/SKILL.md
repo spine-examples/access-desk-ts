@@ -91,14 +91,6 @@ their rejections — do not copy the sibling's `@Throws`. A rejection that "can'
 happen in theory" for a variant should be impossible to reach, not merely
 unlikely.
 
-## Identity comes from the command, not the context
-
-Put the acting person on the command as an explicit `PersonId` field (the
-requester on a submit command, the deciding manager on approve/deny) and read
-`command.<field>`. Do not derive identity from `CommandContext.actorContext`.
-`@Assign`/`@React` methods take `context` only when they truly need it; drop the
-parameter when they don't (as the aggregate's decision handlers do).
-
 ## Traps that cost time (avoid all of these)
 
 - **Handler codegen needs the model *built*, not just generated.** `spine-proto

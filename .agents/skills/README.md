@@ -16,5 +16,5 @@ routing source of truth.
   delivery gap).
 - `write-tests`: lay out and write server-side `BlackBox` tests under
   `packages/*/server/test` — one file per entity plus one process integration,
-  `given/` helpers, local test-helper reuse, and event/rejection
+  `given/` fixtures, generic helper reuse, and event/rejection
   assertions — following `references/testing.md` and the Resources layout.
