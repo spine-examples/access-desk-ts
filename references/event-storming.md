@@ -11,9 +11,6 @@ rejections from the Event Storming board. Architecture details belong in
 - Identity
 - Resources
 
-Resources owns organizations, membership, resources, policies, requests,
-decisions, grants, scheduling, and audit projections.
-
 ## Identity
 
 User registration and authentication. No aggregates or transitions are drawn on

@@ -2004,7 +2004,7 @@ The initial data should make every main screen interesting:
 - One grant was revoked last week.
 - The audit explorer contains at least twenty timeline entries.
 
-Avoid random data that changes on every run. Fixed seed data makes screenshots, documentation, and automated tests predictable.
+Avoid random data that changes on every run. Stable seed data makes screenshots, documentation, and automated tests predictable.
 
 ---
 

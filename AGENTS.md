@@ -167,7 +167,7 @@ work independent. Subagents must not spawn further agents.
 
 Keep narrow TSDoc and behavior claims current with each runtime slice. Defer
 broad documentation and all-example execution until affected interfaces are
-settled unless a changed public interface requires earlier updates. Do not stop
+unless a changed public interface requires earlier updates. Do not stop
 for routine implementation choices; stop only for a real authorization,
 high-risk ambiguity, safety, or external-state blocker.
 
@@ -177,7 +177,7 @@ Never mark a non-trivial change complete without fresh verification. Choose the
 smallest command that proves the touched behavior, then broaden when shared
 behavior, generated contracts, persistence, or context choreography changes.
 
-The application workspace has not yet established a reliable root command set.
+The application workspace has not yet established a root command set.
 Use the scripts in the current `package.json` and the nearest package README
 once scaffolding exists; do not invent commands. Follow the verification ladder
 in `references/development.md`, including Proto generation/schema checks,

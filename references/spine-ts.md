@@ -229,7 +229,7 @@ Mark a cross-context event receptor with direct first-parameter
 
 A single-tenant producer's event has no tenant, while a multitenant entity
 handler requires one. Global Identity events therefore pass through the
-documented durable tenant fan-out adapter, which derives deterministic tenant-scoped
+documented durable tenant fan-out adapter, which derives tenant-scoped
 integration facts. Do not wire a raw single-tenant Identity event directly to a
 multitenant Resources handler.
 

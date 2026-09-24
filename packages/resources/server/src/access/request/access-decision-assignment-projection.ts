@@ -35,11 +35,6 @@ import { equals } from "../../proto/equals.js";
 
 /**
  * One manager's queue of access requests awaiting their decision.
- *
- * Keyed by the manager; the organization is the tenant. A submitted request —
- * whether a first-time request or an extension — is added as a task carrying the
- * full request snapshot, for each of its eligible managers, and leaves every
- * manager's queue as soon as the request reaches a terminal decision.
  */
 export class AccessDecisionAssignmentProjection extends Projection<
   PersonId,

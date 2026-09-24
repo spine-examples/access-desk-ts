@@ -29,11 +29,8 @@ import type {
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
 
 /**
- * Each access request as clients read it, from submission to a terminal decision.
- *
- * Built from the request's own lifecycle facts so a requester can list requests
- * and follow their status. A submitted request — first-time or extension — is
- * seeded as pending, and each terminal fact moves it to its outcome.
+ * An access request as its requester follows it: the request and its status,
+ * from submission to a terminal decision.
  */
 export class AccessRequestViewProjection extends Projection<
   AccessRequestId,
