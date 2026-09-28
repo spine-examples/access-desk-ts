@@ -16,6 +16,7 @@ syntax = "proto3";
 
 package accessdesk.resources;
 
+import "accessdesk/identity/identifiers.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
@@ -40,6 +41,22 @@ message AccessRequestId {
 
 // Identifies an access grant.
 message AccessGrantId {
+
+  string uuid = 1 [(required) = true];
+}
+
+// Identifies the access one person holds to one resource.
+message GrantCoverageId {
+
+  // The person holding the access.
+  accessdesk.identity.PersonId grantee = 1 [(required) = true];
+
+  // The resource the access applies to.
+  ResourceId resource = 2 [(required) = true];
+}
+
+// Identifies one command planned to run at a set time.
+message ScheduledCommandId {
 
   string uuid = 1 [(required) = true];
 }

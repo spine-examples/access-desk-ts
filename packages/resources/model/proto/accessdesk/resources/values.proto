@@ -111,6 +111,50 @@ enum AccessRequestStatus {
   CANCELED = 4;
 }
 
+// The lifecycle state of an access grant.
+enum AccessGrantStatus {
+
+  // The unset grant status.
+  AGS_UNSPECIFIED = 0;
+
+  // The access begins later, and its start is not yet scheduled.
+  PENDING_SCHEDULING = 1;
+
+  // The start of the access is scheduled.
+  SCHEDULED = 2;
+
+  // The grant was issued and its access is due to begin now.
+  PENDING_ACTIVATION = 3;
+
+  // The grantee currently holds the access.
+  ACTIVE = 4;
+
+  // The access ended at its planned end.
+  EXPIRED = 5;
+
+  // The access ended before it could begin, so it never became active.
+  EXPIRED_WITHOUT_ACTIVATION = 6;
+
+  // A manager ended the access before its planned end.
+  REVOKED = 7;
+}
+
+// Where a planned command is in its life.
+enum ScheduleStatus {
+
+  // The unset schedule status.
+  SS_UNSPECIFIED = 0;
+
+  // The command waits for its due time.
+  AWAITING = 1;
+
+  // The command was sent at its due time.
+  DISPATCHED = 2;
+
+  // The command was called off and will not be sent.
+  WITHDRAWN = 3;
+}
+
 // A scheduled half-open access interval.
 message ScheduledAccessPeriod {
 
@@ -154,8 +198,21 @@ message AccessExtension {
   // The grant whose access this request extends.
   AccessGrantId grant = 1 [(required) = true];
 
-  // The additional access duration requested.
-  google.protobuf.Duration duration = 2 [(required) = true];
+  // The end the grant would have once the extension is approved.
+  google.protobuf.Timestamp proposed_end = 2 [(required) = true];
+}
+
+// The access a grant confers: who holds it, to which resource, and at which level.
+message GrantedAccess {
+
+  // The person who holds the access.
+  accessdesk.identity.PersonId grantee = 1 [(required) = true];
+
+  // The resource the access applies to.
+  ResourceId resource = 2 [(required) = true];
+
+  // The access level held.
+  AccessLevel access_level = 3 [(required) = true, (validate) = true];
 }
 
 // The details of an accepted access request.

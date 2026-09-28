@@ -1,0 +1,41 @@
+//
+// Copyright 2026 CodeMatters, Lda.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+// except in compliance with the License. You may obtain a copy of the License at
+//
+// https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software distributed under
+// the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+// either express or implied. See the License for the specific language governing permissions
+// and limitations under the License.
+//
+
+syntax = "proto3";
+
+package accessdesk.resources.access.grant;
+
+import "accessdesk/resources/identifiers.proto";
+import "spine/options.proto";
+
+option (type_url_prefix) = "type.accessdesk";
+
+// The issuing of one access grant from approved requests.
+//
+// 1. An approved first-time request creates the grant.
+// 2. A grant whose access is due to begin now is activated at once.
+// 3. Each approved extension request extends the grant.
+//
+message GrantIssuance {
+  option (entity).kind = PROCESS_MANAGER;
+
+  // The grant being issued.
+  accessdesk.resources.AccessGrantId id = 1;
+
+  // The approved first-time request that created the grant.
+  accessdesk.resources.AccessRequestId request = 2 [(required) = true];
+
+  // The approved extension requests applied to the grant.
+  repeated accessdesk.resources.AccessRequestId extension = 3;
+}
