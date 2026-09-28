@@ -23,7 +23,6 @@ import {
   GrantCoverageSchema,
   GrantCoverage_CoveringGrantSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/access_grant_pb.js";
-import { AccessGrantStatus } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import type {
   AccessGrantCreated,
   AccessGrantExpired,
@@ -41,13 +40,12 @@ export class GrantCoverageProjection extends Projection<
   GrantCoverageId,
   typeof GrantCoverageSchema
 > {
-  /** Adds a newly issued grant to the person's access, unless it ended before it began. */
+  /** Adds a newly issued grant to the person's access. */
   @Subscribe
   onAccessGrantCreated(event: AccessGrantCreated): void {
     const { id: grant, start, end } = event;
     const accessLevel = event.access?.accessLevel;
     if (
-      event.status === AccessGrantStatus.EXPIRED_WITHOUT_ACTIVATION ||
       grant === undefined ||
       accessLevel === undefined ||
       start === undefined ||

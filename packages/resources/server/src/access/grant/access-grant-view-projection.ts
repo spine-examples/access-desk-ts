@@ -51,37 +51,37 @@ export class AccessGrantViewProjection extends Projection<
   @Subscribe
   onAccessGrantActivationScheduled(_event: AccessGrantActivationScheduled): void {
     if (this.state.status === AccessGrantStatus.PENDING_SCHEDULING) {
-      this.update((draft) => draft.status = AccessGrantStatus.SCHEDULED);
+      this.update((draft) => (draft.status = AccessGrantStatus.SCHEDULED));
     }
   }
 
   /** Shows the access as active. */
   @Subscribe
   onAccessGrantActivated(_event: AccessGrantActivated): void {
-    this.update((draft) => draft.status = AccessGrantStatus.ACTIVE);
+    this.update((draft) => (draft.status = AccessGrantStatus.ACTIVE));
   }
 
   /** Shows the new end of extended access. */
   @Subscribe
   onAccessGrantExtended(event: AccessGrantExtended): void {
-    this.update((draft) => draft.end = event.end);
+    this.update((draft) => (draft.end = event.end));
   }
 
   /** Moves expired access to history. */
   @Subscribe
   onAccessGrantExpired(_event: AccessGrantExpired): void {
-    this.update((draft) => draft.status = AccessGrantStatus.EXPIRED);
+    this.update((draft) => (draft.status = AccessGrantStatus.EXPIRED));
   }
 
   /** Moves revoked access to history. */
   @Subscribe
   onAccessGrantRevoked(_event: AccessGrantRevoked): void {
-    this.update((draft) => draft.status = AccessGrantStatus.REVOKED);
+    this.update((draft) => (draft.status = AccessGrantStatus.REVOKED));
   }
 
   /** Moves access that never began to history. */
   @Subscribe
   onAccessGrantExpiredWithoutActivation(_event: AccessGrantExpiredWithoutActivation): void {
-    this.update((draft) => draft.status = AccessGrantStatus.EXPIRED_WITHOUT_ACTIVATION);
+    this.update((draft) => (draft.status = AccessGrantStatus.EXPIRED_WITHOUT_ACTIVATION));
   }
 }
