@@ -16,6 +16,7 @@ syntax = "proto3";
 
 package accessdesk.resources.access.request;
 
+import "google/protobuf/timestamp.proto";
 import "accessdesk/resources/identifiers.proto";
 import "accessdesk/resources/values.proto";
 import "accessdesk/identity/identifiers.proto";
@@ -61,8 +62,11 @@ message AccessRequestApproved {
   // The manager who approved the request.
   accessdesk.identity.PersonId decided_by = 3 [(required) = true];
 
+  // When the request was approved.
+  google.protobuf.Timestamp when_decided = 4 [(required) = true];
+
   // The managers responsible for the request.
-  repeated accessdesk.identity.PersonId manager = 4 [(required) = true];
+  repeated accessdesk.identity.PersonId manager = 5 [(required) = true];
 }
 
 // A request was denied for a business reason.

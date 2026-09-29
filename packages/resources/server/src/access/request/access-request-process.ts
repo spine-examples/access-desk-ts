@@ -13,6 +13,7 @@
  */
 
 import { create } from "@bufbuild/protobuf";
+import type { Duration, Timestamp } from "@bufbuild/protobuf/wkt";
 import { Assign, ProcessManager, Throws } from "@spine-event-engine/server";
 import { equals } from "../../proto/equals.js";
 import {
@@ -27,9 +28,15 @@ import {
   AccessRequestSchema,
   AccessRequestViewSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_pb.js";
+import {
+  AccessGrantSchema,
+  GrantCoverageSchema,
+  type AccessGrant,
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/access_grant_pb.js";
+import { AccessNotActive } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/rejections.js";
 import { ResourceCatalogItemSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_pb.js";
 import {
-  AccessPeriodSchema,
+  AccessGrantStatus,
   AccessRequestSnapshotSchema,
   AccessRequestStatus,
   type AccessPeriod,
@@ -38,6 +45,7 @@ import {
 import {
   AccessGrantIdSchema,
   AccessRequestIdSchema,
+  GrantCoverageIdSchema,
   ResourceIdSchema,
   type AccessGrantId,
   type AccessRequestId,
@@ -63,6 +71,7 @@ import {
   type AccessRequestSubmitted,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
 import {
+  AccessAlreadyHeld,
   RequestedDurationTooLong,
   AccessLevelNotOffered,
   RequestAlreadyPending,
@@ -70,23 +79,35 @@ import {
   RequestAlreadyDecided,
   ResourceNotOpenForRequests,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/rejections.js";
+import { effectiveInterval, requestedInterval } from "../access-period.js";
+import { now } from "../../time/clock.js";
+import {
+  between,
+  compare,
+  type Interval,
+  longerThan,
+  overlaps,
+  plus,
+} from "../../time/interval.js";
 
 /**
  * One access request for a protected resource, driven from submission to a
  * terminal decision.
  *
- * 1. Validate a submission against the resource's request policy and capture
- *    the managers who may decide it.
+ * 1. Validate a submission against the resource's request policy and the
+ *    access the requester already holds, and capture the managers who may
+ *    decide it.
  * 2. Assign the accepted request to those managers for a decision.
  * 3. A manager approves or denies it, or the requester cancels it — once.
+ *    Approval fixes when the access begins, so it checks once more that the
+ *    requester does not already hold that access.
  *
- * A first-time request and an access-extension request differ only in what the
- * client submits and in the snapshot's `kind`; everything downstream is shared.
+ * A first-time request asks for new access; an extension request asks to keep
+ * active access longer and names the end it proposes. Both are decided alike.
  */
 export class AccessRequestProcessManager extends ProcessManager<
   AccessRequestId,
-  typeof AccessRequestSchema,
-  bigint
+  typeof AccessRequestSchema
 > {
   /** Validates a first-time access request and, when it passes, submits it. */
   @Assign
@@ -95,6 +116,7 @@ export class AccessRequestProcessManager extends ProcessManager<
     AccessLevelNotOffered,
     RequestedDurationTooLong,
     RequestAlreadyPending,
+    AccessAlreadyHeld,
   )
   async submitAccessRequest(command: SubmitAccessRequest): Promise<AccessRequestSubmitted> {
     const id = command.id ?? this.id;
@@ -114,6 +136,13 @@ export class AccessRequestProcessManager extends ProcessManager<
     const level = this.matchLevel(id, policy, accessLevel);
     this.assertWithinMaxDuration(id, policy, period);
     await this.assertNoDuplicate(id, requester, resource);
+    await this.assertAccessNotHeld(
+      id,
+      requester,
+      resource,
+      level,
+      requestedInterval(period, now()),
+    );
     const manager = this.managers(policy);
     const snapshot = create(AccessRequestSnapshotSchema, {
       requester,
@@ -124,9 +153,20 @@ export class AccessRequestProcessManager extends ProcessManager<
     return create(AccessRequestSubmittedSchema, { id, snapshot, manager });
   }
 
-  /** Validates an access-extension request and, when it passes, submits it. */
+  /**
+   * Validates a request to keep active access longer and, when it passes, submits it.
+   *
+   * The requester must hold the grant, and it must be active. The proposed end
+   * is the grant's current end plus the requested duration, and the whole
+   * access, extension included, must fit the grant's maximum lifetime.
+   */
   @Assign
-  @Throws(ResourceNotOpenForRequests, RequestedDurationTooLong, RequestAlreadyPending)
+  @Throws(
+    ResourceNotOpenForRequests,
+    AccessNotActive,
+    RequestedDurationTooLong,
+    RequestAlreadyPending,
+  )
   async submitAccessExtensionRequest(
     command: SubmitAccessExtensionRequest,
   ): Promise<AccessExtensionRequestSubmitted> {
@@ -145,31 +185,51 @@ export class AccessRequestProcessManager extends ProcessManager<
         "SubmitAccessExtensionRequest requires a requester, grant, duration, and resource.",
       );
     }
-    // An extension renews an existing grant: its level is implied by the grant, so
-    // it is neither re-validated nor treated as a duplicate of a first-time request.
-    const period = create(AccessPeriodSchema, {
-      kind: { case: "immediateDuration", value: duration },
-    });
+    // An extension keeps the grant's level, so the level is not checked again,
+    // and it is a duplicate only of another extension of the same grant.
     const policy = await this.requestablePolicy(id, resource);
-    this.assertWithinMaxDuration(id, policy, period);
+    const held = await this.activeGrant(grant, requester, resource);
+    const proposedEnd = plus(held.end, duration);
+    if (longerThan(between(held.start, proposedEnd), held.maximumLifetime)) {
+      throw RequestedDurationTooLong.create({ id });
+    }
     await this.assertNoDuplicate(id, requester, resource, grant);
     const manager = this.managers(policy);
     const snapshot = create(AccessRequestSnapshotSchema, {
       requester,
       justification: command.justification,
-      kind: { case: "extension", value: { grant, duration } },
+      kind: { case: "extension", value: { grant, proposedEnd } },
     });
     this.store(snapshot, manager);
     return create(AccessExtensionRequestSubmittedSchema, { id, snapshot, manager });
   }
 
-  /** Approves a request that has not yet been decided. */
+  /**
+   * Approves a request that has not yet been decided.
+   *
+   * Approval fixes when first-time access begins, so the requester must not
+   * already hold the same or stronger access for that effective period.
+   */
   @Assign
-  @Throws(RequestAlreadyDecided, NotAnEligibleManager)
-  approveAccessRequest(command: ApproveAccessRequest): AccessRequestApproved {
+  @Throws(RequestAlreadyDecided, NotAnEligibleManager, AccessAlreadyHeld)
+  async approveAccessRequest(command: ApproveAccessRequest): Promise<AccessRequestApproved> {
     this.assertPending(command.id);
     const snapshot = this.requireSnapshot();
     const decidedBy = this.assertEligibleDecider(command.id, command.manager);
+    const whenDecided = now();
+    if (snapshot.kind.case === "newRequest") {
+      const { resource, accessLevel, period } = snapshot.kind.value;
+      if (snapshot.requester !== undefined && resource !== undefined && accessLevel !== undefined) {
+        const interval = period === undefined ? undefined : effectiveInterval(period, whenDecided);
+        await this.assertAccessNotHeld(
+          command.id ?? this.id,
+          snapshot.requester,
+          resource,
+          accessLevel,
+          interval,
+        );
+      }
+    }
     this.update((draft) => {
       draft.status = AccessRequestStatus.APPROVED;
     });
@@ -177,6 +237,7 @@ export class AccessRequestProcessManager extends ProcessManager<
       id: this.id,
       snapshot,
       decidedBy,
+      whenDecided,
       manager: this.state.manager,
     });
   }
@@ -283,6 +344,64 @@ export class AccessRequestProcessManager extends ProcessManager<
     }
   }
 
+  /**
+   * Rejects a request for access the requester already holds.
+   *
+   * Access is already held when a grant that has not ended confers the same or
+   * a stronger level of the resource for any part of the interval.
+   */
+  private async assertAccessNotHeld(
+    id: AccessRequestId,
+    requester: PersonId,
+    resource: ResourceId,
+    level: AccessLevel,
+    interval: Interval | undefined,
+  ): Promise<void> {
+    if (interval === undefined) {
+      return;
+    }
+    const coverageId = create(GrantCoverageIdSchema, { grantee: requester, resource });
+    const coverage = await this.select(GrantCoverageSchema, {}).findById(coverageId as never);
+    const held = (coverage?.grant ?? []).some(
+      ({ accessLevel, start, end }) =>
+        accessLevel !== undefined &&
+        start !== undefined &&
+        end !== undefined &&
+        accessLevel.rank >= level.rank &&
+        overlaps({ start, end }, interval),
+    );
+    if (held) {
+      throw AccessAlreadyHeld.create({ id });
+    }
+  }
+
+  /**
+   * The grant an extension applies to, when it confers the requester active
+   * access to the resource; otherwise `AccessNotActive`.
+   */
+  private async activeGrant(
+    grant: AccessGrantId,
+    requester: PersonId,
+    resource: ResourceId,
+  ): Promise<ActiveGrant> {
+    const state: AccessGrant | undefined = await this.select(AccessGrantSchema, {}).findById(
+      grant as never,
+    );
+    const { start, end, maximumLifetime } = state ?? {};
+    if (
+      state?.status !== AccessGrantStatus.ACTIVE ||
+      !equals(PersonIdSchema, state.access?.grantee, requester) ||
+      !equals(ResourceIdSchema, state.access?.resource, resource) ||
+      start === undefined ||
+      end === undefined ||
+      maximumLifetime === undefined ||
+      compare(now(), end) >= 0
+    ) {
+      throw AccessNotActive.create({ id: grant });
+    }
+    return { start, end, maximumLifetime };
+  }
+
   /** The resource managers who may decide the request, deduplicated in policy order. */
   private managers(policy: ResourcePolicy): PersonId[] {
     const managers: PersonId[] = [];
@@ -383,4 +502,11 @@ export class AccessRequestProcessManager extends ProcessManager<
     }
     return decidedBy;
   }
+}
+
+/** The period and lifetime limit of a grant that confers active access. */
+interface ActiveGrant {
+  readonly start: Timestamp;
+  readonly end: Timestamp;
+  readonly maximumLifetime: Duration;
 }

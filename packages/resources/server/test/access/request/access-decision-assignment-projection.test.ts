@@ -29,8 +29,16 @@ import {
   resourceUuid,
   seed,
   submitAndAssign,
+  submitExtensionRequest,
 } from "./given/access-request.js";
 import { decisionTasks, managerHasTask } from "./given/access-decision-assignment.js";
+import { SubmitAccessExtensionRequestSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/commands_pb.js";
+import {
+  expireGrant,
+  givenActiveGrant,
+  revokeGrant,
+  testClock,
+} from "../grant/given/access-grant.js";
 
 // The projection reacts to the request's lifecycle facts, produced here through
 // the real submission-and-decision path (the only way to create a request now).
@@ -112,6 +120,40 @@ describe("AccessDecisionAssignmentProjection should", () => {
 
       await awaitTask(box, "primary", "req-canceled", false);
       await awaitTask(box, "second", "req-canceled", false);
+    });
+  });
+
+  describe("on 'AccessGrantRevoked'", () => {
+    it("remove a pending extension of the revoked grant, which can no longer take effect", async () => {
+      const box = await resourcesBlackBox(testClock());
+      const requester = await givenActiveGrant(box, "req-revoked", 10);
+      await requester.post(
+        SubmitAccessExtensionRequestSchema,
+        submitExtensionRequest("ext-revoked", { grant: { uuid: "req-revoked" } }),
+      );
+      await awaitTask(box, "primary", "ext-revoked", true);
+
+      await revokeGrant(requester, "req-revoked", "primary", "Investigation finished.");
+
+      await awaitTask(box, "primary", "ext-revoked", false);
+    });
+  });
+
+  describe("on 'AccessGrantExpired'", () => {
+    it("remove a pending extension of the expired grant, which can no longer take effect", async () => {
+      const clock = testClock();
+      const box = await resourcesBlackBox(clock);
+      const requester = await givenActiveGrant(box, "req-expired", 10);
+      await requester.post(
+        SubmitAccessExtensionRequestSchema,
+        submitExtensionRequest("ext-expired", { grant: { uuid: "req-expired" } }),
+      );
+      await awaitTask(box, "primary", "ext-expired", true);
+
+      clock.advanceMinutes(10);
+      await expireGrant(requester, "req-expired");
+
+      await awaitTask(box, "primary", "ext-expired", false);
     });
   });
 

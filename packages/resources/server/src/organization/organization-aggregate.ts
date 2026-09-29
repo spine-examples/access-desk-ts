@@ -48,11 +48,7 @@ import {
  * One organization - the boundary that owns resources and members and within
  * which access to those resources is granted.
  */
-export class OrganizationAggregate extends Aggregate<
-  OrganizationId,
-  typeof OrganizationSchema,
-  bigint
-> {
+export class OrganizationAggregate extends Aggregate<OrganizationId, typeof OrganizationSchema> {
   /**
    * Brings the organization into existence, rejecting a second creation.
    */

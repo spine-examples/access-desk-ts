@@ -31,8 +31,7 @@ type PolicyEvent = ResourceCreated | ResourceOpenedForRequests | ResourceClosedF
  */
 export class ResourceCatalogProjection extends Projection<
   ResourceId,
-  typeof ResourceCatalogItemSchema,
-  bigint
+  typeof ResourceCatalogItemSchema
 > {
   /**
    * Starts a catalog entry from the resource's complete creation fact.

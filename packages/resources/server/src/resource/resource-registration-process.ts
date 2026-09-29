@@ -57,8 +57,7 @@ import { type ResourceAlreadyExists } from "@access-desk/resources-model/generat
  */
 export class ResourceRegistrationProcessManager extends ProcessManager<
   ResourceId,
-  typeof ResourceRegistrationSchema,
-  bigint
+  typeof ResourceRegistrationSchema
 > {
   /**
    * Remembers a registration request and starts the process.

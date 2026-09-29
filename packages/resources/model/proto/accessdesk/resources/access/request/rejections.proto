@@ -45,6 +45,12 @@ message RequestAlreadyPending {
   accessdesk.resources.AccessRequestId id = 1;
 }
 
+// The requester already holds the same or stronger access for the requested period.
+message AccessAlreadyHeld {
+
+  accessdesk.resources.AccessRequestId id = 1;
+}
+
 // The request has already reached a terminal decision.
 message RequestAlreadyDecided {
 

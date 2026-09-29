@@ -34,8 +34,7 @@ import type {
  */
 export class AccessRequestViewProjection extends Projection<
   AccessRequestId,
-  typeof AccessRequestViewSchema,
-  bigint
+  typeof AccessRequestViewSchema
 > {
   /** Seeds a newly submitted first-time request as pending a decision. */
   @Subscribe

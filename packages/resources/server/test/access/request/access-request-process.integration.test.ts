@@ -36,6 +36,7 @@ import {
   submitRequest,
 } from "./given/access-request.js";
 import { managerHasTask, readAssignments } from "./given/access-decision-assignment.js";
+import { givenActiveGrant, minutesIn, testClock } from "../grant/given/access-grant.js";
 
 const { recordEvents } = eventRecording(testActorContext);
 
@@ -91,16 +92,19 @@ describe("AccessRequestProcessManager should", () => {
   });
 
   it("renew access end to end: submit an extension, assign it, approve it, and expose the decision", async () => {
-    const box = await resourcesBlackBox();
-    const requester = box.onBehalfOf(actor);
-    await seed(box, [actor, "primary"]);
+    const box = await resourcesBlackBox(testClock());
+    const requester = await givenActiveGrant(box, "req-int-held", 10);
 
     expect(
-      (await requester.post(SubmitAccessExtensionRequestSchema, submitExtensionRequest("ext-int")))
-        .kind,
+      (
+        await requester.post(
+          SubmitAccessExtensionRequestSchema,
+          submitExtensionRequest("ext-int", { grant: { uuid: "req-int-held" } }),
+        )
+      ).kind,
     ).toBe("ok");
 
-    // The renewal reaches the manager's queue carrying its grant and duration.
+    // The renewal reaches the manager's queue carrying its grant, duration, and proposed end.
     await box.eventually(
       () => managerHasTask(requester, "primary", "ext-int"),
       (present) => present,
@@ -111,8 +115,8 @@ describe("AccessRequestProcessManager should", () => {
       ?.task.find((task) => task.request?.uuid === "ext-int")?.snapshot?.kind;
     expect(kind?.case).toBe("extension");
     if (kind?.case === "extension") {
-      expect(kind.value.grant?.uuid).toBe("grant-1");
-      expect(kind.value.duration?.seconds).toBe(120n);
+      expect(kind.value.grant?.uuid).toBe("req-int-held");
+      expect(kind.value.proposedEnd).toEqual(minutesIn(12));
     }
 
     // The manager approves; the decision is exposed and the task is cleared.
