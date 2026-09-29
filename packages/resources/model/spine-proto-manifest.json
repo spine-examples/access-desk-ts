@@ -1,9 +1,14 @@
 {
   "formatVersion": 2,
-  "generationId": "eda4256b-28ee-452b-bffc-27a460921be4",
+  "generationId": "22024242-07d8-4c7b-8df6-1c61b29c77e2",
   "packageName": "@access-desk/resources-model",
   "packageVersion": "0.0.0",
   "protoFiles": [
+    "accessdesk/resources/access/grant/access_grant.proto",
+    "accessdesk/resources/access/grant/commands.proto",
+    "accessdesk/resources/access/grant/events.proto",
+    "accessdesk/resources/access/grant/grant_issuance.proto",
+    "accessdesk/resources/access/grant/rejections.proto",
     "accessdesk/resources/access/request/access_request.proto",
     "accessdesk/resources/access/request/commands.proto",
     "accessdesk/resources/access/request/events.proto",
@@ -20,9 +25,17 @@
     "accessdesk/resources/resource/resource_registration.proto",
     "accessdesk/resources/resource/resource_registration_commands.proto",
     "accessdesk/resources/resource/resource_registration_events.proto",
+    "accessdesk/resources/scheduling/commands.proto",
+    "accessdesk/resources/scheduling/events.proto",
+    "accessdesk/resources/scheduling/scheduling.proto",
     "accessdesk/resources/values.proto"
   ],
   "generatedExports": {
+    "accessdesk/resources/access/grant/access_grant.proto": "generated/accessdesk/resources/access/grant/access_grant_pb.js",
+    "accessdesk/resources/access/grant/commands.proto": "generated/accessdesk/resources/access/grant/commands_pb.js",
+    "accessdesk/resources/access/grant/events.proto": "generated/accessdesk/resources/access/grant/events_pb.js",
+    "accessdesk/resources/access/grant/grant_issuance.proto": "generated/accessdesk/resources/access/grant/grant_issuance_pb.js",
+    "accessdesk/resources/access/grant/rejections.proto": "generated/accessdesk/resources/access/grant/rejections_pb.js",
     "accessdesk/resources/access/request/access_request.proto": "generated/accessdesk/resources/access/request/access_request_pb.js",
     "accessdesk/resources/access/request/commands.proto": "generated/accessdesk/resources/access/request/commands_pb.js",
     "accessdesk/resources/access/request/events.proto": "generated/accessdesk/resources/access/request/events_pb.js",
@@ -39,6 +52,9 @@
     "accessdesk/resources/resource/resource_registration.proto": "generated/accessdesk/resources/resource/resource_registration_pb.js",
     "accessdesk/resources/resource/resource_registration_commands.proto": "generated/accessdesk/resources/resource/resource_registration_commands_pb.js",
     "accessdesk/resources/resource/resource_registration_events.proto": "generated/accessdesk/resources/resource/resource_registration_events_pb.js",
+    "accessdesk/resources/scheduling/commands.proto": "generated/accessdesk/resources/scheduling/commands_pb.js",
+    "accessdesk/resources/scheduling/events.proto": "generated/accessdesk/resources/scheduling/events_pb.js",
+    "accessdesk/resources/scheduling/scheduling.proto": "generated/accessdesk/resources/scheduling/scheduling_pb.js",
     "accessdesk/resources/values.proto": "generated/accessdesk/resources/values_pb.js"
   },
   "dependencies": [

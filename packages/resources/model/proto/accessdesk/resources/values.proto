@@ -139,22 +139,6 @@ enum AccessGrantStatus {
   REVOKED = 7;
 }
 
-// Where a planned command is in its life.
-enum ScheduleStatus {
-
-  // The unset schedule status.
-  SS_UNSPECIFIED = 0;
-
-  // The command waits for its due time.
-  AWAITING = 1;
-
-  // The command was sent at its due time.
-  DISPATCHED = 2;
-
-  // The command was called off and will not be sent.
-  WITHDRAWN = 3;
-}
-
 // A scheduled half-open access interval.
 message ScheduledAccessPeriod {
 
