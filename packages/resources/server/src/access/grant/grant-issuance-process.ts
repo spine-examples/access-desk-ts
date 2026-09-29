@@ -1,0 +1,183 @@
+/*
+ * Copyright 2026 CodeMatters, Lda.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+ * except in compliance with the License. You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under
+ * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+ * either express or implied. See the License for the specific language governing permissions
+ * and limitations under the License.
+ */
+
+import { create } from "@bufbuild/protobuf";
+import { AnyMessages } from "@spine-event-engine/core";
+import { Command, ProcessManager, React } from "@spine-event-engine/server";
+import {
+  AccessRequestIdSchema,
+  type AccessGrantId,
+} from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
+import {
+  AccessGrantStatus,
+  type AccessExtension,
+  type NewAccessRequest,
+} from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
+import { ResourceCatalogItemSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_pb.js";
+import type { AccessRequestApproved } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
+import { GrantIssuanceSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/grant_issuance_pb.js";
+import {
+  ActivateAccessGrantSchema,
+  CreateAccessGrantSchema,
+  ExtendAccessGrantSchema,
+  type ActivateAccessGrant,
+  type CreateAccessGrant,
+  type ExtendAccessGrant,
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/commands_pb.js";
+import {
+  AccessGrantActivationScheduledSchema,
+  type AccessGrantActivationScheduled,
+  type AccessGrantCreated,
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
+import {
+  ScheduleCommandSchema,
+  type ScheduleCommand,
+} from "@access-desk/resources-model/generated/accessdesk/resources/scheduling/commands_pb.js";
+import type { CommandScheduled } from "@access-desk/resources-model/generated/accessdesk/resources/scheduling/events_pb.js";
+import { equals } from "../../proto/equals.js";
+import { effectiveInterval, requestedInterval } from "../access-period.js";
+import { between } from "../../time/interval.js";
+
+/**
+ * The issuing of one access grant from approved requests.
+ *
+ * 1. An approved first-time request creates the grant for the access it
+ *    granted; an approved extension request moves the grant's end to the end
+ *    it proposed.
+ * 2. Access due to begin now is activated at once. Access that begins later
+ *    has its activation scheduled, and is reported as scheduled once the plan
+ *    is in place.
+ */
+export class GrantIssuanceProcessManager extends ProcessManager<
+  AccessGrantId,
+  typeof GrantIssuanceSchema
+> {
+  /**
+   * Gives an approved request its effect on the grant.
+   *
+   * 1. An approved first-time request creates the grant.
+   * 2. An approved extension request extends it.
+   */
+  @Command
+  async issueOnApproval(
+    event: AccessRequestApproved,
+  ): Promise<CreateAccessGrant | ExtendAccessGrant> {
+    const kind = event.snapshot?.kind;
+    switch (kind?.case) {
+      case "newRequest":
+        return this.create(event, kind.value);
+      case "extension":
+        return this.extend(event, kind.value);
+      default:
+        throw new Error("An approved request must ask for new access or for an extension.");
+    }
+  }
+
+  /**
+   * Starts a newly created grant, noting the approved request that issued it.
+   *
+   * 1. Access that begins later has its activation scheduled for its start.
+   * 2. Any other access is activated at once — which ends it without activation
+   *    when its end has already passed.
+   */
+  @Command
+  startGrantOnCreation(event: AccessGrantCreated): ActivateAccessGrant | ScheduleCommand {
+    const request = event.request;
+    this.update((draft) => {
+      draft.id = this.id;
+      draft.request = request;
+    });
+    switch (event.status) {
+      case AccessGrantStatus.PENDING_ACTIVATION:
+        return create(ActivateAccessGrantSchema, { id: this.id });
+      case AccessGrantStatus.PENDING_SCHEDULING:
+        return create(ScheduleCommandSchema, {
+          id: { uuid: crypto.randomUUID() },
+          command: AnyMessages.pack(
+            ActivateAccessGrantSchema,
+            create(ActivateAccessGrantSchema, { id: this.id }),
+          ),
+          due: event.start,
+        });
+      default:
+        throw new Error("A grant is created pending either its scheduling or its activation.");
+    }
+  }
+
+  /** Reports the grant's activation as scheduled once the plan is in place. */
+  @React
+  onActivationScheduled(event: CommandScheduled): AccessGrantActivationScheduled {
+    return create(AccessGrantActivationScheduledSchema, { id: this.id, start: event.due });
+  }
+
+  /**
+   * Creates the grant for the access an approved first-time request grants.
+   *
+   * 1. Immediate access counts its duration from the approval.
+   * 2. Scheduled access approved within its interval begins at the approval.
+   * 3. Scheduled access approved before its start keeps its interval and waits
+   *    for its start.
+   * 4. Scheduled access approved after its end keeps its interval and never
+   *    becomes active.
+   */
+  private async create(
+    event: AccessRequestApproved,
+    request: NewAccessRequest,
+  ): Promise<CreateAccessGrant> {
+    const approvedAt = event.whenDecided;
+    const { resource, accessLevel, period } = request;
+    const interval =
+      approvedAt === undefined || period === undefined
+        ? undefined
+        : (effectiveInterval(period, approvedAt) ?? requestedInterval(period, approvedAt));
+    if (interval === undefined) {
+      throw new Error("An approved first-time request must carry its approval time and period.");
+    }
+    const policy = (await this.select(ResourceCatalogItemSchema, {}).findById(resource as never))
+      ?.policy;
+    this.update((draft) => {
+      draft.id = this.id;
+      draft.request = event.id;
+    });
+    return create(CreateAccessGrantSchema, {
+      id: this.id,
+      request: event.id,
+      access: { grantee: event.snapshot?.requester, resource, accessLevel },
+      start: interval.start,
+      end: interval.end,
+      maximumLifetime: policy?.maximumDuration ?? between(interval.start, interval.end),
+      approvedBy: event.decidedBy,
+      manager: event.manager,
+    });
+  }
+
+  /** Moves the grant's end to the end an approved extension request proposed. */
+  private extend(event: AccessRequestApproved, extension: AccessExtension): ExtendAccessGrant {
+    const request = event.id;
+    if (
+      request !== undefined &&
+      !this.state.extension.some((applied) => equals(AccessRequestIdSchema, applied, request))
+    ) {
+      this.update((draft) => {
+        draft.id = this.id;
+        draft.extension = [...draft.extension, request];
+      });
+    }
+    return create(ExtendAccessGrantSchema, {
+      id: this.id,
+      request,
+      end: extension.proposedEnd,
+    });
+  }
+}
