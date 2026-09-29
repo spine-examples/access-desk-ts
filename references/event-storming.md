@@ -51,13 +51,13 @@ for policy; there is no separate request-policy mirror projection.
 
 #### Request & approval
 
-| Owner               | Trigger (actor/event) | Command                         | Event(s)                           | Rejections                                                                                               |
-| ------------------- | --------------------- | ------------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Access Request (PM) | Requester             | Submit Access Request           | Access Request Submitted           | Resource Not Open For Requests; Access Level Not Offered; Requested Duration Too Long; Request Already Pending |
-| Access Request (PM) | Requester             | Submit Access Extension Request | Access Extension Request Submitted | Resource Not Open For Requests; Requested Duration Too Long; Request Already Pending                             |
-| Access Request (PM) | Manager               | Approve Access Request          | Access Request Approved            | Request Already Decided; Not An Eligible Manager                                                            |
-| Access Request (PM) | Manager               | Deny Access Request             | Access Request Denied              | Request Already Decided; Not An Eligible Manager                                                            |
-| Access Request (PM) | Requester             | Cancel Access Request           | Access Request Canceled            | Request Already Decided                                                                                  |
+| Owner               | Trigger (actor/event) | Command                         | Event(s)                           | Rejections                                                                                                                          |
+| ------------------- | --------------------- | ------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Access Request (PM) | Requester             | Submit Access Request           | Access Request Submitted           | Resource Not Open For Requests; Access Level Not Offered; Requested Duration Too Long; Request Already Pending; Access Already Held |
+| Access Request (PM) | Requester             | Submit Access Extension Request | Access Extension Request Submitted | Resource Not Open For Requests; Access Not Active; Requested Duration Too Long; Request Already Pending                             |
+| Access Request (PM) | Manager               | Approve Access Request          | Access Request Approved            | Request Already Decided; Not An Eligible Manager; Access Already Held                                                               |
+| Access Request (PM) | Manager               | Deny Access Request             | Access Request Denied              | Request Already Decided; Not An Eligible Manager                                                                                    |
+| Access Request (PM) | Requester             | Cancel Access Request           | Access Request Canceled            | Request Already Decided                                                                                                             |
 
 Submission captures managers in policy order and removes duplicates. A
 requester who is also a manager may decide the request.
@@ -69,21 +69,22 @@ Projection inputs and outputs drawn on the board:
   Request Canceled — the requester's read model of each request and its status.
 - **Access Decision Assignment** receives Access Request Submitted, Access
   Extension Request Submitted, Access Request Approved, Access Request Denied,
-  and Access Request Canceled.
+  and Access Request Canceled; it also receives Access Grant Expired and Access
+  Grant Revoked, dropping pending extensions of that grant.
 
-#### Grant issuance — Grant Issuance PM, Access Grant aggregate (forward design)
+#### Grant issuance — Grant Issuance PM, Access Grant aggregate
 
-| Owner               | Trigger (actor/event)                 | Command                                                             | Event(s)                          |
-| ------------------- | ------------------------------------- | ------------------------------------------------------------------- | --------------------------------- |
-| Grant Issuance (PM) | on Access Request Approved            | Create Access Grant `OR` Extend Access Grant                        | —                                 |
-| Access Grant        | Grant Issuance (PM)                   | Create Access Grant                                                 | Access Grant Created              |
-| Access Grant        | Grant Issuance (PM)                   | Extend Access Grant                                                 | Access Grant Extended             |
-| Grant Issuance (PM) | on Access Grant Created               | Activate Access Grant `OR` Schedule Command (Activate Access Grant) | —                                 |
-| Access Grant        | Grant Issuance (PM), immediate branch | Activate Access Grant                                               | Access Grant Activated            |
-| Grant Issuance (PM) | on Command Scheduled                  | —                                                                   | Access Grant Activation Scheduled |
-| Access Grant        | Scheduling, due                       | Activate Access Grant                                               | Access Grant Activated            |
+| Owner               | Trigger (actor/event)                 | Command                                                             | Event(s)                                                            | Rejections               |
+| ------------------- | ------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------ |
+| Grant Issuance (PM) | on Access Request Approved            | Create Access Grant `OR` Extend Access Grant                        | —                                                                   | —                        |
+| Access Grant        | Grant Issuance (PM)                   | Create Access Grant                                                 | Access Grant Created                                                | —                        |
+| Access Grant        | Grant Issuance (PM)                   | Extend Access Grant                                                 | Access Grant Extended                                               | Access Not Active        |
+| Grant Issuance (PM) | on Access Grant Created               | Activate Access Grant `OR` Schedule Command (Activate Access Grant) | —                                                                   | —                        |
+| Access Grant        | Grant Issuance (PM), immediate branch | Activate Access Grant                                               | Access Grant Activated `OR` Access Grant Expired Without Activation | —                        |
+| Grant Issuance (PM) | on Command Scheduled                  | —                                                                   | Access Grant Activation Scheduled                                   | —                        |
+| Access Grant        | Scheduling, due                       | Activate Access Grant                                               | Access Grant Activated `OR` Access Grant Expired Without Activation | Access Grant Not Pending |
 
-#### Revocation & expiration (forward design)
+#### Revocation & expiration — Access Grant aggregate
 
 | Owner                 | Trigger (actor/event)         | Command                                | Event(s)                            | Rejections        |
 | --------------------- | ----------------------------- | -------------------------------------- | ----------------------------------- | ----------------- |

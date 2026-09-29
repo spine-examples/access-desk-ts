@@ -30,7 +30,7 @@ baseline: Node.js 24 or newer, pnpm 11.9, strict TypeScript, and ESM.
 The system has two bounded contexts:
 
 | Bounded context | Owns                                                                                                                                                                                                                       | Tenant mode                        |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
 | Identity        | Global users, registration, authentication identity, user activity                                                                                                                                                         | Global/single-tenant control plane |
 | Resources       | Organizations, memberships, resources, ordered access levels, resource managers, request policy, requests, approval decisions, grants, extensions, revocation, the durable scheduling those rely on, and audit projections | Organization-scoped                |
 
@@ -299,40 +299,33 @@ manages its scheduling lifecycle. Because it lives inside Resources, the grant
 facts it reacts to and the scheduling facts it emits are domestic Resources
 events rather than cross-context integration facts.
 
-The process persists an allowlisted **application command value** in Protobuf
-`Any` together with its schedule ID, authoritative organization, approved
-purpose and target, due time, and current status. Type URLs must be registered,
-explicitly allowlisted, tenant-compatible, target-compatible, size-bounded,
-schema-compatible, and unpackable to the expected command value. The payload
-never supplies a trusted tenant, actor, target route, or credentials.
+The process persists a Resources **application command value** in Protobuf
+`Any` together with its schedule ID, due time, and current status. The
+organization is not stored: the plan lives in the organization's tenant, which
+is authoritative. Its type must be registered and belong to the generated
+`SchedulableCommand` interface; its payload must be schema-compatible and
+unpackable. `ActivateAccessGrant` and `ExpireAccessGrant` are the schedulable commands.
+The payload never supplies a trusted tenant, actor, route, or credentials.
 
 The required choreography is:
 
 1. Resources commits a genuine fact such as `AccessGrantCreated` with a
-   pending-scheduling status and activation/expiration scheduling intents.
-2. The `Scheduling` process reacts to that Resources fact and accepts the
-   corresponding domestic `ScheduleCommand`.
+   pending-scheduling status and an activation scheduling intent.
+2. The grant issuance process reacts to that Resources fact and sends the
+   corresponding domestic `ScheduleCommand` to `Scheduling`.
 3. The process persists the planned command and emits `CommandScheduled` only
    after that state is durable.
-4. The grant lifecycle consumes the scheduling confirmation and establishes
-   scheduled state only after every required schedule is confirmed. Active state
+4. The grant lifecycle consumes the activation scheduling confirmation and
+   establishes scheduled state only after the plan is confirmed. Active state
    additionally requires successful handling and the resulting fact from the
    target activation command.
-5. When the due time passes, the same `Scheduling` process sends its stored
-   command through the tenant-aware client supplied by the application. The
-   client sends the command to the same server, and the target receives an
-   ordinary domestic command.
+5. At the due time, the planned command is sent to its target as an ordinary
+   domestic command.
 
-The process accepts `ScheduleCommand`, `RescheduleCommand`, and
-`CancelScheduledCommand`, and emits `CommandScheduled`, `CommandRescheduled`,
-and `ScheduledCommandCanceled`. Extension approval is a genuine grant fact the
-`Scheduling` process reacts to, rescheduling domestically and confirming it; the
-grant applies the extension only after confirmation. Revocation is authoritative
-in the grant lifecycle and emits a fact the `Scheduling` process reacts to,
-canceling domestically.
+The generated `SchedulableCommand` interface fixes the set of command schemas
+the process may return. The payload cannot select an endpoint, context, actor,
+or tenant.
 
-The allowlist fixes the command schema and target route for each approved type
-and purpose. The payload cannot select an endpoint, context, actor, or tenant.
 Logs and Audit retain only the minimum redacted scheduling and correlation data,
 never the stored command payload.
 

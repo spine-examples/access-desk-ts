@@ -69,28 +69,28 @@ preserved.
 
 Use Standard speed. Keep Fast mode disabled and do not use Max or Ultra
 reasoning in the normal delivery cycle. The root orchestrator defaults to
-`gpt-5.6-sol` with `medium` reasoning.
+`gpt-6-astra` with `high` reasoning.
 
 Use only the roles configured in `.codex/config.toml` and
 `.codex/agents/*.toml`; do not invent, rename, merge, or replace project roles:
 
-- `requirements_splitter`: `gpt-5.6-sol` / `high`, only for
+- `requirements_splitter`: `gpt-6-astra` / `high`, only for
   architecture-significant requirements, Event Storming reconciliation,
   public or serialized contracts, domain semantics, or a demonstrated
   architectural block.
-- `implementer`: `gpt-5.6-terra` / `medium`, for ordinary TypeScript
+- `implementer`: `gpt-6-sol` / `medium`, for ordinary TypeScript
   implementation, fixes, bounded refactoring, and correction batches.
-- `style_maintainability_reviewer`: `gpt-5.6-terra` / `high`.
-- `documentation_reviewer`: `gpt-5.6-luna` / `medium`.
-- `typescript_api_docs_reviewer`: `gpt-5.6-terra` / `high`.
-- `performance_reliability_reviewer`: `gpt-5.6-terra` / `high`.
-- `security_reviewer`: `gpt-5.6-terra` / `high`, as the final security lane
+- `style_maintainability_reviewer`: `gpt-6-sol` / `medium`.
+- `documentation_reviewer`: `gpt-6-luna` / `medium`.
+- `typescript_api_docs_reviewer`: `gpt-6-sol` / `medium`.
+- `performance_reliability_reviewer`: `gpt-6-sol` / `medium`.
+- `security_reviewer`: `gpt-6-sol` / `high`, as the final security lane
   when the change affects trust boundaries or release readiness.
 
 Deterministic builds, tests, typechecking, linting, log triage, and repository
 scans are orchestrator-dispatched functions, not new agent identities. When the
 execution surface supports delegating such a function without creating a
-project role, use `gpt-5.6-luna` / `low`, or `medium` when classification or
+project role, use `gpt-6-luna` / `low`, or `medium` when classification or
 version-specific judgment is required.
 
 Always set the model and reasoning explicitly when dispatching a subagent; do
@@ -103,7 +103,7 @@ occurred.
 
 At the beginning of multi-agent work, confirm that the selected execution
 surface supports the required profiles and explicit child dispatch. Escalate to
-`gpt-5.6-sol` / `high` only for high-risk architecture or correctness ambiguity,
+`gpt-6-astra` / `high` only for high-risk architecture or correctness ambiguity,
 or after a lower-cost profile cannot establish the answer. Run one such
 architecture pass for an approved batch of work and repeat it only after a
 material contract change or a demonstrated architectural blocker.
