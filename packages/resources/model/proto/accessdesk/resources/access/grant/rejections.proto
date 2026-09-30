@@ -22,7 +22,7 @@ import "spine/options.proto";
 option (type_url_prefix) = "type.accessdesk";
 
 // The grant does not confer active access, so it cannot be changed this way.
-message AccessNotActive {
+message AccessGrantNotActive {
 
   accessdesk.resources.AccessGrantId id = 1;
 }
@@ -36,12 +36,6 @@ message NotResourceManager {
 // The grant no longer waits for its access to begin: the access is already
 // active, or has ended.
 message AccessGrantNotPending {
-
-  accessdesk.resources.AccessGrantId id = 1;
-}
-
-// The access is not yet due to end.
-message GrantExpirationNotDue {
 
   accessdesk.resources.AccessGrantId id = 1;
 }

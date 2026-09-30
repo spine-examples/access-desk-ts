@@ -78,7 +78,7 @@ import {
   RequestAlreadyDecided,
   ResourceNotOpenForRequests,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/rejections.js";
-import { AccessNotActive } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/rejections.js";
+import { AccessGrantNotActive } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/rejections.js";
 import { effectiveInterval, requestedInterval } from "../access-period.js";
 import { now } from "../../time/clock.js";
 import {
@@ -163,7 +163,7 @@ export class AccessRequestProcessManager extends ProcessManager<
   @Assign
   @Throws(
     ResourceNotOpenForRequests,
-    AccessNotActive,
+    AccessGrantNotActive,
     RequestedDurationTooLong,
     RequestAlreadyPending,
     AccessAlreadyHeld,
@@ -225,7 +225,7 @@ export class AccessRequestProcessManager extends ProcessManager<
    *    the added time.
    */
   @Assign
-  @Throws(RequestAlreadyDecided, NotAnEligibleManager, AccessAlreadyHeld, AccessNotActive)
+  @Throws(RequestAlreadyDecided, NotAnEligibleManager, AccessAlreadyHeld, AccessGrantNotActive)
   async approveAccessRequest(command: ApproveAccessRequest): Promise<AccessRequestApproved> {
     this.assertPending(command.id);
     const snapshot = this.requireSnapshot();
@@ -407,7 +407,7 @@ export class AccessRequestProcessManager extends ProcessManager<
 
   /**
    * The grant an extension applies to, when it confers the requester active
-   * access — to the resource, when one is named; otherwise `AccessNotActive`.
+   * access — to the resource, when one is named; otherwise `AccessGrantNotActive`.
    */
   private async activeGrant(
     grant: AccessGrantId,
@@ -431,7 +431,7 @@ export class AccessRequestProcessManager extends ProcessManager<
       maximumLifetime === undefined ||
       compare(now(), end) >= 0
     ) {
-      throw AccessNotActive.create({ id: grant });
+      throw AccessGrantNotActive.create({ id: grant });
     }
     return { resource: heldResource, accessLevel, start, end, maximumLifetime };
   }

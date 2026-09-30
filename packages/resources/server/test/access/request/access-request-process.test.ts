@@ -31,7 +31,7 @@ import {
   RequestAlreadyDecidedSchema,
   ResourceNotOpenForRequestsSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/rejections_pb.js";
-import { AccessNotActiveSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/rejections_pb.js";
+import { AccessGrantNotActiveSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/rejections_pb.js";
 import {
   SubmitAccessExtensionRequestSchema,
   SubmitAccessRequestSchema,
@@ -361,22 +361,22 @@ describe("AccessRequestProcessManager should", () => {
       );
     });
 
-    it("reject a grant the requester does not hold ('AccessNotActive')", async () => {
+    it("reject a grant the requester does not hold ('AccessGrantNotActive')", async () => {
       const box = await resourcesBlackBox();
       await seed(box, [actor, "primary"]);
       const requester = box.onBehalfOf(actor);
-      await expectRejection(box, requester, AccessNotActiveSchema, () =>
+      await expectRejection(box, requester, AccessGrantNotActiveSchema, () =>
         requester.post(SubmitAccessExtensionRequestSchema, submitExtensionRequest("ext-unheld")),
       );
     });
 
-    it("reject a grant that was revoked ('AccessNotActive')", async () => {
+    it("reject a grant that was revoked ('AccessGrantNotActive')", async () => {
       const box = await resourcesBlackBox(testClock());
       const requester = await givenActiveGrant(box, "req-revoked", 10);
       await revokeGrant(requester, "req-revoked", "primary", "No longer needed.");
       await awaitGrantStatus(box, requester, "req-revoked", AccessGrantStatus.REVOKED);
 
-      await expectRejection(box, requester, AccessNotActiveSchema, () =>
+      await expectRejection(box, requester, AccessGrantNotActiveSchema, () =>
         requester.post(
           SubmitAccessExtensionRequestSchema,
           submitExtensionRequest("ext-revoked", { grant: { uuid: "req-revoked" } }),
@@ -524,13 +524,13 @@ describe("AccessRequestProcessManager should", () => {
       expect(await statusOf(requester, "ext-overtaken")).toBe(AccessRequestStatus.PENDING);
     });
 
-    it("reject an extension of access revoked since it was submitted ('AccessNotActive')", async () => {
+    it("reject an extension of access revoked since it was submitted ('AccessGrantNotActive')", async () => {
       const box = await resourcesBlackBox(testClock());
       const requester = await givenPendingExtension(box, "req-revoked-since", "ext-too-late");
       await revokeGrant(requester, "req-revoked-since", "primary", "No longer needed.");
       await awaitGrantStatus(box, requester, "req-revoked-since", AccessGrantStatus.REVOKED);
 
-      await expectRejection(box, requester, AccessNotActiveSchema, () =>
+      await expectRejection(box, requester, AccessGrantNotActiveSchema, () =>
         approveAccessRequest(requester, "ext-too-late", "primary"),
       );
       expect(await statusOf(requester, "ext-too-late")).toBe(AccessRequestStatus.PENDING);

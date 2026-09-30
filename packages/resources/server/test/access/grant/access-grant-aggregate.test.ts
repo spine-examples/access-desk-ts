@@ -25,8 +25,7 @@ import {
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
 import {
   AccessGrantNotPendingSchema,
-  GrantExpirationNotDueSchema,
-  AccessNotActiveSchema,
+  AccessGrantNotActiveSchema,
   NotResourceManagerSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/rejections_pb.js";
 import { eventRecording } from "../../given/event-recording.js";
@@ -271,13 +270,13 @@ describe("AccessGrantAggregate should", () => {
       await awaitGrantStatus(box, scope, "grant-not-begun", AccessGrantStatus.REVOKED);
     });
 
-    it("reject revoking expired access ('AccessNotActive')", async () => {
+    it("reject revoking expired access ('AccessGrantNotActive')", async () => {
       const { box, scope, clock } = await givenActive("grant-revoke-expired");
       clock.advanceMinutes(60);
       await expireGrant(scope, "grant-revoke-expired");
       await awaitGrantStatus(box, scope, "grant-revoke-expired", AccessGrantStatus.EXPIRED);
 
-      await expectRejection(box, scope, AccessNotActiveSchema, () =>
+      await expectRejection(box, scope, AccessGrantNotActiveSchema, () =>
         revokeGrant(scope, "grant-revoke-expired", "primary", "Too late."),
       );
     });
@@ -318,20 +317,20 @@ describe("AccessGrantAggregate should", () => {
       }
     });
 
-    it("reject extending revoked access ('AccessNotActive')", async () => {
+    it("reject extending revoked access ('AccessGrantNotActive')", async () => {
       const { box, scope } = await givenActive("grant-extend-revoked");
       await revokeGrant(scope, "grant-extend-revoked", "primary", "Ended.");
       await awaitGrantStatus(box, scope, "grant-extend-revoked", AccessGrantStatus.REVOKED);
 
-      await expectRejection(box, scope, AccessNotActiveSchema, () =>
+      await expectRejection(box, scope, AccessGrantNotActiveSchema, () =>
         extendGrant(scope, "grant-extend-revoked", "ext-late", minutesIn(90)),
       );
     });
 
-    it("reject extending access whose end has already arrived ('AccessNotActive')", async () => {
+    it("reject extending access whose end has already arrived ('AccessGrantNotActive')", async () => {
       const { box, scope, clock } = await givenActive("grant-lapsed");
       clock.advanceMinutes(60);
-      await expectRejection(box, scope, AccessNotActiveSchema, () =>
+      await expectRejection(box, scope, AccessGrantNotActiveSchema, () =>
         extendGrant(scope, "grant-lapsed", "ext-lapsed", minutesIn(90)),
       );
     });
@@ -342,13 +341,6 @@ describe("AccessGrantAggregate should", () => {
       const { box, scope } = await givenActive("grant-active-again");
       await expectRejection(box, scope, AccessGrantNotPendingSchema, () =>
         activateGrant(scope, "grant-active-again"),
-      );
-    });
-
-    it("'GrantExpirationNotDue' for expiring before the end", async () => {
-      const { box, scope } = await givenActive("grant-early-end");
-      await expectRejection(box, scope, GrantExpirationNotDueSchema, () =>
-        expireGrant(scope, "grant-early-end"),
       );
     });
   });

@@ -44,8 +44,7 @@ import {
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
 import {
   AccessGrantNotPending,
-  AccessNotActive,
-  GrantExpirationNotDue,
+  AccessGrantNotActive,
   NotResourceManager,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/rejections.js";
 import { equals } from "../../proto/equals.js";
@@ -148,17 +147,16 @@ export class AccessGrantAggregate extends Aggregate<AccessGrantId, typeof Access
    * Ends active access once its planned end has arrived.
    *
    * Expiration happens at most once: an expiration sent again or after the
-   * grant has ended, or planned for an end the access has since been extended
-   * past, is refused and changes nothing.
+   * grant has ended is refused and changes nothing.
    */
   @Assign
-  @Throws(AccessNotActive, GrantExpirationNotDue)
+  @Throws(AccessGrantNotActive)
   expireAccessGrant(_command: ExpireAccessGrant): AccessGrantExpired {
     if (this.state.status !== AccessGrantStatus.ACTIVE) {
-      throw AccessNotActive.create({ id: this.id });
+      throw AccessGrantNotActive.create({ id: this.id });
     }
     if (!this.hasReachedEnd()) {
-      throw GrantExpirationNotDue.create({ id: this.id });
+      throw new Error("A grant's access expires only once its end has arrived.");
     }
     this.update((draft) => {
       draft.status = AccessGrantStatus.EXPIRED;
@@ -177,7 +175,7 @@ export class AccessGrantAggregate extends Aggregate<AccessGrantId, typeof Access
    * Both active access and access that has yet to begin may be revoked.
    */
   @Assign
-  @Throws(NotResourceManager, AccessNotActive)
+  @Throws(NotResourceManager, AccessGrantNotActive)
   revokeAccessGrant(command: RevokeAccessGrant): AccessGrantRevoked {
     const revokedBy = this.assertManager(command.manager);
     const status = this.state.status;
@@ -185,7 +183,7 @@ export class AccessGrantAggregate extends Aggregate<AccessGrantId, typeof Access
       (status !== AccessGrantStatus.ACTIVE && status !== AccessGrantStatus.PENDING_SCHEDULING) ||
       this.hasReachedEnd()
     ) {
-      throw AccessNotActive.create({ id: this.id });
+      throw AccessGrantNotActive.create({ id: this.id });
     }
     this.update((draft) => {
       draft.status = AccessGrantStatus.REVOKED;
@@ -208,10 +206,10 @@ export class AccessGrantAggregate extends Aggregate<AccessGrantId, typeof Access
    * awaited approval is refused.
    */
   @Assign
-  @Throws(AccessNotActive)
+  @Throws(AccessGrantNotActive)
   extendAccessGrant(command: ExtendAccessGrant): AccessGrantExtended {
     if (this.state.status !== AccessGrantStatus.ACTIVE || this.hasReachedEnd()) {
-      throw AccessNotActive.create({ id: this.id });
+      throw AccessGrantNotActive.create({ id: this.id });
     }
     const previousEnd = this.state.end;
     const { start, maximumLifetime } = this.state;
