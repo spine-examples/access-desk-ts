@@ -220,9 +220,9 @@ export class AccessRequestProcessManager extends ProcessManager<
    * 1. Approval fixes when first-time access begins, so the requester must not
    *    already hold the same or stronger access for that effective period.
    * 2. An extension extends active access only, so the grant it applies to must
-   *    still confer the requester active access.
+   *    still give the requester active access.
    * 3. An extension is checked again against access granted since it was
-   *    submitted, so no other grant may confer the same or stronger access for
+   *    submitted, so no other grant may give the same or stronger access for
    *    the added time.
    */
   @Assign
@@ -375,7 +375,7 @@ export class AccessRequestProcessManager extends ProcessManager<
   /**
    * Rejects a request for access the requester already holds.
    *
-   * Access is already held when a grant that has not ended confers the same or
+   * Access is already held when a grant that has not ended gives the same or
    * a stronger level of the resource for any part of the interval. The grant
    * an extension applies to is not counted against it.
    */
@@ -407,8 +407,8 @@ export class AccessRequestProcessManager extends ProcessManager<
   }
 
   /**
-   * The grant an extension applies to, when it confers the requester access now,
-   * to the resource when one is named. A grant confers access now when it is not
+   * The grant an extension applies to, when it gives the requester access now,
+   * to the resource when one is named. A grant gives access now when it is not
    * revoked and the current time is within its period. Otherwise the result is
    * `AccessGrantNotActive`.
    */
@@ -542,7 +542,7 @@ export class AccessRequestProcessManager extends ProcessManager<
   }
 }
 
-/** The access and period of a grant that confers access now. */
+/** The access and period of a grant that gives access now. */
 interface ActiveGrant {
   readonly resource: ResourceId;
   readonly accessLevel: AccessLevel;

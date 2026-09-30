@@ -61,7 +61,7 @@ import { effectiveInterval, requestedInterval } from "../access-period.js";
  *
  * A manager of the resource may revoke the grant, with a reason, before its end.
  *
- * The grant confers access while it is not revoked and the current time is
+ * The grant gives access while it is not revoked and the current time is
  * within its period. Nothing changes when the period begins or ends. Extending
  * and revoking check the grant against the current time when they are handled.
  */
@@ -126,7 +126,7 @@ export class AccessGrantProcessManager extends ProcessManager<
   /**
    * Moves the end of the access to the end an approved extension proposed.
    *
-   * Only a grant that confers access now can be extended, so access revoked,
+   * Only a grant that gives access now can be extended, so access revoked,
    * ended, or not yet begun is refused. The extension counts toward the longest
    * total access the resource permits, as its catalog entry tells it now. The
    * request was checked against the same limit when it was submitted.
@@ -134,7 +134,7 @@ export class AccessGrantProcessManager extends ProcessManager<
   @Assign
   @Throws(AccessGrantNotActive)
   async extendAccessGrant(command: ExtendAccessGrant): Promise<AccessGrantExtended> {
-    if (!this.confersAccessNow()) {
+    if (!this.givesAccessNow()) {
       throw AccessGrantNotActive.create({ id: this.id });
     }
     const { start, end: previousEnd } = this.state;
@@ -194,7 +194,7 @@ export class AccessGrantProcessManager extends ProcessManager<
    * 2. Scheduled access approved within its interval begins at the approval.
    * 3. Scheduled access approved before its start keeps its interval.
    * 4. Scheduled access approved after its end keeps its interval, so the grant
-   *    never confers access.
+   *    never gives access.
    */
   private creation(event: AccessRequestApproved, request: NewAccessRequest): CreateAccessGrant {
     const approvedAt = event.whenDecided;
@@ -245,8 +245,8 @@ export class AccessGrantProcessManager extends ProcessManager<
     return maximum;
   }
 
-  /** Whether the grant confers access at the current time. */
-  private confersAccessNow(): boolean {
+  /** Whether the grant gives access at the current time. */
+  private givesAccessNow(): boolean {
     const { revoked, start } = this.state;
     return !revoked && start !== undefined && compare(start, now()) <= 0 && !this.hasEnded();
   }

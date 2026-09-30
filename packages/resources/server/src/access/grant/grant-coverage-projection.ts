@@ -35,7 +35,7 @@ import { equals } from "../../proto/equals.js";
  *
  * It lists every issued grant that was not revoked, with its level and period.
  * A grant whose period has ended stays listed, and its period shows that it
- * confers no access any more.
+ * gives no access any more.
  */
 export class GrantCoverageProjection extends Projection<
   GrantCoverageId,

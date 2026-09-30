@@ -77,7 +77,7 @@ Organization is the tenant.
 - Resources is multitenant. Identity remains a global context and publishes
   global identity facts to durable integration infrastructure.
 - Roles and permissions are organization-scoped. A role in one organization
-  confers no authority in another.
+  gives no authority in another.
 - Storage namespaces and context-prefixed kinds provide defense in depth; they
   never replace handler, query, subscription, and gateway authorization.
 
@@ -226,12 +226,13 @@ the approval creates or extends the grant.
 
 Required request outcomes are pending, approved, denied, and canceled.
 
-A grant has no lifecycle of its own beyond its revocation. It holds the access
-it confers, its period `[start, end)`, and whether a manager revoked it. The
-grant confers access while it is not revoked and the current time is within its
+A grant has no lifecycle of its own beyond its revocation. It holds the person,
+resource, and access level it gives access for, its period `[start, end)`, and
+whether a manager revoked it. The
+grant gives access while it is not revoked and the current time is within its
 period. Nothing happens when the period begins or ends. Whenever a request
 depends on the grant, the system checks against the current time whether the
-grant confers access at that moment. There are no activation, expiration, or
+grant gives access at that moment. There are no activation, expiration, or
 scheduling facts, and the UI derives "not yet begun", "active", and "ended" from
 the period and the current time.
 
@@ -243,14 +244,14 @@ someone who does not manage the resource with `NotResourceManager`.
 
 An extension:
 
-- submission requires a grant that confers access now;
+- submission requires a grant that gives access now;
 - proposes an additional duration and changes no other grant field;
 - requires a separate approval task and decision;
 - is capped by the resource's maximum **total grant lifetime**, not an
   independent duration per extension. The grant does not store this limit. It
   is read from the resource's current policy in the resource catalog, when the
   extension is submitted and again when the grant applies it;
-- is refused at approval, and by the grant, when the grant no longer confers
+- is refused at approval, and by the grant, when the grant no longer gives
   access by then (`AccessGrantNotActive`).
 
 When a grant is revoked, its pending extension tasks leave the pending-task
@@ -272,11 +273,11 @@ approval is accepted at time `A`, its effective grant interval is
 A scheduled request stores an explicit requested interval `[S,E)`. When
 approval is accepted at `A`:
 
-- `A < S`: the grant keeps `[S, E)`, and confers access from `S`.
-- `S <= A < E`: the grant covers `[A, E)` and confers access at once. The
+- `A < S`: the grant keeps `[S, E)`, and gives access from `S`.
+- `S <= A < E`: the grant covers `[A, E)` and gives access at once. The
   requested `S` and `E` are kept on the request for history.
 - `A >= E`: the grant keeps `[S, E)`, which has already ended, so it never
-  confers access.
+  gives access.
 
 All time-based code uses an injected clock; tests must not depend on arbitrary
 sleeping.

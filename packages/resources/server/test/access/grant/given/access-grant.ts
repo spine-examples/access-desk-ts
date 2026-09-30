@@ -184,7 +184,7 @@ export function awaitGrantRevoked(
 /**
  * Seeds the payroll resource, then has the requester ask for immediate access
  * and `primary` approve it, and waits until the grant is issued. Immediate
- * access begins at the approval, so the grant confers access at once.
+ * access begins at the approval, so the grant gives access at once.
  *
  * The grant shares its identifier with the request.
  *

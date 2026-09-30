@@ -21,7 +21,7 @@ let clock: Clock = new SystemClock();
  * Sets the clock that tells the Resources domain what time it is.
  *
  * Every business decision that depends on the current time — when an approval
- * happened, whether a grant confers access now — reads
+ * happened, whether a grant gives access now — reads
  * this clock.
  *
  * @param next The clock to read from now on.

@@ -83,7 +83,7 @@ Projection inputs and outputs drawn on the board:
 
 The grant holds a start, an end, and whether it was revoked. Nothing happens
 when its period begins or ends. Whenever a request depends on the grant, the
-system checks against the current time whether the grant confers access, that
+system checks against the current time whether the grant gives access, that
 is, whether it is not revoked and the current time is within its period.
 
 Projections: **Access Grant View** and **Grant Coverage** receive Access Grant

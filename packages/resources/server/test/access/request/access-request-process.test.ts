@@ -412,7 +412,7 @@ describe("AccessRequestProcessManager should", () => {
       );
     });
 
-    it("reject extending into access another grant already confers ('AccessAlreadyHeld')", async () => {
+    it("reject extending into access another grant already gives ('AccessAlreadyHeld')", async () => {
       // Held: [0, 10) and, through another grant, [10, 20). Extending the first overlaps the second.
       const box = await resourcesBlackBox(testClock());
       const requester = await givenActiveGrant(box, "req-this-slot", 10);

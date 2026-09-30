@@ -62,7 +62,7 @@ export interface ResourcesContextOptions {
    * Tells the domain what time it is; defaults to the system clock.
    *
    * Supply a controllable clock to make time-dependent behavior, such as
-   * whether a grant confers access now, deterministic in tests and
+   * whether a grant gives access now, deterministic in tests and
    * demonstrations.
    */
   readonly clock?: Clock;
