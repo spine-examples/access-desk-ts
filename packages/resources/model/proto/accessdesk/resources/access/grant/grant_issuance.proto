@@ -21,22 +21,28 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
-// The issuing of one access grant from approved requests.
+// The issuing of one access grant from the requests approved for it.
 //
-// 1. An approved first-time request creates the grant.
-// 2. A grant whose access is due to begin now is activated at once; one whose
-//    access begins later has its activation scheduled.
-// 3. Each approved extension request extends the grant.
+// 1. When a first-time request is approved, the process creates the grant for
+//    the access the approval makes effective. The grant shares its identifier
+//    with that request.
+// 2. Once the grant is created, access due to begin now is activated at once.
+//    Access that begins later has its activation scheduled for its start.
+// 3. When Scheduling confirms the scheduled activation, the process reports the
+//    grant's activation as scheduled.
+// 4. When an extension request for the grant is approved, the process moves the
+//    grant's end to the end the request proposed.
 //
 message GrantIssuance {
   option (entity).kind = PROCESS_MANAGER;
 
-  // The grant being issued.
+  // The grant being issued, identified like the first-time request that
+  // created it.
   accessdesk.resources.AccessGrantId id = 1;
 
   // The approved first-time request that created the grant.
   accessdesk.resources.AccessRequestId request = 2 [(required) = true];
 
-  // The approved extension requests the grant applied.
+  // The approved extension requests that extend the grant, each recorded once.
   repeated accessdesk.resources.AccessRequestId extension = 3;
 }

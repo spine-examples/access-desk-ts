@@ -54,14 +54,18 @@ import { between, compare, longerThan } from "../../time/interval.js";
 /**
  * Access a person holds to a resource, from its issue to its end.
  *
- * 1. An approved request creates the grant. Access that begins later awaits
- *    the scheduling of its start; any other access awaits activation at once.
- * 2. The grant becomes active once its start has arrived — or, if its end has
- *    arrived first, it ends without ever having been active.
- * 3. It ends exactly once. It expires at its planned end, or a manager of the
- *    resource revokes it earlier with a reason.
- * 4. While active, an approved extension request may move its end, never past
- *    the longest total access the resource permits.
+ * An approved request creates the grant. Access that begins later awaits the
+ * scheduling of its start, and any other access awaits activation at once.
+ *
+ * The grant becomes active once its start has arrived. If its end has arrived
+ * first, the grant expires before activation and the person never holds the
+ * access.
+ *
+ * The grant ends exactly once. It expires at its planned end, or a manager of the
+ * resource revokes it earlier with a reason.
+ *
+ * While the grant is active, an approved extension request may move its end, but
+ * never past the longest total access the resource permits.
  */
 export class AccessGrantAggregate extends Aggregate<AccessGrantId, typeof AccessGrantSchema> {
   /** Issues the grant from an approved request. */
@@ -107,8 +111,9 @@ export class AccessGrantAggregate extends Aggregate<AccessGrantId, typeof Access
    * Activates the grant once its start has arrived.
    *
    * A grant whose end arrived before its activation ends without ever being
-   * active. An activation sent again, or after the grant has ended,
-   * is rejected.
+   * active.
+   *
+   * An activation sent again, or after the grant has ended, is rejected.
    */
   @Assign
   @Throws(AccessGrantNotPending)
@@ -146,8 +151,7 @@ export class AccessGrantAggregate extends Aggregate<AccessGrantId, typeof Access
   /**
    * Ends active access once its planned end has arrived.
    *
-   * Expiration happens at most once. An expiration sent again, or sent after
-   * the grant has ended, is refused and changes nothing.
+   * An expiration sent again, or sent after the grant has ended, is rejected.
    */
   @Assign
   @Throws(AccessGrantNotActive)
@@ -170,7 +174,7 @@ export class AccessGrantAggregate extends Aggregate<AccessGrantId, typeof Access
   }
 
   /**
-   * Ends access early on behalf of a manager of the resource, with a reason.
+   * Ends access early on behalf of a manager of the resource.
    *
    * Both active access and access that has yet to begin may be revoked.
    */

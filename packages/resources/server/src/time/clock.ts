@@ -22,8 +22,7 @@ let clock: Clock = new SystemClock();
  *
  * Every business decision that depends on the current time — when an approval
  * happened, whether access has started, whether it is due to expire — reads
- * this clock, so a test or a demonstration can control time instead of waiting
- * for it.
+ * this clock.
  *
  * @param next The clock to read from now on.
  */

@@ -104,7 +104,7 @@ import {
  *    only while the access it extends is still active.
  *
  * A first-time request asks for new access; an extension request asks to keep
- * active access longer and names the end it proposes. Both are decided alike.
+ * active access longer and names the end it proposes.
  */
 export class AccessRequestProcessManager extends ProcessManager<
   AccessRequestId,
@@ -186,8 +186,6 @@ export class AccessRequestProcessManager extends ProcessManager<
         "SubmitAccessExtensionRequest requires a requester, grant, duration, and resource.",
       );
     }
-    // An extension keeps the grant's level, so the level is not checked again,
-    // and it is a duplicate only of another extension of the same grant.
     const policy = await this.requestablePolicy(id, resource);
     const held = await this.activeGrant(grant, requester, resource);
     const proposedEnd = plus(held.end, duration);

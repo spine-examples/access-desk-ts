@@ -53,14 +53,16 @@ import { effectiveInterval, requestedInterval } from "../access-period.js";
 import { invokerOf } from "../../invoker-id.js";
 
 /**
- * The issuing of one access grant from approved requests.
+ * The issuing of one access grant from the requests approved for it.
  *
- * 1. An approved first-time request creates the grant for the access it
- *    granted; an approved extension request moves the grant's end to the end
- *    it proposed.
- * 2. Access due to begin now is activated at once. Access that begins later
- *    has its activation scheduled, and is reported as scheduled once the
- *    scheduled command is in place.
+ * 1. When a first-time request is approved, the process creates the grant for
+ *    the access the approval makes effective.
+ * 2. Once the grant is created, access due to begin now is activated at once.
+ *    Access that begins later has its activation scheduled for its start.
+ * 3. When Scheduling confirms the scheduled activation, the process reports the
+ *    grant's activation as scheduled.
+ * 4. When an extension request for the grant is approved, the process moves the
+ *    grant's end to the end the request proposed.
  */
 export class GrantIssuanceProcessManager extends ProcessManager<
   AccessGrantId,
@@ -69,8 +71,8 @@ export class GrantIssuanceProcessManager extends ProcessManager<
   /**
    * Gives an approved request its effect on the grant.
    *
-   * 1. An approved first-time request creates the grant.
-   * 2. An approved extension request extends it.
+   * An approved first-time request creates the grant. An approved extension
+   * request extends the grant it names.
    */
   @Command
   async issueOnApproval(
@@ -88,11 +90,9 @@ export class GrantIssuanceProcessManager extends ProcessManager<
   }
 
   /**
-   * Starts a newly created grant, noting the approved request that issued it.
+   * Starts a newly created grant, and notes the approved request that issued it.
    *
-   * 1. Access that begins later has its activation scheduled for its start.
-   * 2. Any other access is activated at once — which expires it before activation
-   *    when its end has already passed.
+   * Access that begins later has its activation scheduled for its start.
    */
   @Command
   startGrantOnCreation(event: AccessGrantCreated): ActivateAccessGrant | ScheduleCommand {
@@ -123,13 +123,16 @@ export class GrantIssuanceProcessManager extends ProcessManager<
     }
   }
 
-  /** Reports the grant's activation as scheduled once the plan is in place. */
+  /**
+   * Reports the grant's activation as scheduled, once Scheduling confirms the
+   * activation command it was asked to schedule.
+   */
   @React
   onActivationScheduled(event: CommandScheduled): AccessGrantActivationScheduled {
     return create(AccessGrantActivationScheduledSchema, { id: this.id, start: event.due });
   }
 
-  /** Records an extension the grant applied. */
+  /** Records the approved extension request that the grant has applied. */
   @React
   onGrantExtended(event: AccessGrantExtended): undefined {
     const request = event.request;
@@ -149,8 +152,11 @@ export class GrantIssuanceProcessManager extends ProcessManager<
    * 2. Scheduled access approved within its interval begins at the approval.
    * 3. Scheduled access approved before its start keeps its interval and waits
    *    for its start.
-   * 4. Scheduled access approved after its end keeps its interval and never
-   *    becomes active.
+   * 4. Scheduled access approved after its end keeps its interval, and the
+   *    grant expires before activation.
+   *
+   * The longest the access may last is the resource's maximum duration at the
+   * time of approval.
    */
   private async create(
     event: AccessRequestApproved,
@@ -189,7 +195,10 @@ export class GrantIssuanceProcessManager extends ProcessManager<
     });
   }
 
-  /** Moves the grant's end to the end an approved extension request proposed. */
+  /**
+   * Moves the grant's end to the end an approved extension request proposed, and
+   * records the request among the grant's extensions.
+   */
   private extend(event: AccessRequestApproved, extension: AccessExtension): ExtendAccessGrant {
     const request = event.id;
     if (
@@ -209,7 +218,7 @@ export class GrantIssuanceProcessManager extends ProcessManager<
   }
 }
 
-/** The requests with `request` among them, each once. */
+/** The requests with `request` added, unless it is already among them. */
 function including(
   requests: readonly AccessRequestId[],
   request: AccessRequestId,
