@@ -14,13 +14,13 @@ Runtime baseline: **Node ≥ 24, pnpm 11.9, strict TypeScript, ESM**.
 
 Two contexts (`references/architecture.md`):
 
-| Context    | Owns                                                                                                                                    | Tenancy                  |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| Identity   | Global users, registration, auth identity                                                                                               | Global / single-tenant   |
-| Resources  | Organizations, membership, resources, policy, managers, requests, approvals, grants, extensions, revocation, scheduling, audit projections | Org-scoped (multitenant) |
+| Context    | Owns                                                                                                                           | Tenancy                  |
+| ---------- |--------------------------------------------------------------------------------------------------------------------------------| ------------------------ |
+| Identity   | Global users, registration, auth identity                                                                                      | Global / single-tenant   |
+| Resources  | Organizations, membership, resources, policy, managers, requests, approvals, grants, extensions, revocation, audit projections | Org-scoped (multitenant) |
 
 Resources owns the whole request-and-approval domain. What earlier drafts split
-into separate Access, Scheduling, and Audit contexts is now internal to
+into separate Access and Audit contexts is now internal to
 Resources; the request-and-approval process reads Resources' own read models
 directly rather than mirroring them.
 
@@ -44,7 +44,7 @@ packages/
   Canonical `.proto` under `proto/accessdesk/<context>/` plus the generated
   `ProtoModule`; pure wire contracts, no behavior. Resources subdivides its protos
   into per-area folders (`organization/`, `resource/`, `access/request/`,
-  `access/grant/`, `scheduling/`), each its
+  `access/grant/`), each its
   own sub-package under `accessdesk.resources.*`, with shared `identifiers.proto`
   and `values.proto` at the top level (filename conventions in the `protobuf-style` skill).
 - **`<context>/server`** — `@access-desk/<context>-server`, `spine-proto.json`

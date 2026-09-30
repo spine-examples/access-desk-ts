@@ -33,10 +33,7 @@ import type {
   AccessRequestDenied,
   AccessRequestSubmitted,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
-import type {
-  AccessGrantExpired,
-  AccessGrantRevoked,
-} from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
+import type { AccessGrantRevoked } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
 import { equals } from "../../proto/equals.js";
 
 /**
@@ -74,12 +71,6 @@ export class AccessDecisionAssignmentProjection extends Projection<
   @Subscribe
   onAccessRequestCanceled(event: AccessRequestCanceled): void {
     this.close(event.id);
-  }
-
-  /** Drops extension requests for access that has expired, as they can no longer take effect. */
-  @Subscribe
-  onAccessGrantExpired(event: AccessGrantExpired): void {
-    this.dropExtensionsOf(event.id);
   }
 
   /** Drops extension requests for access that was revoked, as they can no longer take effect. */

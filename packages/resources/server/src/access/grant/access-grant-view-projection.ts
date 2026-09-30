@@ -14,14 +14,9 @@
 
 import { Projection, Subscribe } from "@spine-event-engine/server";
 import type { AccessGrantId } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
-import { AccessGrantStatus } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import { AccessGrantViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/access_grant_pb.js";
 import type {
-  AccessGrantActivated,
-  AccessGrantActivationScheduled,
   AccessGrantCreated,
-  AccessGrantExpired,
-  AccessGrantExpiredBeforeActivation,
   AccessGrantExtended,
   AccessGrantRevoked,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
@@ -42,23 +37,9 @@ export class AccessGrantViewProjection extends Projection<
       draft.accessLevel = event.access?.accessLevel;
       draft.start = event.start;
       draft.end = event.end;
-      draft.status = event.status;
+      draft.revoked = false;
       draft.request = event.request;
     });
-  }
-
-  /** Shows access that begins later as scheduled, once its start is scheduled. */
-  @Subscribe
-  onAccessGrantActivationScheduled(_event: AccessGrantActivationScheduled): void {
-    if (this.state.status === AccessGrantStatus.PENDING_SCHEDULING) {
-      this.update((draft) => (draft.status = AccessGrantStatus.SCHEDULED));
-    }
-  }
-
-  /** Shows the access as active. */
-  @Subscribe
-  onAccessGrantActivated(_event: AccessGrantActivated): void {
-    this.update((draft) => (draft.status = AccessGrantStatus.ACTIVE));
   }
 
   /** Shows the new end of extended access. */
@@ -67,21 +48,9 @@ export class AccessGrantViewProjection extends Projection<
     this.update((draft) => (draft.end = event.end));
   }
 
-  /** Moves expired access to history. */
-  @Subscribe
-  onAccessGrantExpired(_event: AccessGrantExpired): void {
-    this.update((draft) => (draft.status = AccessGrantStatus.EXPIRED));
-  }
-
-  /** Moves revoked access to history. */
+  /** Shows the access as revoked. */
   @Subscribe
   onAccessGrantRevoked(_event: AccessGrantRevoked): void {
-    this.update((draft) => (draft.status = AccessGrantStatus.REVOKED));
-  }
-
-  /** Moves access that never began to history. */
-  @Subscribe
-  onAccessGrantExpiredBeforeActivation(_event: AccessGrantExpiredBeforeActivation): void {
-    this.update((draft) => (draft.status = AccessGrantStatus.EXPIRED_BEFORE_ACTIVATION));
+    this.update((draft) => (draft.revoked = true));
   }
 }

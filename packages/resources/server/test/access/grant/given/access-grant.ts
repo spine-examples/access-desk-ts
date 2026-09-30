@@ -17,11 +17,8 @@ import { type Timestamp, timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { type BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
 import { PersonIdSchema } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { ResourceIdSchema } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
-import { AccessGrantStatus } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import {
-  ActivateAccessGrantSchema,
   CreateAccessGrantSchema,
-  ExpireAccessGrantSchema,
   ExtendAccessGrantSchema,
   RevokeAccessGrantSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/commands_pb.js";
@@ -73,33 +70,27 @@ export function createGrantCommand(
     },
     start: minutesIn(0),
     end: minutesIn(60),
-    maximumLifetime: { seconds: 7200n },
     approvedBy: { uuid: "primary" },
     manager: [{ uuid: "primary" }],
     ...overrides,
   });
 }
 
-/** Posts `CreateAccessGrant` directly, bypassing grant issuance. */
+/**
+ * Registers the payroll resource that {@link createGrantCommand} grants access to,
+ * permitting two hours of access in total, so that its grants can be extended.
+ */
+export function seedGrantedResource(box: BlackBox): Promise<void> {
+  return seed(box, [actor, "primary"], { policy: { maximumDuration: { seconds: 7200n } } });
+}
+
+/** Posts `CreateAccessGrant` directly, as the grant itself does on approval. */
 export function createGrant(
   scope: BlackBoxScope,
   id: string,
   overrides: Record<string, unknown> = {},
 ) {
   return scope.post(CreateAccessGrantSchema, createGrantCommand(id, overrides));
-}
-
-/** Posts `ActivateAccessGrant` for the grant. */
-export function activateGrant(scope: BlackBoxScope, id: string) {
-  return scope.post(
-    ActivateAccessGrantSchema,
-    create(ActivateAccessGrantSchema, { id: { uuid: id } }),
-  );
-}
-
-/** Posts `ExpireAccessGrant` for the grant, as the system does once its end arrives. */
-export function expireGrant(scope: BlackBoxScope, id: string) {
-  return scope.post(ExpireAccessGrantSchema, create(ExpireAccessGrantSchema, { id: { uuid: id } }));
 }
 
 /** Posts `RevokeAccessGrant` naming `manager` as the revoking person. */
@@ -172,19 +163,28 @@ export async function awaitGrantView(
   return found;
 }
 
-/** Waits until the requester's view shows the grant in the given status. */
-export function awaitGrantStatus(
+/** Waits until the requester's view lists the grant, and returns it. */
+export function awaitGrantIssued(
   box: BlackBox,
   reader: BlackBoxScope,
   grant: string,
-  status: AccessGrantStatus,
 ): Promise<AccessGrantView> {
-  return awaitGrantView(box, reader, grant, (item) => item.status === status);
+  return awaitGrantView(box, reader, grant, () => true);
+}
+
+/** Waits until the requester's view shows the grant as revoked, and returns it. */
+export function awaitGrantRevoked(
+  box: BlackBox,
+  reader: BlackBoxScope,
+  grant: string,
+): Promise<AccessGrantView> {
+  return awaitGrantView(box, reader, grant, (item) => item.revoked);
 }
 
 /**
  * Seeds the payroll resource, then has the requester ask for immediate access
- * and `primary` approve it, and waits until the issued grant is active.
+ * and `primary` approve it, and waits until the grant is issued. Immediate
+ * access begins at the approval, so the grant confers access at once.
  *
  * The grant shares its identifier with the request.
  *
@@ -206,6 +206,6 @@ export async function givenActiveGrant(
     period: { kind: { case: "immediateDuration", value: { seconds: BigInt(minutes * 60) } } },
   });
   await approveAccessRequest(requester, request, "primary");
-  await awaitGrantStatus(box, requester, request, AccessGrantStatus.ACTIVE);
+  await awaitGrantIssued(box, requester, request);
   return requester;
 }

@@ -25,8 +25,6 @@ import {
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/access_grant_pb.js";
 import type {
   AccessGrantCreated,
-  AccessGrantExpired,
-  AccessGrantExpiredBeforeActivation,
   AccessGrantExtended,
   AccessGrantRevoked,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
@@ -35,7 +33,9 @@ import { equals } from "../../proto/equals.js";
 /**
  * The access one person holds, or is about to hold, to one resource.
  *
- * It lists every issued grant that has not yet ended, with its level and period.
+ * It lists every issued grant that was not revoked, with its level and period.
+ * A grant whose period has ended stays listed, and its period shows that it
+ * confers no access any more.
  */
 export class GrantCoverageProjection extends Projection<
   GrantCoverageId,
@@ -81,21 +81,9 @@ export class GrantCoverageProjection extends Projection<
     });
   }
 
-  /** Drops a grant whose access has expired. */
-  @Subscribe
-  onAccessGrantExpired(event: AccessGrantExpired): void {
-    this.drop(event.id);
-  }
-
   /** Drops a grant whose access was revoked. */
   @Subscribe
   onAccessGrantRevoked(event: AccessGrantRevoked): void {
-    this.drop(event.id);
-  }
-
-  /** Drops a grant whose access ended before it began. */
-  @Subscribe
-  onAccessGrantExpiredBeforeActivation(event: AccessGrantExpiredBeforeActivation): void {
     this.drop(event.id);
   }
 

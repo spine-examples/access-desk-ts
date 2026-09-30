@@ -16,7 +16,6 @@ syntax = "proto3";
 
 package accessdesk.resources.access.grant;
 
-import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "accessdesk/resources/identifiers.proto";
 import "accessdesk/resources/values.proto";
@@ -25,10 +24,18 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
-// Access a person holds to a resource, issued from an approved request and held
-// from its start until it expires or is revoked.
+// Access a person holds to a resource from its start until its end.
+//
+// An approved first-time request creates the grant, and each approved extension
+// request moves its end. A manager of the resource may revoke the grant before
+// its end.
+//
+// The grant confers access while it is not revoked and the current time is
+// within its period. This is checked whenever a request depends on it.
+//
 message AccessGrant {
-  option (entity).kind = AGGREGATE;
+  option (entity).kind = PROCESS_MANAGER;
+  option (entity).visibility = FULL;
 
   // The grant identifier.
   accessdesk.resources.AccessGrantId id = 1;
@@ -45,17 +52,14 @@ message AccessGrant {
   // The exclusive end of the access.
   google.protobuf.Timestamp end = 5 [(required) = true];
 
-  // The longest the access may last in total.
-  google.protobuf.Duration maximum_lifetime = 6 [(required) = true];
-
   // The manager who approved the issuing request.
-  accessdesk.identity.PersonId approved_by = 7 [(required) = true];
+  accessdesk.identity.PersonId approved_by = 6 [(required) = true];
 
   // The resource managers who may revoke the grant.
-  repeated accessdesk.identity.PersonId manager = 8 [(required) = true];
+  repeated accessdesk.identity.PersonId manager = 7 [(required) = true];
 
-  // The grant status.
-  accessdesk.resources.AccessGrantStatus status = 9 [(required) = true];
+  // Whether a manager revoked the grant before its end.
+  bool revoked = 8;
 }
 
 // An access grant as its grantee and the resource's managers see it.
@@ -81,8 +85,8 @@ message AccessGrantView {
   // The exclusive end of the access.
   google.protobuf.Timestamp end = 6 [(required) = true];
 
-  // The grant status.
-  accessdesk.resources.AccessGrantStatus status = 7 [(required) = true];
+  // Whether a manager revoked the grant before its end.
+  bool revoked = 7;
 
   // The approved request that authorized the access.
   accessdesk.resources.AccessRequestId request = 8 [(required) = true];

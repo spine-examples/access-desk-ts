@@ -37,11 +37,8 @@ import type {
   AccessRequestSnapshot,
   GrantedAccess,
 } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
-import { CommandScheduledSchema } from "@access-desk/resources-model/generated/accessdesk/resources/scheduling/events_pb.js";
 import {
   AccessGrantCreatedSchema,
-  AccessGrantExpiredSchema,
-  AccessGrantExpiredBeforeActivationSchema,
   AccessGrantExtendedSchema,
   AccessGrantRevokedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
@@ -54,14 +51,10 @@ import { ResourceRegistrationProcessManager } from "./resource/resource-registra
 import { AccessRequestProcessManager } from "./access/request/access-request-process.js";
 import { AccessRequestViewProjection } from "./access/request/access-request-view-projection.js";
 import { AccessDecisionAssignmentProjection } from "./access/request/access-decision-assignment-projection.js";
-import { AccessGrantAggregate } from "./access/grant/access-grant-aggregate.js";
-import { GrantIssuanceProcessManager } from "./access/grant/grant-issuance-process.js";
+import { AccessGrantProcessManager } from "./access/grant/access-grant-process.js";
 import { GrantCoverageProjection } from "./access/grant/grant-coverage-projection.js";
 import { AccessGrantViewProjection } from "./access/grant/access-grant-view-projection.js";
-import { SchedulingProcessManager } from "./scheduling/scheduling-process.js";
 import { useClock } from "./time/clock.js";
-import { relatedInvoker } from "./invoker-id.js";
-import { GrantIssuanceSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/grant_issuance_pb.js";
 
 /** How the Resources context is assembled. */
 export interface ResourcesContextOptions {
@@ -69,7 +62,8 @@ export interface ResourcesContextOptions {
    * Tells the domain what time it is; defaults to the system clock.
    *
    * Supply a controllable clock to make time-dependent behavior, such as
-   * expiration, deterministic in tests and demonstrations.
+   * whether a grant confers access now, deterministic in tests and
+   * demonstrations.
    */
   readonly clock?: Clock;
 }
@@ -104,19 +98,15 @@ export async function createResourcesContext(
     .route(AccessRequestApprovedSchema, (event) => event.manager)
     .route(AccessRequestDeniedSchema, (event) => event.manager)
     .route(AccessRequestCanceledSchema, (event) => event.manager)
-    .route(AccessGrantExpiredSchema, (event) => event.manager)
     .route(AccessGrantRevokedSchema, (event) => event.manager);
-  const issuanceRouting = EventRouting.create<AccessGrantId>()
-    .route(AccessRequestApprovedSchema, (event) => grantIssuedBy(event))
-    .route(CommandScheduledSchema, (event) =>
-      relatedInvoker(event.invoker, GrantIssuanceSchema, AccessGrantIdSchema),
-    );
+  const grantRouting = EventRouting.create<AccessGrantId>().route(
+    AccessRequestApprovedSchema,
+    (event) => grantIssuedBy(event),
+  );
   const coverageRouting = EventRouting.create<GrantCoverageId>()
     .route(AccessGrantCreatedSchema, (event) => coverageOf(event.access))
     .route(AccessGrantExtendedSchema, (event) => coverageOf(event.access))
-    .route(AccessGrantExpiredSchema, (event) => coverageOf(event.access))
-    .route(AccessGrantRevokedSchema, (event) => coverageOf(event.access))
-    .route(AccessGrantExpiredBeforeActivationSchema, (event) => coverageOf(event.access));
+    .route(AccessGrantRevokedSchema, (event) => coverageOf(event.access));
   const builder = BoundedContext.multitenant("Resources")
     .withGeneratedRegistryRoot(new URL("..", import.meta.url))
     .add(OrganizationAggregate)
@@ -127,11 +117,9 @@ export async function createResourcesContext(
     .add(AccessRequestProcessManager)
     .add(AccessRequestViewProjection)
     .add(AccessDecisionAssignmentProjection, { eventRouting: decisionRouting })
-    .add(AccessGrantAggregate)
-    .add(GrantIssuanceProcessManager, { eventRouting: issuanceRouting })
+    .add(AccessGrantProcessManager, { eventRouting: grantRouting })
     .add(GrantCoverageProjection, { eventRouting: coverageRouting })
-    .add(AccessGrantViewProjection)
-    .add(SchedulingProcessManager);
+    .add(AccessGrantViewProjection);
   return builder.buildAsync();
 }
 

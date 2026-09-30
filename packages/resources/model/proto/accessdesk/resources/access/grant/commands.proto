@@ -16,7 +16,6 @@ syntax = "proto3";
 
 package accessdesk.resources.access.grant;
 
-import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "accessdesk/resources/identifiers.proto";
 import "accessdesk/resources/values.proto";
@@ -43,36 +42,11 @@ message CreateAccessGrant {
   // The exclusive end of the access.
   google.protobuf.Timestamp end = 5 [(required) = true];
 
-  // The longest the access may last in total.
-  google.protobuf.Duration maximum_lifetime = 6 [(required) = true];
-
   // The manager who approved the request.
-  accessdesk.identity.PersonId approved_by = 7 [(required) = true];
+  accessdesk.identity.PersonId approved_by = 6 [(required) = true];
 
   // The resource managers who may revoke the grant.
-  repeated accessdesk.identity.PersonId manager = 8 [(required) = true];
-}
-
-// Activates a grant whose access is due to begin.
-//
-// Can be scheduled, so that it is sent when the access is due to begin.
-//
-message ActivateAccessGrant {
-  option (is).ts_type = "SchedulableCommand";
-
-  // The grant to activate.
-  accessdesk.resources.AccessGrantId id = 1;
-}
-
-// Ends an active grant at its planned end.
-//
-// Can be scheduled, so that it is sent when the access is due to end.
-//
-message ExpireAccessGrant {
-  option (is).ts_type = "SchedulableCommand";
-
-  // The grant to expire.
-  accessdesk.resources.AccessGrantId id = 1;
+  repeated accessdesk.identity.PersonId manager = 7 [(required) = true];
 }
 
 // Ends a grant before its planned end.

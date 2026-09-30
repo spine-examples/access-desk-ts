@@ -13,7 +13,6 @@
  */
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { AccessGrantStatus } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import {
   actor,
   closeResourcesBlackBoxes,
@@ -22,15 +21,16 @@ import {
 } from "../../given/resources-context.js";
 import { resourceUuid } from "../request/given/access-request.js";
 import {
-  awaitGrantStatus,
+  awaitGrantIssued,
+  awaitGrantRevoked,
   awaitGrantView,
   createGrant,
-  expireGrant,
   extendGrant,
   minutesIn,
   readAccessHeldBy,
   readAccessTo,
   revokeGrant,
+  seedGrantedResource,
   testClock,
 } from "./given/access-grant.js";
 
@@ -61,7 +61,7 @@ describe("AccessGrantViewProjection should", () => {
       },
     });
 
-    const view = await awaitGrantStatus(box, scope, "grant-mine", AccessGrantStatus.ACTIVE);
+    const view = await awaitGrantIssued(box, scope, "grant-mine");
     expect(view.grantee?.uuid).toBe(actor);
     expect(view.resource?.uuid).toBe(resourceUuid);
     expect(view.accessLevel?.name).toBe("Read");
@@ -86,8 +86,9 @@ describe("AccessGrantViewProjection should", () => {
   it("show the new end of extended access", async () => {
     const box = await resourcesBlackBox(testClock());
     const scope = box.onBehalfOf(actor);
+    await seedGrantedResource(box);
     await createGrant(scope, "grant-extended");
-    await awaitGrantStatus(box, scope, "grant-extended", AccessGrantStatus.ACTIVE);
+    await awaitGrantIssued(box, scope, "grant-extended");
 
     await extendGrant(scope, "grant-extended", "ext-1", minutesIn(90));
 
@@ -99,27 +100,14 @@ describe("AccessGrantViewProjection should", () => {
     );
   });
 
-  it("move expired access to history", async () => {
-    const clock = testClock();
-    const box = await resourcesBlackBox(clock);
-    const scope = box.onBehalfOf(actor);
-    await createGrant(scope, "grant-expired");
-    await awaitGrantStatus(box, scope, "grant-expired", AccessGrantStatus.ACTIVE);
-
-    clock.advanceMinutes(60);
-    await expireGrant(scope, "grant-expired");
-
-    await awaitGrantStatus(box, scope, "grant-expired", AccessGrantStatus.EXPIRED);
-  });
-
-  it("move revoked access to history", async () => {
+  it("show revoked access as revoked", async () => {
     const box = await resourcesBlackBox(testClock());
     const scope = box.onBehalfOf(actor);
     await createGrant(scope, "grant-revoked");
-    await awaitGrantStatus(box, scope, "grant-revoked", AccessGrantStatus.ACTIVE);
+    await awaitGrantIssued(box, scope, "grant-revoked");
 
     await revokeGrant(scope, "grant-revoked", "primary", "Investigation finished.");
 
-    await awaitGrantStatus(box, scope, "grant-revoked", AccessGrantStatus.REVOKED);
+    await awaitGrantRevoked(box, scope, "grant-revoked");
   });
 });

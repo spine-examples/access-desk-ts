@@ -13,47 +13,35 @@
  */
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { create } from "@bufbuild/protobuf";
-import { AccessGrantIdSchema } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
-import { GrantIssuanceSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/grant_issuance_pb.js";
-import { CommandScheduledSchema } from "@access-desk/resources-model/generated/accessdesk/resources/scheduling/events_pb.js";
-import { AccessGrantStatus } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import { SubmitAccessExtensionRequestSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/commands_pb.js";
-import { relatedInvoker } from "../../../dist/src/invoker-id.js";
-import { eventRecording } from "../../given/event-recording.js";
 import {
   actor,
   closeResourcesBlackBoxes,
   loadResourcesContext,
   resourcesBlackBox,
-  testActorContext,
 } from "../../given/resources-context.js";
 import {
   approveAccessRequest,
+  seed,
   submitAndAssign,
   submitExtensionRequest,
 } from "../request/given/access-request.js";
 import { managerHasTask } from "../request/given/access-decision-assignment.js";
 import {
-  awaitGrantStatus,
+  awaitGrantIssued,
   awaitGrantView,
   givenActiveGrant,
   minutesIn,
   readAccessTo,
   testClock,
 } from "./given/access-grant.js";
-import { seed } from "../request/given/access-request.js";
-import { awaitActivationPlan } from "../../scheduling/given/scheduling.js";
 
-const { recordEvents } = eventRecording(testActorContext);
-
-// These run grant issuance end to end — from a manager's approval, through the
-// grant's creation and activation, to the requester's and the resource's views —
-// on a controlled clock, sending due activation commands as the system.
+// These run an access grant end to end, from a manager's approval to the
+// requester's and the resource's views, on a controlled clock.
 beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
 
-describe("GrantIssuanceProcessManager should", () => {
+describe("AccessGrantProcessManager should", () => {
   it("issue active access on approval", async () => {
     const clock = testClock();
     const box = await resourcesBlackBox(clock);
@@ -67,7 +55,7 @@ describe("GrantIssuanceProcessManager should", () => {
     clock.advanceMinutes(5);
     expect((await approveAccessRequest(requester, "req-issue", "primary")).kind).toBe("ok");
 
-    const active = await awaitGrantStatus(box, requester, "req-issue", AccessGrantStatus.ACTIVE);
+    const active = await awaitGrantIssued(box, requester, "req-issue");
     expect(active.start).toEqual(minutesIn(5));
     expect(active.end).toEqual(minutesIn(15));
     expect(active.accessLevel?.name).toBe("Read");
@@ -78,7 +66,7 @@ describe("GrantIssuanceProcessManager should", () => {
     const row = managed.find((item) => item.id?.uuid === "req-issue");
     expect(row?.grantee?.uuid).toBe(actor);
     expect(row?.request?.uuid).toBe("req-issue");
-    expect(row?.status).toBe(AccessGrantStatus.ACTIVE);
+    expect(row?.revoked).toBe(false);
   });
 
   it("extend active access when a manager approves an extension request", async () => {
@@ -111,39 +99,8 @@ describe("GrantIssuanceProcessManager should", () => {
       (item) => item.end?.seconds === minutesIn(25).seconds,
     );
     expect(extended.start).toEqual(minutesIn(0));
-    expect(extended.status).toBe(AccessGrantStatus.ACTIVE);
+    expect(extended.revoked).toBe(false);
 
     expect(extended.end).toEqual(minutesIn(25));
-  });
-
-  it("schedule access approved before it begins", async () => {
-    const clock = testClock();
-    const box = await resourcesBlackBox(clock);
-    const requester = box.onBehalfOf(actor);
-    await seed(box, [actor, "primary"]);
-    await submitAndAssign(box, requester, "req-future", "primary", {
-      period: {
-        kind: { case: "scheduled", value: { start: minutesIn(30), end: minutesIn(90) } },
-      },
-    });
-
-    const scheduled = await recordEvents(requester, CommandScheduledSchema);
-    try {
-      expect((await approveAccessRequest(requester, "req-future", "primary")).kind).toBe("ok");
-
-      // Grant Issuance schedules the start, naming itself as the one who scheduled it.
-      const issuance = [create(AccessGrantIdSchema, { uuid: "req-future" })];
-      const event = await scheduled.waitFor(box);
-      expect(relatedInvoker(event.invoker, GrantIssuanceSchema, AccessGrantIdSchema)).toEqual(
-        issuance,
-      );
-      const plan = await awaitActivationPlan(box, requester, "req-future");
-      expect(plan.due).toEqual(minutesIn(30));
-
-      // The fact that the start is scheduled comes back to Grant Issuance.
-      await awaitGrantStatus(box, requester, "req-future", AccessGrantStatus.SCHEDULED);
-    } finally {
-      await scheduled.cancel();
-    }
   });
 });

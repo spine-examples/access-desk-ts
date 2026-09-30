@@ -3,8 +3,7 @@
 ## Orientation
 
 This repository is **Access Desk**, a production-shaped Spine TS demonstration
-for organization-scoped resource access requests, approvals, scheduling, and
-audit.
+for organization-scoped resource access requests, approvals, grants, and audit.
 
 For substantive implementation, review, or documentation work, start by reading
 the smallest relevant set:

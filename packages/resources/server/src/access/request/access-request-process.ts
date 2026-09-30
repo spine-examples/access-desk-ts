@@ -13,7 +13,7 @@
  */
 
 import { create } from "@bufbuild/protobuf";
-import type { Duration, Timestamp } from "@bufbuild/protobuf/wkt";
+import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { Assign, ProcessManager, Throws } from "@spine-event-engine/server";
 import { equals } from "../../proto/equals.js";
 import {
@@ -35,7 +35,6 @@ import {
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/access_grant_pb.js";
 import { ResourceCatalogItemSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_pb.js";
 import {
-  AccessGrantStatus,
   AccessRequestSnapshotSchema,
   AccessRequestStatus,
   type AccessPeriod,
@@ -155,8 +154,8 @@ export class AccessRequestProcessManager extends ProcessManager<
    * 1. The requester must hold the grant, and it must be active.
    * 2. The proposed end is the grant's current end plus the requested
    *    duration.
-   * 3. The whole access, extension included, must fit the grant's maximum
-   *    lifetime.
+   * 3. The whole access, extension included, must fit the maximum duration of
+   *    the resource's policy.
    * 4. The requester must not already hold the same or stronger access to the
    *    resource, through another grant, for any part of the added time.
    */
@@ -189,7 +188,11 @@ export class AccessRequestProcessManager extends ProcessManager<
     const policy = await this.requestablePolicy(id, resource);
     const held = await this.activeGrant(grant, requester, resource);
     const proposedEnd = plus(held.end, duration);
-    if (longerThan(between(held.start, proposedEnd), held.maximumLifetime)) {
+    const maximum = policy.maximumDuration;
+    if (maximum === undefined) {
+      throw new Error("A resource policy must carry its maximum duration.");
+    }
+    if (longerThan(between(held.start, proposedEnd), maximum)) {
       throw RequestedDurationTooLong.create({ id });
     }
     await this.assertNoDuplicate(id, requester, resource, grant);
@@ -404,8 +407,10 @@ export class AccessRequestProcessManager extends ProcessManager<
   }
 
   /**
-   * The grant an extension applies to, when it confers the requester active
-   * access — to the resource, when one is named; otherwise `AccessGrantNotActive`.
+   * The grant an extension applies to, when it confers the requester access now,
+   * to the resource when one is named. A grant confers access now when it is not
+   * revoked and the current time is within its period. Otherwise the result is
+   * `AccessGrantNotActive`.
    */
   private async activeGrant(
     grant: AccessGrantId,
@@ -415,23 +420,24 @@ export class AccessRequestProcessManager extends ProcessManager<
     const state: AccessGrant | undefined = await this.select(AccessGrantSchema, {}).findById(
       grant as never,
     );
-    const { start, end, maximumLifetime } = state ?? {};
+    const { start, end } = state ?? {};
     const heldResource = state?.access?.resource;
     const accessLevel = state?.access?.accessLevel;
     if (
-      state?.status !== AccessGrantStatus.ACTIVE ||
+      state === undefined ||
+      state.revoked ||
       heldResource === undefined ||
       accessLevel === undefined ||
       !equals(PersonIdSchema, state.access?.grantee, requester) ||
       (resource !== undefined && !equals(ResourceIdSchema, heldResource, resource)) ||
       start === undefined ||
       end === undefined ||
-      maximumLifetime === undefined ||
+      compare(now(), start) < 0 ||
       compare(now(), end) >= 0
     ) {
       throw AccessGrantNotActive.create({ id: grant });
     }
-    return { resource: heldResource, accessLevel, start, end, maximumLifetime };
+    return { resource: heldResource, accessLevel, start, end };
   }
 
   /** The resource managers who may decide the request, deduplicated in policy order. */
@@ -536,11 +542,10 @@ export class AccessRequestProcessManager extends ProcessManager<
   }
 }
 
-/** The access, period, and lifetime limit of a grant that confers active access. */
+/** The access and period of a grant that confers access now. */
 interface ActiveGrant {
   readonly resource: ResourceId;
   readonly accessLevel: AccessLevel;
   readonly start: Timestamp;
   readonly end: Timestamp;
-  readonly maximumLifetime: Duration;
 }

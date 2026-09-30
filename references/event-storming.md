@@ -69,45 +69,25 @@ Projection inputs and outputs drawn on the board:
   Request Canceled — the requester's read model of each request and its status.
 - **Access Decision Assignment** receives Access Request Submitted, Access
   Extension Request Submitted, Access Request Approved, Access Request Denied,
-  and Access Request Canceled; it also receives Access Grant Expired and Access
-  Grant Revoked, dropping pending extensions of that grant.
+  and Access Request Canceled; it also receives Access Grant Revoked, dropping
+  pending extensions of that grant.
 
-#### Grant issuance — Grant Issuance PM, Access Grant aggregate
+#### Access grant — Access Grant PM
 
-| Owner               | Trigger (actor/event)                 | Command                                                             | Event(s)                                                           | Rejections               |
-| ------------------- | ------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------ |
-| Grant Issuance (PM) | on Access Request Approved            | Create Access Grant `OR` Extend Access Grant                        | —                                                                  | —                        |
-| Access Grant        | Grant Issuance (PM)                   | Create Access Grant                                                 | Access Grant Created                                               | —                        |
-| Access Grant        | Grant Issuance (PM)                   | Extend Access Grant                                                 | Access Grant Extended                                              | Access Grant Not Active  |
-| Grant Issuance (PM) | on Access Grant Created               | Activate Access Grant `OR` Schedule Command (Activate Access Grant) | —                                                                  | —                        |
-| Access Grant        | Grant Issuance (PM), immediate branch | Activate Access Grant                                               | Access Grant Activated `OR` Access Grant Expired Before Activation | —                        |
-| Grant Issuance (PM) | on Command Scheduled                  | —                                                                   | Access Grant Activation Scheduled                                  | —                        |
-| Access Grant        | Scheduling, due                       | Activate Access Grant                                               | Access Grant Activated `OR` Access Grant Expired Before Activation | Access Grant Not Pending |
+| Owner             | Trigger (actor/event)      | Command                                      | Event(s)              | Rejections                                    |
+| ----------------- | -------------------------- | -------------------------------------------- | --------------------- | --------------------------------------------- |
+| Access Grant (PM) | on Access Request Approved | Create Access Grant `OR` Extend Access Grant | —                     | —                                             |
+| Access Grant (PM) | Access Grant (PM)          | Create Access Grant                          | Access Grant Created  | —                                             |
+| Access Grant (PM) | Access Grant (PM)          | Extend Access Grant                          | Access Grant Extended | Access Grant Not Active                       |
+| Access Grant (PM) | Resource Manager           | Revoke Access Grant                          | Access Grant Revoked  | Access Grant Not Active; Not Resource Manager |
 
-#### Revocation & expiration — Access Grant aggregate
+The grant holds a start, an end, and whether it was revoked. Nothing happens
+when its period begins or ends. Whenever a request depends on the grant, the
+system checks against the current time whether the grant confers access, that
+is, whether it is not revoked and the current time is within its period.
 
-| Owner                 | Trigger (actor/event)         | Command                                | Event(s)                            | Rejections              |
-| --------------------- | ----------------------------- | -------------------------------------- | ----------------------------------- | ----------------------- |
-| Access Grant          | Resource Manager              | Revoke Access Grant                    | Access Grant Revoked                | Access Grant Not Active |
-| Grant Expiration (PM) | on Access Grant Revoked       | Cancel Scheduled Command (Optional)    | —                                   | —                       |
-| Grant Expiration (PM) | on Scheduled Command Canceled | —                                      | Access Grant Expiration Canceled    | —                       |
-| Grant Expiration (PM) | on Access Grant Activated     | Schedule Command (Expire Access Grant) | —                                   | —                       |
-| Grant Expiration (PM) | on Command Scheduled          | —                                      | Access Grant Expiration Scheduled   | —                       |
-| Grant Expiration (PM) | on Access Grant Extended      | Reschedule Command (Optional)          | —                                   | —                       |
-| Grant Expiration (PM) | on Command Rescheduled        | —                                      | Access Grant Expiration Rescheduled | —                       |
-| Access Grant          | Scheduling, due               | Expire Access Grant                    | Access Grant Expired                | —                       |
-
-#### Scheduling
-
-| Owner           | Trigger (actor/event) | Command                            | Event(s)                   |
-| --------------- | --------------------- | ---------------------------------- | -------------------------- |
-| Scheduling (PM) | —                     | Schedule Command                   | Command Scheduled          |
-| Scheduling (PM) | —                     | Reschedule Command                 | Command Rescheduled        |
-| Scheduling (PM) | —                     | Cancel Scheduled Command           | Scheduled Command Canceled |
-| Scheduling (PM) | Time Passed           | `(Scheduled Command)` (`Optional`) | —                          |
-
-Stored command values carried in the "Schedule Command" sub-notes: **Activate
-Access Grant** and **Expire Access Grant**.
+Projections: **Access Grant View** and **Grant Coverage** receive Access Grant
+Created, Access Grant Extended, and Access Grant Revoked.
 
 #### Audit
 

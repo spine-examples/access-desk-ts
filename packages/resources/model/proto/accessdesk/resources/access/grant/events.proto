@@ -47,41 +47,6 @@ message AccessGrantCreated {
 
   // The resource managers who may revoke the grant.
   repeated accessdesk.identity.PersonId manager = 7 [(required) = true];
-
-  // The grant status once created.
-  accessdesk.resources.AccessGrantStatus status = 8 [(required) = true];
-}
-
-// The grantee began to hold the granted access.
-message AccessGrantActivated {
-
-  // The activated grant.
-  accessdesk.resources.AccessGrantId id = 1 [(required) = true];
-
-  // The access the grant confers.
-  accessdesk.resources.GrantedAccess access = 2 [(required) = true];
-
-  // The inclusive start of the access.
-  google.protobuf.Timestamp start = 3 [(required) = true];
-
-  // The exclusive end of the access.
-  google.protobuf.Timestamp end = 4 [(required) = true];
-}
-
-// The granted access ended at its planned end.
-message AccessGrantExpired {
-
-  // The expired grant.
-  accessdesk.resources.AccessGrantId id = 1 [(required) = true];
-
-  // The access the grant conferred.
-  accessdesk.resources.GrantedAccess access = 2 [(required) = true];
-
-  // The exclusive end at which the access ended.
-  google.protobuf.Timestamp end = 3 [(required) = true];
-
-  // The resource managers responsible for the grant.
-  repeated accessdesk.identity.PersonId manager = 4 [(required) = true];
 }
 
 // A manager ended the granted access before its planned end.
@@ -125,34 +90,3 @@ message AccessGrantExtended {
   google.protobuf.Timestamp end = 5 [(required) = true];
 }
 
-// The grant expired before it was activated.
-//
-// The end of its access period arrived first, so the grantee never held the access.
-//
-message AccessGrantExpiredBeforeActivation {
-
-  // The grant that never became active.
-  accessdesk.resources.AccessGrantId id = 1 [(required) = true];
-
-  // The access the grant would have conferred.
-  accessdesk.resources.GrantedAccess access = 2 [(required) = true];
-
-  // The inclusive start of the access.
-  google.protobuf.Timestamp start = 3 [(required) = true];
-
-  // The exclusive end of the access.
-  google.protobuf.Timestamp end = 4 [(required) = true];
-
-  // The resource managers responsible for the grant.
-  repeated accessdesk.identity.PersonId manager = 5 [(required) = true];
-}
-
-// The start of the granted access was scheduled.
-message AccessGrantActivationScheduled {
-
-  // The grant whose access will begin.
-  accessdesk.resources.AccessGrantId id = 1 [(required) = true];
-
-  // When the access will begin.
-  google.protobuf.Timestamp start = 2 [(required) = true];
-}

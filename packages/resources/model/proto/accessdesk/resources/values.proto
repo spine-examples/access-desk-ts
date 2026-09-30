@@ -111,34 +111,6 @@ enum AccessRequestStatus {
   CANCELED = 4;
 }
 
-// The lifecycle state of an access grant.
-enum AccessGrantStatus {
-
-  // The unset grant status.
-  AGS_UNSPECIFIED = 0;
-
-  // The access begins later, and its start is not yet scheduled.
-  PENDING_SCHEDULING = 1;
-
-  // The start of the access is scheduled.
-  SCHEDULED = 2;
-
-  // The grant was issued and its access is due to begin now.
-  PENDING_ACTIVATION = 3;
-
-  // The grantee currently holds the access.
-  ACTIVE = 4;
-
-  // The access ended at its planned end.
-  EXPIRED = 5;
-
-  // The grant expired before it was activated, so its access never began.
-  EXPIRED_BEFORE_ACTIVATION = 6;
-
-  // A manager ended the access before its planned end.
-  REVOKED = 7;
-}
-
 // A scheduled half-open access interval.
 message ScheduledAccessPeriod {
 

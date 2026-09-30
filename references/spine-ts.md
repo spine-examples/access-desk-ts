@@ -175,8 +175,8 @@ generated types, and `Promise<…>` of any of these. The decorator limits them:
 
 Entities take two type parameters — `Aggregate<Id, typeof StateSchema>` — as
 the framework manages the version. A generated `ts_type` message interface
-(`generated/interfaces/…`) is **not** accepted as a return type: name its member
-commands as a union, as `SchedulingProcessManager.onTimePassed` does, with a
+(`generated/interfaces/…`) is **not** accepted as a return type, and neither is
+a local type alias. Name its member commands as a union in the signature, with a
 compile-time check that the union matches the interface's members.
 
 **`this.state` is the state before the handler's transaction.** Inside an
@@ -271,20 +271,6 @@ Use the Spine core `Any`/TypeRegistry helpers verified against this exact
 snapshot. The server application composes the complete generated TypeRegistry;
 do not depend on runtime package scanning or mutable global schema registration.
 
-The stateful `Scheduling` Process Manager plans only commands registered in the
-context's generated `TypeRegistry` (`generated/model-registry.ts`) and declared
-with `(is).ts_type = "SchedulableCommand"`; it refuses anything else. The
-generated interface is the allowlist and currently contains
-`ActivateAccessGrant` and `ExpireAccessGrant`. On `TimePassed`, the process
-resolves and unpacks the stored type URL, then returns that optional command from
-its `@Command` handler so the command bus routes it to its normal receptor.
-Keeping unauthorized principals from planning commands or publishing trusted
-time events is the gateway and application boundary's job. The stored `Any`
-must not carry credentials or establish trusted tenant/actor identity,
-and cannot select an endpoint, context, actor, or tenant: the command is sent
-in the organization's tenant, on behalf of the scheduling actor. Unknown,
-non-schedulable, or unpacking-failed values fail closed.
-
 **Reading Protobuf enum custom options** (the "enum with `EnumValueOptions`
 extension" pattern): `getOption` from `@bufbuild/protobuf`,
 `getOption(EnumSchema.values.find((v) => v.number === n), extension)`. Comparing
@@ -327,9 +313,7 @@ authoritative query for reconnect/gap recovery. Command validation remains
 server-side.
 
 The gateway, not a bounded context, performs OIDC/session/CSRF/origin controls
-defined in the architecture. Internal Scheduling ingress uses a distinct trusted
-principal and never reuses a browser session or accepts caller-provided tenant,
-route, or actor claims.
+defined in the architecture.
 
 ## Testing boundaries
 

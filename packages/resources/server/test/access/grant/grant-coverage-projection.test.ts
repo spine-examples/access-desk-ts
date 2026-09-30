@@ -14,7 +14,6 @@
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { type BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
-import { AccessGrantStatus } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import type { GrantCoverage } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/access_grant_pb.js";
 import {
   actor,
@@ -24,13 +23,13 @@ import {
 } from "../../given/resources-context.js";
 import { resourceUuid } from "../request/given/access-request.js";
 import {
-  awaitGrantStatus,
+  awaitGrantIssued,
   createGrant,
-  expireGrant,
   extendGrant,
   minutesIn,
   readCoverage,
   revokeGrant,
+  seedGrantedResource,
   testClock,
 } from "./given/access-grant.js";
 
@@ -125,8 +124,9 @@ describe("GrantCoverageProjection should", () => {
   it("move the end of an extended grant", async () => {
     const box = await resourcesBlackBox(testClock());
     const scope = box.onBehalfOf(actor);
+    await seedGrantedResource(box);
     await createGrant(scope, "grant-longer");
-    await awaitGrantStatus(box, scope, "grant-longer", AccessGrantStatus.ACTIVE);
+    await awaitGrantIssued(box, scope, "grant-longer");
 
     await extendGrant(scope, "grant-longer", "ext-longer", minutesIn(90));
 
@@ -140,24 +140,11 @@ describe("GrantCoverageProjection should", () => {
     expect(coverage.grant[0]?.start).toEqual(minutesIn(0));
   });
 
-  it("stop covering access once it expires", async () => {
-    const clock = testClock();
-    const box = await resourcesBlackBox(clock);
-    const scope = box.onBehalfOf(actor);
-    await createGrant(scope, "grant-ending");
-    await awaitGrantStatus(box, scope, "grant-ending", AccessGrantStatus.ACTIVE);
-
-    clock.advanceMinutes(60);
-    await expireGrant(scope, "grant-ending");
-
-    await awaitCoverage(box, scope, actor, resourceUuid, (c) => c.grant.length === 0);
-  });
-
   it("stop covering access once it is revoked", async () => {
     const box = await resourcesBlackBox(testClock());
     const scope = box.onBehalfOf(actor);
     await createGrant(scope, "grant-withdrawn");
-    await awaitGrantStatus(box, scope, "grant-withdrawn", AccessGrantStatus.ACTIVE);
+    await awaitGrantIssued(box, scope, "grant-withdrawn");
 
     await revokeGrant(scope, "grant-withdrawn", "primary", "No longer needed.");
 
