@@ -1,16 +1,16 @@
-//
-// Copyright 2026 CodeMatters, Lda.
-//
-// Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
-// except in compliance with the License. You may obtain a copy of the License at
-//
-// https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software distributed under
-// the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-// either express or implied. See the License for the specific language governing permissions
-// and limitations under the License.
-//
+/*
+ * Copyright 2026 CodeMatters, Lda.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+ * except in compliance with the License. You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under
+ * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+ * either express or implied. See the License for the specific language governing permissions
+ * and limitations under the License.
+ */
 
 syntax = "proto3";
 
@@ -27,66 +27,66 @@ option (type_url_prefix) = "type.accessdesk";
 // An access grant was issued from an approved request.
 message AccessGrantCreated {
 
-  // The created grant.
-  accessdesk.resources.AccessGrantId id = 1 [(required) = true];
+    // The created grant.
+    accessdesk.resources.AccessGrantId id = 1 [(required) = true];
 
-  // The approved request that issued the grant.
-  accessdesk.resources.AccessRequestId request = 2 [(required) = true];
+    // The approved request that issued the grant.
+    accessdesk.resources.AccessRequestId request = 2 [(required) = true];
 
-  // The access the grant confers.
-  accessdesk.resources.GrantedAccess access = 3 [(required) = true];
+    // The person, resource, and access level the grant gives access for.
+    accessdesk.resources.GrantedAccess access = 3 [(required) = true];
 
-  // The inclusive start of the access.
-  google.protobuf.Timestamp start = 4 [(required) = true];
+    // The inclusive start of the access.
+    google.protobuf.Timestamp start = 4 [(required) = true];
 
-  // The exclusive end of the access.
-  google.protobuf.Timestamp end = 5 [(required) = true];
+    // The exclusive end of the access.
+    google.protobuf.Timestamp end = 5 [(required) = true];
 
-  // The manager who approved the request.
-  accessdesk.identity.PersonId approved_by = 6 [(required) = true];
+    // The manager who approved the request.
+    accessdesk.identity.PersonId approved_by = 6 [(required) = true];
 
-  // The resource managers who may revoke the grant.
-  repeated accessdesk.identity.PersonId manager = 7 [(required) = true];
+    // The resource managers who may revoke the grant.
+    repeated accessdesk.identity.PersonId manager = 7 [(required) = true];
 }
 
 // A manager ended the granted access before its planned end.
 message AccessGrantRevoked {
 
-  // The revoked grant.
-  accessdesk.resources.AccessGrantId id = 1 [(required) = true];
+    // The revoked grant.
+    accessdesk.resources.AccessGrantId id = 1 [(required) = true];
 
-  // The access the grant conferred.
-  accessdesk.resources.GrantedAccess access = 2 [(required) = true];
+    // The person, resource, and access level the grant gave access for.
+    accessdesk.resources.GrantedAccess access = 2 [(required) = true];
 
-  // The manager who revoked the grant.
-  accessdesk.identity.PersonId revoked_by = 3 [(required) = true];
+    // The manager who revoked the grant.
+    accessdesk.identity.PersonId revoked_by = 3 [(required) = true];
 
-  // The business reason for revoking the grant.
-  string reason = 4 [(required) = true];
+    // The business reason for revoking the grant.
+    string reason = 4 [(required) = true];
 
-  // When the access was revoked.
-  google.protobuf.Timestamp when_revoked = 5 [(required) = true];
+    // When the access was revoked.
+    google.protobuf.Timestamp when_revoked = 5 [(required) = true];
 
-  // The resource managers responsible for the grant.
-  repeated accessdesk.identity.PersonId manager = 6 [(required) = true];
+    // The resource managers responsible for the grant.
+    repeated accessdesk.identity.PersonId manager = 6 [(required) = true];
 }
 
 // The granted access was extended by an approved extension request.
 message AccessGrantExtended {
 
-  // The extended grant.
-  accessdesk.resources.AccessGrantId id = 1 [(required) = true];
+    // The extended grant.
+    accessdesk.resources.AccessGrantId id = 1 [(required) = true];
 
-  // The approved extension request.
-  accessdesk.resources.AccessRequestId request = 2 [(required) = true];
+    // The approved extension request.
+    accessdesk.resources.AccessRequestId request = 2 [(required) = true];
 
-  // The access the grant confers.
-  accessdesk.resources.GrantedAccess access = 3 [(required) = true];
+    // The person, resource, and access level the grant gives access for.
+    accessdesk.resources.GrantedAccess access = 3 [(required) = true];
 
-  // The exclusive end before the extension.
-  google.protobuf.Timestamp previous_end = 4 [(required) = true];
+    // The exclusive end before the extension.
+    google.protobuf.Timestamp previous_end = 4 [(required) = true];
 
-  // The new exclusive end of the access.
-  google.protobuf.Timestamp end = 5 [(required) = true];
+    // The new exclusive end of the access.
+    google.protobuf.Timestamp end = 5 [(required) = true];
 }
 
