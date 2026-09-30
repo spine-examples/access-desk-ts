@@ -53,7 +53,7 @@ describe("AccessGrantProcessManager should", () => {
 
     // Approved five minutes later: the ten-minute countdown starts at approval.
     clock.advanceMinutes(5);
-    expect((await approveAccessRequest(requester, "req-issue", "primary")).kind).toBe("ok");
+    expect((await approveAccessRequest(box, "req-issue", "primary")).kind).toBe("ok");
 
     const active = await awaitGrantIssued(box, requester, "req-issue");
     expect(active.start).toEqual(minutesIn(5));
@@ -90,7 +90,7 @@ describe("AccessGrantProcessManager should", () => {
       (present) => present,
     );
 
-    expect((await approveAccessRequest(requester, "ext-grant", "primary")).kind).toBe("ok");
+    expect((await approveAccessRequest(box, "ext-grant", "primary")).kind).toBe("ok");
 
     const extended = await awaitGrantView(
       box,

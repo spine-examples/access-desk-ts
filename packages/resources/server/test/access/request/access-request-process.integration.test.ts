@@ -120,7 +120,7 @@ describe("AccessRequestProcessManager should", () => {
     }
 
     // The manager approves; the decision is exposed and the task is cleared.
-    expect((await approveAccessRequest(requester, "ext-int", "primary")).kind).toBe("ok");
+    expect((await approveAccessRequest(box, "ext-int", "primary")).kind).toBe("ok");
     await box.eventually(
       () => statusOf(requester, "ext-int"),
       (status) => status === AccessRequestStatus.APPROVED,

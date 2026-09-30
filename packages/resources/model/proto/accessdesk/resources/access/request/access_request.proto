@@ -16,6 +16,7 @@ syntax = "proto3";
 
 package accessdesk.resources.access.request;
 
+import "google/protobuf/timestamp.proto";
 import "accessdesk/resources/identifiers.proto";
 import "accessdesk/resources/values.proto";
 import "accessdesk/identity/identifiers.proto";
@@ -56,6 +57,12 @@ message AccessRequestView {
 
     // The request status.
     accessdesk.resources.AccessRequestStatus status = 4;
+
+    // The manager who approved or denied the request.
+    accessdesk.identity.PersonId decided_by = 5;
+
+    // When the request was approved or denied.
+    google.protobuf.Timestamp when_decided = 6;
 }
 
 // The pending access requests assigned to a manager.

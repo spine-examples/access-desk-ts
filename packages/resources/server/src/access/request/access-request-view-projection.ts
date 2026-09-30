@@ -48,16 +48,16 @@ export class AccessRequestViewProjection extends Projection<
     this.seedPending(event.snapshot, event.manager);
   }
 
-  /** Records an approved request as its terminal outcome. */
+  /** Records an approved request as its terminal outcome, with who approved it and when. */
   @Subscribe
   onAccessRequestApproved(event: AccessRequestApproved): void {
-    this.settle(AccessRequestStatus.APPROVED, event.snapshot);
+    this.settle(AccessRequestStatus.APPROVED, event.snapshot, event);
   }
 
-  /** Records a denied request as its terminal outcome. */
+  /** Records a denied request as its terminal outcome, with who denied it and when. */
   @Subscribe
   onAccessRequestDenied(event: AccessRequestDenied): void {
-    this.settle(AccessRequestStatus.DENIED, event.snapshot);
+    this.settle(AccessRequestStatus.DENIED, event.snapshot, event);
   }
 
   /** Records a canceled request as its terminal outcome. */
@@ -81,13 +81,24 @@ export class AccessRequestViewProjection extends Projection<
     });
   }
 
-  private settle(status: AccessRequestStatus, snapshot: AccessRequestSnapshot | undefined): void {
+  private settle(
+    status: AccessRequestStatus,
+    snapshot: AccessRequestSnapshot | undefined,
+    decision?: Decision,
+  ): void {
     this.update((draft) => {
       draft.id = this.id;
       if (snapshot !== undefined) {
         draft.snapshot = snapshot;
       }
       draft.status = status;
+      if (decision !== undefined) {
+        draft.decidedBy = decision.decidedBy;
+        draft.whenDecided = decision.whenDecided;
+      }
     });
   }
 }
+
+/** Who approved or denied a request, and when. */
+type Decision = Pick<AccessRequestApproved | AccessRequestDenied, "decidedBy" | "whenDecided">;

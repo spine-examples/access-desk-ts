@@ -81,11 +81,14 @@ message AccessRequestDenied {
     // The manager who denied the request.
     accessdesk.identity.PersonId decided_by = 3 [(required) = true];
 
+    // When the request was denied.
+    google.protobuf.Timestamp when_decided = 4 [(required) = true];
+
     // The business reason for denial.
-    string reason = 4 [(required) = true];
+    string reason = 5 [(required) = true];
 
     // The managers responsible for the request.
-    repeated accessdesk.identity.PersonId manager = 5 [(required) = true];
+    repeated accessdesk.identity.PersonId manager = 6 [(required) = true];
 }
 
 // A request was canceled by its requester.

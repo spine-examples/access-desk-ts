@@ -199,7 +199,8 @@ Submission must enforce all the following:
 - The justification is meaningful.
 - The access period uses whole-minute precision for immediate durations and
   scheduled endpoints.
-- The time specification is valid and within the maximum duration.
+- The time specification is valid — the access ends after it begins — and
+  within the maximum duration.
 - The requester does not already hold same-or-stronger access for the relevant
   interval.
 - No other nonterminal request by the same requester for the same resource has
@@ -236,7 +237,8 @@ grant gives access at that moment. There are no activation, expiration, or
 scheduling facts, and the UI derives "not yet begun", "active", and "ended" from
 the period and the current time.
 
-Any current manager of the granting resource may revoke a grant, with a reason,
+Any manager of the granting resource, as recorded on the grant when it was
+created, may revoke it, with a reason,
 until its end, whether its period has begun or not. Revocation authority is
 scoped to that resource, not the organization. A grant already revoked, or whose
 end has passed, is refused with `AccessGrantNotActive`, as is a revocation by
@@ -245,14 +247,16 @@ someone who does not manage the resource with `NotResourceManager`.
 An extension:
 
 - submission requires a grant that gives access now;
-- proposes an additional duration and changes no other grant field;
+- adds a positive duration to the grant's end, proposing the later end it
+  would have, and changes no other grant field;
 - requires a separate approval task and decision;
 - is capped by the resource's maximum **total grant lifetime**, not an
   independent duration per extension. The grant does not store this limit. It
   is read from the resource's current policy in the resource catalog, when the
   extension is submitted and again when the grant applies it;
 - is refused at approval, and by the grant, when the grant no longer gives
-  access by then (`AccessGrantNotActive`).
+  access by then (`AccessGrantNotActive`), and at approval when the grant
+  already reaches the proposed end (`AccessAlreadyHeld`).
 
 When a grant is revoked, its pending extension tasks leave the pending-task
 projection. Immutable facts remain in history.

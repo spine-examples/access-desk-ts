@@ -17,6 +17,7 @@ import { type Timestamp, timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { type BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
 import { PersonIdSchema } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { ResourceIdSchema } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
+import { SubmitAccessExtensionRequestSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/commands_pb.js";
 import {
   CreateAccessGrantSchema,
   ExtendAccessGrantSchema,
@@ -36,8 +37,15 @@ import {
   resourceUuid,
   seed,
   submitAndAssign,
+  submitExtensionRequest,
 } from "../../request/given/access-request.js";
-import type { ResourceDraft } from "../../../resource/given/resource.js";
+import { managerHasTask } from "../../request/given/access-decision-assignment.js";
+import {
+  awaitCatalogItem,
+  createResource,
+  openResource,
+  type ResourceDraft,
+} from "../../../resource/given/resource.js";
 
 /** The moment every grant test starts at, on a whole minute. */
 export const startOfTest = new Date("2030-01-01T10:00:00Z");
@@ -54,7 +62,8 @@ export function minutesIn(minutes: number): Timestamp {
 
 /**
  * Builds a `CreateAccessGrant` issuing the requester read access to the payroll
- * resource for the first hour of the test, revocable by `primary`.
+ * resource for the first hour of the test, revocable by `primary` — as though
+ * a request with the same identifier had been approved.
  */
 export function createGrantCommand(
   id: string,
@@ -76,16 +85,96 @@ export function createGrantCommand(
   });
 }
 
+/** The longest access, in total, the resources granted in these tests permit. */
+const maximumDuration = { seconds: 7200n };
+
 /**
- * Registers the payroll resource that {@link createGrantCommand} grants access to,
- * permitting two hours of access in total, so that its grants can be extended.
+ * Registers the payroll resource, managed by `primary` and permitting two hours
+ * of access in total, so that its grants can be extended.
  */
 export function seedGrantedResource(box: BlackBox): Promise<void> {
-  return seed(box, [actor, "primary"], { policy: { maximumDuration: { seconds: 7200n } } });
+  return seed(box, [actor, "primary"], { policy: { maximumDuration } });
+}
+
+/**
+ * Registers one more resource, open for requests, managed by `primary` and
+ * permitting two hours of access in total.
+ *
+ * Call it after {@link seedGrantedResource}, which creates the organization.
+ */
+export async function seedOtherResource(box: BlackBox, resource: string): Promise<void> {
+  const scope = box.onBehalfOf(actor);
+  await createResource(scope, resource, {
+    name: resource,
+    manager: [{ uuid: "primary" }],
+    maximumDuration,
+  });
+  await openResource(scope, resource);
+  await awaitCatalogItem(box, scope, resource, (item) => item.policy?.openForRequests ?? false);
+}
+
+/** Who is granted access to what, and over which minutes of the test. */
+export interface GrantDraft {
+  readonly grantee?: string;
+  readonly resource?: string;
+  readonly start?: number;
+  readonly end?: number;
+}
+
+/**
+ * Has the grantee ask for read access over an interval, and `primary` approve
+ * it at once, which issues a grant with the same identifier as the request.
+ *
+ * The grantee reads the payroll resource over the first hour of the test by
+ * default. The clock must not have passed the start of the interval, so that
+ * the grant keeps it.
+ *
+ * @param box The BlackBox to drive.
+ * @param request The request, and so the grant, identifier.
+ * @param draft Who is granted access to what, and when.
+ */
+export async function issueGrant(
+  box: BlackBox,
+  request: string,
+  { grantee = actor, resource = resourceUuid, start = 0, end = 60 }: GrantDraft = {},
+): Promise<void> {
+  await submitAndAssign(box, box.onBehalfOf(grantee), request, "primary", {
+    requester: { uuid: grantee },
+    resource: { uuid: resource },
+    period: {
+      kind: { case: "scheduled", value: { start: minutesIn(start), end: minutesIn(end) } },
+    },
+  });
+  await approveAccessRequest(box, request, "primary");
+}
+
+/**
+ * Has the requester ask to extend the grant by some minutes, and `primary`
+ * approve it.
+ */
+export async function approveExtension(
+  box: BlackBox,
+  request: string,
+  grant: string,
+  minutes: number,
+): Promise<void> {
+  const requester = box.onBehalfOf(actor);
+  await requester.post(
+    SubmitAccessExtensionRequestSchema,
+    submitExtensionRequest(request, {
+      grant: { uuid: grant },
+      duration: { seconds: BigInt(minutes * 60) },
+    }),
+  );
+  await box.eventually(
+    () => managerHasTask(requester, "primary", request),
+    (present) => present,
+  );
+  await approveAccessRequest(box, request, "primary");
 }
 
 /** Posts `CreateAccessGrant` directly, as the grant itself does on approval. */
-export function createGrant(
+export function postCreateAccessGrant(
   scope: BlackBoxScope,
   id: string,
   overrides: Record<string, unknown> = {},
@@ -93,16 +182,23 @@ export function createGrant(
   return scope.post(CreateAccessGrantSchema, createGrantCommand(id, overrides));
 }
 
-/** Posts `RevokeAccessGrant` naming `manager` as the revoking person. */
-export function revokeGrant(scope: BlackBoxScope, id: string, manager: string, reason: string) {
-  return scope.post(
-    RevokeAccessGrantSchema,
-    create(RevokeAccessGrantSchema, { id: { uuid: id }, manager: { uuid: manager }, reason }),
-  );
+/** Posts `RevokeAccessGrant` on behalf of `manager`, naming them as the revoking person. */
+export function revokeGrant(box: BlackBox, id: string, manager: string, reason: string) {
+  return box
+    .onBehalfOf(manager)
+    .post(
+      RevokeAccessGrantSchema,
+      create(RevokeAccessGrantSchema, { id: { uuid: id }, manager: { uuid: manager }, reason }),
+    );
 }
 
-/** Posts `ExtendAccessGrant` moving the grant's end as the named request approved. */
-export function extendGrant(scope: BlackBoxScope, id: string, request: string, end: Timestamp) {
+/** Posts `ExtendAccessGrant` directly, as the grant itself does on approval. */
+export function postExtendAccessGrant(
+  scope: BlackBoxScope,
+  id: string,
+  request: string,
+  end: Timestamp,
+) {
   return scope.post(
     ExtendAccessGrantSchema,
     create(ExtendAccessGrantSchema, { id: { uuid: id }, request: { uuid: request }, end }),
@@ -205,7 +301,7 @@ export async function givenActiveGrant(
   await submitAndAssign(box, requester, request, "primary", {
     period: { kind: { case: "immediateDuration", value: { seconds: BigInt(minutes * 60) } } },
   });
-  await approveAccessRequest(requester, request, "primary");
+  await approveAccessRequest(box, request, "primary");
   await awaitGrantIssued(box, requester, request);
   return requester;
 }

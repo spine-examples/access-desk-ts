@@ -24,19 +24,20 @@ import {
   awaitGrantIssued,
   awaitGrantRevoked,
   awaitGrantView,
-  createGrant,
-  extendGrant,
+  approveExtension,
+  issueGrant,
   minutesIn,
   readAccessHeldBy,
   readAccessTo,
   revokeGrant,
   seedGrantedResource,
+  seedOtherResource,
   testClock,
 } from "./given/access-grant.js";
 
-// The projection is driven by posting the grant's own commands, and read
-// through both of its queries: the access a person holds, and the access to a
-// resource.
+// The projection is driven by managers approving requests, which issue and
+// extend grants, and by revoking them. It is read through both of its queries:
+// the access a person holds, and the access to a resource.
 beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
 
@@ -44,22 +45,12 @@ describe("AccessGrantViewProjection should", () => {
   it("list a grant to the person holding it and among its resource's access", async () => {
     const box = await resourcesBlackBox(testClock());
     const scope = box.onBehalfOf(actor);
+    await seedGrantedResource(box);
+    await seedOtherResource(box, "vault");
 
-    await createGrant(scope, "grant-mine", { request: { uuid: "req-mine" } });
-    await createGrant(scope, "grant-theirs", {
-      access: {
-        grantee: { uuid: "colleague" },
-        resource: { uuid: resourceUuid },
-        accessLevel: { name: "Read", rank: 1 },
-      },
-    });
-    await createGrant(scope, "grant-elsewhere", {
-      access: {
-        grantee: { uuid: actor },
-        resource: { uuid: "vault" },
-        accessLevel: { name: "Read", rank: 1 },
-      },
-    });
+    await issueGrant(box, "grant-mine");
+    await issueGrant(box, "grant-theirs", { grantee: "colleague" });
+    await issueGrant(box, "grant-elsewhere", { resource: "vault" });
 
     const view = await awaitGrantIssued(box, scope, "grant-mine");
     expect(view.grantee?.uuid).toBe(actor);
@@ -67,7 +58,7 @@ describe("AccessGrantViewProjection should", () => {
     expect(view.accessLevel?.name).toBe("Read");
     expect(view.start).toEqual(minutesIn(0));
     expect(view.end).toEqual(minutesIn(60));
-    expect(view.request?.uuid).toBe("req-mine");
+    expect(view.request?.uuid).toBe("grant-mine");
     await box.eventually(
       () => readAccessTo(scope),
       (rows) => rows.some((row) => row.id?.uuid === "grant-theirs"),
@@ -87,10 +78,10 @@ describe("AccessGrantViewProjection should", () => {
     const box = await resourcesBlackBox(testClock());
     const scope = box.onBehalfOf(actor);
     await seedGrantedResource(box);
-    await createGrant(scope, "grant-extended");
+    await issueGrant(box, "grant-extended");
     await awaitGrantIssued(box, scope, "grant-extended");
 
-    await extendGrant(scope, "grant-extended", "ext-1", minutesIn(90));
+    await approveExtension(box, "ext-1", "grant-extended", 30);
 
     await awaitGrantView(
       box,
@@ -103,10 +94,11 @@ describe("AccessGrantViewProjection should", () => {
   it("show revoked access as revoked", async () => {
     const box = await resourcesBlackBox(testClock());
     const scope = box.onBehalfOf(actor);
-    await createGrant(scope, "grant-revoked");
+    await seedGrantedResource(box);
+    await issueGrant(box, "grant-revoked");
     await awaitGrantIssued(box, scope, "grant-revoked");
 
-    await revokeGrant(scope, "grant-revoked", "primary", "Investigation finished.");
+    await revokeGrant(box, "grant-revoked", "primary", "Investigation finished.");
 
     await awaitGrantRevoked(box, scope, "grant-revoked");
   });

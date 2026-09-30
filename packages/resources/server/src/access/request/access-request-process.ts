@@ -13,7 +13,7 @@
  */
 
 import { create } from "@bufbuild/protobuf";
-import type { Timestamp } from "@bufbuild/protobuf/wkt";
+import { DurationSchema, type Timestamp } from "@bufbuild/protobuf/wkt";
 import { Assign, ProcessManager, Throws } from "@spine-event-engine/server";
 import { equals } from "../../proto/equals.js";
 import {
@@ -37,7 +37,6 @@ import { ResourceCatalogItemSchema } from "@access-desk/resources-model/generate
 import {
   AccessRequestSnapshotSchema,
   AccessRequestStatus,
-  type AccessPeriod,
   type AccessRequestSnapshot,
 } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import {
@@ -89,6 +88,9 @@ import {
   plus,
 } from "../../time/interval.js";
 
+/** No time at all, which every extension must exceed. */
+const NO_TIME = create(DurationSchema, {});
+
 /**
  * One access request for a protected resource, driven from submission to a
  * terminal decision.
@@ -132,10 +134,13 @@ export class AccessRequestProcessManager extends ProcessManager<
     ) {
       throw new Error("SubmitAccessRequest requires a requester, resource, level, and period.");
     }
+    const requested = requestedInterval(period, now());
+    if (requested === undefined || compare(requested.start, requested.end) >= 0) {
+      throw new Error("Requested access must end after it begins.");
+    }
     const policy = await this.requestablePolicy(id, resource);
     const level = this.matchLevel(id, policy, accessLevel);
-    const requested = requestedInterval(period, now());
-    this.assertWithinMaxDuration(id, policy, period);
+    this.assertWithinMaximumDuration(id, policy, requested);
     await this.assertNoDuplicate(id, requester, resource);
     await this.assertAccessNotHeld(id, requester, resource, level, requested);
     const manager = this.managers(policy);
@@ -153,7 +158,7 @@ export class AccessRequestProcessManager extends ProcessManager<
    *
    * 1. The requester must hold the grant, and it must be active.
    * 2. The proposed end is the grant's current end plus the requested
-   *    duration.
+   *    duration, which must be positive.
    * 3. The whole access, extension included, must fit the maximum duration of
    *    the resource's policy.
    * 4. The requester must not already hold the same or stronger access to the
@@ -185,16 +190,13 @@ export class AccessRequestProcessManager extends ProcessManager<
         "SubmitAccessExtensionRequest requires a requester, grant, duration, and resource.",
       );
     }
+    if (!longerThan(duration, NO_TIME)) {
+      throw new Error("An extension must add time to the access.");
+    }
     const policy = await this.requestablePolicy(id, resource);
     const held = await this.activeGrant(grant, requester, resource);
     const proposedEnd = plus(held.end, duration);
-    const maximum = policy.maximumDuration;
-    if (maximum === undefined) {
-      throw new Error("A resource policy must carry its maximum duration.");
-    }
-    if (longerThan(between(held.start, proposedEnd), maximum)) {
-      throw RequestedDurationTooLong.create({ id });
-    }
+    this.assertWithinMaximumDuration(id, policy, { start: held.start, end: proposedEnd });
     await this.assertNoDuplicate(id, requester, resource, grant);
     await this.assertAccessNotHeld(
       id,
@@ -222,8 +224,9 @@ export class AccessRequestProcessManager extends ProcessManager<
    * 2. An extension extends active access only, so the grant it applies to must
    *    still give the requester active access.
    * 3. An extension is checked again against access granted since it was
-   *    submitted, so no other grant may give the same or stronger access for
-   *    the added time.
+   *    submitted: the grant itself must not already reach the proposed end,
+   *    and no other grant may give the same or stronger access for the added
+   *    time.
    */
   @Assign
   @Throws(RequestAlreadyDecided, NotAnEligibleManager, AccessAlreadyHeld, AccessGrantNotActive)
@@ -247,16 +250,17 @@ export class AccessRequestProcessManager extends ProcessManager<
     } else if (kind.case === "extension" && kind.value.grant !== undefined) {
       const { grant, proposedEnd } = kind.value;
       const held = await this.activeGrant(grant, requester);
-      if (proposedEnd !== undefined && compare(held.end, proposedEnd) < 0) {
-        await this.assertAccessNotHeld(
-          id,
-          requester,
-          held.resource,
-          held.accessLevel,
-          { start: held.end, end: proposedEnd },
-          grant,
-        );
+      if (proposedEnd === undefined || compare(proposedEnd, held.end) <= 0) {
+        throw AccessAlreadyHeld.create({ id });
       }
+      await this.assertAccessNotHeld(
+        id,
+        requester,
+        held.resource,
+        held.accessLevel,
+        { start: held.end, end: proposedEnd },
+        grant,
+      );
     }
     this.update((draft) => {
       draft.status = AccessRequestStatus.APPROVED;
@@ -277,6 +281,7 @@ export class AccessRequestProcessManager extends ProcessManager<
     this.assertPending(command.id);
     const snapshot = this.requireSnapshot();
     const decidedBy = this.assertEligibleDecider(command.id, command.manager);
+    const whenDecided = now();
     this.update((draft) => {
       draft.status = AccessRequestStatus.DENIED;
     });
@@ -284,6 +289,7 @@ export class AccessRequestProcessManager extends ProcessManager<
       id: this.id,
       snapshot,
       decidedBy,
+      whenDecided,
       reason: command.reason,
       manager: this.state.manager,
     });
@@ -346,16 +352,17 @@ export class AccessRequestProcessManager extends ProcessManager<
     return level;
   }
 
-  /** Rejects a requested period longer than the resource's maximum access duration. */
-  private assertWithinMaxDuration(
+  /** Rejects access that would last longer than the resource's maximum duration. */
+  private assertWithinMaximumDuration(
     id: AccessRequestId,
     policy: ResourcePolicy,
-    period: AccessPeriod,
+    access: Interval,
   ): void {
-    if (
-      policy.maximumDuration !== undefined &&
-      this.durationExceedsMaximum(period, policy.maximumDuration)
-    ) {
+    const maximum = policy.maximumDuration;
+    if (maximum === undefined) {
+      throw new Error("A resource policy must carry its maximum duration.");
+    }
+    if (longerThan(between(access.start, access.end), maximum)) {
       throw RequestedDurationTooLong.create({ id });
     }
   }
@@ -483,35 +490,6 @@ export class AccessRequestProcessManager extends ProcessManager<
       }
       return false;
     });
-  }
-
-  private durationExceedsMaximum(
-    period: AccessPeriod,
-    maximum: { seconds: bigint; nanos: number },
-  ): boolean {
-    const requested = this.durationOf(period);
-    if (requested === undefined) {
-      return false;
-    }
-    return (
-      requested.seconds > maximum.seconds ||
-      (requested.seconds === maximum.seconds && requested.nanos > maximum.nanos)
-    );
-  }
-
-  private durationOf(period: AccessPeriod): { seconds: bigint; nanos: number } | undefined {
-    if (period.kind.case === "immediateDuration") {
-      return period.kind.value;
-    }
-    if (period.kind.case === "scheduled") {
-      const start = period.kind.value.start;
-      const end = period.kind.value.end;
-      if (start === undefined || end === undefined) {
-        return undefined;
-      }
-      return { seconds: end.seconds - start.seconds, nanos: end.nanos - start.nanos };
-    }
-    return undefined;
   }
 
   private assertPending(id: AccessRequestId | undefined): void {

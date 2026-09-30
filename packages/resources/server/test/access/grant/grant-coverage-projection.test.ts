@@ -23,17 +23,19 @@ import {
 } from "../../given/resources-context.js";
 import { resourceUuid } from "../request/given/access-request.js";
 import {
+  approveExtension,
   awaitGrantIssued,
-  createGrant,
-  extendGrant,
+  issueGrant,
   minutesIn,
   readCoverage,
   revokeGrant,
   seedGrantedResource,
+  seedOtherResource,
   testClock,
 } from "./given/access-grant.js";
 
-// The projection is driven by posting the grant's own commands.
+// The projection is driven by managers approving requests, which issue and
+// extend grants, and by revoking them.
 beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
 
@@ -69,8 +71,9 @@ describe("GrantCoverageProjection should", () => {
   it("cover a person's resource with an issued grant's level and period", async () => {
     const box = await resourcesBlackBox(testClock());
     const scope = box.onBehalfOf(actor);
+    await seedGrantedResource(box);
 
-    await createGrant(scope, "grant-covered");
+    await issueGrant(box, "grant-covered");
 
     const coverage = await awaitCoverage(
       box,
@@ -91,21 +94,12 @@ describe("GrantCoverageProjection should", () => {
     const box = await resourcesBlackBox(testClock());
     const scope = box.onBehalfOf(actor);
 
-    await createGrant(scope, "grant-mine");
-    await createGrant(scope, "grant-theirs", {
-      access: {
-        grantee: { uuid: "colleague" },
-        resource: { uuid: resourceUuid },
-        accessLevel: { name: "Read", rank: 1 },
-      },
-    });
-    await createGrant(scope, "grant-elsewhere", {
-      access: {
-        grantee: { uuid: actor },
-        resource: { uuid: "vault" },
-        accessLevel: { name: "Read", rank: 1 },
-      },
-    });
+    await seedGrantedResource(box);
+    await seedOtherResource(box, "vault");
+
+    await issueGrant(box, "grant-mine");
+    await issueGrant(box, "grant-theirs", { grantee: "colleague" });
+    await issueGrant(box, "grant-elsewhere", { resource: "vault" });
 
     const mine = await awaitCoverage(box, scope, actor, resourceUuid, (c) => c.grant.length > 0);
     const theirs = await awaitCoverage(
@@ -125,10 +119,10 @@ describe("GrantCoverageProjection should", () => {
     const box = await resourcesBlackBox(testClock());
     const scope = box.onBehalfOf(actor);
     await seedGrantedResource(box);
-    await createGrant(scope, "grant-longer");
+    await issueGrant(box, "grant-longer");
     await awaitGrantIssued(box, scope, "grant-longer");
 
-    await extendGrant(scope, "grant-longer", "ext-longer", minutesIn(90));
+    await approveExtension(box, "ext-longer", "grant-longer", 30);
 
     const coverage = await awaitCoverage(
       box,
@@ -143,10 +137,11 @@ describe("GrantCoverageProjection should", () => {
   it("stop covering access once it is revoked", async () => {
     const box = await resourcesBlackBox(testClock());
     const scope = box.onBehalfOf(actor);
-    await createGrant(scope, "grant-withdrawn");
+    await seedGrantedResource(box);
+    await issueGrant(box, "grant-withdrawn");
     await awaitGrantIssued(box, scope, "grant-withdrawn");
 
-    await revokeGrant(scope, "grant-withdrawn", "primary", "No longer needed.");
+    await revokeGrant(box, "grant-withdrawn", "primary", "No longer needed.");
 
     await awaitCoverage(box, scope, actor, resourceUuid, (c) => c.grant.length === 0);
   });

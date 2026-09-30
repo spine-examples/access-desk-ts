@@ -14,7 +14,6 @@
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { type BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
-import { SubmitAccessExtensionRequestSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/commands_pb.js";
 import { AccessGrantSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/access_grant_pb.js";
 import {
   AccessGrantCreatedSchema,
@@ -35,30 +34,27 @@ import {
   testActorContext,
 } from "../../given/resources-context.js";
 import type { ManualClock } from "../../given/manual-clock.js";
+import { approveAccessRequest, seed, submitAndAssign } from "../request/given/access-request.js";
 import {
-  approveAccessRequest,
-  seed,
-  submitAndAssign,
-  submitExtensionRequest,
-} from "../request/given/access-request.js";
-import { managerHasTask } from "../request/given/access-decision-assignment.js";
-import {
+  approveExtension,
   awaitGrantIssued,
   awaitGrantRevoked,
   awaitGrantView,
-  createGrant,
-  extendGrant,
   givenActiveGrant,
+  issueGrant,
   minutesIn,
+  postCreateAccessGrant,
+  postExtendAccessGrant,
   revokeGrant,
   seedGrantedResource,
   testClock,
+  type GrantDraft,
 } from "./given/access-grant.js";
 
 const { expectRejection, recordEvents } = eventRecording(testActorContext);
 
-// Commands are posted to the grant directly, except in the cases that start from
-// a manager's approval of a request.
+// Grants are issued and extended by managers approving requests. The grant's
+// own commands are posted directly only to repeat one it has already handled.
 beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
 
@@ -69,15 +65,16 @@ interface Given {
 }
 
 /**
- * Registers the resource, creates a grant to it, for the first hour of the test
- * by default, and waits until the grant is issued.
+ * Registers the resource, has `primary` approve a request for access to it,
+ * for the first hour of the test by default, and waits until the grant is
+ * issued.
  */
-async function givenGrant(id: string, overrides: Record<string, unknown> = {}): Promise<Given> {
+async function givenGrant(id: string, draft: GrantDraft = {}): Promise<Given> {
   const clock = testClock();
   const box = await resourcesBlackBox(clock);
   const scope = box.onBehalfOf(actor);
   await seedGrantedResource(box);
-  await createGrant(scope, id, overrides);
+  await issueGrant(box, id, draft);
   await awaitGrantIssued(box, scope, id);
   return { box, scope, clock };
 }
@@ -88,46 +85,8 @@ async function givenGrant(id: string, overrides: Record<string, unknown> = {}): 
  */
 async function fence({ box, scope }: Given, id: string): Promise<void> {
   await expectRejection(box, scope, NotResourceManagerSchema, () =>
-    revokeGrant(scope, id, "outsider", "Fence."),
+    revokeGrant(box, id, "outsider", "Fence."),
   );
-}
-
-/** Has the requester ask for access over the interval and `primary` approve it. */
-async function approveScheduled(
-  box: BlackBox,
-  requester: BlackBoxScope,
-  request: string,
-  start: number,
-  end: number,
-): Promise<void> {
-  await submitAndAssign(box, requester, request, "primary", {
-    period: {
-      kind: { case: "scheduled", value: { start: minutesIn(start), end: minutesIn(end) } },
-    },
-  });
-  await approveAccessRequest(requester, request, "primary");
-}
-
-/** Submits an extension of the grant by `minutes` and has `primary` approve it. */
-async function approveExtension(
-  box: BlackBox,
-  requester: BlackBoxScope,
-  request: string,
-  grant: string,
-  minutes: number,
-): Promise<void> {
-  await requester.post(
-    SubmitAccessExtensionRequestSchema,
-    submitExtensionRequest(request, {
-      grant: { uuid: grant },
-      duration: { seconds: BigInt(minutes * 60) },
-    }),
-  );
-  await box.eventually(
-    () => managerHasTask(requester, "primary", request),
-    (present) => present,
-  );
-  await approveAccessRequest(requester, request, "primary");
 }
 
 describe("AccessGrantProcessManager should", () => {
@@ -142,7 +101,7 @@ describe("AccessGrantProcessManager should", () => {
       });
       clock.advanceMinutes(5);
 
-      await approveAccessRequest(requester, "req-now", "primary");
+      await approveAccessRequest(box, "req-now", "primary");
 
       const item = await awaitGrantIssued(box, requester, "req-now");
       expect(item.start).toEqual(minutesIn(5));
@@ -163,7 +122,7 @@ describe("AccessGrantProcessManager should", () => {
       await seed(box, [actor, "primary"]);
       clock.advanceMinutes(10);
 
-      await approveScheduled(box, requester, "req-within", 0, 30);
+      await issueGrant(box, "req-within", { start: 0, end: 30 });
 
       const item = await awaitGrantIssued(box, requester, "req-within");
       expect(item.start).toEqual(minutesIn(10));
@@ -175,7 +134,7 @@ describe("AccessGrantProcessManager should", () => {
       const requester = box.onBehalfOf(actor);
       await seed(box, [actor, "primary"]);
 
-      await approveScheduled(box, requester, "req-future", 30, 90);
+      await issueGrant(box, "req-future", { start: 30, end: 90 });
 
       const item = await awaitGrantIssued(box, requester, "req-future");
       expect(item.start).toEqual(minutesIn(30));
@@ -194,7 +153,7 @@ describe("AccessGrantProcessManager should", () => {
       });
       clock.advanceMinutes(10);
 
-      await approveAccessRequest(requester, "req-too-late", "primary");
+      await approveAccessRequest(box, "req-too-late", "primary");
 
       const item = await awaitGrantIssued(box, requester, "req-too-late");
       expect(item.start).toEqual(minutesIn(0));
@@ -208,9 +167,9 @@ describe("AccessGrantProcessManager should", () => {
       const requester = await givenActiveGrant(box, "req-to-extend", 10);
       const extended = await recordEvents(requester, AccessGrantExtendedSchema);
       try {
-        await approveExtension(box, requester, "ext-first", "req-to-extend", 10);
+        await approveExtension(box, "ext-first", "req-to-extend", 10);
         await extended.waitFor(box, (e) => e.request?.uuid === "ext-first");
-        await approveExtension(box, requester, "ext-second", "req-to-extend", 10);
+        await approveExtension(box, "ext-second", "req-to-extend", 10);
 
         const event = await extended.waitFor(box, (e) => e.request?.uuid === "ext-second");
         expect(event.previousEnd).toEqual(minutesIn(20));
@@ -226,14 +185,17 @@ describe("AccessGrantProcessManager should", () => {
     it("emit 'AccessGrantCreated' with the access, its period, and its managers", async () => {
       const box = await resourcesBlackBox(testClock());
       const scope = box.onBehalfOf(actor);
+      await seedGrantedResource(box);
       const created = await recordEvents(scope, AccessGrantCreatedSchema);
       try {
-        expect((await createGrant(scope, "grant-created")).kind).toBe("ok");
+        await issueGrant(box, "grant-created");
 
         const event = await created.waitFor(box, (e) => e.id?.uuid === "grant-created");
+        expect(event.request?.uuid).toBe("grant-created");
         expect(event.access?.grantee?.uuid).toBe(actor);
         expect(event.start).toEqual(minutesIn(0));
         expect(event.end).toEqual(minutesIn(60));
+        expect(event.approvedBy?.uuid).toBe("primary");
         expect(event.manager.map((manager) => manager.uuid)).toEqual(["primary"]);
       } finally {
         await created.cancel();
@@ -245,7 +207,8 @@ describe("AccessGrantProcessManager should", () => {
       const { box, scope } = given;
       const created = await recordEvents(scope, AccessGrantCreatedSchema);
       try {
-        await createGrant(scope, "grant-once", { end: minutesIn(30) });
+        await postCreateAccessGrant(scope, "grant-once");
+        await postCreateAccessGrant(scope, "grant-once", { end: minutesIn(30) });
         await fence(given, "grant-once");
 
         expect(created.received).toHaveLength(0);
@@ -262,7 +225,7 @@ describe("AccessGrantProcessManager should", () => {
       const { box, scope } = await givenGrant("grant-extended");
       const extended = await recordEvents(scope, AccessGrantExtendedSchema);
       try {
-        await extendGrant(scope, "grant-extended", "ext-1", minutesIn(90));
+        await approveExtension(box, "ext-1", "grant-extended", 30);
 
         const event = await extended.waitFor(box, (e) => e.id?.uuid === "grant-extended");
         expect(event.previousEnd).toEqual(minutesIn(60));
@@ -279,55 +242,37 @@ describe("AccessGrantProcessManager should", () => {
       }
     });
 
-    it("extend access that begins later once its start has arrived", async () => {
-      const given = await givenGrant("grant-begins-later", {
-        start: minutesIn(30),
-        end: minutesIn(90),
-      });
-      const { box, scope, clock } = given;
+    it("extend access that began later once its start has arrived", async () => {
+      const { box, scope, clock } = await givenGrant("grant-begins-later", { start: 30, end: 90 });
       const extended = await recordEvents(scope, AccessGrantExtendedSchema);
       try {
-        await expectRejection(box, scope, AccessGrantNotActiveSchema, () =>
-          extendGrant(scope, "grant-begins-later", "ext-too-early", minutesIn(100)),
-        );
         clock.advanceMinutes(30);
 
-        await extendGrant(scope, "grant-begins-later", "ext-on-time", minutesIn(100));
+        await approveExtension(box, "ext-on-time", "grant-begins-later", 10);
 
         const event = await extended.waitFor(box, (e) => e.id?.uuid === "grant-begins-later");
         expect(event.request?.uuid).toBe("ext-on-time");
+        expect(event.end).toEqual(minutesIn(100));
       } finally {
         await extended.cancel();
       }
     });
 
-    it("reject extending revoked access ('AccessGrantNotActive')", async () => {
-      const { box, scope } = await givenGrant("grant-extend-revoked");
-      await revokeGrant(scope, "grant-extend-revoked", "primary", "Ended.");
+    it("reject an approved extension of access revoked since ('AccessGrantNotActive')", async () => {
+      const given = await givenGrant("grant-extend-revoked");
+      const { box, scope } = given;
+      await approveExtension(box, "ext-late", "grant-extend-revoked", 30);
+      await awaitGrantView(
+        box,
+        scope,
+        "grant-extend-revoked",
+        (item) => item.end?.seconds === minutesIn(90).seconds,
+      );
+      await revokeGrant(box, "grant-extend-revoked", "primary", "Ended.");
       await awaitGrantRevoked(box, scope, "grant-extend-revoked");
 
       await expectRejection(box, scope, AccessGrantNotActiveSchema, () =>
-        extendGrant(scope, "grant-extend-revoked", "ext-late", minutesIn(90)),
-      );
-    });
-
-    it("reject extending access whose end has passed ('AccessGrantNotActive')", async () => {
-      const { box, scope, clock } = await givenGrant("grant-ended");
-      clock.advanceMinutes(60);
-
-      await expectRejection(box, scope, AccessGrantNotActiveSchema, () =>
-        extendGrant(scope, "grant-ended", "ext-ended", minutesIn(90)),
-      );
-    });
-
-    it("reject extending access that has not yet begun ('AccessGrantNotActive')", async () => {
-      const { box, scope } = await givenGrant("grant-not-begun", {
-        start: minutesIn(30),
-        end: minutesIn(90),
-      });
-
-      await expectRejection(box, scope, AccessGrantNotActiveSchema, () =>
-        extendGrant(scope, "grant-not-begun", "ext-early", minutesIn(120)),
+        postExtendAccessGrant(scope, "grant-extend-revoked", "ext-late", minutesIn(90)),
       );
     });
   });
@@ -339,7 +284,7 @@ describe("AccessGrantProcessManager should", () => {
       try {
         clock.advanceMinutes(20);
         expect(
-          (await revokeGrant(scope, "grant-revoked", "primary", "Investigation finished.")).kind,
+          (await revokeGrant(box, "grant-revoked", "primary", "Investigation finished.")).kind,
         ).toBe("ok");
 
         const event = await revoked.waitFor(box, (e) => e.id?.uuid === "grant-revoked");
@@ -353,14 +298,9 @@ describe("AccessGrantProcessManager should", () => {
     });
 
     it("revoke access that has yet to begin", async () => {
-      const { box, scope } = await givenGrant("grant-later", {
-        start: minutesIn(30),
-        end: minutesIn(90),
-      });
+      const { box, scope } = await givenGrant("grant-later", { start: 30, end: 90 });
 
-      expect((await revokeGrant(scope, "grant-later", "primary", "Plans changed.")).kind).toBe(
-        "ok",
-      );
+      expect((await revokeGrant(box, "grant-later", "primary", "Plans changed.")).kind).toBe("ok");
 
       await awaitGrantRevoked(box, scope, "grant-later");
     });
@@ -368,7 +308,7 @@ describe("AccessGrantProcessManager should", () => {
     it("reject a person who does not manage the resource ('NotResourceManager')", async () => {
       const { box, scope } = await givenGrant("grant-outsider");
       await expectRejection(box, scope, NotResourceManagerSchema, () =>
-        revokeGrant(scope, "grant-outsider", actor, "I am done."),
+        revokeGrant(box, "grant-outsider", actor, "I am done."),
       );
       const view = await awaitGrantIssued(box, scope, "grant-outsider");
       expect(view.revoked).toBe(false);
@@ -379,23 +319,23 @@ describe("AccessGrantProcessManager should", () => {
       clock.advanceMinutes(60);
 
       await expectRejection(box, scope, AccessGrantNotActiveSchema, () =>
-        revokeGrant(scope, "grant-revoke-ended", "primary", "Too late."),
+        revokeGrant(box, "grant-revoke-ended", "primary", "Too late."),
       );
     });
 
     it("reject revoking access again ('AccessGrantNotActive')", async () => {
       const { box, scope } = await givenGrant("grant-revoke-twice");
-      await revokeGrant(scope, "grant-revoke-twice", "primary", "No longer needed.");
+      await revokeGrant(box, "grant-revoke-twice", "primary", "No longer needed.");
       await awaitGrantRevoked(box, scope, "grant-revoke-twice");
 
       await expectRejection(box, scope, AccessGrantNotActiveSchema, () =>
-        revokeGrant(scope, "grant-revoke-twice", "primary", "Once more."),
+        revokeGrant(box, "grant-revoke-twice", "primary", "Once more."),
       );
     });
 
     it("reject a revocation without a reason", async () => {
-      const { scope } = await givenGrant("grant-no-reason");
-      expect((await revokeGrant(scope, "grant-no-reason", "primary", "")).kind).toBe("error");
+      const { box } = await givenGrant("grant-no-reason");
+      expect((await revokeGrant(box, "grant-no-reason", "primary", "")).kind).toBe("error");
     });
   });
 });

@@ -132,25 +132,27 @@ export async function submitAndAssign(
   );
 }
 
-/** Posts `ApproveAccessRequest` naming `manager` as the deciding manager. */
-export function approveAccessRequest(scope: BlackBoxScope, id: string, manager: string) {
-  return scope.post(
-    ApproveAccessRequestSchema,
-    create(ApproveAccessRequestSchema, { id: { uuid: id }, manager: { uuid: manager } }),
-  );
+/** Posts `ApproveAccessRequest` on behalf of `manager`, naming them as the deciding manager. */
+export function approveAccessRequest(box: BlackBox, id: string, manager: string) {
+  return box
+    .onBehalfOf(manager)
+    .post(
+      ApproveAccessRequestSchema,
+      create(ApproveAccessRequestSchema, { id: { uuid: id }, manager: { uuid: manager } }),
+    );
 }
 
-/** Posts `DenyAccessRequest` with a reason, naming `manager` as the deciding manager. */
-export function denyAccessRequest(
-  scope: BlackBoxScope,
-  id: string,
-  manager: string,
-  reason: string,
-) {
-  return scope.post(
-    DenyAccessRequestSchema,
-    create(DenyAccessRequestSchema, { id: { uuid: id }, manager: { uuid: manager }, reason }),
-  );
+/**
+ * Posts `DenyAccessRequest` with a reason, naming `manager` as the deciding
+ * manager, on behalf of that manager.
+ */
+export function denyAccessRequest(box: BlackBox, id: string, manager: string, reason: string) {
+  return box
+    .onBehalfOf(manager)
+    .post(
+      DenyAccessRequestSchema,
+      create(DenyAccessRequestSchema, { id: { uuid: id }, manager: { uuid: manager }, reason }),
+    );
 }
 
 /** Posts `CancelAccessRequest` for the request. */

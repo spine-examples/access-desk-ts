@@ -33,10 +33,7 @@ import {
   type GrantCoverageId,
   type ResourceId,
 } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
-import type {
-  AccessRequestSnapshot,
-  GrantedAccess,
-} from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
+import type { GrantedAccess } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import {
   AccessGrantCreatedSchema,
   AccessGrantExtendedSchema,
@@ -64,6 +61,9 @@ export interface ResourcesContextOptions {
    * Supply a controllable clock to make time-dependent behavior, such as
    * whether a grant gives access now, deterministic in tests and
    * demonstrations.
+   *
+   * The Resources domain tells time by one clock per process, so building
+   * another context replaces the clock of every context built before it.
    */
   readonly clock?: Clock;
 }
@@ -130,16 +130,11 @@ export async function createResourcesContext(
  * an extension request applies to the grant it names.
  */
 function grantIssuedBy(approval: AccessRequestApproved): AccessGrantId[] {
-  if (approval.snapshot?.kind.case === "extension") {
-    return grantExtendedBy(approval.snapshot);
+  const kind = approval.snapshot?.kind;
+  if (kind?.case === "extension") {
+    return kind.value.grant === undefined ? [] : [kind.value.grant];
   }
   return approval.id === undefined ? [] : [create(AccessGrantIdSchema, { uuid: approval.id.uuid })];
-}
-
-/** The grant an extension request applies to; none for a first-time request. */
-function grantExtendedBy(snapshot: AccessRequestSnapshot | undefined): AccessGrantId[] {
-  const kind = snapshot?.kind;
-  return kind?.case === "extension" && kind.value.grant !== undefined ? [kind.value.grant] : [];
 }
 
 /** The coverage of the person and resource a grant applies to. */

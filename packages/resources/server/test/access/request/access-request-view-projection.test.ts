@@ -31,6 +31,7 @@ import {
   statusOf,
   submitAndAssign,
 } from "./given/access-request.js";
+import { minutesIn, testClock } from "../grant/given/access-grant.js";
 
 // The view reacts to the request's own lifecycle facts, produced here through
 // the real submission-and-decision path.
@@ -71,26 +72,36 @@ describe("AccessRequestViewProjection should", () => {
     }
   });
 
-  it("on 'AccessRequestApproved' move the request to approved", async () => {
-    const box = await resourcesBlackBox();
+  it("on 'AccessRequestApproved' move the request to approved, recording who approved it and when", async () => {
+    const clock = testClock();
+    const box = await resourcesBlackBox(clock);
     const requester = box.onBehalfOf(actor);
     await seed(box, [actor, "primary"]);
     await submitAndAssign(box, requester, "view-approved", "primary");
+    clock.advanceMinutes(5);
 
-    await approveAccessRequest(requester, "view-approved", "primary");
+    await approveAccessRequest(box, "view-approved", "primary");
 
     await awaitStatus(box, requester, "view-approved", AccessRequestStatus.APPROVED);
+    const row = (await readRequests(requester)).find((r) => r.id?.uuid === "view-approved");
+    expect(row?.decidedBy?.uuid).toBe("primary");
+    expect(row?.whenDecided).toEqual(minutesIn(5));
   });
 
-  it("on 'AccessRequestDenied' move the request to denied", async () => {
-    const box = await resourcesBlackBox();
+  it("on 'AccessRequestDenied' move the request to denied, recording who denied it and when", async () => {
+    const clock = testClock();
+    const box = await resourcesBlackBox(clock);
     const requester = box.onBehalfOf(actor);
     await seed(box, [actor, "primary"]);
     await submitAndAssign(box, requester, "view-denied", "primary");
+    clock.advanceMinutes(5);
 
-    await denyAccessRequest(requester, "view-denied", "primary", "Insufficient justification.");
+    await denyAccessRequest(box, "view-denied", "primary", "Insufficient justification.");
 
     await awaitStatus(box, requester, "view-denied", AccessRequestStatus.DENIED);
+    const row = (await readRequests(requester)).find((r) => r.id?.uuid === "view-denied");
+    expect(row?.decidedBy?.uuid).toBe("primary");
+    expect(row?.whenDecided).toEqual(minutesIn(5));
   });
 
   it("on 'AccessRequestCanceled' move the request to canceled", async () => {

@@ -83,7 +83,7 @@ describe("AccessDecisionAssignmentProjection should", () => {
       await seed(box, [actor, "primary", "second"], twoManagers);
       await submitAndAssign(box, requester, "req-approved", ["primary", "second"]);
 
-      await approveAccessRequest(requester, "req-approved", "primary");
+      await approveAccessRequest(box, "req-approved", "primary");
 
       await awaitTask(box, "primary", "req-approved", false);
       await awaitTask(box, "second", "req-approved", false);
@@ -97,7 +97,7 @@ describe("AccessDecisionAssignmentProjection should", () => {
       await seed(box, [actor, "primary", "second"], twoManagers);
       await submitAndAssign(box, requester, "req-denied", ["primary", "second"]);
 
-      await denyAccessRequest(requester, "req-denied", "primary", "Insufficient justification.");
+      await denyAccessRequest(box, "req-denied", "primary", "Insufficient justification.");
 
       await awaitTask(box, "primary", "req-denied", false);
       await awaitTask(box, "second", "req-denied", false);
@@ -128,7 +128,7 @@ describe("AccessDecisionAssignmentProjection should", () => {
       );
       await awaitTask(box, "primary", "ext-revoked", true);
 
-      await revokeGrant(requester, "req-revoked", "primary", "Investigation finished.");
+      await revokeGrant(box, "req-revoked", "primary", "Investigation finished.");
 
       await awaitTask(box, "primary", "ext-revoked", false);
     });
@@ -143,7 +143,7 @@ describe("AccessDecisionAssignmentProjection should", () => {
     // A second requester keeps the same manager busy with an independent request.
     await submitAndAssign(box, teammate, "req-b", "primary", { requester: { uuid: "teammate" } });
 
-    await denyAccessRequest(requester, "req-a", "primary", "Not this time.");
+    await denyAccessRequest(box, "req-a", "primary", "Not this time.");
 
     await box.eventually(
       () => decisionTasks(requester, "primary"),
