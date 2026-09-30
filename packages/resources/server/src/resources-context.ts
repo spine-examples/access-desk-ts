@@ -103,7 +103,9 @@ export async function createResourcesContext(
     .route(AccessExtensionRequestSubmittedSchema, (event) => event.manager)
     .route(AccessRequestApprovedSchema, (event) => event.manager)
     .route(AccessRequestDeniedSchema, (event) => event.manager)
-    .route(AccessRequestCanceledSchema, (event) => event.manager);
+    .route(AccessRequestCanceledSchema, (event) => event.manager)
+    .route(AccessGrantExpiredSchema, (event) => event.manager)
+    .route(AccessGrantRevokedSchema, (event) => event.manager);
   const issuanceRouting = EventRouting.create<AccessGrantId>()
     .route(AccessRequestApprovedSchema, (event) => grantIssuedBy(event))
     .route(CommandScheduledSchema, (event) =>

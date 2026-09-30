@@ -31,6 +31,7 @@ import {
   RequestAlreadyDecidedSchema,
   ResourceNotOpenForRequestsSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/rejections_pb.js";
+import { AccessNotActiveSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/rejections_pb.js";
 import {
   SubmitAccessExtensionRequestSchema,
   SubmitAccessRequestSchema,
@@ -40,7 +41,6 @@ import {
   AccessLevelSchema,
   AccessRequestStatus,
 } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
-import { AccessNotActiveSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/rejections_pb.js";
 import {
   actor,
   closeResourcesBlackBoxes,
@@ -90,6 +90,47 @@ const twoLevels = {
     create(AccessLevelSchema, { name: "Write", rank: 2 }),
   ],
 };
+
+/**
+ * Has the requester of ten minutes of active access ask to extend it, and
+ * waits until the extension is pending.
+ */
+async function givenPendingExtension(
+  box: BlackBox,
+  grant: string,
+  extension: string,
+): Promise<BlackBoxScope> {
+  const requester = await givenActiveGrant(box, grant, 10);
+  await requester.post(
+    SubmitAccessExtensionRequestSchema,
+    submitExtensionRequest(extension, { grant: { uuid: grant } }),
+  );
+  await box.eventually(
+    () => statusOf(requester, extension),
+    (status) => status === AccessRequestStatus.PENDING,
+  );
+  return requester;
+}
+
+/**
+ * Has the requester ask for access over `[start, end)` minutes into the test and
+ * `primary` approve it, and waits until the access is scheduled.
+ */
+async function givenScheduledGrant(
+  box: BlackBox,
+  requester: BlackBoxScope,
+  request: string,
+  start: number,
+  end: number,
+): Promise<void> {
+  await submitAndAssign(box, requester, request, "primary", {
+    period: {
+      kind: { case: "scheduled", value: { start: minutesIn(start), end: minutesIn(end) } },
+    },
+  });
+  await approveAccessRequest(requester, request, "primary");
+  await awaitGrantStatus(box, requester, request, AccessGrantStatus.SCHEDULED);
+}
 
 /** Approves a request and waits until it is terminal. */
 async function givenApproved(box: BlackBox, requester: BlackBoxScope, id: string): Promise<void> {
@@ -343,6 +384,23 @@ describe("AccessRequestProcessManager should", () => {
       );
     });
 
+    it("reject extending into access another grant already confers ('AccessAlreadyHeld')", async () => {
+      // Held: [0, 10) and, through another grant, [10, 20). Extending the first overlaps the second.
+      const box = await resourcesBlackBox(testClock());
+      const requester = await givenActiveGrant(box, "req-this-slot", 10);
+      await givenScheduledGrant(box, requester, "req-next-slot", 10, 20);
+
+      await expectRejection(box, requester, AccessAlreadyHeldSchema, () =>
+        requester.post(
+          SubmitAccessExtensionRequestSchema,
+          submitExtensionRequest("ext-into-next", {
+            grant: { uuid: "req-this-slot" },
+            duration: { seconds: 600n },
+          }),
+        ),
+      );
+    });
+
     it("reject access lasting longer in total than the resource permits ('RequestedDurationTooLong')", async () => {
       // Ten minutes held plus fifty-one more exceeds the default hour.
       const box = await resourcesBlackBox(testClock());
@@ -452,6 +510,30 @@ describe("AccessRequestProcessManager should", () => {
         approveAccessRequest(requester, "req-later", "primary"),
       );
       expect(await statusOf(requester, "req-later")).toBe(AccessRequestStatus.PENDING);
+    });
+
+    it("reject an extension into access granted since it was submitted ('AccessAlreadyHeld')", async () => {
+      // The extension would move the held end from 10 to 12, into [10, 20) granted since.
+      const box = await resourcesBlackBox(testClock());
+      const requester = await givenPendingExtension(box, "req-before-next", "ext-overtaken");
+      await givenScheduledGrant(box, requester, "req-granted-since", 10, 20);
+
+      await expectRejection(box, requester, AccessAlreadyHeldSchema, () =>
+        approveAccessRequest(requester, "ext-overtaken", "primary"),
+      );
+      expect(await statusOf(requester, "ext-overtaken")).toBe(AccessRequestStatus.PENDING);
+    });
+
+    it("reject an extension of access revoked since it was submitted ('AccessNotActive')", async () => {
+      const box = await resourcesBlackBox(testClock());
+      const requester = await givenPendingExtension(box, "req-revoked-since", "ext-too-late");
+      await revokeGrant(requester, "req-revoked-since", "primary", "No longer needed.");
+      await awaitGrantStatus(box, requester, "req-revoked-since", AccessGrantStatus.REVOKED);
+
+      await expectRejection(box, requester, AccessNotActiveSchema, () =>
+        approveAccessRequest(requester, "ext-too-late", "primary"),
+      );
+      expect(await statusOf(requester, "ext-too-late")).toBe(AccessRequestStatus.PENDING);
     });
 
     it("reject a decision on an already-decided request ('RequestAlreadyDecided')", async () => {
