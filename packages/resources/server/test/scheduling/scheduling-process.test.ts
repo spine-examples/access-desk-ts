@@ -13,7 +13,11 @@
  */
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { create } from "@bufbuild/protobuf";
 import { CommandScheduledSchema } from "@access-desk/resources-model/generated/accessdesk/resources/scheduling/events_pb.js";
+import { AccessRequestIdSchema } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
+import { AccessRequestSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_pb.js";
+import { invokerOf } from "../../dist/src/invoker-id.js";
 import { eventRecording } from "../given/event-recording.js";
 import {
   actor,
@@ -26,6 +30,7 @@ import { minutesIn, testClock } from "../access/grant/given/access-grant.js";
 import {
   activatedGrant,
   awaitActivationPlan,
+  packedActivation,
   readSchedules,
   scheduleActivation,
   scheduleCommand,
@@ -34,14 +39,14 @@ import {
 
 const { recordEvents } = eventRecording(testActorContext);
 
-// The planning command is posted directly. The planned command begins the access
+// The scheduling command is posted directly. The scheduled command begins the access
 // of a grant that does not exist, and nothing sends it yet.
 beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
 
 describe("SchedulingProcessManager should", () => {
   describe("handle 'ScheduleCommand', and", () => {
-    it("emit 'CommandScheduled' for the planned command and its due time", async () => {
+    it("emit 'CommandScheduled' for the scheduled command and its due time", async () => {
       const box = await resourcesBlackBox(testClock());
       const scope = box.onBehalfOf(actor);
       const scheduled = await recordEvents(scope, CommandScheduledSchema);
@@ -51,6 +56,7 @@ describe("SchedulingProcessManager should", () => {
         const event = await scheduled.waitFor(box);
         expect(activatedGrant(event.command)).toBe("grant-planned");
         expect(event.due).toEqual(minutesIn(30));
+        expect(event.invoker).toBeUndefined();
         const plan = await awaitActivationPlan(box, scope, "grant-planned");
         expect(plan.id?.uuid).toBe(event.id?.uuid);
         expect(plan.due).toEqual(minutesIn(30));
@@ -59,14 +65,36 @@ describe("SchedulingProcessManager should", () => {
       }
     });
 
-    describe("not plan a command", () => {
+    it("carry the requesting entity back in the scheduled event", async () => {
+      const box = await resourcesBlackBox(testClock());
+      const scope = box.onBehalfOf(actor);
+      const scheduled = await recordEvents(scope, CommandScheduledSchema);
+      // No process of this kind awaits a scheduled command, so only the event itself is observed.
+      const invoker = invokerOf(
+        AccessRequestIdSchema,
+        create(AccessRequestIdSchema, { uuid: "request-invoker" }),
+        AccessRequestSchema,
+      );
+      try {
+        expect(
+          (await scheduleCommand(scope, packedActivation("grant-invoker"), minutesIn(30), invoker))
+            .kind,
+        ).toBe("ok");
+        const event = await scheduled.waitFor(box);
+        expect(event.invoker).toEqual(invoker);
+      } finally {
+        await scheduled.cancel();
+      }
+    });
+
+    describe("not schedule a command", () => {
       for (const [condition, command] of Object.entries(unschedulable)) {
         it(condition, async () => {
           const box = await resourcesBlackBox(testClock());
           const scope = box.onBehalfOf(actor);
 
           await scheduleCommand(scope, command, minutesIn(30));
-          // A schedulable command planned afterwards shows the refused one was handled.
+          // A schedulable command scheduled afterwards shows the refused one was handled.
           await scheduleActivation(scope, "grant-after", minutesIn(30));
           await awaitActivationPlan(box, scope, "grant-after");
 

@@ -16,8 +16,10 @@ import { create } from "@bufbuild/protobuf";
 import { AnyMessages } from "@spine-event-engine/core";
 import { Command, ProcessManager, React } from "@spine-event-engine/server";
 import {
+  AccessGrantIdSchema,
   AccessRequestIdSchema,
   type AccessGrantId,
+  type AccessRequestId,
 } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
 import {
   AccessGrantStatus,
@@ -39,6 +41,7 @@ import {
   AccessGrantActivationScheduledSchema,
   type AccessGrantActivationScheduled,
   type AccessGrantCreated,
+  type AccessGrantExtended,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
 import {
   ScheduleCommandSchema,
@@ -47,7 +50,7 @@ import {
 import type { CommandScheduled } from "@access-desk/resources-model/generated/accessdesk/resources/scheduling/events_pb.js";
 import { equals } from "../../proto/equals.js";
 import { effectiveInterval, requestedInterval } from "../access-period.js";
-import { between } from "../../time/interval.js";
+import { invokerOf } from "../../invoker-id.js";
 
 /**
  * The issuing of one access grant from approved requests.
@@ -56,8 +59,8 @@ import { between } from "../../time/interval.js";
  *    granted; an approved extension request moves the grant's end to the end
  *    it proposed.
  * 2. Access due to begin now is activated at once. Access that begins later
- *    has its activation scheduled, and is reported as scheduled once the plan
- *    is in place.
+ *    has its activation scheduled, and is reported as scheduled once the
+ *    scheduled command is in place.
  */
 export class GrantIssuanceProcessManager extends ProcessManager<
   AccessGrantId,
@@ -94,14 +97,18 @@ export class GrantIssuanceProcessManager extends ProcessManager<
   @Command
   startGrantOnCreation(event: AccessGrantCreated): ActivateAccessGrant | ScheduleCommand {
     const request = event.request;
-    this.update((draft) => {
-      draft.id = this.id;
-      draft.request = request;
-    });
     switch (event.status) {
       case AccessGrantStatus.PENDING_ACTIVATION:
+        this.update((draft) => {
+          draft.id = this.id;
+          draft.request = request;
+        });
         return create(ActivateAccessGrantSchema, { id: this.id });
       case AccessGrantStatus.PENDING_SCHEDULING:
+        this.update((draft) => {
+          draft.id = this.id;
+          draft.request = request;
+        });
         return create(ScheduleCommandSchema, {
           id: { uuid: crypto.randomUUID() },
           command: AnyMessages.pack(
@@ -109,6 +116,7 @@ export class GrantIssuanceProcessManager extends ProcessManager<
             create(ActivateAccessGrantSchema, { id: this.id }),
           ),
           due: event.start,
+          invoker: invokerOf(AccessGrantIdSchema, this.id, GrantIssuanceSchema),
         });
       default:
         throw new Error("A grant is created pending either its scheduling or its activation.");
@@ -119,6 +127,19 @@ export class GrantIssuanceProcessManager extends ProcessManager<
   @React
   onActivationScheduled(event: CommandScheduled): AccessGrantActivationScheduled {
     return create(AccessGrantActivationScheduledSchema, { id: this.id, start: event.due });
+  }
+
+  /** Records an extension the grant applied. */
+  @React
+  onGrantExtended(event: AccessGrantExtended): undefined {
+    const request = event.request;
+    if (request !== undefined) {
+      this.update((draft) => {
+        draft.id = this.id;
+        draft.extension = including(draft.extension, request);
+      });
+    }
+    return undefined;
   }
 
   /**
@@ -141,11 +162,17 @@ export class GrantIssuanceProcessManager extends ProcessManager<
       approvedAt === undefined || period === undefined
         ? undefined
         : (effectiveInterval(period, approvedAt) ?? requestedInterval(period, approvedAt));
-    if (interval === undefined) {
-      throw new Error("An approved first-time request must carry its approval time and period.");
+    if (interval === undefined || resource === undefined) {
+      throw new Error(
+        "An approved first-time request must carry its approval time, resource, and period.",
+      );
     }
-    const policy = (await this.select(ResourceCatalogItemSchema, {}).findById(resource as never))
-      ?.policy;
+    const maximumLifetime = (
+      await this.select(ResourceCatalogItemSchema, {}).findById(resource as never)
+    )?.policy?.maximumDuration;
+    if (maximumLifetime === undefined) {
+      throw new Error("The resource of an approved request must be in the catalog.");
+    }
     this.update((draft) => {
       draft.id = this.id;
       draft.request = event.id;
@@ -156,7 +183,7 @@ export class GrantIssuanceProcessManager extends ProcessManager<
       access: { grantee: event.snapshot?.requester, resource, accessLevel },
       start: interval.start,
       end: interval.end,
-      maximumLifetime: policy?.maximumDuration ?? between(interval.start, interval.end),
+      maximumLifetime,
       approvedBy: event.decidedBy,
       manager: event.manager,
     });
@@ -180,4 +207,14 @@ export class GrantIssuanceProcessManager extends ProcessManager<
       end: extension.proposedEnd,
     });
   }
+}
+
+/** The requests with `request` among them, each once. */
+function including(
+  requests: readonly AccessRequestId[],
+  request: AccessRequestId,
+): AccessRequestId[] {
+  return requests.some((known) => equals(AccessRequestIdSchema, known, request))
+    ? [...requests]
+    : [...requests, request];
 }

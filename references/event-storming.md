@@ -69,8 +69,7 @@ Projection inputs and outputs drawn on the board:
   Request Canceled — the requester's read model of each request and its status.
 - **Access Decision Assignment** receives Access Request Submitted, Access
   Extension Request Submitted, Access Request Approved, Access Request Denied,
-  and Access Request Canceled; it also receives Access Grant Expired and Access
-  Grant Revoked, dropping pending extensions of that grant.
+  and Access Request Canceled.
 
 #### Grant issuance — Grant Issuance PM, Access Grant aggregate
 

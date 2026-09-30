@@ -27,29 +27,30 @@ import { SchedulableCommand } from "@access-desk/resources-model/generated/inter
 import { typeRegistry } from "../../generated/model-registry.js";
 
 /**
- * One command an organization plans to run at a set time.
+ * One command an organization schedules to run at a set time.
  *
- * Only a command declared schedulable is planned, for a due time.
+ * Only a command declared schedulable is scheduled, for a due time.
  */
 export class SchedulingProcessManager extends ProcessManager<
   ScheduledCommandId,
   typeof SchedulingSchema
 > {
-  /** Plans the command for its due time. */
+  /** Schedules the command for its due time. */
   @Assign
   scheduleCommand(command: ScheduleCommand): CommandScheduled {
     if (this.state.command !== undefined) {
-      throw new Error("A command is planned once under its plan.");
+      throw new Error("A command is scheduled once under its identifier.");
     }
     const due = command.due;
     const packed = command.command;
+    const invoker = command.invoker;
     if (packed === undefined || due === undefined || !isSchedulable(packed)) {
-      throw new Error("Only a schedulable command, due at a set time, can be planned.");
+      throw new Error("Only a schedulable command, due at a set time, can be scheduled.");
     }
     this.update((draft) => {
       Object.assign(draft, create(SchedulingSchema, { id: this.id, command: packed, due }));
     });
-    return create(CommandScheduledSchema, { id: this.id, command: packed, due });
+    return create(CommandScheduledSchema, { id: this.id, command: packed, due, invoker });
   }
 }
 
@@ -57,7 +58,7 @@ export class SchedulingProcessManager extends ProcessManager<
 const schedulableCommands = new Set<MessageSchema>(SchedulableCommand.schemas);
 
 /**
- * Whether a packed command may be planned.
+ * Whether a packed command may be scheduled.
  *
  * It may when all of the following hold:
  *

@@ -23,10 +23,10 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
-// Plans a schedulable command to be sent later, at its due time.
+// Schedules a schedulable command for its due time.
 message ScheduleCommand {
 
-  // The planned command.
+  // The scheduled command.
   accessdesk.resources.ScheduledCommandId id = 1;
 
   // The command to run.
@@ -34,4 +34,7 @@ message ScheduleCommand {
 
   // When the command is due.
   google.protobuf.Timestamp due = 3 [(required) = true];
+
+  // Who scheduled the command, when known.
+  accessdesk.resources.InvokerId invoker = 4;
 }

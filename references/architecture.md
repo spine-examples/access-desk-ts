@@ -200,9 +200,8 @@ Submission must enforce all the following:
   accepted.
 - The requested level is offered by that resource.
 - The justification is meaningful.
-- The access period is canonical and positive: immediate durations and scheduled
-  endpoints use whole-minute precision, and a scheduled interval has a strictly
-  later exclusive end.
+- The access period uses whole-minute precision for immediate durations and
+  scheduled endpoints.
 - The time specification is valid and within the maximum duration.
 - The requester does not already hold same-or-stronger access for the relevant
   interval.
@@ -243,17 +242,12 @@ is an idempotent no-op.
 
 An extension:
 
-- is allowed only for an active grant;
+- submission requires an active grant;
 - proposes an additional duration and changes no other grant field;
 - requires a separate approval task and decision;
 - is capped by the resource's maximum **total grant lifetime**, not an
   independent duration per extension;
 - becomes ineffective if the grant expires or is revoked first.
-
-When revocation or expiry makes a pending extension/confirmation task
-irrelevant, remove that task from the pending-task projection. Immutable facts
-remain in history. Removing a task already absent from the projection is an
-idempotent no-op.
 
 ## Time semantics
 
@@ -294,14 +288,14 @@ the originally requested interval for audit.
 ## Scheduling (internal Resources component)
 
 Scheduling is an internal component of Resources, not a context of its own: a
-single stateful `Scheduling` Process Manager that owns one planned command and
+single stateful `Scheduling` Process Manager that owns one scheduled command and
 manages its scheduling lifecycle. Because it lives inside Resources, the grant
 facts it reacts to and the scheduling facts it emits are domestic Resources
 events rather than cross-context integration facts.
 
 The process persists a Resources **application command value** in Protobuf
 `Any` together with its schedule ID, due time, and current status. The
-organization is not stored: the plan lives in the organization's tenant, which
+organization is not stored: the scheduled command lives in the organization's tenant, which
 is authoritative. Its type must be registered and belong to the generated
 `SchedulableCommand` interface; its payload must be schema-compatible and
 unpackable. `ActivateAccessGrant` and `ExpireAccessGrant` are the schedulable commands.
@@ -312,14 +306,20 @@ The required choreography is:
 1. Resources commits a genuine fact such as `AccessGrantCreated` with a
    pending-scheduling status and an activation scheduling intent.
 2. The grant issuance process reacts to that Resources fact and sends the
-   corresponding domestic `ScheduleCommand` to `Scheduling`.
-3. The process persists the planned command and emits `CommandScheduled` only
-   after that state is durable.
-4. The grant lifecycle consumes the activation scheduling confirmation and
-   establishes scheduled state only after the plan is confirmed. Active state
+   corresponding domestic `ScheduleCommand` to `Scheduling`, naming itself as
+   the invoker: an `InvokerId` with its packed identifier and the type URL of
+   its state.
+3. The process persists the scheduled command and emits `CommandScheduled`,
+   which carries the invoker from `ScheduleCommand` back, only after that state
+   is durable. The stored scheduled command does not keep the invoker.
+4. The confirmation is routed by its invoker alone: it reaches the grant issuance
+   process only when the invoker names that kind of process and its identifier
+   reads back; otherwise it reaches no one. The grant lifecycle consumes the
+   activation scheduling confirmation and establishes scheduled state only after
+   the scheduled command is confirmed. Active state
    additionally requires successful handling and the resulting fact from the
    target activation command.
-5. At the due time, the planned command is sent to its target as an ordinary
+5. At the due time, the scheduled command is sent to its target as an ordinary
    domestic command.
 
 The generated `SchedulableCommand` interface fixes the set of command schemas

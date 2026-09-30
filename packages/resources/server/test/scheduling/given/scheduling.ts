@@ -26,6 +26,7 @@ import {
   type Scheduling,
 } from "@access-desk/resources-model/generated/accessdesk/resources/scheduling/scheduling_pb.js";
 import { ScheduleCommandSchema } from "@access-desk/resources-model/generated/accessdesk/resources/scheduling/commands_pb.js";
+import type { InvokerId } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
 
 import { readAll } from "../../given/resources-context.js";
 
@@ -43,7 +44,7 @@ function packedAsActivation(value: Uint8Array): Any {
 }
 
 /**
- * Commands the organization never plans.
+ * Commands the organization never schedules.
  */
 export const unschedulable: Record<string, Any> = {
   "that is not a command": AnyMessages.pack(
@@ -81,33 +82,38 @@ export const unschedulable: Record<string, Any> = {
   ),
 };
 
-/** The grant whose access a planned command begins, when it begins access. */
+/** The grant whose access a scheduled command begins, when it begins access. */
 export function activatedGrant(command: Any | undefined): string | undefined {
   return command === undefined
     ? undefined
     : AnyMessages.unpack(command, ActivateAccessGrantSchema)?.id?.uuid;
 }
 
-/** Posts `ScheduleCommand` planning a packed command when due, under a new plan. */
-export function scheduleCommand(scope: BlackBoxScope, command: Any, due: Timestamp) {
+/** Posts `ScheduleCommand` scheduling a packed command for when it is due, under a new identifier. */
+export function scheduleCommand(
+  scope: BlackBoxScope,
+  command: Any,
+  due: Timestamp,
+  invoker?: InvokerId,
+) {
   return scope.post(
     ScheduleCommandSchema,
-    create(ScheduleCommandSchema, { id: { uuid: crypto.randomUUID() }, command, due }),
+    create(ScheduleCommandSchema, { id: { uuid: crypto.randomUUID() }, command, due, invoker }),
   );
 }
 
-/** Posts `ScheduleCommand` planning to begin a grant's access when due, under a new plan. */
+/** Posts `ScheduleCommand` scheduling the start of a grant's access for when it is due, under a new identifier. */
 export function scheduleActivation(scope: BlackBoxScope, grant: string, due: Timestamp) {
   return scheduleCommand(scope, packedActivation(grant), due);
 }
 
-/** Every planned command of the organization. */
+/** Every scheduled command of the organization. */
 export function readSchedules(reader: BlackBoxScope): Promise<Scheduling[]> {
   return readAll(reader, SchedulingSchema, "schedules");
 }
 
 /**
- * Waits until the plan to begin a grant's access satisfies the predicate,
+ * Waits until the scheduled command that begins a grant's access satisfies the predicate,
  * and returns it.
  */
 export async function awaitActivationPlan(
@@ -124,7 +130,7 @@ export async function awaitActivationPlan(
   );
   const found = plans.find(matches);
   if (found === undefined) {
-    throw new Error(`No plan begins the access of grant "${grant}".`);
+    throw new Error(`No scheduled command begins the access of grant "${grant}".`);
   }
   return found;
 }

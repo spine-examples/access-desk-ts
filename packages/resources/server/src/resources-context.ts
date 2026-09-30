@@ -13,8 +13,6 @@
  */
 
 import { create } from "@bufbuild/protobuf";
-import { AnyMessages } from "@spine-event-engine/core";
-import type { Any } from "@bufbuild/protobuf/wkt";
 import { BoundedContext, type Clock, EventRouting, SystemClock } from "@spine-event-engine/server";
 import { ResourceAddedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
 import { ResourceDeletedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/events_pb.js";
@@ -35,7 +33,10 @@ import {
   type GrantCoverageId,
   type ResourceId,
 } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
-import type { GrantedAccess } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
+import type {
+  AccessRequestSnapshot,
+  GrantedAccess,
+} from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import { CommandScheduledSchema } from "@access-desk/resources-model/generated/accessdesk/resources/scheduling/events_pb.js";
 import {
   AccessGrantCreatedSchema,
@@ -58,8 +59,9 @@ import { GrantIssuanceProcessManager } from "./access/grant/grant-issuance-proce
 import { GrantCoverageProjection } from "./access/grant/grant-coverage-projection.js";
 import { AccessGrantViewProjection } from "./access/grant/access-grant-view-projection.js";
 import { SchedulingProcessManager } from "./scheduling/scheduling-process.js";
-import { ActivateAccessGrantSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/commands_pb.js";
 import { useClock } from "./time/clock.js";
+import { relatedInvoker } from "./invoker-id.js";
+import { GrantIssuanceSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/grant_issuance_pb.js";
 
 /** How the Resources context is assembled. */
 export interface ResourcesContextOptions {
@@ -101,12 +103,12 @@ export async function createResourcesContext(
     .route(AccessExtensionRequestSubmittedSchema, (event) => event.manager)
     .route(AccessRequestApprovedSchema, (event) => event.manager)
     .route(AccessRequestDeniedSchema, (event) => event.manager)
-    .route(AccessRequestCanceledSchema, (event) => event.manager)
-    .route(AccessGrantExpiredSchema, (event) => event.manager)
-    .route(AccessGrantRevokedSchema, (event) => event.manager);
+    .route(AccessRequestCanceledSchema, (event) => event.manager);
   const issuanceRouting = EventRouting.create<AccessGrantId>()
     .route(AccessRequestApprovedSchema, (event) => grantIssuedBy(event))
-    .route(CommandScheduledSchema, (event) => grantActivatedBy(event.command));
+    .route(CommandScheduledSchema, (event) =>
+      relatedInvoker(event.invoker, GrantIssuanceSchema, AccessGrantIdSchema),
+    );
   const coverageRouting = EventRouting.create<GrantCoverageId>()
     .route(AccessGrantCreatedSchema, (event) => coverageOf(event.access))
     .route(AccessGrantExtendedSchema, (event) => coverageOf(event.access))
@@ -138,18 +140,16 @@ export async function createResourcesContext(
  * an extension request applies to the grant it names.
  */
 function grantIssuedBy(approval: AccessRequestApproved): AccessGrantId[] {
-  const kind = approval.snapshot?.kind;
-  if (kind?.case === "extension") {
-    return kind.value.grant === undefined ? [] : [kind.value.grant];
+  if (approval.snapshot?.kind.case === "extension") {
+    return grantExtendedBy(approval.snapshot);
   }
   return approval.id === undefined ? [] : [create(AccessGrantIdSchema, { uuid: approval.id.uuid })];
 }
 
-/** The grant whose access a planned command begins, when it begins access. */
-function grantActivatedBy(command: Any | undefined): AccessGrantId[] {
-  const grant =
-    command === undefined ? undefined : AnyMessages.unpack(command, ActivateAccessGrantSchema)?.id;
-  return grant === undefined ? [] : [grant];
+/** The grant an extension request applies to; none for a first-time request. */
+function grantExtendedBy(snapshot: AccessRequestSnapshot | undefined): AccessGrantId[] {
+  const kind = snapshot?.kind;
+  return kind?.case === "extension" && kind.value.grant !== undefined ? [kind.value.grant] : [];
 }
 
 /** The coverage of the person and resource a grant applies to. */

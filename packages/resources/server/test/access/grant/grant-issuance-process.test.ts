@@ -17,7 +17,10 @@ import { type BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
 import { AccessGrantStatus } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import { SubmitAccessExtensionRequestSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/commands_pb.js";
 import { AccessGrantSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/access_grant_pb.js";
-import { AccessGrantExtendedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
+import {
+  AccessGrantActivationScheduledSchema,
+  AccessGrantExtendedSchema,
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
 import { eventRecording } from "../../given/event-recording.js";
 import {
   actor,
@@ -34,7 +37,11 @@ import {
   submitExtensionRequest,
 } from "../request/given/access-request.js";
 import { managerHasTask } from "../request/given/access-decision-assignment.js";
-import { awaitActivationPlan } from "../../scheduling/given/scheduling.js";
+import {
+  awaitActivationPlan,
+  packedActivation,
+  scheduleCommand,
+} from "../../scheduling/given/scheduling.js";
 import { awaitGrantStatus, givenActiveGrant, minutesIn, testClock } from "./given/access-grant.js";
 
 const { recordEvents } = eventRecording(testActorContext);
@@ -43,6 +50,22 @@ const { recordEvents } = eventRecording(testActorContext);
 // request, then observes the grant it issued.
 beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
+
+/** Has the requester ask for access over the interval and `primary` approve it. */
+async function approveScheduled(
+  box: BlackBox,
+  requester: BlackBoxScope,
+  request: string,
+  start: number,
+  end: number,
+): Promise<void> {
+  await submitAndAssign(box, requester, request, "primary", {
+    period: {
+      kind: { case: "scheduled", value: { start: minutesIn(start), end: minutesIn(end) } },
+    },
+  });
+  await approveAccessRequest(requester, request, "primary");
+}
 
 /** Submits an extension of the grant by `minutes` and has `primary` approve it. */
 async function approveExtension(
@@ -186,6 +209,30 @@ describe("GrantIssuanceProcessManager should", () => {
         expect(extended.received.map((e) => e.request?.uuid)).toEqual(["ext-first", "ext-second"]);
       } finally {
         await extended.cancel();
+      }
+    });
+  });
+
+  describe("on 'CommandScheduled'", () => {
+    it("hear only of commands scheduled with it as the invoker", async () => {
+      const box = await resourcesBlackBox(testClock());
+      const requester = box.onBehalfOf(actor);
+      await seed(box, [actor, "primary"]);
+      const scheduled = await recordEvents(requester, AccessGrantActivationScheduledSchema);
+      try {
+        await approveScheduled(box, requester, "req-routed", 30, 90);
+        await scheduled.waitFor(box, (e) => e.id?.uuid === "req-routed");
+
+        // Another activation of the grant is scheduled without naming an invoker.
+        await scheduleCommand(requester, packedActivation("req-routed"), minutesIn(45));
+        // A later grant's activation, confirmed after it.
+        await approveScheduled(box, requester, "req-fence", 100, 130);
+        await scheduled.waitFor(box, (e) => e.id?.uuid === "req-fence");
+
+        const routed = scheduled.received.filter((e) => e.id?.uuid === "req-routed");
+        expect(routed.map((e) => e.start)).toEqual([minutesIn(30)]);
+      } finally {
+        await scheduled.cancel();
       }
     });
   });

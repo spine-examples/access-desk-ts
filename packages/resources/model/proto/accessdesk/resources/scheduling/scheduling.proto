@@ -23,12 +23,12 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
-// One schedulable command planned to run at a specified time.
+// One schedulable command, scheduled to run at a specified time.
 message Scheduling {
   option (entity).kind = PROCESS_MANAGER;
   option (entity).visibility = FULL;
 
-  // The planned command.
+  // The scheduled command.
   accessdesk.resources.ScheduledCommandId id = 1;
 
   // The command to run.
