@@ -32,13 +32,13 @@ import {
   AccessGrantActivatedSchema,
   AccessGrantCreatedSchema,
   AccessGrantExpiredSchema,
-  AccessGrantExpiredWithoutActivationSchema,
+  AccessGrantExpiredBeforeActivationSchema,
   AccessGrantExtendedSchema,
   AccessGrantRevokedSchema,
   type AccessGrantActivated,
   type AccessGrantCreated,
   type AccessGrantExpired,
-  type AccessGrantExpiredWithoutActivation,
+  type AccessGrantExpiredBeforeActivation,
   type AccessGrantExtended,
   type AccessGrantRevoked,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
@@ -58,7 +58,7 @@ import { between, compare, longerThan } from "../../time/interval.js";
  *    the scheduling of its start; any other access awaits activation at once.
  * 2. The grant becomes active once its start has arrived — or, if its end has
  *    arrived first, it ends without ever having been active.
- * 3. It ends exactly once: it expires at its planned end, or a manager of the
+ * 3. It ends exactly once. It expires at its planned end, or a manager of the
  *    resource revokes it earlier with a reason.
  * 4. While active, an approved extension request may move its end, never past
  *    the longest total access the resource permits.
@@ -114,7 +114,7 @@ export class AccessGrantAggregate extends Aggregate<AccessGrantId, typeof Access
   @Throws(AccessGrantNotPending)
   activateAccessGrant(
     _command: ActivateAccessGrant,
-  ): AccessGrantActivated | AccessGrantExpiredWithoutActivation {
+  ): AccessGrantActivated | AccessGrantExpiredBeforeActivation {
     const { status, start } = this.state;
     if (
       (status !== AccessGrantStatus.PENDING_ACTIVATION &&
@@ -128,9 +128,9 @@ export class AccessGrantAggregate extends Aggregate<AccessGrantId, typeof Access
     }
     if (this.hasReachedEnd()) {
       this.update((draft) => {
-        draft.status = AccessGrantStatus.EXPIRED_WITHOUT_ACTIVATION;
+        draft.status = AccessGrantStatus.EXPIRED_BEFORE_ACTIVATION;
       });
-      return this.expiredWithoutActivation();
+      return this.expiredBeforeActivation();
     }
     this.update((draft) => {
       draft.status = AccessGrantStatus.ACTIVE;
@@ -146,8 +146,8 @@ export class AccessGrantAggregate extends Aggregate<AccessGrantId, typeof Access
   /**
    * Ends active access once its planned end has arrived.
    *
-   * Expiration happens at most once: an expiration sent again or after the
-   * grant has ended is refused and changes nothing.
+   * Expiration happens at most once. An expiration sent again, or sent after
+   * the grant has ended, is refused and changes nothing.
    */
   @Assign
   @Throws(AccessGrantNotActive)
@@ -241,8 +241,8 @@ export class AccessGrantAggregate extends Aggregate<AccessGrantId, typeof Access
   }
 
   /** The fact that the grant ended before its access could begin. */
-  private expiredWithoutActivation(): AccessGrantExpiredWithoutActivation {
-    return create(AccessGrantExpiredWithoutActivationSchema, {
+  private expiredBeforeActivation(): AccessGrantExpiredBeforeActivation {
+    return create(AccessGrantExpiredBeforeActivationSchema, {
       id: this.id,
       access: this.state.access,
       start: this.state.start,

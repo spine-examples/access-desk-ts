@@ -91,7 +91,7 @@ export class GrantIssuanceProcessManager extends ProcessManager<
    * Starts a newly created grant, noting the approved request that issued it.
    *
    * 1. Access that begins later has its activation scheduled for its start.
-   * 2. Any other access is activated at once — which ends it without activation
+   * 2. Any other access is activated at once — which expires it before activation
    *    when its end has already passed.
    */
   @Command

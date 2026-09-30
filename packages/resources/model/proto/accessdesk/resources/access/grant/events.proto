@@ -125,8 +125,11 @@ message AccessGrantExtended {
   google.protobuf.Timestamp end = 5 [(required) = true];
 }
 
-// The access ended before it could begin: its end arrived before it was activated.
-message AccessGrantExpiredWithoutActivation {
+// The grant expired before it was activated.
+//
+// The end of its access period arrived first, so the grantee never held the access.
+//
+message AccessGrantExpiredBeforeActivation {
 
   // The grant that never became active.
   accessdesk.resources.AccessGrantId id = 1 [(required) = true];

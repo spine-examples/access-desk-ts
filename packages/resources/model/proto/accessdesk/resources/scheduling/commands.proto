@@ -23,7 +23,7 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
-// Schedules a schedulable command for its due time.
+// Schedules a command for its due time.
 message ScheduleCommand {
 
   // The scheduled command.

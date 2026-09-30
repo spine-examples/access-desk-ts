@@ -137,6 +137,9 @@ message CreateOrganization {
   real queries filter or sort by.
 - Rejections live in `*rejections.proto`; the model then depends on
   `@spine-event-engine/core`.
+- The first field of a rejection or an event is not required by default. Mark it
+  `[(required) = true]` explicitly, e.g.
+  `accessdesk.resources.AccessGrantId id = 1 [(required) = true];`.
 
 ## Evolution & generation
 

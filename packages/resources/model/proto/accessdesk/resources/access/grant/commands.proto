@@ -43,7 +43,7 @@ message CreateAccessGrant {
   // The exclusive end of the access.
   google.protobuf.Timestamp end = 5 [(required) = true];
 
-  // The longest the access may last in total, extensions included.
+  // The longest the access may last in total.
   google.protobuf.Duration maximum_lifetime = 6 [(required) = true];
 
   // The manager who approved the request.

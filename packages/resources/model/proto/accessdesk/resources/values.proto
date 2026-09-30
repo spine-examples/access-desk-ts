@@ -132,8 +132,8 @@ enum AccessGrantStatus {
   // The access ended at its planned end.
   EXPIRED = 5;
 
-  // The access ended before it could begin, so it never became active.
-  EXPIRED_WITHOUT_ACTIVATION = 6;
+  // The grant expired before it was activated, so its access never began.
+  EXPIRED_BEFORE_ACTIVATION = 6;
 
   // A manager ended the access before its planned end.
   REVOKED = 7;
@@ -186,7 +186,7 @@ message AccessExtension {
   google.protobuf.Timestamp proposed_end = 2 [(required) = true];
 }
 
-// The access a grant confers: who holds it, to which resource, and at which level.
+// The access a grant confers.
 message GrantedAccess {
 
   // The person who holds the access.

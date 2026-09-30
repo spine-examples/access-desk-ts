@@ -45,7 +45,7 @@ message AccessGrant {
   // The exclusive end of the access.
   google.protobuf.Timestamp end = 5 [(required) = true];
 
-  // The longest the access may last in total, extensions included.
+  // The longest the access may last in total.
   google.protobuf.Duration maximum_lifetime = 6 [(required) = true];
 
   // The manager who approved the issuing request.
@@ -93,7 +93,7 @@ message GrantCoverage {
   option (entity).kind = PROJECTION;
   option (entity).visibility = FULL;
 
-  // The person and resource covered.
+  // The person holding the access, and the resource it applies to.
   accessdesk.resources.GrantCoverageId id = 1;
 
   // The grants that confer the access.
@@ -102,7 +102,7 @@ message GrantCoverage {
   // A grant that confers, or is about to confer, access to the resource.
   message CoveringGrant {
 
-    // The grant.
+    // The grant that confers the access to the person.
     accessdesk.resources.AccessGrantId id = 1 [(required) = true];
 
     // The access level the grant confers.

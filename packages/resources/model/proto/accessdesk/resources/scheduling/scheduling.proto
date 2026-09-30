@@ -23,17 +23,22 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
-// One schedulable command, scheduled to run at a specified time.
+// The scheduling of one command for a set time.
+//
+// A process requests that a command be scheduled for its due time.
+// Only a command declared as schedulable is accepted.
+//
 message Scheduling {
   option (entity).kind = PROCESS_MANAGER;
   option (entity).visibility = FULL;
 
-  // The scheduled command.
+  // Identifies the scheduled command. The process that schedules the command
+  // chooses the identifier.
   accessdesk.resources.ScheduledCommandId id = 1;
 
-  // The command to run.
+  // The scheduled command, packed with its type.
   google.protobuf.Any command = 2 [(required) = true];
 
-  // When the command is due.
+  // The moment the command is scheduled for.
   google.protobuf.Timestamp due = 3 [(required) = true];
 }

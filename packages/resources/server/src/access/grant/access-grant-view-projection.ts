@@ -21,7 +21,7 @@ import type {
   AccessGrantActivationScheduled,
   AccessGrantCreated,
   AccessGrantExpired,
-  AccessGrantExpiredWithoutActivation,
+  AccessGrantExpiredBeforeActivation,
   AccessGrantExtended,
   AccessGrantRevoked,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
@@ -81,7 +81,7 @@ export class AccessGrantViewProjection extends Projection<
 
   /** Moves access that never began to history. */
   @Subscribe
-  onAccessGrantExpiredWithoutActivation(_event: AccessGrantExpiredWithoutActivation): void {
-    this.update((draft) => (draft.status = AccessGrantStatus.EXPIRED_WITHOUT_ACTIVATION));
+  onAccessGrantExpiredBeforeActivation(_event: AccessGrantExpiredBeforeActivation): void {
+    this.update((draft) => (draft.status = AccessGrantStatus.EXPIRED_BEFORE_ACTIVATION));
   }
 }

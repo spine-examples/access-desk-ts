@@ -27,15 +27,16 @@ import { SchedulableCommand } from "@access-desk/resources-model/generated/inter
 import { typeRegistry } from "../../generated/model-registry.js";
 
 /**
- * One command an organization schedules to run at a set time.
+ * The scheduling of one command for a set time.
  *
- * Only a command declared schedulable is scheduled, for a due time.
+ * A process requests that a command be scheduled for its due time.
+ * Only a command declared as schedulable is accepted.
  */
 export class SchedulingProcessManager extends ProcessManager<
   ScheduledCommandId,
   typeof SchedulingSchema
 > {
-  /** Schedules the command for its due time. */
+  /** Schedules the command for its due time and tells the invoker it is scheduled. */
   @Assign
   scheduleCommand(command: ScheduleCommand): CommandScheduled {
     if (this.state.command !== undefined) {

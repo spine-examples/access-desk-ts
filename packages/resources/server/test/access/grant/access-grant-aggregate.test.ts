@@ -19,7 +19,7 @@ import {
   AccessGrantActivatedSchema,
   AccessGrantCreatedSchema,
   AccessGrantExpiredSchema,
-  AccessGrantExpiredWithoutActivationSchema,
+  AccessGrantExpiredBeforeActivationSchema,
   AccessGrantExtendedSchema,
   AccessGrantRevokedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
@@ -97,12 +97,12 @@ describe("AccessGrantAggregate should", () => {
       }
     });
 
-    it("await activation of access whose end has passed, which then ends it without activation", async () => {
+    it("await activation of access whose end has passed, which then expires it before activation", async () => {
       const clock = testClock();
       const box = await resourcesBlackBox(clock);
       const scope = box.onBehalfOf(actor);
       const created = await recordEvents(scope, AccessGrantCreatedSchema);
-      const lapsed = await recordEvents(scope, AccessGrantExpiredWithoutActivationSchema);
+      const lapsed = await recordEvents(scope, AccessGrantExpiredBeforeActivationSchema);
       try {
         clock.advanceMinutes(60);
 
@@ -157,7 +157,7 @@ describe("AccessGrantAggregate should", () => {
       const box = await resourcesBlackBox(clock);
       const scope = box.onBehalfOf(actor);
       const given = { box, scope, clock };
-      const lapsed = await recordEvents(scope, AccessGrantExpiredWithoutActivationSchema);
+      const lapsed = await recordEvents(scope, AccessGrantExpiredBeforeActivationSchema);
       try {
         await createGrant(scope, "grant-missed", { start: minutesIn(10), end: minutesIn(20) });
         await awaitGrantStatus(box, scope, "grant-missed", AccessGrantStatus.SCHEDULED);
@@ -174,7 +174,7 @@ describe("AccessGrantAggregate should", () => {
           box,
           scope,
           "grant-missed",
-          AccessGrantStatus.EXPIRED_WITHOUT_ACTIVATION,
+          AccessGrantStatus.EXPIRED_BEFORE_ACTIVATION,
         );
       } finally {
         await lapsed.cancel();

@@ -230,7 +230,7 @@ scheduled.
 
 Required request outcomes are pending, approved, denied, and canceled. Required
 grant outcomes are pending scheduling, scheduled, active, expired, expired
-without activation, and revoked. Contract design may use more precise internal
+before activation, and revoked. Contract design may use more precise internal
 substates, but the UI must never claim scheduled or active access before the
 required facts exist.
 
@@ -271,12 +271,12 @@ approval is accepted at `A`:
   activation command as an immediate request, not the scheduling component.
   Preserve requested `S` and `E` for history, but effective access begins at `A`
   and ends at `E`.
-- `A >= E`: create the explicit expired-without-activation outcome. Never
+- `A >= E`: create the explicit expired-before-activation outcome. Never
   activate it.
 
-Normal expiration and expiration without activation are distinct facts. If a
+Normal expiration and expiration before activation are distinct facts. If a
 valid due activation command arrives once the clock is at or after the requested
-end `E`, Resources records the expired-without-activation outcome exactly once
+end `E`, Resources records the expired-before-activation outcome exactly once
 instead of activating. Duplicate, stale, revision-mismatched, canceled, revoked,
 or otherwise terminal commands are successful no-ops. All time-based code uses an
 injected clock; tests must not depend on arbitrary sleeping.

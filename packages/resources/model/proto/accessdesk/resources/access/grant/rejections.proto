@@ -24,18 +24,18 @@ option (type_url_prefix) = "type.accessdesk";
 // The grant does not confer active access, so it cannot be changed this way.
 message AccessGrantNotActive {
 
-  accessdesk.resources.AccessGrantId id = 1;
+  accessdesk.resources.AccessGrantId id = 1 [(required) = true];
 }
 
 // The person is not a manager of the resource the grant applies to.
 message NotResourceManager {
 
-  accessdesk.resources.AccessGrantId id = 1;
+  accessdesk.resources.AccessGrantId id = 1 [(required) = true];
 }
 
-// The grant no longer waits for its access to begin: the access is already
-// active, or has ended.
+// The grant no longer waits for its access to begin, because the access is
+// already active or has already ended.
 message AccessGrantNotPending {
 
-  accessdesk.resources.AccessGrantId id = 1;
+  accessdesk.resources.AccessGrantId id = 1 [(required) = true];
 }

@@ -19,6 +19,7 @@
  * `ScheduleCommand` with the command and its due time — and the scheduler sends
  * it once that time arrives.
  */
-// A marker: what makes a command schedulable is declaring it so, not any field.
+// Only a marker. A command is schedulable because it is declared so, not because
+// of any field it has.
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface SchedulableCommand {}

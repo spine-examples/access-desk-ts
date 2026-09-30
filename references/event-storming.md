@@ -74,15 +74,15 @@ Projection inputs and outputs drawn on the board:
 
 #### Grant issuance — Grant Issuance PM, Access Grant aggregate
 
-| Owner               | Trigger (actor/event)                 | Command                                                             | Event(s)                                                            | Rejections               |
-| ------------------- | ------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------ |
-| Grant Issuance (PM) | on Access Request Approved            | Create Access Grant `OR` Extend Access Grant                        | —                                                                   | —                        |
-| Access Grant        | Grant Issuance (PM)                   | Create Access Grant                                                 | Access Grant Created                                                | —                        |
-| Access Grant        | Grant Issuance (PM)                   | Extend Access Grant                                                 | Access Grant Extended                                               | Access Grant Not Active  |
-| Grant Issuance (PM) | on Access Grant Created               | Activate Access Grant `OR` Schedule Command (Activate Access Grant) | —                                                                   | —                        |
-| Access Grant        | Grant Issuance (PM), immediate branch | Activate Access Grant                                               | Access Grant Activated `OR` Access Grant Expired Without Activation | —                        |
-| Grant Issuance (PM) | on Command Scheduled                  | —                                                                   | Access Grant Activation Scheduled                                   | —                        |
-| Access Grant        | Scheduling, due                       | Activate Access Grant                                               | Access Grant Activated `OR` Access Grant Expired Without Activation | Access Grant Not Pending |
+| Owner               | Trigger (actor/event)                 | Command                                                             | Event(s)                                                           | Rejections               |
+| ------------------- | ------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------ |
+| Grant Issuance (PM) | on Access Request Approved            | Create Access Grant `OR` Extend Access Grant                        | —                                                                  | —                        |
+| Access Grant        | Grant Issuance (PM)                   | Create Access Grant                                                 | Access Grant Created                                               | —                        |
+| Access Grant        | Grant Issuance (PM)                   | Extend Access Grant                                                 | Access Grant Extended                                              | Access Grant Not Active  |
+| Grant Issuance (PM) | on Access Grant Created               | Activate Access Grant `OR` Schedule Command (Activate Access Grant) | —                                                                  | —                        |
+| Access Grant        | Grant Issuance (PM), immediate branch | Activate Access Grant                                               | Access Grant Activated `OR` Access Grant Expired Before Activation | —                        |
+| Grant Issuance (PM) | on Command Scheduled                  | —                                                                   | Access Grant Activation Scheduled                                  | —                        |
+| Access Grant        | Scheduling, due                       | Activate Access Grant                                               | Access Grant Activated `OR` Access Grant Expired Before Activation | Access Grant Not Pending |
 
 #### Revocation & expiration — Access Grant aggregate
 

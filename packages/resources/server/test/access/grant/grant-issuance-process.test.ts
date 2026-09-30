@@ -185,7 +185,7 @@ describe("GrantIssuanceProcessManager should", () => {
         box,
         requester,
         "req-too-late",
-        AccessGrantStatus.EXPIRED_WITHOUT_ACTIVATION,
+        AccessGrantStatus.EXPIRED_BEFORE_ACTIVATION,
       );
       // The requested interval is kept for history.
       expect(item.start).toEqual(minutesIn(0));

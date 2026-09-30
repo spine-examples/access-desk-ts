@@ -41,7 +41,7 @@ import { CommandScheduledSchema } from "@access-desk/resources-model/generated/a
 import {
   AccessGrantCreatedSchema,
   AccessGrantExpiredSchema,
-  AccessGrantExpiredWithoutActivationSchema,
+  AccessGrantExpiredBeforeActivationSchema,
   AccessGrantExtendedSchema,
   AccessGrantRevokedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
@@ -116,7 +116,7 @@ export async function createResourcesContext(
     .route(AccessGrantExtendedSchema, (event) => coverageOf(event.access))
     .route(AccessGrantExpiredSchema, (event) => coverageOf(event.access))
     .route(AccessGrantRevokedSchema, (event) => coverageOf(event.access))
-    .route(AccessGrantExpiredWithoutActivationSchema, (event) => coverageOf(event.access));
+    .route(AccessGrantExpiredBeforeActivationSchema, (event) => coverageOf(event.access));
   const builder = BoundedContext.multitenant("Resources")
     .withGeneratedRegistryRoot(new URL("..", import.meta.url))
     .add(OrganizationAggregate)
