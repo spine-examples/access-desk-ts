@@ -16,6 +16,7 @@ syntax = "proto3";
 
 package accessdesk.resources;
 
+import "google/protobuf/any.proto";
 import "accessdesk/identity/identifiers.proto";
 import "spine/options.proto";
 
@@ -59,4 +60,22 @@ message GrantCoverageId {
 message ScheduledCommandId {
 
   string uuid = 1 [(required) = true];
+}
+
+// Identifies a message invoker.
+//
+// Stores a packed ID and the type of the entity
+// that triggered the first command or event in the flow.
+//
+// Useful for routing events back to the invoker
+// after completion of a flow that may be initiated
+// from different places.
+//
+message InvokerId {
+
+  // The packed invoker ID.
+  google.protobuf.Any id = 1 [(required) = true];
+
+  // The type of the invoker.
+  string type = 2 [(required) = true];
 }
