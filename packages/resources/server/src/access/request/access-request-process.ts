@@ -99,9 +99,6 @@ const NO_TIME = create(DurationSchema, {});
  *    decide it.
  * 2. Assign the accepted request to those managers for a decision.
  * 3. A manager approves or denies it, or the requester cancels it — once.
- *    Approval fixes when the access begins, so it checks once more that the
- *    requester does not already hold that access; an extension is approved
- *    only while the access it extends is still active.
  *
  * A first-time request asks for new access; an extension request asks to keep
  * active access longer and names the end it proposes.
@@ -215,18 +212,7 @@ export class AccessRequestProcessManager extends ProcessManager<
     return create(AccessExtensionRequestSubmittedSchema, { id, snapshot, manager });
   }
 
-  /**
-   * Approves a request that has not yet been decided.
-   *
-   * 1. Approval fixes when first-time access begins, so the requester must not
-   *    already hold the same or stronger access for that effective period.
-   * 2. An extension extends active access only, so the grant it applies to must
-   *    still give the requester active access.
-   * 3. An extension is checked again against access granted since it was
-   *    submitted: the grant itself must not already reach the proposed end,
-   *    and no other grant may give the same or stronger access for the added
-   *    time.
-   */
+  /** Approves a request that has not yet been decided. */
   @Assign
   @Throws(RequestAlreadyDecided, NotAnEligibleManager, AccessAlreadyHeld, AccessGrantNotActive)
   async approveAccessRequest(command: ApproveAccessRequest): Promise<AccessRequestApproved> {
@@ -382,8 +368,7 @@ export class AccessRequestProcessManager extends ProcessManager<
    * Rejects a request for access the requester already holds.
    *
    * Access is already held when a grant that has not ended gives the same or
-   * a stronger level of the resource for any part of the interval. The grant
-   * an extension applies to is not counted against it.
+   * a stronger level of the resource for any part of the interval.
    */
   private async assertAccessNotHeld(
     id: AccessRequestId,
@@ -412,12 +397,7 @@ export class AccessRequestProcessManager extends ProcessManager<
     }
   }
 
-  /**
-   * The grant an extension applies to, when it gives the requester access now,
-   * to the resource when one is named. A grant gives access now when it is not
-   * revoked and the current time is within its period. Otherwise the result is
-   * `AccessGrantNotActive`.
-   */
+  /** The requester's grant to extend, or `AccessGrantNotActive` when it gives no access now. */
   private async activeGrant(
     grant: AccessGrantId,
     requester: PersonId,

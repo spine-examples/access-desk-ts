@@ -158,7 +158,7 @@ export class AccessGrantProcessManager extends ProcessManager<
    *
    * The managers are those the resource has now, as its catalog entry tells.
    * Access may be revoked before or after it begins, until its end. A grant
-   * already revoked, or whose end has passed, is refused.
+   * already revoked, or whose end has passed, is rejected.
    */
   @Assign
   @Throws(NotResourceManager, AccessGrantNotActive)

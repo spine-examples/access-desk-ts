@@ -59,11 +59,7 @@ export interface ResourcesContextOptions {
    * Tells the domain what time it is; defaults to the system clock.
    *
    * Supply a controllable clock to make time-dependent behavior, such as
-   * whether a grant gives access now, deterministic in tests and
-   * demonstrations.
-   *
-   * The Resources domain tells time by one clock per process, so building
-   * another context replaces the clock of every context built before it.
+   * whether a grant gives access now.
    */
   readonly clock?: Clock;
 }
