@@ -275,6 +275,40 @@ describe("AccessGrantProcessManager should", () => {
         postExtendAccessGrant(scope, "grant-extend-revoked", "ext-late", minutesIn(90)),
       );
     });
+
+    it("keep its end when an extension does not move it later", async () => {
+      const given = await givenGrant("grant-not-later");
+      const { box, scope } = given;
+      const extended = await recordEvents(scope, AccessGrantExtendedSchema);
+      try {
+        await postExtendAccessGrant(scope, "grant-not-later", "ext-same", minutesIn(60));
+        await postExtendAccessGrant(scope, "grant-not-later", "ext-earlier", minutesIn(30));
+        await fence(given, "grant-not-later");
+
+        expect(extended.received).toHaveLength(0);
+        const view = await awaitGrantIssued(box, scope, "grant-not-later");
+        expect(view.end).toEqual(minutesIn(60));
+      } finally {
+        await extended.cancel();
+      }
+    });
+
+    it("keep its end when an extension exceeds the longest access the resource permits", async () => {
+      // The resource permits two hours in total, and the grant began at the start of the test.
+      const given = await givenGrant("grant-too-long");
+      const { box, scope } = given;
+      const extended = await recordEvents(scope, AccessGrantExtendedSchema);
+      try {
+        await postExtendAccessGrant(scope, "grant-too-long", "ext-too-long", minutesIn(121));
+        await fence(given, "grant-too-long");
+
+        expect(extended.received).toHaveLength(0);
+        const view = await awaitGrantIssued(box, scope, "grant-too-long");
+        expect(view.end).toEqual(minutesIn(60));
+      } finally {
+        await extended.cancel();
+      }
+    });
   });
 
   describe("handle 'RevokeAccessGrant', and", () => {

@@ -303,6 +303,20 @@ describe("AccessRequestProcessManager should", () => {
       });
     });
 
+    it("submit a request for a scheduled period that is already over", async () => {
+      const box = await resourcesBlackBox(testClock());
+      await seed(box, [actor, "primary"]);
+      const requester = box.onBehalfOf(actor);
+
+      await submitAndAssign(box, requester, "req-already-over", "primary", {
+        period: {
+          kind: { case: "scheduled", value: { start: minutesIn(-30), end: minutesIn(-10) } },
+        },
+      });
+
+      expect(await statusOf(requester, "req-already-over")).toBe(AccessRequestStatus.PENDING);
+    });
+
     it("submit when the requester is the resource's sole manager", async () => {
       const box = await resourcesBlackBox();
       await seed(box, [actor], { policy: { manager: [{ uuid: actor }] } });
@@ -628,6 +642,18 @@ describe("AccessRequestProcessManager should", () => {
         approveAccessRequest(box, "ext-too-late", "primary"),
       );
       expect(await statusOf(requester, "ext-too-late")).toBe(AccessRequestStatus.PENDING);
+    });
+
+    it("reject an extension of access ended since it was submitted ('AccessGrantNotActive')", async () => {
+      const clock = testClock();
+      const box = await resourcesBlackBox(clock);
+      const requester = await givenPendingExtension(box, "req-ended-since", "ext-after-end");
+      clock.advanceMinutes(10);
+
+      await expectRejection(box, requester, AccessGrantNotActiveSchema, () =>
+        approveAccessRequest(box, "ext-after-end", "primary"),
+      );
+      expect(await statusOf(requester, "ext-after-end")).toBe(AccessRequestStatus.PENDING);
     });
 
     it("reject a decision on an already-decided request ('RequestAlreadyDecided')", async () => {

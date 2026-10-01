@@ -217,8 +217,9 @@ Any manager captured from the resource policy may decide a pending request; no
 approver is assigned. Admission preserves policy order and removes duplicate
 manager identifiers. A requester who is also a manager may decide their own
 request. Approval or denial is terminal and happens at most once. Denial
-requires a reason. Concurrent decisions are resolved by the aggregate
-transaction so only one fact is accepted.
+requires a reason. Concurrent decisions on one request are handled one at a
+time, so only the first is accepted and the others are refused with
+`RequestAlreadyDecided`.
 
 ## Request and grant lifecycles
 
