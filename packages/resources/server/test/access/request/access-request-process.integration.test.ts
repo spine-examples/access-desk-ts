@@ -104,7 +104,7 @@ describe("AccessRequestProcessManager should", () => {
       ).kind,
     ).toBe("ok");
 
-    // The renewal reaches the manager's queue carrying its grant, duration, and proposed end.
+    // The renewal reaches the manager's queue carrying its grant and proposed end.
     await box.eventually(
       () => managerHasTask(requester, "primary", "ext-int"),
       (present) => present,

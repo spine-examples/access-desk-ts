@@ -33,7 +33,12 @@ import {
   testActorContext,
 } from "../../given/resources-context.js";
 import type { ManualClock } from "../../given/manual-clock.js";
-import { approveAccessRequest, seed, submitAndAssign } from "../request/given/access-request.js";
+import {
+  approveAccessRequest,
+  resourceUuid,
+  seed,
+  submitAndAssign,
+} from "../request/given/access-request.js";
 import {
   approveExtension,
   awaitGrantIssued,
@@ -51,8 +56,9 @@ import {
 
 const { expectRejection, recordEvents } = eventRecording(testActorContext);
 
-// Grants are issued and extended by managers approving requests. The grant's
-// own commands are posted directly only to repeat one it has already handled.
+// Grants are issued and extended by managers approving requests.
+// `ExtendAccessGrant` is posted directly only for extensions that an approval
+// would not let through.
 beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
 
@@ -186,6 +192,8 @@ describe("AccessGrantProcessManager should", () => {
         const event = await created.waitFor(box, (e) => e.id?.uuid === "grant-created");
         expect(event.request?.uuid).toBe("grant-created");
         expect(event.access?.grantee?.uuid).toBe(actor);
+        expect(event.access?.resource?.uuid).toBe(resourceUuid);
+        expect(event.access?.accessLevel?.name).toBe("Read");
         expect(event.start).toEqual(minutesIn(0));
         expect(event.end).toEqual(minutesIn(60));
       } finally {
@@ -195,27 +203,6 @@ describe("AccessGrantProcessManager should", () => {
   });
 
   describe("handle 'ExtendAccessGrant', and", () => {
-    it("emit 'AccessGrantExtended' moving the end", async () => {
-      const { box, scope } = await givenGrant("grant-extended");
-      const extended = await recordEvents(scope, AccessGrantExtendedSchema);
-      try {
-        await approveExtension(box, "ext-1", "grant-extended", 30);
-
-        const event = await extended.waitFor(box, (e) => e.id?.uuid === "grant-extended");
-        expect(event.previousEnd).toEqual(minutesIn(60));
-        expect(event.end).toEqual(minutesIn(90));
-        expect(event.request?.uuid).toBe("ext-1");
-        await awaitGrantView(
-          box,
-          scope,
-          "grant-extended",
-          (item) => item.end?.seconds === minutesIn(90).seconds,
-        );
-      } finally {
-        await extended.cancel();
-      }
-    });
-
     it("extend access that began later once its start has arrived", async () => {
       const { box, scope, clock } = await givenGrant("grant-begins-later", { start: 30, end: 90 });
       const extended = await recordEvents(scope, AccessGrantExtendedSchema);
@@ -232,21 +219,30 @@ describe("AccessGrantProcessManager should", () => {
       }
     });
 
-    it("reject an approved extension of access revoked since ('AccessGrantNotActive')", async () => {
-      const given = await givenGrant("grant-extend-revoked");
-      const { box, scope } = given;
-      await approveExtension(box, "ext-late", "grant-extend-revoked", 30);
-      await awaitGrantView(
-        box,
-        scope,
-        "grant-extend-revoked",
-        (item) => item.end?.seconds === minutesIn(90).seconds,
-      );
+    it("reject an extension of revoked access ('AccessGrantNotActive')", async () => {
+      const { box, scope } = await givenGrant("grant-extend-revoked");
       await revokeGrant(box, "grant-extend-revoked", "primary", "Ended.");
       await awaitGrantRevoked(box, scope, "grant-extend-revoked");
 
       await expectRejection(box, scope, AccessGrantNotActiveSchema, () =>
         postExtendAccessGrant(scope, "grant-extend-revoked", "ext-late", minutesIn(90)),
+      );
+    });
+
+    it("reject an extension of access that has not yet begun ('AccessGrantNotActive')", async () => {
+      const { box, scope } = await givenGrant("grant-extend-early", { start: 30, end: 90 });
+
+      await expectRejection(box, scope, AccessGrantNotActiveSchema, () =>
+        postExtendAccessGrant(scope, "grant-extend-early", "ext-early", minutesIn(100)),
+      );
+    });
+
+    it("reject an extension of access whose end has passed ('AccessGrantNotActive')", async () => {
+      const { box, scope, clock } = await givenGrant("grant-extend-ended");
+      clock.advanceMinutes(60);
+
+      await expectRejection(box, scope, AccessGrantNotActiveSchema, () =>
+        postExtendAccessGrant(scope, "grant-extend-ended", "ext-ended", minutesIn(90)),
       );
     });
 
@@ -284,12 +280,13 @@ describe("AccessGrantProcessManager should", () => {
 
       await postExtendAccessGrant(scope, "grant-to-limit", "ext-to-limit", minutesIn(120));
 
-      await awaitGrantView(
+      const view = await awaitGrantView(
         box,
         scope,
         "grant-to-limit",
         (item) => item.end?.seconds === minutesIn(120).seconds,
       );
+      expect(view.start).toEqual(minutesIn(0));
     });
   });
 
@@ -319,7 +316,8 @@ describe("AccessGrantProcessManager should", () => {
 
       expect((await revokeGrant(box, "grant-later", "primary", "Plans changed.")).kind).toBe("ok");
 
-      await awaitGrantRevoked(box, scope, "grant-later");
+      const view = await awaitGrantRevoked(box, scope, "grant-later");
+      expect(view.revoked).toBe(true);
     });
 
     it("reject a person who does not manage the resource ('NotResourceManager')", async () => {
@@ -351,8 +349,12 @@ describe("AccessGrantProcessManager should", () => {
     });
 
     it("reject a revocation without a reason", async () => {
-      const { box } = await givenGrant("grant-no-reason");
+      const { box, scope } = await givenGrant("grant-no-reason");
+
       expect((await revokeGrant(box, "grant-no-reason", "primary", "")).kind).toBe("error");
+
+      const view = await awaitGrantIssued(box, scope, "grant-no-reason");
+      expect(view.revoked).toBe(false);
     });
   });
 });

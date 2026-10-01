@@ -290,6 +290,8 @@ describe("AccessRequestProcessManager should", () => {
       await submitAndAssign(box, requester, "req-write", "primary", {
         accessLevel: { name: "Write", rank: 2 },
       });
+
+      expect(await statusOf(requester, "req-write")).toBe(AccessRequestStatus.PENDING);
     });
 
     it("submit a request for a period starting when held access ends", async () => {
@@ -301,6 +303,8 @@ describe("AccessRequestProcessManager should", () => {
           kind: { case: "scheduled", value: { start: minutesIn(10), end: minutesIn(20) } },
         },
       });
+
+      expect(await statusOf(requester, "req-next-slot")).toBe(AccessRequestStatus.PENDING);
     });
 
     it("submit a request for a scheduled period that is already over", async () => {
@@ -551,17 +555,24 @@ describe("AccessRequestProcessManager should", () => {
   });
 
   describe("handle 'ApproveAccessRequest', and", () => {
-    it("emit 'AccessRequestApproved' recording the deciding manager", async () => {
-      const box = await resourcesBlackBox();
+    it("emit 'AccessRequestApproved' recording the deciding manager and the time", async () => {
+      const clock = testClock();
+      const box = await resourcesBlackBox(clock);
       const requester = await givenPending(box, "req-approve");
       const approved = await recordEvents(requester, AccessRequestApprovedSchema);
       try {
+        clock.advanceMinutes(5);
+
         expect((await approveAccessRequest(box, "req-approve", "primary")).kind).toBe("ok");
+
         const event = await approved.waitFor(
           box,
           (approvedEvent) => approvedEvent.id?.uuid === "req-approve",
         );
         expect(event.decidedBy?.uuid).toBe("primary");
+        expect(event.whenDecided).toEqual(minutesIn(5));
+        expect(event.manager.map((manager) => manager.uuid)).toEqual(["primary"]);
+        expect(event.snapshot?.requester?.uuid).toBe(actor);
       } finally {
         await approved.cancel();
       }
@@ -573,6 +584,7 @@ describe("AccessRequestProcessManager should", () => {
       await expectRejection(box, requester, NotAnEligibleManagerSchema, () =>
         approveAccessRequest(box, "req-outsider", "outsider"),
       );
+      expect(await statusOf(requester, "req-outsider")).toBe(AccessRequestStatus.PENDING);
     });
 
     it("allow a requester who manages the resource to approve their own request", async () => {
@@ -667,11 +679,14 @@ describe("AccessRequestProcessManager should", () => {
   });
 
   describe("handle 'DenyAccessRequest', and", () => {
-    it("emit 'AccessRequestDenied' carrying the reason and the deciding manager", async () => {
-      const box = await resourcesBlackBox();
+    it("emit 'AccessRequestDenied' carrying the reason, the deciding manager, and the time", async () => {
+      const clock = testClock();
+      const box = await resourcesBlackBox(clock);
       const requester = await givenPending(box, "req-deny");
       const denied = await recordEvents(requester, AccessRequestDeniedSchema);
       try {
+        clock.advanceMinutes(5);
+
         expect(
           (await denyAccessRequest(box, "req-deny", "primary", "Insufficient justification.")).kind,
         ).toBe("ok");
@@ -681,6 +696,7 @@ describe("AccessRequestProcessManager should", () => {
         );
         expect(event.decidedBy?.uuid).toBe("primary");
         expect(event.reason).toBe("Insufficient justification.");
+        expect(event.whenDecided).toEqual(minutesIn(5));
       } finally {
         await denied.cancel();
       }

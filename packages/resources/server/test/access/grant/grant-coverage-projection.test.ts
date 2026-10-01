@@ -131,6 +131,7 @@ describe("GrantCoverageProjection should", () => {
       resourceUuid,
       (c) => c.grant[0]?.end?.seconds === minutesIn(90).seconds,
     );
+    expect(grantsOf(coverage)).toEqual(["grant-longer"]);
     expect(coverage.grant[0]?.start).toEqual(minutesIn(0));
   });
 
@@ -143,6 +144,13 @@ describe("GrantCoverageProjection should", () => {
 
     await revokeGrant(box, "grant-withdrawn", "primary", "No longer needed.");
 
-    await awaitCoverage(box, scope, actor, resourceUuid, (c) => c.grant.length === 0);
+    const coverage = await awaitCoverage(
+      box,
+      scope,
+      actor,
+      resourceUuid,
+      (c) => c.grant.length === 0,
+    );
+    expect(grantsOf(coverage)).toEqual([]);
   });
 });

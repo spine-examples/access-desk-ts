@@ -12,14 +12,13 @@
  * and limitations under the License.
  */
 
-import { create, type MessageShape } from "@bufbuild/protobuf";
+import { create } from "@bufbuild/protobuf";
 import { type Timestamp, timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { type BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
 import { PersonIdSchema } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { ResourceIdSchema } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
 import { SubmitAccessExtensionRequestSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/commands_pb.js";
 import {
-  CreateAccessGrantSchema,
   ExtendAccessGrantSchema,
   RevokeAccessGrantSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/commands_pb.js";
@@ -58,29 +57,6 @@ export function testClock(): ManualClock {
 /** The time a number of minutes after {@link startOfTest}. */
 export function minutesIn(minutes: number): Timestamp {
   return timestampFromDate(new Date(startOfTest.getTime() + minutes * 60_000));
-}
-
-/**
- * Builds a `CreateAccessGrant` issuing the requester read access to the payroll
- * resource for the first hour of the test — as though a request with the same
- * identifier had been approved.
- */
-export function createGrantCommand(
-  id: string,
-  overrides: Record<string, unknown> = {},
-): MessageShape<typeof CreateAccessGrantSchema> {
-  return create(CreateAccessGrantSchema, {
-    id: { uuid: id },
-    request: { uuid: id },
-    access: {
-      grantee: { uuid: actor },
-      resource: { uuid: resourceUuid },
-      accessLevel: { name: "Read", rank: 1 },
-    },
-    start: minutesIn(0),
-    end: minutesIn(60),
-    ...overrides,
-  });
 }
 
 /** The longest access, in total, the resources granted in these tests permit. */
@@ -171,15 +147,6 @@ export async function approveExtension(
   await approveAccessRequest(box, request, "primary");
 }
 
-/** Posts `CreateAccessGrant` directly, as the grant itself does on approval. */
-export function postCreateAccessGrant(
-  scope: BlackBoxScope,
-  id: string,
-  overrides: Record<string, unknown> = {},
-) {
-  return scope.post(CreateAccessGrantSchema, createGrantCommand(id, overrides));
-}
-
 /** Posts `RevokeAccessGrant` on behalf of `manager`, naming them as the revoking person. */
 export function revokeGrant(box: BlackBox, id: string, manager: string, reason: string) {
   return box
@@ -190,7 +157,7 @@ export function revokeGrant(box: BlackBox, id: string, manager: string, reason: 
     );
 }
 
-/** Posts `ExtendAccessGrant` directly, as the grant itself does on approval. */
+/** Posts `ExtendAccessGrant` directly, as the grant itself does when an extension is approved. */
 export function postExtendAccessGrant(
   scope: BlackBoxScope,
   id: string,

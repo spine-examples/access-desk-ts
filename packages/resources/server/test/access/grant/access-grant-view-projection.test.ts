@@ -109,6 +109,8 @@ describe("AccessGrantViewProjection should", () => {
 
     await revokeGrant(box, "grant-revoked", "primary", "Investigation finished.");
 
-    await awaitGrantRevoked(box, scope, "grant-revoked");
+    const view = await awaitGrantRevoked(box, scope, "grant-revoked");
+    expect(view.revoked).toBe(true);
+    expect(view.end).toEqual(minutesIn(60));
   });
 });

@@ -57,7 +57,7 @@ describe("ResourceRegistrationProcessManager should", () => {
       }
     });
 
-    it("reject recording a name already used in the organization", async () => {
+    it("emit 'ResourceRegistrationFailed' when the name is already used in the organization", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await createOrganization(scope)).kind).toBe("ok");
@@ -67,17 +67,17 @@ describe("ResourceRegistrationProcessManager should", () => {
       );
 
       const failed = await recordEvents(scope, ResourceRegistrationFailedSchema);
-      await expectRejection(box, scope, OrganizationResourceNameAlreadyUsedSchema, () =>
-        registerResource(scope, "payroll-2", "payroll"),
-      );
       try {
+        await expectRejection(box, scope, OrganizationResourceNameAlreadyUsedSchema, () =>
+          registerResource(scope, "payroll-2", "payroll"),
+        );
         expect((await failed.waitFor(box)).id?.uuid).toBe("payroll-2");
       } finally {
         await failed.cancel();
       }
     });
 
-    it("emit ResourceRegistrationFailed when the resource already exists", async () => {
+    it("emit 'ResourceRegistrationFailed' when the resource already exists", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await createResource(scope, "payroll")).kind).toBe("ok");
@@ -131,7 +131,7 @@ describe("ResourceRegistrationProcessManager should", () => {
   });
 
   describe("handle 'ResourceAdded', and", () => {
-    it("emit ResourceRegistered and complete once the resource is recorded", async () => {
+    it("emit 'ResourceRegistered' once the resource is recorded", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await createOrganization(scope)).kind).toBe("ok");

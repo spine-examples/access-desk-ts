@@ -134,7 +134,7 @@ describe("AccessDecisionAssignmentProjection should", () => {
     });
   });
 
-  it("clears only the decided request, keeping a manager's other tasks", async () => {
+  it("clear only the decided request, keeping a manager's other tasks", async () => {
     const box = await resourcesBlackBox();
     const requester = box.onBehalfOf(actor);
     const teammate = box.onBehalfOf("teammate");

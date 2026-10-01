@@ -70,8 +70,7 @@ describe("AccessGrantProcessManager should", () => {
   });
 
   it("extend active access when a manager approves an extension request", async () => {
-    const clock = testClock();
-    const box = await resourcesBlackBox(clock);
+    const box = await resourcesBlackBox(testClock());
     const requester = await givenActiveGrant(box, "req-extended", 10);
 
     expect(
@@ -99,8 +98,8 @@ describe("AccessGrantProcessManager should", () => {
       (item) => item.end?.seconds === minutesIn(25).seconds,
     );
     expect(extended.start).toEqual(minutesIn(0));
-    expect(extended.revoked).toBe(false);
-
     expect(extended.end).toEqual(minutesIn(25));
+    expect(extended.revoked).toBe(false);
+    expect(extended.extension.map((request) => request.uuid)).toEqual(["ext-grant"]);
   });
 });
