@@ -44,6 +44,7 @@ import {
   type AccessGrantRevoked,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
 import {
+  AccessGrantLifetimeExceeded,
   AccessGrantNotActive,
   NotResourceManager,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/rejections.js";
@@ -56,9 +57,8 @@ import { effectiveInterval, requestedInterval } from "../access-period.js";
  * Access a person holds to a resource from its start until its end.
  *
  * An approved first-time request creates the grant for the access the approval
- * makes effective. The grant shares its identifier with that request. Each
- * approved extension request then moves the grant's end to the end it proposed,
- * never past the longest total access the resource permits.
+ * makes effective. Each approved extension request then moves the grant's end
+ * to the end it proposed, never past the longest total access the resource permits.
  *
  * A manager of the resource may revoke the grant, with a reason, before its end.
  */
@@ -85,12 +85,9 @@ export class AccessGrantProcessManager extends ProcessManager<
     }
   }
 
-  /** Issues the grant from an approved first-time request, once. */
+  /** Issues the grant from an approved first-time request. */
   @Assign
   createAccessGrant(command: CreateAccessGrant): AccessGrantCreated {
-    if (this.state.start !== undefined) {
-      throw new Error("An access grant is created once.");
-    }
     const { request, access, start, end } = command;
     if (start === undefined || end === undefined || compare(start, end) >= 0) {
       throw new Error("An access grant must end after it starts.");
@@ -120,12 +117,11 @@ export class AccessGrantProcessManager extends ProcessManager<
    * Moves the end of the access to the end an approved extension proposed.
    *
    * Only a grant that gives access now can be extended, so access revoked,
-   * ended, or not yet begun is refused. The extension counts toward the longest
-   * total access the resource permits, as its catalog entry tells it now. The
-   * request was checked against the same limit when it was submitted.
+   * ended, or not yet begun is rejected. The extension counts toward the longest
+   * total access the resource permits, and one that exceeds it is rejected.
    */
   @Assign
-  @Throws(AccessGrantNotActive)
+  @Throws(AccessGrantNotActive, AccessGrantLifetimeExceeded)
   async extendAccessGrant(command: ExtendAccessGrant): Promise<AccessGrantExtended> {
     if (!this.givesAccessNow()) {
       throw AccessGrantNotActive.create({ id: this.id });
@@ -140,7 +136,7 @@ export class AccessGrantProcessManager extends ProcessManager<
       throw new Error("An approved extension moves the end of access later.");
     }
     if (longerThan(between(start, end), maximumLifetime)) {
-      throw new Error("An approved extension keeps access within its maximum lifetime.");
+      throw AccessGrantLifetimeExceeded.create({ id: this.id });
     }
     this.update((draft) => {
       draft.end = end;

@@ -257,7 +257,8 @@ An extension:
 - is capped by the resource's maximum **total grant lifetime**, not an
   independent duration per extension. The grant does not store this limit. It
   is read from the resource's current policy in the resource catalog, when the
-  extension is submitted and again when the grant applies it;
+  extension is submitted (`RequestedDurationTooLong`) and again when the grant
+  applies it (`AccessGrantLifetimeExceeded`);
 - is refused at approval, and by the grant, when the grant no longer gives
   access by then (`AccessGrantNotActive`), and at approval when the grant
   already reaches the proposed end (`AccessAlreadyHeld`).

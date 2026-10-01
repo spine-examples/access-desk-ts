@@ -74,12 +74,12 @@ Projection inputs and outputs drawn on the board:
 
 #### Access grant — Access Grant PM
 
-| Owner             | Trigger (actor/event)      | Command                                      | Event(s)              | Rejections                                    |
-| ----------------- | -------------------------- | -------------------------------------------- | --------------------- | --------------------------------------------- |
-| Access Grant (PM) | on Access Request Approved | Create Access Grant `OR` Extend Access Grant | —                     | —                                             |
-| Access Grant (PM) | Access Grant (PM)          | Create Access Grant                          | Access Grant Created  | —                                             |
-| Access Grant (PM) | Access Grant (PM)          | Extend Access Grant                          | Access Grant Extended | Access Grant Not Active                       |
-| Access Grant (PM) | Resource Manager           | Revoke Access Grant                          | Access Grant Revoked  | Access Grant Not Active; Not Resource Manager |
+| Owner             | Trigger (actor/event)      | Command                                      | Event(s)              | Rejections                                              |
+| ----------------- | -------------------------- | -------------------------------------------- | --------------------- | ------------------------------------------------------- |
+| Access Grant (PM) | on Access Request Approved | Create Access Grant `OR` Extend Access Grant | —                     | —                                                       |
+| Access Grant (PM) | Access Grant (PM)          | Create Access Grant                          | Access Grant Created  | —                                                       |
+| Access Grant (PM) | Access Grant (PM)          | Extend Access Grant                          | Access Grant Extended | Access Grant Not Active; Access Grant Lifetime Exceeded |
+| Access Grant (PM) | Resource Manager           | Revoke Access Grant                          | Access Grant Revoked  | Access Grant Not Active; Not Resource Manager           |
 
 The grant holds the request that issued it, the extension requests that moved
 its end, a start, an end, and whether it was revoked. Nothing happens

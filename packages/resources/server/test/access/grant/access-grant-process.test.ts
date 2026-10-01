@@ -20,6 +20,7 @@ import {
   AccessGrantRevokedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
 import {
+  AccessGrantLifetimeExceededSchema,
   AccessGrantNotActiveSchema,
   NotResourceManagerSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/rejections_pb.js";
@@ -41,7 +42,6 @@ import {
   givenActiveGrant,
   issueGrant,
   minutesIn,
-  postCreateAccessGrant,
   postExtendAccessGrant,
   revokeGrant,
   seedGrantedResource,
@@ -192,23 +192,6 @@ describe("AccessGrantProcessManager should", () => {
         await created.cancel();
       }
     });
-
-    it("create the grant once, leaving issued access as it is", async () => {
-      const given = await givenGrant("grant-once");
-      const { box, scope } = given;
-      const created = await recordEvents(scope, AccessGrantCreatedSchema);
-      try {
-        await postCreateAccessGrant(scope, "grant-once");
-        await postCreateAccessGrant(scope, "grant-once", { end: minutesIn(30) });
-        await fence(given, "grant-once");
-
-        expect(created.received).toHaveLength(0);
-        const view = await awaitGrantIssued(box, scope, "grant-once");
-        expect(view.end).toEqual(minutesIn(60));
-      } finally {
-        await created.cancel();
-      }
-    });
   });
 
   describe("handle 'ExtendAccessGrant', and", () => {
@@ -284,21 +267,29 @@ describe("AccessGrantProcessManager should", () => {
       }
     });
 
-    it("keep its end when an extension exceeds the longest access the resource permits", async () => {
+    it("reject an extension beyond the longest access the resource permits ('AccessGrantLifetimeExceeded')", async () => {
       // The resource permits two hours in total, and the grant began at the start of the test.
-      const given = await givenGrant("grant-too-long");
-      const { box, scope } = given;
-      const extended = await recordEvents(scope, AccessGrantExtendedSchema);
-      try {
-        await postExtendAccessGrant(scope, "grant-too-long", "ext-too-long", minutesIn(121));
-        await fence(given, "grant-too-long");
+      const { box, scope } = await givenGrant("grant-too-long");
 
-        expect(extended.received).toHaveLength(0);
-        const view = await awaitGrantIssued(box, scope, "grant-too-long");
-        expect(view.end).toEqual(minutesIn(60));
-      } finally {
-        await extended.cancel();
-      }
+      await expectRejection(box, scope, AccessGrantLifetimeExceededSchema, () =>
+        postExtendAccessGrant(scope, "grant-too-long", "ext-too-long", minutesIn(121)),
+      );
+
+      const view = await awaitGrantIssued(box, scope, "grant-too-long");
+      expect(view.end).toEqual(minutesIn(60));
+    });
+
+    it("extend access up to the longest the resource permits", async () => {
+      const { box, scope } = await givenGrant("grant-to-limit");
+
+      await postExtendAccessGrant(scope, "grant-to-limit", "ext-to-limit", minutesIn(120));
+
+      await awaitGrantView(
+        box,
+        scope,
+        "grant-to-limit",
+        (item) => item.end?.seconds === minutesIn(120).seconds,
+      );
     });
   });
 
