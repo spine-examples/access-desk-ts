@@ -54,4 +54,3 @@ message GrantCoverageId {
     // The resource the access applies to.
     ResourceId resource = 2 [(required) = true];
 }
-

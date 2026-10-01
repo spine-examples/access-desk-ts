@@ -99,7 +99,7 @@ message GrantCoverage {
     accessdesk.resources.GrantCoverageId id = 1;
 
     // The grants that give the person access to the resource.
-    repeated CoveringGrant grant = 2;
+    repeated CoveringGrant grant = 2 [(validate) = true];
 
     // A grant that gives, or will give, the person access to the resource.
     message CoveringGrant {

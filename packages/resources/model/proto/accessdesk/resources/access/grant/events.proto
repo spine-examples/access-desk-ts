@@ -83,4 +83,3 @@ message AccessGrantExtended {
     // The new exclusive end of the access.
     google.protobuf.Timestamp end = 5 [(required) = true];
 }
-

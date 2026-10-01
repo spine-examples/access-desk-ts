@@ -158,8 +158,7 @@ message AccessExtension {
     google.protobuf.Timestamp proposed_end = 2 [(required) = true];
 }
 
-// The access a grant gives, which is a person, a resource, and the level of
-// access the person holds to that resource.
+// The access a grant gives.
 message GrantedAccess {
 
     // The person who holds the access.

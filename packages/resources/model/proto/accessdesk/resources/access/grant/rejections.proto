@@ -22,7 +22,7 @@ import "spine/options.proto";
 option (type_url_prefix) = "type.accessdesk";
 
 // The grant does not give access now, because it was revoked, or its period
-// has ended or has not yet begun, so it cannot be changed this way.
+// has ended or has not yet begun.
 message AccessGrantNotActive {
 
     accessdesk.resources.AccessGrantId id = 1 [(required) = true];
