@@ -34,11 +34,6 @@ The system has two bounded contexts:
 | Identity        | Global users, registration, authentication identity, user activity                                                                                                                   | Global/single-tenant control plane |
 | Resources       | Organizations, memberships, resources, ordered access levels, resource managers, request policy, requests, approval decisions, grants, extensions, revocation, and audit projections | Organization-scoped                |
 
-Resources owns the whole request-and-approval domain. What earlier drafts split
-into separate Access and Audit contexts, the request, approval, grant,
-extension, and revocation lifecycles and the audit projections built from
-durable facts, is now internal to Resources.
-
 An initial deployment may co-host both contexts in one Node.js application.
 Co-location does not weaken the boundaries: each context must have its own model
 package, generated module, `BoundedContext` instance, repositories, storage
@@ -53,11 +48,11 @@ flowchart LR
 
 Cross-context state propagation and lifecycle choreography use versioned
 external events. Commands are domestic to their receiving context. Shared
-packages may contain
-wire contracts and value types, but never another context's behavior or mutable
-state. Each context owns its cross-context event contracts in its own model
-package; a consumer depends on the publishing context's model for those schemas
-and declares its external-event receptors internally.
+packages may contain wire contracts and value types, but never another
+context's behavior or mutable state. Each context owns its cross-context
+event contracts in its own model package; a consumer depends on the
+publishing context's model for those schemas and declares its
+external-event receptors internally.
 
 ## Tenant, identity, and authorization model
 
@@ -197,8 +192,6 @@ Submission must enforce all the following:
   accepted.
 - The requested level is offered by that resource.
 - The justification is meaningful.
-- The access period uses whole-minute precision for immediate durations and
-  scheduled endpoints.
 - The time specification is valid — the access ends after it begins — and
   within the maximum duration.
 - The requester does not already hold same-or-stronger access for the relevant
@@ -209,9 +202,9 @@ Submission must enforce all the following:
 
 Conflicting nonterminal requests use a duplicate-request rejection. Conflicts
 with grants that are not revoked, whether their period has begun or not, use the
-existing-access policy and a distinct business rejection. Immediate requests retain a duration; overlap that can only
-be known after an approval time is established must be revalidated before a
-grant is created.
+existing-access policy and a distinct business rejection. Immediate requests
+retain a duration; overlap that can only be known after an approval time is
+established must be revalidated before a grant is created.
 
 Any manager captured from the resource policy may decide a pending request; no
 approver is assigned. Admission preserves policy order and removes duplicate
@@ -230,23 +223,16 @@ Required request outcomes are pending, approved, denied, and canceled.
 
 A grant has no lifecycle of its own beyond its revocation. It holds the person,
 resource, and access level it gives access for, its period `[start, end)`, and
-whether a manager revoked it. The
-grant gives access while it is not revoked and the current time is within its
-period. Nothing happens when the period begins or ends. Whenever a request
-depends on the grant, the system checks against the current time whether the
-grant gives access at that moment. There are no activation, expiration, or
-scheduling facts, and the UI derives "not yet begun", "active", and "ended" from
-the period and the current time.
+whether a manager revoked it. The grant gives access while it is not revoked
+and the current time is within its period. Whenever a request depends on the
+grant, the system checks against the current time whether the grant gives
+access at that moment.
 
 Any manager of the granting resource may revoke it, with a reason, until its
-end, whether its period has begun or not. The grant does not store the
-managers. They are read from the resource's current policy in the resource
-catalog when the revocation is handled. The grant stores the request that
+end, whether its period has begun or not. The grant stores the request that
 issued it and each extension request that moved its end, so who approved the
 access is read from those requests. Revocation authority is
-scoped to that resource, not the organization. A grant already revoked, or whose
-end has passed, is refused with `AccessGrantNotActive`, as is a revocation by
-someone who does not manage the resource with `NotResourceManager`.
+scoped to that resource, not the organization.
 
 An extension:
 
@@ -255,13 +241,7 @@ An extension:
   would have, and changes no other grant field;
 - requires a separate approval task and decision;
 - is capped by the resource's maximum **total grant lifetime**, not an
-  independent duration per extension. The grant does not store this limit. It
-  is read from the resource's current policy in the resource catalog, when the
-  extension is submitted (`RequestedDurationTooLong`) and again when the grant
-  applies it (`AccessGrantLifetimeExceeded`);
-- is refused at approval, and by the grant, when the grant no longer gives
-  access by then (`AccessGrantNotActive`), and at approval when the grant
-  already reaches the proposed end (`AccessAlreadyHeld`).
+  independent duration per extension.
 
 When a grant is revoked, its pending extension tasks leave the pending-task
 projection. Immutable facts remain in history.
