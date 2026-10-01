@@ -30,12 +30,8 @@ option (type_url_prefix) = "type.accessdesk";
 // request moves its end. A manager of the resource may revoke the grant before
 // its end.
 //
-// The grant gives access while it is not revoked and the current time is
-// within its period. This is checked whenever a request depends on it.
-//
 message AccessGrant {
     option (entity).kind = PROCESS_MANAGER;
-    option (entity).visibility = FULL;
 
     // The grant identifier.
     accessdesk.resources.AccessGrantId id = 1;
@@ -43,23 +39,21 @@ message AccessGrant {
     // The approved request that issued the grant.
     accessdesk.resources.AccessRequestId request = 2 [(required) = true];
 
+    // The approved extension requests that moved the end of the access, in the
+    // order they took effect.
+    repeated accessdesk.resources.AccessRequestId extension = 3;
+
     // The person, resource, and access level the grant gives access for.
-    accessdesk.resources.GrantedAccess access = 3 [(required) = true];
+    accessdesk.resources.GrantedAccess access = 4 [(required) = true];
 
     // The inclusive start of the access.
-    google.protobuf.Timestamp start = 4 [(required) = true];
+    google.protobuf.Timestamp start = 5 [(required) = true];
 
     // The exclusive end of the access.
-    google.protobuf.Timestamp end = 5 [(required) = true];
-
-    // The manager who approved the issuing request.
-    accessdesk.identity.PersonId approved_by = 6 [(required) = true];
-
-    // The resource managers who may revoke the grant.
-    repeated accessdesk.identity.PersonId manager = 7 [(required) = true];
+    google.protobuf.Timestamp end = 6 [(required) = true];
 
     // Whether a manager revoked the grant before its end.
-    bool revoked = 8;
+    bool revoked = 7;
 }
 
 // An access grant as its grantee and the resource's managers see it.
@@ -90,6 +84,10 @@ message AccessGrantView {
 
     // The approved request that authorized the access.
     accessdesk.resources.AccessRequestId request = 8 [(required) = true];
+
+    // The approved extension requests that moved the end of the access, in the
+    // order they took effect.
+    repeated accessdesk.resources.AccessRequestId extension = 9;
 }
 
 // The access a person holds, or is about to hold, to one resource.

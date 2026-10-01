@@ -14,7 +14,6 @@
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { type BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
-import { AccessGrantSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/access_grant_pb.js";
 import {
   AccessGrantCreatedSchema,
   AccessGrantExtendedSchema,
@@ -29,7 +28,6 @@ import {
   actor,
   closeResourcesBlackBoxes,
   loadResourcesContext,
-  readAll,
   resourcesBlackBox,
   testActorContext,
 } from "../../given/resources-context.js";
@@ -107,12 +105,7 @@ describe("AccessGrantProcessManager should", () => {
       expect(item.start).toEqual(minutesIn(5));
       expect(item.end).toEqual(minutesIn(15));
       expect(item.revoked).toBe(false);
-      const grant = (await readAll(requester, AccessGrantSchema, "grants")).find(
-        (state) => state.id?.uuid === "req-now",
-      );
-      expect(grant?.request?.uuid).toBe("req-now");
-      expect(grant?.approvedBy?.uuid).toBe("primary");
-      expect(grant?.manager.map((manager) => manager.uuid)).toEqual(["primary"]);
+      expect(item.request?.uuid).toBe("req-now");
     });
 
     it("begin scheduled access approved within its interval at the approval, keeping its end", async () => {
@@ -182,7 +175,7 @@ describe("AccessGrantProcessManager should", () => {
   });
 
   describe("handle 'CreateAccessGrant', and", () => {
-    it("emit 'AccessGrantCreated' with the access, its period, and its managers", async () => {
+    it("emit 'AccessGrantCreated' with the access and its period", async () => {
       const box = await resourcesBlackBox(testClock());
       const scope = box.onBehalfOf(actor);
       await seedGrantedResource(box);
@@ -195,8 +188,6 @@ describe("AccessGrantProcessManager should", () => {
         expect(event.access?.grantee?.uuid).toBe(actor);
         expect(event.start).toEqual(minutesIn(0));
         expect(event.end).toEqual(minutesIn(60));
-        expect(event.approvedBy?.uuid).toBe("primary");
-        expect(event.manager.map((manager) => manager.uuid)).toEqual(["primary"]);
       } finally {
         await created.cancel();
       }
@@ -325,6 +316,7 @@ describe("AccessGrantProcessManager should", () => {
         expect(event.revokedBy?.uuid).toBe("primary");
         expect(event.reason).toBe("Investigation finished.");
         expect(event.whenRevoked).toEqual(minutesIn(20));
+        expect(event.manager.map((manager) => manager.uuid)).toEqual(["primary"]);
         await awaitGrantRevoked(box, scope, "grant-revoked");
       } finally {
         await revoked.cancel();

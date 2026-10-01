@@ -238,9 +238,12 @@ grant gives access at that moment. There are no activation, expiration, or
 scheduling facts, and the UI derives "not yet begun", "active", and "ended" from
 the period and the current time.
 
-Any manager of the granting resource, as recorded on the grant when it was
-created, may revoke it, with a reason,
-until its end, whether its period has begun or not. Revocation authority is
+Any manager of the granting resource may revoke it, with a reason, until its
+end, whether its period has begun or not. The grant does not store the
+managers. They are read from the resource's current policy in the resource
+catalog when the revocation is handled. The grant stores the request that
+issued it and each extension request that moved its end, so who approved the
+access is read from those requests. Revocation authority is
 scoped to that resource, not the organization. A grant already revoked, or whose
 end has passed, is refused with `AccessGrantNotActive`, as is a revocation by
 someone who does not manage the resource with `NotResourceManager`.

@@ -13,7 +13,7 @@ Conventions for every `.proto` in
 
 ## File layout (in this order)
 
-1. `/* */` copyright header block (see below).
+1. `/* */` copyright header block.
 2. blank line, then `syntax = "proto3";`
 3. blank line, then `package accessdesk.<context>;`
 4. blank line, then imports — one per line (`google/...` first, then `spine/...`
@@ -30,8 +30,7 @@ Conventions for every `.proto` in
 
 ## Copyright header — `/* */` block
 
-Use a `/* */` block, the same header as TypeScript and JavaScript files, word
-for word:
+Use a `/* */` block, word for word:
 
 ```proto
 /*
@@ -49,8 +48,6 @@ for word:
  */
 ```
 
-The header is the only block comment in a `.proto` file.
-
 ## `type_url_prefix`
 
 Use the shared prefix `type.accessdesk` in every file that declares messages.
@@ -58,7 +55,7 @@ Do not append a bounded-context, package, or other type suffix.
 
 ## Documentation comments
 
-Use `//` line comments (never `/* */` or `/** */`). Document every message and every field.
+Use `//` line comments (never `/* */`). Document every message and every field.
 
 Describe only the domain meaning. Do not mention handlers, entity kinds,
 routing, storage, queries, clients, generation, or why a field exists for an

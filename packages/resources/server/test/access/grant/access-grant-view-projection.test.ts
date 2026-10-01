@@ -74,21 +74,30 @@ describe("AccessGrantViewProjection should", () => {
     expect(toPayroll.map((row) => row.id?.uuid).sort()).toEqual(["grant-mine", "grant-theirs"]);
   });
 
-  it("show the new end of extended access", async () => {
+  it("show the new end of extended access, and the requests that extended it", async () => {
     const box = await resourcesBlackBox(testClock());
     const scope = box.onBehalfOf(actor);
     await seedGrantedResource(box);
     await issueGrant(box, "grant-extended");
-    await awaitGrantIssued(box, scope, "grant-extended");
+    const issued = await awaitGrantIssued(box, scope, "grant-extended");
+    expect(issued.extension).toHaveLength(0);
 
     await approveExtension(box, "ext-1", "grant-extended", 30);
-
     await awaitGrantView(
       box,
       scope,
       "grant-extended",
       (view) => view.end?.seconds === minutesIn(90).seconds,
     );
+    await approveExtension(box, "ext-2", "grant-extended", 10);
+
+    const view = await awaitGrantView(
+      box,
+      scope,
+      "grant-extended",
+      (item) => item.end?.seconds === minutesIn(100).seconds,
+    );
+    expect(view.extension.map((request) => request.uuid)).toEqual(["ext-1", "ext-2"]);
   });
 
   it("show revoked access as revoked", async () => {

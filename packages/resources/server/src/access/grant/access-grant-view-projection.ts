@@ -42,10 +42,16 @@ export class AccessGrantViewProjection extends Projection<
     });
   }
 
-  /** Shows the new end of extended access. */
+  /** Shows the new end of extended access, and the request that extended it. */
   @Subscribe
   onAccessGrantExtended(event: AccessGrantExtended): void {
-    this.update((draft) => (draft.end = event.end));
+    const { end, request } = event;
+    this.update((draft) => {
+      draft.end = end;
+      if (request !== undefined) {
+        draft.extension = [...draft.extension, request];
+      }
+    });
   }
 
   /** Shows the access as revoked. */

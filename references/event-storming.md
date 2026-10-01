@@ -81,7 +81,8 @@ Projection inputs and outputs drawn on the board:
 | Access Grant (PM) | Access Grant (PM)          | Extend Access Grant                          | Access Grant Extended | Access Grant Not Active                       |
 | Access Grant (PM) | Resource Manager           | Revoke Access Grant                          | Access Grant Revoked  | Access Grant Not Active; Not Resource Manager |
 
-The grant holds a start, an end, and whether it was revoked. Nothing happens
+The grant holds the request that issued it, the extension requests that moved
+its end, a start, an end, and whether it was revoked. Nothing happens
 when its period begins or ends. Whenever a request depends on the grant, the
 system checks against the current time whether the grant gives access, that
 is, whether it is not revoked and the current time is within its period.

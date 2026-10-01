@@ -41,12 +41,6 @@ message CreateAccessGrant {
 
     // The exclusive end of the access.
     google.protobuf.Timestamp end = 5 [(required) = true];
-
-    // The manager who approved the request.
-    accessdesk.identity.PersonId approved_by = 6 [(required) = true];
-
-    // The resource managers who may revoke the grant.
-    repeated accessdesk.identity.PersonId manager = 7 [(required) = true];
 }
 
 // Ends a grant before its planned end.

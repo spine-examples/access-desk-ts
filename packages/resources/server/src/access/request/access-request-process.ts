@@ -29,9 +29,8 @@ import {
   AccessRequestViewSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_pb.js";
 import {
-  AccessGrantSchema,
+  AccessGrantViewSchema,
   GrantCoverageSchema,
-  type AccessGrant,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/access_grant_pb.js";
 import { ResourceCatalogItemSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_pb.js";
 import {
@@ -424,18 +423,14 @@ export class AccessRequestProcessManager extends ProcessManager<
     requester: PersonId,
     resource?: ResourceId,
   ): Promise<ActiveGrant> {
-    const state: AccessGrant | undefined = await this.select(AccessGrantSchema, {}).findById(
-      grant as never,
-    );
-    const { start, end } = state ?? {};
-    const heldResource = state?.access?.resource;
-    const accessLevel = state?.access?.accessLevel;
+    const view = await this.select(AccessGrantViewSchema, {}).findById(grant as never);
+    const { resource: heldResource, accessLevel, start, end } = view ?? {};
     if (
-      state === undefined ||
-      state.revoked ||
+      view === undefined ||
+      view.revoked ||
       heldResource === undefined ||
       accessLevel === undefined ||
-      !equals(PersonIdSchema, state.access?.grantee, requester) ||
+      !equals(PersonIdSchema, view.grantee, requester) ||
       (resource !== undefined && !equals(ResourceIdSchema, heldResource, resource)) ||
       start === undefined ||
       end === undefined ||

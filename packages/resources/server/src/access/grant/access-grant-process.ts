@@ -23,6 +23,7 @@ import type { AccessGrantId } from "@access-desk/resources-model/generated/acces
 import type {
   AccessExtension,
   NewAccessRequest,
+  ResourcePolicy,
 } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import { ResourceCatalogItemSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_pb.js";
 import type { AccessRequestApproved } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
@@ -60,10 +61,6 @@ import { effectiveInterval, requestedInterval } from "../access-period.js";
  * never past the longest total access the resource permits.
  *
  * A manager of the resource may revoke the grant, with a reason, before its end.
- *
- * The grant gives access while it is not revoked and the current time is
- * within its period. Nothing changes when the period begins or ends. Extending
- * and revoking check the grant against the current time when they are handled.
  */
 export class AccessGrantProcessManager extends ProcessManager<
   AccessGrantId,
@@ -94,7 +91,7 @@ export class AccessGrantProcessManager extends ProcessManager<
     if (this.state.start !== undefined) {
       throw new Error("An access grant is created once.");
     }
-    const { request, access, start, end, approvedBy, manager } = command;
+    const { request, access, start, end } = command;
     if (start === undefined || end === undefined || compare(start, end) >= 0) {
       throw new Error("An access grant must end after it starts.");
     }
@@ -107,8 +104,6 @@ export class AccessGrantProcessManager extends ProcessManager<
           access,
           start,
           end,
-          approvedBy,
-          manager,
         }),
       );
     });
@@ -118,8 +113,6 @@ export class AccessGrantProcessManager extends ProcessManager<
       access,
       start,
       end,
-      approvedBy,
-      manager,
     });
   }
 
@@ -151,6 +144,9 @@ export class AccessGrantProcessManager extends ProcessManager<
     }
     this.update((draft) => {
       draft.end = end;
+      if (command.request !== undefined) {
+        draft.extension = [...draft.extension, command.request];
+      }
     });
     return create(AccessGrantExtendedSchema, {
       id: this.id,
@@ -164,13 +160,15 @@ export class AccessGrantProcessManager extends ProcessManager<
   /**
    * Ends the access early, with a reason, on behalf of a manager of the resource.
    *
+   * The managers are those the resource has now, as its catalog entry tells.
    * Access may be revoked before or after it begins, until its end. A grant
    * already revoked, or whose end has passed, is refused.
    */
   @Assign
   @Throws(NotResourceManager, AccessGrantNotActive)
-  revokeAccessGrant(command: RevokeAccessGrant): AccessGrantRevoked {
-    const revokedBy = this.assertManager(command.manager);
+  async revokeAccessGrant(command: RevokeAccessGrant): Promise<AccessGrantRevoked> {
+    const manager = await this.managers();
+    const revokedBy = this.assertManager(command.manager, manager);
     if (this.state.revoked || this.hasEnded()) {
       throw AccessGrantNotActive.create({ id: this.id });
     }
@@ -183,7 +181,7 @@ export class AccessGrantProcessManager extends ProcessManager<
       revokedBy,
       reason: command.reason,
       whenRevoked: now(),
-      manager: this.state.manager,
+      manager,
     });
   }
 
@@ -214,8 +212,6 @@ export class AccessGrantProcessManager extends ProcessManager<
       access: { grantee: event.snapshot?.requester, resource, accessLevel },
       start: interval.start,
       end: interval.end,
-      approvedBy: event.decidedBy,
-      manager: event.manager,
     });
   }
 
@@ -233,16 +229,27 @@ export class AccessGrantProcessManager extends ProcessManager<
    * entry tells it now.
    */
   private async maximumLifetime(): Promise<Duration> {
-    const resource = this.state.access?.resource;
-    const maximum =
-      resource === undefined
-        ? undefined
-        : (await this.select(ResourceCatalogItemSchema, {}).findById(resource as never))?.policy
-            ?.maximumDuration;
+    const maximum = (await this.policy())?.maximumDuration;
     if (maximum === undefined) {
       throw new Error("The resource of an access grant must be in the catalog.");
     }
     return maximum;
+  }
+
+  /**
+   * The people who manage the resource of the grant now, as its catalog entry
+   * tells. Nobody manages the resource of a grant that was never issued.
+   */
+  private async managers(): Promise<PersonId[]> {
+    return (await this.policy())?.manager ?? [];
+  }
+
+  /** The current policy of the grant's resource, when the catalog lists the resource. */
+  private async policy(): Promise<ResourcePolicy | undefined> {
+    const resource = this.state.access?.resource;
+    return resource === undefined
+      ? undefined
+      : (await this.select(ResourceCatalogItemSchema, {}).findById(resource as never))?.policy;
   }
 
   /** Whether the grant gives access at the current time. */
@@ -257,11 +264,11 @@ export class AccessGrantProcessManager extends ProcessManager<
     return end !== undefined && compare(now(), end) >= 0;
   }
 
-  /** The acting person, when they manage the resource the grant applies to. */
-  private assertManager(person: PersonId | undefined): PersonId {
+  /** The acting person, when they are among the managers of the grant's resource. */
+  private assertManager(person: PersonId | undefined, managers: readonly PersonId[]): PersonId {
     if (
       person === undefined ||
-      !this.state.manager.some((manager) => equals(PersonIdSchema, manager, person))
+      !managers.some((manager) => equals(PersonIdSchema, manager, person))
     ) {
       throw NotResourceManager.create({ id: this.id });
     }

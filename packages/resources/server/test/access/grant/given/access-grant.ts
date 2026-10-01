@@ -62,8 +62,8 @@ export function minutesIn(minutes: number): Timestamp {
 
 /**
  * Builds a `CreateAccessGrant` issuing the requester read access to the payroll
- * resource for the first hour of the test, revocable by `primary` — as though
- * a request with the same identifier had been approved.
+ * resource for the first hour of the test — as though a request with the same
+ * identifier had been approved.
  */
 export function createGrantCommand(
   id: string,
@@ -79,8 +79,6 @@ export function createGrantCommand(
     },
     start: minutesIn(0),
     end: minutesIn(60),
-    approvedBy: { uuid: "primary" },
-    manager: [{ uuid: "primary" }],
     ...overrides,
   });
 }
