@@ -26,7 +26,7 @@ import {
 import {
   AccessGrantViewSchema,
   type AccessGrantView,
-} from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/access_grant_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/resource_access_pb.js";
 
 import { actor, readWhere } from "../../../given/resources-context.js";
 import { ManualClock } from "../../../given/manual-clock.js";

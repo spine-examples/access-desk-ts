@@ -14,7 +14,7 @@
 
 import { Projection, Subscribe } from "@spine-event-engine/server";
 import type { AccessGrantId } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
-import { AccessGrantViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/access_grant_pb.js";
+import { AccessGrantViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/resource_access_pb.js";
 import type {
   AccessGrantCreated,
   AccessGrantExtended,

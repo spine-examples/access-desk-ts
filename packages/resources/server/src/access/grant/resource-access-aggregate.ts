@@ -29,7 +29,7 @@ import {
   ResourceAccessSchema,
   ResourceAccess_GrantSchema,
   type ResourceAccess_Grant as Grant,
-} from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/access_grant_pb.js";
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/resource_access_pb.js";
 import type {
   CheckRequestedAccess,
   CheckRequestedExtension,
