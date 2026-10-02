@@ -153,6 +153,9 @@ export class ResourceAccessAggregate extends Aggregate<
     ) {
       throw new Error("An access grant must end after it starts.");
     }
+    if (this.state.grant.some((kept) => equals(AccessGrantIdSchema, kept.id, grant))) {
+      throw new Error("An access grant is issued only once.");
+    }
     const created = create(ResourceAccess_GrantSchema, { id: grant, accessLevel, start, end });
     this.update((draft) => {
       draft.id = this.id;
@@ -238,9 +241,11 @@ export class ResourceAccessAggregate extends Aggregate<
   /**
    * Whether a grant other than the excepted one gives the same or a stronger
    * access level for any part of the interval.
+   *
+   * A grant whose end has passed gives no access, so it is not counted.
    */
   private holds(level: AccessLevel, interval: Interval, except?: AccessGrantId): boolean {
-    return this.state.grant.some(
+    return this.grantsNotEnded().some(
       ({ id, accessLevel, start, end }) =>
         !equals(AccessGrantIdSchema, id, except) &&
         accessLevel !== undefined &&

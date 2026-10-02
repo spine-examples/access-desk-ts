@@ -49,6 +49,7 @@ import {
   givenActiveGrant,
   issueGrant,
   minutesIn,
+  postCreateAccessGrant,
   postExtendAccessGrant,
   readAccessHeldBy,
   revokeGrant,
@@ -199,6 +200,23 @@ describe("ResourceAccessAggregate should", () => {
         expect(event.access?.accessLevel?.name).toBe("Read");
         expect(event.start).toEqual(minutesIn(0));
         expect(event.end).toEqual(minutesIn(60));
+      } finally {
+        await created.cancel();
+      }
+    });
+
+    it("issue a grant only once", async () => {
+      const given = await givenGrant("grant-once");
+      const { box, scope } = given;
+      const created = await recordEvents(scope, AccessGrantCreatedSchema);
+      try {
+        await postCreateAccessGrant(scope, "grant-once", 60, 90);
+        await fence(given, "grant-once");
+
+        expect(created.received).toHaveLength(0);
+        const held = await readAccessHeldBy(scope);
+        expect(held.map((grant) => grant.end)).toEqual([minutesIn(60)]);
+        expect((await awaitGrantIssued(box, scope, "grant-once")).start).toEqual(minutesIn(0));
       } finally {
         await created.cancel();
       }

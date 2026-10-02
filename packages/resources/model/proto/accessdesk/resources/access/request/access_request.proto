@@ -87,6 +87,9 @@ message AccessDecisionAssignment {
     // The requests awaiting the manager's decision.
     repeated AccessDecisionTask task = 2;
 
+    // The grants whose revocation has made later extension requests irrelevant.
+    repeated accessdesk.resources.AccessGrantId revoked_grant = 3;
+
     // A request awaiting the manager's decision.
     message AccessDecisionTask {
 

@@ -277,6 +277,28 @@ describe("AccessRequestProcessManager should", () => {
       );
     });
 
+    it("refuse reuse of a request identifier", async () => {
+      const box = await resourcesBlackBox();
+      const requester = await givenPending(box, "req-reused");
+      const submitted = await recordEvents(requester, AccessRequestSubmittedSchema);
+      try {
+        await requester.post(SubmitAccessRequestSchema, submitRequest("req-reused"));
+        await requester.post(
+          SubmitAccessExtensionRequestSchema,
+          submitExtensionRequest("req-reused", { grant: { uuid: "grant-unused" } }),
+        );
+        await cancelAccessRequest(requester, "req-reused");
+
+        await box.eventually(
+          () => statusOf(requester, "req-reused"),
+          (status) => status === AccessRequestStatus.CANCELED,
+        );
+        expect(submitted.received).toHaveLength(0);
+      } finally {
+        await submitted.cancel();
+      }
+    });
+
     it("reject access already held for the requested period ('AccessAlreadyHeld')", async () => {
       const box = await resourcesBlackBox(testClock());
       const requester = await givenActiveGrant(box, "req-held", 10);
@@ -340,6 +362,38 @@ describe("AccessRequestProcessManager should", () => {
       });
 
       expect(await statusOf(requester, "req-already-over")).toBe(AccessRequestStatus.PENDING);
+    });
+
+    it("submit a request for a period overlapping access that has ended", async () => {
+      // Held: [0, 10), which is over by minute 10. Requested: [5, 30).
+      const clock = testClock();
+      const box = await resourcesBlackBox(clock);
+      const requester = await givenActiveGrant(box, "req-over-by-now", 10);
+      clock.advanceMinutes(10);
+
+      await submitAndAssign(box, requester, "req-across-ended", "primary", {
+        period: {
+          kind: { case: "scheduled", value: { start: minutesIn(5), end: minutesIn(30) } },
+        },
+      });
+
+      expect(await statusOf(requester, "req-across-ended")).toBe(AccessRequestStatus.PENDING);
+    });
+
+    it("reject a request for a resource whose access awaits an extension ('RequestAlreadyPending')", async () => {
+      const box = await resourcesBlackBox(testClock());
+      const requester = await givenPendingExtension(box, "req-being-extended", "ext-awaiting");
+
+      await expectRejection(box, requester, RequestAlreadyPendingSchema, () =>
+        requester.post(
+          SubmitAccessRequestSchema,
+          submitRequest("req-beside-extension", {
+            period: {
+              kind: { case: "scheduled", value: { start: minutesIn(12), end: minutesIn(20) } },
+            },
+          }),
+        ),
+      );
     });
 
     it("submit when the requester is the resource's sole manager", async () => {

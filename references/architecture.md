@@ -276,7 +276,9 @@ An extension:
   independent duration per extension, checked when the extension is submitted.
 
 When a grant is revoked, its pending extension tasks leave the pending-task
-projection. Immutable facts remain in history.
+projection. The projection also retains the revoked grant identifier so a
+late-arriving extension submission cannot recreate its task. Immutable facts
+remain in history.
 
 ## Time semantics
 

@@ -19,6 +19,7 @@ import { PersonIdSchema } from "@access-desk/identity-model/generated/accessdesk
 import { ResourceIdSchema } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
 import { SubmitAccessExtensionRequestSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/commands_pb.js";
 import {
+  CreateAccessGrantSchema,
   ExtendAccessGrantSchema,
   RevokeAccessGrantSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/commands_pb.js";
@@ -157,6 +158,30 @@ export function revokeGrant(box: BlackBox, id: string, manager: string, reason: 
       grant: { uuid: id },
       manager: { uuid: manager },
       reason,
+    }),
+  );
+}
+
+/**
+ * Posts `CreateAccessGrant` directly, as an approved first-time request does,
+ * for read access over `[start, end)` minutes into the test.
+ */
+export function postCreateAccessGrant(
+  scope: BlackBoxScope,
+  id: string,
+  start: number,
+  end: number,
+) {
+  return scope.post(
+    CreateAccessGrantSchema,
+    create(CreateAccessGrantSchema, {
+      id: requesterAccess,
+      grant: { uuid: id },
+      request: { uuid: id },
+      accessLevel: { name: "Read", rank: 1 },
+      start: minutesIn(start),
+      end: minutesIn(end),
+      manager: [{ uuid: "primary" }],
     }),
   );
 }

@@ -159,6 +159,7 @@ export class AccessRequestProcessManager extends ProcessManager<
     if (requested === undefined || compare(requested.start, requested.end) >= 0) {
       throw new Error("Requested access must end after it begins.");
     }
+    this.assertUnclaimed();
     const policy = await this.requestablePolicy(id, resource);
     const level = this.matchLevel(id, policy, accessLevel);
     await this.assertNoDuplicate(id, requester, resource);
@@ -201,6 +202,7 @@ export class AccessRequestProcessManager extends ProcessManager<
     if (!longerThan(duration, NO_TIME)) {
       throw new Error("An extension must add time to the access.");
     }
+    this.assertUnclaimed();
     const policy = await this.requestablePolicy(id, resource);
     await this.assertNoDuplicate(id, requester, resource, grant);
     const manager = this.managers(policy);
@@ -615,6 +617,16 @@ export class AccessRequestProcessManager extends ProcessManager<
     }
   }
 
+  /** Refuses a request identifier that already names a request lifecycle. */
+  private assertUnclaimed(): void {
+    if (
+      this.state.status !== AccessRequestStatus.ARS_UNSPECIFIED ||
+      this.state.snapshot !== undefined
+    ) {
+      throw new Error("A request identifier names only one request.");
+    }
+  }
+
   /** The resource managers who may decide the request, deduplicated in policy order. */
   private managers(policy: ResourcePolicy): PersonId[] {
     const managers: PersonId[] = [];
@@ -629,7 +641,15 @@ export class AccessRequestProcessManager extends ProcessManager<
     return managers;
   }
 
-  /** Whether an equivalent request from the same requester is already pending. */
+  /**
+   * Whether a conflicting request from the same requester is already pending.
+   *
+   * 1. A pending first-time request for the resource conflicts with any other
+   *    request for it.
+   * 2. A pending extension request conflicts with a first-time request for the
+   *    resource its grant gives access to, and with another extension of the
+   *    same grant.
+   */
   private async hasPendingRequest(
     requester: PersonId,
     resource: ResourceId,
@@ -652,9 +672,11 @@ export class AccessRequestProcessManager extends ProcessManager<
         const requested = snapshot.kind.value.resource;
         return requested !== undefined && equals(ResourceIdSchema, requested, resource);
       }
-      if (snapshot.kind.case === "extension" && grant !== undefined) {
-        const extended = snapshot.kind.value.grant;
-        return extended !== undefined && equals(AccessGrantIdSchema, extended, grant);
+      if (snapshot.kind.case === "extension") {
+        const { grant: extended, resource: extendedOn } = snapshot.kind.value;
+        return grant === undefined
+          ? extendedOn !== undefined && equals(ResourceIdSchema, extendedOn, resource)
+          : extended !== undefined && equals(AccessGrantIdSchema, extended, grant);
       }
       return false;
     });
