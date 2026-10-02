@@ -15,6 +15,7 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { type BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
 import { AccessRequestStatus } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
+import { SubmitAccessExtensionRequestSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/commands_pb.js";
 import {
   actor,
   closeResourcesBlackBoxes,
@@ -30,8 +31,9 @@ import {
   seed,
   statusOf,
   submitAndAssign,
+  submitExtensionRequest,
 } from "./given/access-request.js";
-import { minutesIn, testClock } from "../grant/given/access-grant.js";
+import { givenActiveGrant, minutesIn, testClock } from "../grant/given/access-grant.js";
 
 // The view reacts to the request's own lifecycle facts, produced here through
 // the real submission-and-decision path.
@@ -86,6 +88,25 @@ describe("AccessRequestViewProjection should", () => {
     const row = (await readRequests(requester)).find((r) => r.id?.uuid === "view-approved");
     expect(row?.decidedBy?.uuid).toBe("primary");
     expect(row?.whenDecided).toEqual(minutesIn(5));
+  });
+
+  it("on 'AccessRequestApprovalFailed' move the request to approval failed", async () => {
+    const clock = testClock();
+    const box = await resourcesBlackBox(clock);
+    const requester = await givenActiveGrant(box, "view-grant", 10);
+    await requester.post(
+      SubmitAccessExtensionRequestSchema,
+      submitExtensionRequest("view-failed", { grant: { uuid: "view-grant" } }),
+    );
+    await awaitStatus(box, requester, "view-failed", AccessRequestStatus.PENDING);
+    clock.advanceMinutes(10);
+
+    await approveAccessRequest(box, "view-failed", "primary");
+
+    await awaitStatus(box, requester, "view-failed", AccessRequestStatus.APPROVAL_FAILED);
+    const row = (await readRequests(requester)).find((r) => r.id?.uuid === "view-failed");
+    expect(row?.decidedBy?.uuid).toBe("primary");
+    expect(row?.whenDecided).toEqual(minutesIn(10));
   });
 
   it("on 'AccessRequestDenied' move the request to denied, recording who denied it and when", async () => {

@@ -41,7 +41,7 @@ import {
 beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
 
-describe("AccessGrantProcessManager should", () => {
+describe("AccessGrantAggregate should", () => {
   it("issue active access on approval", async () => {
     const clock = testClock();
     const box = await resourcesBlackBox(clock);

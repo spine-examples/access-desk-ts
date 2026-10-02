@@ -39,6 +39,12 @@ message AccessRequest {
 
     // The request status.
     accessdesk.resources.AccessRequestStatus status = 4;
+
+    // The manager who approved or denied the request.
+    accessdesk.identity.PersonId decided_by = 5;
+
+    // When the request was approved or denied.
+    google.protobuf.Timestamp when_decided = 6;
 }
 
 // An access request and its current status.

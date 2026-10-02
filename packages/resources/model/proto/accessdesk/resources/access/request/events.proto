@@ -50,6 +50,25 @@ message AccessExtensionRequestSubmitted {
     repeated accessdesk.identity.PersonId manager = 3 [(required) = true];
 }
 
+// A manager approved a request, and the access it asks for is to be granted.
+message AccessRequestApprovalRequested {
+
+    // The request the manager approved.
+    accessdesk.resources.AccessRequestId id = 1 [(required) = true];
+
+    // The request details.
+    accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
+
+    // The manager who approved the request.
+    accessdesk.identity.PersonId decided_by = 3 [(required) = true];
+
+    // When the manager approved the request.
+    google.protobuf.Timestamp when_decided = 4 [(required) = true];
+
+    // The managers responsible for the request.
+    repeated accessdesk.identity.PersonId manager = 5 [(required) = true];
+}
+
 // A request was approved.
 message AccessRequestApproved {
 
@@ -63,6 +82,26 @@ message AccessRequestApproved {
     accessdesk.identity.PersonId decided_by = 3 [(required) = true];
 
     // When the request was approved.
+    google.protobuf.Timestamp when_decided = 4 [(required) = true];
+
+    // The managers responsible for the request.
+    repeated accessdesk.identity.PersonId manager = 5 [(required) = true];
+}
+
+// A manager approved an extension request, but the grant it would extend gave
+// no access by then.
+message AccessRequestApprovalFailed {
+
+    // The request whose approval failed.
+    accessdesk.resources.AccessRequestId id = 1 [(required) = true];
+
+    // The request details.
+    accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
+
+    // The manager who approved the request.
+    accessdesk.identity.PersonId decided_by = 3 [(required) = true];
+
+    // When the manager approved the request.
     google.protobuf.Timestamp when_decided = 4 [(required) = true];
 
     // The managers responsible for the request.

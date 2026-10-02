@@ -22,6 +22,7 @@ import type { AccessRequestId } from "@access-desk/resources-model/generated/acc
 import type { PersonId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import type {
   AccessExtensionRequestSubmitted,
+  AccessRequestApprovalFailed,
   AccessRequestApproved,
   AccessRequestCanceled,
   AccessRequestDenied,
@@ -52,6 +53,12 @@ export class AccessRequestViewProjection extends Projection<
   @Subscribe
   onAccessRequestApproved(event: AccessRequestApproved): void {
     this.settle(AccessRequestStatus.APPROVED, event.snapshot, event);
+  }
+
+  /** Records a failed approval as the request's terminal outcome, with who approved it and when. */
+  @Subscribe
+  onAccessRequestApprovalFailed(event: AccessRequestApprovalFailed): void {
+    this.settle(AccessRequestStatus.APPROVAL_FAILED, event.snapshot, event);
   }
 
   /** Records a denied request as its terminal outcome, with who denied it and when. */

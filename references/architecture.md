@@ -216,10 +216,24 @@ time, so only the first is accepted and the others are refused with
 
 ## Request and grant lifecycles
 
-Requests and grants are separate lifecycles. Approval records a decision, and
-the approval creates or extends the grant.
+Requests and grants are separate lifecycles. The request is a process, and the
+grant is an aggregate that reads nothing but its own state.
 
-Required request outcomes are pending, approved, denied, and canceled.
+A manager's approval takes effect on the grant before the request counts as
+approved:
+
+1. The manager approves a pending request.
+2. A first-time request asks for its grant to be created, and an extension
+   request asks for the grant it names to be extended.
+3. Once the grant is created or extended, the request is approved.
+4. When the grant to extend gives no access, the grant refuses with
+   `AccessGrantNotActive`, the approval fails, and the request ends without
+   effect.
+
+While the grant is asked, the request accepts no other decision.
+
+Request statuses are pending, approval requested, approved, approval failed,
+denied, and canceled.
 
 A grant has no lifecycle of its own beyond its revocation. It holds the person,
 resource, and access level it gives access for, its period `[start, end)`, and
@@ -229,10 +243,13 @@ grant, the system checks against the current time whether the grant gives
 access at that moment.
 
 Any manager of the granting resource may revoke it, with a reason, until its
-end, whether its period has begun or not. The grant stores the request that
-issued it and each extension request that moved its end, so who approved the
-access is read from those requests. Revocation authority is
-scoped to that resource, not the organization.
+end, whether its period has begun or not. The managers are those of the
+approved request, which the grant keeps from its creation. The grant keeps only
+what it decides by: the access, its period, those managers, and whether it was
+revoked. Its read model shows the request that issued it and each extension
+request that moved its end, so who approved the access is read from those
+requests. Revocation authority is scoped to that resource, not the
+organization.
 
 An extension:
 
@@ -241,7 +258,7 @@ An extension:
   would have, and changes no other grant field;
 - requires a separate approval task and decision;
 - is capped by the resource's maximum **total grant lifetime**, not an
-  independent duration per extension.
+  independent duration per extension, checked when the extension is submitted.
 
 When a grant is revoked, its pending extension tasks leave the pending-task
 projection. Immutable facts remain in history.

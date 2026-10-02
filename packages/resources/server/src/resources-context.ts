@@ -13,6 +13,8 @@
  */
 
 import { create } from "@bufbuild/protobuf";
+import { anyIs, anyUnpack } from "@bufbuild/protobuf/wkt";
+import type { EventContext } from "@spine-event-engine/proto";
 import { BoundedContext, type Clock, EventRouting, SystemClock } from "@spine-event-engine/server";
 import { ResourceAddedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
 import { ResourceDeletedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/events_pb.js";
@@ -20,16 +22,15 @@ import { ResourceAlreadyExistsSchema } from "@access-desk/resources-model/genera
 import { OrganizationResourceNameAlreadyUsedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/rejections_pb.js";
 import {
   AccessExtensionRequestSubmittedSchema,
+  AccessRequestApprovalFailedSchema,
   AccessRequestApprovedSchema,
   AccessRequestCanceledSchema,
   AccessRequestDeniedSchema,
   AccessRequestSubmittedSchema,
-  type AccessRequestApproved,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
 import {
-  AccessGrantIdSchema,
   GrantCoverageIdSchema,
-  type AccessGrantId,
+  type AccessRequestId,
   type GrantCoverageId,
   type ResourceId,
 } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
@@ -39,6 +40,8 @@ import {
   AccessGrantExtendedSchema,
   AccessGrantRevokedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
+import { ExtendAccessGrantSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/commands_pb.js";
+import { AccessGrantNotActiveSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/rejections_pb.js";
 import { type PersonId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { OrganizationAggregate } from "./organization/organization-aggregate.js";
 import { OrganizationViewProjection } from "./organization/organization-view-projection.js";
@@ -48,7 +51,7 @@ import { ResourceRegistrationProcessManager } from "./resource/resource-registra
 import { AccessRequestProcessManager } from "./access/request/access-request-process.js";
 import { AccessRequestViewProjection } from "./access/request/access-request-view-projection.js";
 import { AccessDecisionAssignmentProjection } from "./access/request/access-decision-assignment-projection.js";
-import { AccessGrantProcessManager } from "./access/grant/access-grant-process.js";
+import { AccessGrantAggregate } from "./access/grant/access-grant-aggregate.js";
 import { GrantCoverageProjection } from "./access/grant/grant-coverage-projection.js";
 import { AccessGrantViewProjection } from "./access/grant/access-grant-view-projection.js";
 import { useClock } from "./time/clock.js";
@@ -92,13 +95,14 @@ export async function createResourcesContext(
     .route(AccessRequestSubmittedSchema, (event) => event.manager)
     .route(AccessExtensionRequestSubmittedSchema, (event) => event.manager)
     .route(AccessRequestApprovedSchema, (event) => event.manager)
+    .route(AccessRequestApprovalFailedSchema, (event) => event.manager)
     .route(AccessRequestDeniedSchema, (event) => event.manager)
     .route(AccessRequestCanceledSchema, (event) => event.manager)
     .route(AccessGrantRevokedSchema, (event) => event.manager);
-  const grantRouting = EventRouting.create<AccessGrantId>().route(
-    AccessRequestApprovedSchema,
-    (event) => grantIssuedBy(event),
-  );
+  const requestRouting = EventRouting.create<AccessRequestId>()
+    .route(AccessGrantCreatedSchema, (event) => requestOf(event))
+    .route(AccessGrantExtendedSchema, (event) => requestOf(event))
+    .route(AccessGrantNotActiveSchema, (_rejection, context) => requestOfRefusedExtension(context));
   const coverageRouting = EventRouting.create<GrantCoverageId>()
     .route(AccessGrantCreatedSchema, (event) => coverageOf(event.access))
     .route(AccessGrantExtendedSchema, (event) => coverageOf(event.access))
@@ -110,27 +114,36 @@ export async function createResourcesContext(
     .add(ResourceRegistrationProcessManager, { eventRouting: resourceRegistrationProcmanRouting })
     .add(ResourceAggregate)
     .add(ResourceCatalogProjection)
-    .add(AccessRequestProcessManager)
+    .add(AccessRequestProcessManager, { eventRouting: requestRouting })
     .add(AccessRequestViewProjection)
     .add(AccessDecisionAssignmentProjection, { eventRouting: decisionRouting })
-    .add(AccessGrantProcessManager, { eventRouting: grantRouting })
+    .add(AccessGrantAggregate)
     .add(GrantCoverageProjection, { eventRouting: coverageRouting })
     .add(AccessGrantViewProjection);
   return builder.buildAsync();
 }
 
 /**
- * The grant an approved request issues or extends.
+ * The approved request a grant answers, when it answers one.
  *
- * A grant shares its identifier with the first-time request that issued it;
- * an extension request applies to the grant it names.
+ * A grant answers the request that asked it to be created or extended.
  */
-function grantIssuedBy(approval: AccessRequestApproved): AccessGrantId[] {
-  const kind = approval.snapshot?.kind;
-  if (kind?.case === "extension") {
-    return kind.value.grant === undefined ? [] : [kind.value.grant];
+function requestOf(answer: { readonly request?: AccessRequestId | undefined }): AccessRequestId[] {
+  return answer.request === undefined ? [] : [answer.request];
+}
+
+/**
+ * The approved extension request whose extension a grant refused.
+ *
+ * The request is the one named by the refused `ExtendAccessGrant`. A refusal of
+ * anything else, such as a revocation, answers no request.
+ */
+function requestOfRefusedExtension(context: EventContext): AccessRequestId[] {
+  const refused = context.rejection?.command?.message;
+  if (refused === undefined || !anyIs(refused, ExtendAccessGrantSchema)) {
+    return [];
   }
-  return approval.id === undefined ? [] : [create(AccessGrantIdSchema, { uuid: approval.id.uuid })];
+  return requestOf(anyUnpack(refused, ExtendAccessGrantSchema) ?? {});
 }
 
 /** The coverage of the person and resource a grant applies to. */

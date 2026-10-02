@@ -28,6 +28,7 @@ import type { AccessRequestSnapshot } from "@access-desk/resources-model/generat
 import type { PersonId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import type {
   AccessExtensionRequestSubmitted,
+  AccessRequestApprovalFailed,
   AccessRequestApproved,
   AccessRequestCanceled,
   AccessRequestDenied,
@@ -58,6 +59,12 @@ export class AccessDecisionAssignmentProjection extends Projection<
   /** Clears an approved request from this manager's decision queue. */
   @Subscribe
   onAccessRequestApproved(event: AccessRequestApproved): void {
+    this.close(event.id);
+  }
+
+  /** Clears a request whose approval failed from this manager's decision queue. */
+  @Subscribe
+  onAccessRequestApprovalFailed(event: AccessRequestApprovalFailed): void {
     this.close(event.id);
   }
 

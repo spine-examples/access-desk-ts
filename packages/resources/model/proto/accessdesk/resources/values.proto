@@ -109,6 +109,13 @@ enum AccessRequestStatus {
 
     // The requester canceled the request.
     CANCELED = 4;
+
+    // A manager approved the request, and the access it asks for is being
+    // granted.
+    APPROVAL_REQUESTED = 5;
+
+    // A manager approved the request, but the access could not be granted.
+    APPROVAL_FAILED = 6;
 }
 
 // A scheduled half-open access interval.

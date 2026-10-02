@@ -118,6 +118,24 @@ describe("AccessDecisionAssignmentProjection should", () => {
     });
   });
 
+  describe("on 'AccessRequestApprovalFailed'", () => {
+    it("remove an extension whose grant gave no access by the approval", async () => {
+      const clock = testClock();
+      const box = await resourcesBlackBox(clock);
+      const requester = await givenActiveGrant(box, "req-ended", 10);
+      await requester.post(
+        SubmitAccessExtensionRequestSchema,
+        submitExtensionRequest("ext-ended", { grant: { uuid: "req-ended" } }),
+      );
+      await awaitTask(box, "primary", "ext-ended", true);
+      clock.advanceMinutes(10);
+
+      await approveAccessRequest(box, "ext-ended", "primary");
+
+      await awaitTask(box, "primary", "ext-ended", false);
+    });
+  });
+
   describe("on 'AccessGrantRevoked'", () => {
     it("remove a pending extension of the revoked grant, which can no longer take effect", async () => {
       const box = await resourcesBlackBox(testClock());

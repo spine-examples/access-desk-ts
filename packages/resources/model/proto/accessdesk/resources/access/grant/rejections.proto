@@ -28,13 +28,6 @@ message AccessGrantNotActive {
     accessdesk.resources.AccessGrantId id = 1 [(required) = true];
 }
 
-// The extension would make the access last longer, in total, than the resource
-// permits.
-message AccessGrantLifetimeExceeded {
-
-    accessdesk.resources.AccessGrantId id = 1 [(required) = true];
-}
-
 // The person is not a manager of the resource the grant applies to.
 message NotResourceManager {
 
