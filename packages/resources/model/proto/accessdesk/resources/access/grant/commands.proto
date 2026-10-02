@@ -25,46 +25,44 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
-// Checks the access a first-time request asks for against the access the
-// requester already holds, without granting it.
+// Checks whether the requested access may be granted.
 message CheckRequestedAccess {
 
     // The requester, and the resource the requested access applies to.
     accessdesk.resources.ResourceAccessId id = 1;
 
-    // The request that asks for the access.
+    // The request being checked.
     accessdesk.resources.AccessRequestId request = 2 [(required) = true];
 
-    // The access level asked for.
+    // The requested access level.
     accessdesk.resources.AccessLevel access_level = 3 [(required) = true, (validate) = true];
 
-    // The inclusive start of the access asked for.
+    // The inclusive start of the requested access.
     google.protobuf.Timestamp start = 4 [(required) = true];
 
-    // The exclusive end of the access asked for.
+    // The exclusive end of the requested access.
     google.protobuf.Timestamp end = 5 [(required) = true];
 
-    // The longest access, in total, the resource permits.
+    // The longest access the resource permits.
     google.protobuf.Duration maximum_duration = 6 [(required) = true];
 }
 
-// Checks the extension a request asks for against the grant it would extend
-// and the access the requester already holds, without extending the grant.
+// Checks whether a grant may be extended as requested.
 message CheckRequestedExtension {
 
     // The requester, and the resource the grant gives access to.
     accessdesk.resources.ResourceAccessId id = 1;
 
-    // The grant the extension would apply to.
+    // The grant to extend.
     accessdesk.resources.AccessGrantId grant = 2 [(required) = true];
 
-    // The request that asks for the extension.
+    // The request being checked.
     accessdesk.resources.AccessRequestId request = 3 [(required) = true];
 
-    // The time the extension would add to the grant's end.
+    // The time to add to the grant's end.
     google.protobuf.Duration duration = 4 [(required) = true];
 
-    // The longest access, in total, the resource permits.
+    // The longest access the resource permits.
     google.protobuf.Duration maximum_duration = 5 [(required) = true];
 }
 

@@ -16,6 +16,7 @@ syntax = "proto3";
 
 package accessdesk.resources.access.request;
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "accessdesk/resources/identifiers.proto";
 import "accessdesk/resources/values.proto";
@@ -49,6 +50,9 @@ message AccessExtensionRequestSubmissionStarted {
 
     // The extension request the requester submitted.
     accessdesk.resources.AccessRequestId id = 1 [(required) = true];
+
+    // The time the request asks to add to the grant's end.
+    google.protobuf.Duration duration = 2 [(required) = true];
 }
 
 // A requester submitted an extension request, but its grant may not be
@@ -116,14 +120,8 @@ message AccessRequestApproved {
     // The request details.
     accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
 
-    // The manager who approved the request.
-    accessdesk.identity.PersonId decided_by = 3 [(required) = true];
-
-    // When the request was approved.
-    google.protobuf.Timestamp when_decided = 4 [(required) = true];
-
     // The managers responsible for the request.
-    repeated accessdesk.identity.PersonId manager = 5 [(required) = true];
+    repeated accessdesk.identity.PersonId manager = 3 [(required) = true];
 }
 
 // A manager approved an extension request, but the grant it would extend gave
@@ -136,14 +134,8 @@ message AccessRequestApprovalFailed {
     // The request details.
     accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
 
-    // The manager who approved the request.
-    accessdesk.identity.PersonId decided_by = 3 [(required) = true];
-
-    // When the manager approved the request.
-    google.protobuf.Timestamp when_decided = 4 [(required) = true];
-
     // The managers responsible for the request.
-    repeated accessdesk.identity.PersonId manager = 5 [(required) = true];
+    repeated accessdesk.identity.PersonId manager = 3 [(required) = true];
 }
 
 // A request was denied for a business reason.

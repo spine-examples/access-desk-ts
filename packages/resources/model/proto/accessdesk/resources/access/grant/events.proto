@@ -24,8 +24,7 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
-// The access a first-time request asks for was checked against the access the
-// requester already holds, and may be granted.
+// The requested access was checked and may be granted.
 message RequestedAccessChecked {
 
     // The requester, and the resource the requested access applies to.
@@ -35,8 +34,7 @@ message RequestedAccessChecked {
     accessdesk.resources.AccessRequestId request = 2 [(required) = true];
 }
 
-// The extension a request asks for was checked against the grant it would
-// extend and the access the requester already holds, and may be granted.
+// The requested extension was checked and may be granted.
 message RequestedExtensionChecked {
 
     // The requester, and the resource the grant gives access to.

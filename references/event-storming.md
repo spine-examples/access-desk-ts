@@ -79,9 +79,10 @@ grant.
 Projection inputs and outputs drawn on the board:
 
 - **Access Request View** receives Access Request Submitted, Access Extension
-  Request Submitted, Access Request Approved, Access Request Approval Failed,
-  Access Request Denied, and Access Request Canceled — the requester's read
-  model of each request and its status.
+  Request Submitted, Access Request Approval Started, Access Request Approved,
+  Access Request Approval Failed, Access Request Denied, and Access Request
+  Canceled — the requester's read model of each request and its status. It
+  takes who approved a request, and when, from Access Request Approval Started.
 - **Access Decision Assignment** receives Access Request Submitted, Access
   Extension Request Submitted, Access Request Approved, Access Request Approval
   Failed, Access Request Denied, and Access Request Canceled; it also receives

@@ -23,6 +23,7 @@ import type { PersonId } from "@access-desk/identity-model/generated/accessdesk/
 import type {
   AccessExtensionRequestSubmitted,
   AccessRequestApprovalFailed,
+  AccessRequestApprovalStarted,
   AccessRequestApproved,
   AccessRequestCanceled,
   AccessRequestDenied,
@@ -49,16 +50,25 @@ export class AccessRequestViewProjection extends Projection<
     this.seedPending(event.snapshot, event.manager);
   }
 
-  /** Records an approved request as its terminal outcome, with who approved it and when. */
+  /** Records who approved the request and when, while its access is being granted. */
   @Subscribe
-  onAccessRequestApproved(event: AccessRequestApproved): void {
-    this.settle(AccessRequestStatus.APPROVED, event.snapshot, event);
+  onAccessRequestApprovalStarted(event: AccessRequestApprovalStarted): void {
+    this.update((draft) => {
+      draft.decidedBy = event.decidedBy;
+      draft.whenDecided = event.whenDecided;
+    });
   }
 
-  /** Records a failed approval as the request's terminal outcome, with who approved it and when. */
+  /** Records an approved request as its terminal outcome. */
+  @Subscribe
+  onAccessRequestApproved(event: AccessRequestApproved): void {
+    this.settle(AccessRequestStatus.APPROVED, event.snapshot);
+  }
+
+  /** Records a failed approval as the request's terminal outcome. */
   @Subscribe
   onAccessRequestApprovalFailed(event: AccessRequestApprovalFailed): void {
-    this.settle(AccessRequestStatus.APPROVAL_FAILED, event.snapshot, event);
+    this.settle(AccessRequestStatus.APPROVAL_FAILED, event.snapshot);
   }
 
   /** Records a denied request as its terminal outcome, with who denied it and when. */
@@ -108,4 +118,4 @@ export class AccessRequestViewProjection extends Projection<
 }
 
 /** Who approved or denied a request, and when. */
-type Decision = Pick<AccessRequestApproved | AccessRequestDenied, "decidedBy" | "whenDecided">;
+type Decision = Pick<AccessRequestDenied, "decidedBy" | "whenDecided">;

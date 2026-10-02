@@ -649,7 +649,7 @@ describe("AccessRequestProcessManager should", () => {
   });
 
   describe("handle 'ApproveAccessRequest', and", () => {
-    it("emit 'AccessRequestApproved' recording the deciding manager and the time", async () => {
+    it("emit 'AccessRequestApproved' once the grant is created", async () => {
       const clock = testClock();
       const box = await resourcesBlackBox(clock);
       const requester = await givenPending(box, "req-approve");
@@ -663,8 +663,6 @@ describe("AccessRequestProcessManager should", () => {
           box,
           (approvedEvent) => approvedEvent.id?.uuid === "req-approve",
         );
-        expect(event.decidedBy?.uuid).toBe("primary");
-        expect(event.whenDecided).toEqual(minutesIn(5));
         expect(event.manager.map((manager) => manager.uuid)).toEqual(["primary"]);
         expect(event.snapshot?.requester?.uuid).toBe(actor);
       } finally {
@@ -723,7 +721,7 @@ describe("AccessRequestProcessManager should", () => {
         await approveAccessRequest(box, "ext-too-late", "primary");
 
         const event = await failed.waitFor(box, (e) => e.id?.uuid === "ext-too-late");
-        expect(event.decidedBy?.uuid).toBe("primary");
+        expect(event.manager.map((manager) => manager.uuid)).toEqual(["primary"]);
         await box.eventually(
           () => statusOf(requester, "ext-too-late"),
           (status) => status === AccessRequestStatus.APPROVAL_FAILED,

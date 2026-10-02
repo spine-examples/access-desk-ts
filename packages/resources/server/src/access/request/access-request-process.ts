@@ -211,8 +211,8 @@ export class AccessRequestProcessManager extends ProcessManager<
       justification: command.justification,
       kind: { case: "extension", value: { grant, resource } },
     });
-    this.store(snapshot, manager, duration);
-    return create(AccessExtensionRequestSubmissionStartedSchema, { id });
+    this.store(snapshot, manager);
+    return create(AccessExtensionRequestSubmissionStartedSchema, { id, duration });
   }
 
   /**
@@ -249,7 +249,7 @@ export class AccessRequestProcessManager extends ProcessManager<
    */
   @Command
   async onAccessExtensionRequestSubmissionStarted(
-    _event: AccessExtensionRequestSubmissionStarted,
+    event: AccessExtensionRequestSubmissionStarted,
   ): Promise<CheckRequestedExtension> {
     const snapshot = this.requireSnapshot();
     if (snapshot.kind.case !== "extension") {
@@ -260,7 +260,7 @@ export class AccessRequestProcessManager extends ProcessManager<
       id: { grantee: snapshot.requester, resource },
       grant,
       request: this.id,
-      duration: this.state.extensionDuration,
+      duration: event.duration,
       maximumDuration: await this.maximumDuration(resource),
     });
   }
@@ -330,8 +330,6 @@ export class AccessRequestProcessManager extends ProcessManager<
     const whenDecided = now();
     this.update((draft) => {
       draft.status = AccessRequestStatus.APPROVAL_STARTED;
-      draft.decidedBy = decidedBy;
-      draft.whenDecided = whenDecided;
     });
     return create(AccessRequestApprovalStartedSchema, {
       id: this.id,
@@ -477,15 +475,13 @@ export class AccessRequestProcessManager extends ProcessManager<
 
   /** The request's approval, now that its grant was created or extended. */
   private approved(): AccessRequestApproved {
-    const { snapshot, decidedBy, whenDecided } = this.requireApprovalStarted();
+    const snapshot = this.requireApprovalStarted();
     this.update((draft) => {
       draft.status = AccessRequestStatus.APPROVED;
     });
     return create(AccessRequestApprovedSchema, {
       id: this.id,
       snapshot,
-      decidedBy,
-      whenDecided,
       manager: this.state.manager,
     });
   }
@@ -498,15 +494,13 @@ export class AccessRequestProcessManager extends ProcessManager<
     if (this.state.status === AccessRequestStatus.SUBMISSION_STARTED) {
       return this.submissionFailed();
     }
-    const { snapshot, decidedBy, whenDecided } = this.requireApprovalStarted();
+    const snapshot = this.requireApprovalStarted();
     this.update((draft) => {
       draft.status = AccessRequestStatus.APPROVAL_FAILED;
     });
     return create(AccessRequestApprovalFailedSchema, {
       id: this.id,
       snapshot,
-      decidedBy,
-      whenDecided,
       manager: this.state.manager,
     });
   }
@@ -534,35 +528,24 @@ export class AccessRequestProcessManager extends ProcessManager<
     return this.requireSnapshot();
   }
 
-  /** The request and its approval while its grant is asked to give the approval its effect. */
-  private requireApprovalStarted(): Pick<
-    AccessRequestApproved,
-    "snapshot" | "decidedBy" | "whenDecided"
-  > {
-    const { status, snapshot, decidedBy, whenDecided } = this.state;
-    if (status !== AccessRequestStatus.APPROVAL_STARTED) {
+  /** The request details while its grant is asked to give the approval its effect. */
+  private requireApprovalStarted(): AccessRequestSnapshot {
+    if (this.state.status !== AccessRequestStatus.APPROVAL_STARTED) {
       throw new Error("Only a request a manager approved is settled by its grant.");
     }
-    return { snapshot, decidedBy, whenDecided };
+    return this.requireSnapshot();
   }
 
   /**
    * Stores the request details and its manager pool while it is asked whether
-   * the access may be granted, with the time an extension request asks to add.
+   * the access may be granted.
    */
-  private store(
-    snapshot: AccessRequestSnapshot,
-    manager: readonly PersonId[],
-    extensionDuration?: Duration,
-  ): void {
+  private store(snapshot: AccessRequestSnapshot, manager: readonly PersonId[]): void {
     this.update((draft) => {
       draft.id = this.id;
       draft.snapshot = snapshot;
       draft.manager = [...manager];
       draft.status = AccessRequestStatus.SUBMISSION_STARTED;
-      if (extensionDuration !== undefined) {
-        draft.extensionDuration = extensionDuration;
-      }
     });
   }
 
