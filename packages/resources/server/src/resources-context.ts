@@ -106,13 +106,6 @@ export async function createResourcesContext(
     .route(AccessRequestDeniedSchema, (event) => event.manager)
     .route(AccessRequestCanceledSchema, (event) => event.manager)
     .route(AccessGrantRevokedSchema, (event) => event.manager);
-  const requestViewRouting = EventRouting.create<AccessRequestId>()
-    .route(AccessRequestSubmittedSchema, (event) => requestIdOf(event))
-    .route(AccessExtensionRequestSubmittedSchema, (event) => requestIdOf(event))
-    .route(AccessRequestApprovedSchema, (event) => requestIdOf(event))
-    .route(AccessRequestApprovalFailedSchema, (event) => requestIdOf(event))
-    .route(AccessRequestDeniedSchema, (event) => requestIdOf(event))
-    .route(AccessRequestCanceledSchema, (event) => requestIdOf(event));
   const requestRouting = EventRouting.create<AccessRequestId>()
     .route(RequestedAccessCheckedSchema, (event) => requestOf(event))
     .route(RequestedExtensionCheckedSchema, (event) => requestOf(event))
@@ -133,7 +126,7 @@ export async function createResourcesContext(
     .add(ResourceAggregate)
     .add(ResourceCatalogProjection)
     .add(AccessRequestProcessManager, { eventRouting: requestRouting })
-    .add(AccessRequestViewProjection, { eventRouting: requestViewRouting })
+    .add(AccessRequestViewProjection)
     .add(AccessDecisionAssignmentProjection, { eventRouting: decisionRouting })
     .add(ResourceAccessAggregate)
     .add(AccessGrantViewProjection, { eventRouting: grantViewRouting });
@@ -148,11 +141,6 @@ export async function createResourcesContext(
  */
 function requestOf(answer: { readonly request?: AccessRequestId | undefined }): AccessRequestId[] {
   return answer.request === undefined ? [] : [answer.request];
-}
-
-/** The request an event directly describes. */
-function requestIdOf(event: { readonly id?: AccessRequestId | undefined }): AccessRequestId[] {
-  return event.id === undefined ? [] : [event.id];
 }
 
 /** The commands through which a request asks something of a person's access to a resource. */
