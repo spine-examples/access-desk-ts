@@ -202,9 +202,8 @@ Submission must enforce all the following:
 
 Conflicting nonterminal requests use a duplicate-request rejection. Conflicts
 with grants that are not revoked, whether their period has begun or not, use the
-existing-access policy and a distinct business rejection. Immediate requests
-retain a duration; overlap that can only be known after an approval time is
-established must be revalidated before a grant is created.
+existing-access policy and a distinct business rejection. Access already held
+is checked when a request is submitted, not again when it is approved.
 
 Any manager captured from the resource policy may decide a pending request; no
 approver is assigned. Admission preserves policy order and removes duplicate
@@ -231,6 +230,9 @@ A submission is checked before the request is accepted, and changes no grant:
    gives no access — the submission fails and the request ends without effect.
    Otherwise the request is submitted and awaits a manager's decision.
 
+A first-time request and an extension request tell the start and the failure
+of their submission with their own facts.
+
 Grants change only after approval.
 
 A manager's approval takes effect on the grant before the request counts as
@@ -240,19 +242,17 @@ approved:
 2. A first-time request asks for its grant to be created, and an extension
    request asks for the grant it names to be extended.
 3. Once the grant is created or extended, the request is approved.
-4. When the grant to extend gives no access (`AccessGrantNotActive`), or the
-   requester has come to hold the same or stronger access since
-   (`AccessAlreadyHeld`), the approval fails and the request ends without
-   effect.
+4. When the grant to extend gives no access (`AccessGrantNotActive`), the
+   approval fails and the request ends without effect.
 
 While the grant is asked, the request accepts no other decision.
 
-Request statuses are submission requested, submission failed, pending,
-approval requested, approved, approval failed, denied, and canceled.
+Request statuses are submission started, submission failed, pending,
+approval started, approved, approval failed, denied, and canceled.
 
-A grant has no lifecycle of its own beyond its revocation. It holds the person,
-resource, and access level it gives access for, its period `[start, end)`, and
-whether a manager revoked it. The grant gives access while it is not revoked
+A grant has no lifecycle of its own beyond its revocation. It gives one person
+one access level to one resource for its period `[start, end)`. The grant gives
+access while it is not revoked
 and the current time is within its period. Whenever a request depends on the
 grant, the system checks against the current time whether the grant gives
 access at that moment.

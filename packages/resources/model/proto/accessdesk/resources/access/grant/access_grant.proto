@@ -30,8 +30,8 @@ option (type_url_prefix) = "type.accessdesk";
 // each approved extension request moves a grant's end. A manager of the
 // resource may revoke a grant before its end.
 //
-// The person never holds the same or a stronger access level through two
-// grants at the same time.
+// A request for access the person already holds at the same or a stronger
+// level is refused when it is submitted.
 //
 message ResourceAccess {
     option (entity).kind = AGGREGATE;

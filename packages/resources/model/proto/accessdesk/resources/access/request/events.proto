@@ -24,19 +24,38 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
-// A requester submitted a request, and whether its access may be granted is to
-// be checked.
-message AccessRequestSubmissionRequested {
+// A requester submitted a first-time request, and whether its access may be
+// granted is to be checked.
+message AccessRequestSubmissionStarted {
 
     // The request the requester submitted.
     accessdesk.resources.AccessRequestId id = 1 [(required) = true];
 }
 
-// A requester submitted a request, but the access it asks for may not be
-// granted, so the request ended without effect.
+// A requester submitted a first-time request, but the access it asks for may
+// not be granted, so the request ended without effect.
 message AccessRequestSubmissionFailed {
 
     // The request whose submission failed.
+    accessdesk.resources.AccessRequestId id = 1 [(required) = true];
+
+    // The person who submitted the request.
+    accessdesk.identity.PersonId requester = 2 [(required) = true];
+}
+
+// A requester submitted an extension request, and whether its grant may be
+// extended is to be checked.
+message AccessExtensionRequestSubmissionStarted {
+
+    // The extension request the requester submitted.
+    accessdesk.resources.AccessRequestId id = 1 [(required) = true];
+}
+
+// A requester submitted an extension request, but its grant may not be
+// extended as asked, so the request ended without effect.
+message AccessExtensionRequestSubmissionFailed {
+
+    // The extension request whose submission failed.
     accessdesk.resources.AccessRequestId id = 1 [(required) = true];
 
     // The person who submitted the request.
@@ -70,7 +89,7 @@ message AccessExtensionRequestSubmitted {
 }
 
 // A manager approved a request, and the access it asks for is to be granted.
-message AccessRequestApprovalRequested {
+message AccessRequestApprovalStarted {
 
     // The request the manager approved.
     accessdesk.resources.AccessRequestId id = 1 [(required) = true];
@@ -108,7 +127,7 @@ message AccessRequestApproved {
 }
 
 // A manager approved an extension request, but the grant it would extend gave
-// no access by then.
+// no access by then, so the request ended without effect.
 message AccessRequestApprovalFailed {
 
     // The request whose approval failed.

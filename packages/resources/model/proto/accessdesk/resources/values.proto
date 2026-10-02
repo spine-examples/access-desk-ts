@@ -112,14 +112,14 @@ enum AccessRequestStatus {
 
     // A manager approved the request, and the access it asks for is being
     // granted.
-    APPROVAL_REQUESTED = 5;
+    APPROVAL_STARTED = 5;
 
     // A manager approved the request, but the access could not be granted.
     APPROVAL_FAILED = 6;
 
     // The requester submitted the request, and whether the access may be granted
     // is being checked.
-    SUBMISSION_REQUESTED = 7;
+    SUBMISSION_STARTED = 7;
 
     // The requester submitted the request, but the access may not be granted.
     SUBMISSION_FAILED = 8;

@@ -75,11 +75,9 @@ import {
  * each approved extension request moves a grant's end to the end it proposed.
  * A manager of the resource may revoke a grant, with a reason, before its end.
  *
- * The person never holds the same or a stronger access level through two
- * grants at the same time. A request is checked against that when it is
- * submitted, which changes nothing here, and again when its approval creates or
- * extends a grant. Only an approved request, or a revocation, changes the
- * grants.
+ * A request for access the person already holds at the same or a stronger
+ * level is refused when it is submitted. That check changes nothing here. Only
+ * an approved request, or a revocation, changes the grants.
  *
  * Only grants that still give, or will give, access are kept. A grant that
  * ended or was revoked is forgotten.
@@ -145,7 +143,6 @@ export class ResourceAccessAggregate extends Aggregate<
 
   /** Issues a grant from an approved first-time request. */
   @Assign
-  @Throws(AccessAlreadyHeld)
   createAccessGrant(command: CreateAccessGrant): AccessGrantCreated {
     const { grant, request, accessLevel, start, end, manager } = command;
     if (
@@ -155,9 +152,6 @@ export class ResourceAccessAggregate extends Aggregate<
       compare(start, end) >= 0
     ) {
       throw new Error("An access grant must end after it starts.");
-    }
-    if (this.holds(accessLevel, { start, end })) {
-      throw AccessAlreadyHeld.create({ id: request });
     }
     const created = create(ResourceAccess_GrantSchema, { id: grant, accessLevel, start, end });
     this.update((draft) => {
@@ -178,11 +172,10 @@ export class ResourceAccessAggregate extends Aggregate<
    * Moves the end of a grant to the end an approved extension proposed.
    *
    * Only a grant that gives access now can be extended, so access revoked,
-   * ended, or not yet begun is rejected. So is an extension into time for which
-   * another grant gives the same or stronger access.
+   * ended, or not yet begun is rejected.
    */
   @Assign
-  @Throws(AccessGrantNotActive, AccessAlreadyHeld)
+  @Throws(AccessGrantNotActive)
   extendAccessGrant(command: ExtendAccessGrant): AccessGrantExtended {
     const { grant, request, end } = command;
     const held = this.activeGrant(grant);
@@ -192,9 +185,6 @@ export class ResourceAccessAggregate extends Aggregate<
     }
     if (compare(end, previousEnd) <= 0) {
       throw new Error("An approved extension moves the end of access later.");
-    }
-    if (this.holds(held.accessLevel, { start: previousEnd, end }, grant)) {
-      throw AccessAlreadyHeld.create({ id: request });
     }
     this.update((draft) => {
       draft.grant = this.grantsNotEnded().map((kept) =>

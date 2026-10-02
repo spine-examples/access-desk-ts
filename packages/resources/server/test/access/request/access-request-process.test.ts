@@ -17,9 +17,10 @@ import { create } from "@bufbuild/protobuf";
 import { type BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
 import { eventRecording } from "../../given/event-recording.js";
 import {
+  AccessExtensionRequestSubmissionFailedSchema,
   AccessExtensionRequestSubmittedSchema,
   AccessRequestApprovalFailedSchema,
-  AccessRequestApprovalRequestedSchema,
+  AccessRequestApprovalStartedSchema,
   AccessRequestApprovedSchema,
   AccessRequestDeniedSchema,
   AccessRequestSubmissionFailedSchema,
@@ -504,7 +505,7 @@ describe("AccessRequestProcessManager should", () => {
       const box = await resourcesBlackBox(clock);
       const requester = await givenActiveGrant(box, "req-over", 10);
       clock.advanceMinutes(10);
-      const failed = await recordEvents(requester, AccessRequestSubmissionFailedSchema);
+      const failed = await recordEvents(requester, AccessExtensionRequestSubmissionFailedSchema);
       try {
         await requester.post(
           SubmitAccessExtensionRequestSchema,
@@ -617,11 +618,11 @@ describe("AccessRequestProcessManager should", () => {
       }
     });
 
-    it("emit 'AccessRequestApprovalRequested' recording the deciding manager and the time", async () => {
+    it("emit 'AccessRequestApprovalStarted' recording the deciding manager and the time", async () => {
       const clock = testClock();
       const box = await resourcesBlackBox(clock);
       const requester = await givenPending(box, "req-approval-requested");
-      const requested = await recordEvents(requester, AccessRequestApprovalRequestedSchema);
+      const requested = await recordEvents(requester, AccessRequestApprovalStartedSchema);
       try {
         clock.advanceMinutes(5);
 
@@ -676,39 +677,6 @@ describe("AccessRequestProcessManager should", () => {
       } finally {
         await failed.cancel();
       }
-    });
-
-    it("fail the approval of access the requester came to hold after submitting", async () => {
-      // Held: [0, 10). Requested: [20, 30), clear of it when submitted.
-      const box = await resourcesBlackBox(testClock());
-      const requester = await givenActiveGrant(box, "req-held", 10);
-      await requester.post(
-        SubmitAccessExtensionRequestSchema,
-        submitExtensionRequest("ext-overlap", {
-          grant: { uuid: "req-held" },
-          duration: { seconds: 900n },
-        }),
-      );
-      await submitAndAssign(box, requester, "req-later", "primary", {
-        period: {
-          kind: { case: "scheduled", value: { start: minutesIn(20), end: minutesIn(30) } },
-        },
-      });
-      // The extension moves the held end to 25, into the requested period.
-      await approveAccessRequest(box, "ext-overlap", "primary");
-      await box.eventually(
-        () => statusOf(requester, "ext-overlap"),
-        (status) => status === AccessRequestStatus.APPROVED,
-      );
-
-      await expectRejection(box, requester, AccessAlreadyHeldSchema, () =>
-        approveAccessRequest(box, "req-later", "primary"),
-      );
-
-      await box.eventually(
-        () => statusOf(requester, "req-later"),
-        (status) => status === AccessRequestStatus.APPROVAL_FAILED,
-      );
     });
 
     it("fail the approval of an extension of access ended since it was submitted", async () => {
