@@ -71,11 +71,6 @@ for policy; there is no separate request-policy mirror projection.
 Submission captures managers in policy order and removes duplicates. A
 requester who is also a manager may decide the request.
 
-A request is checked against the resource's policy from the catalog first.
-What it asks for is then checked by the requester's access to the resource,
-which changes nothing there. Only an approved request creates or extends a
-grant.
-
 Projection inputs and outputs drawn on the board:
 
 - **Access Request View** receives Access Request Submitted, Access Extension
@@ -97,14 +92,6 @@ Projection inputs and outputs drawn on the board:
 | Resource Access | Access Request (PM), at approval   | Create Access Grant       | Access Grant Created        | —                                                                         |
 | Resource Access | Access Request (PM), at approval   | Extend Access Grant       | Access Grant Extended       | Access Grant Not Active                                                   |
 | Resource Access | Resource Manager                   | Revoke Access Grant       | Access Grant Revoked        | Access Grant Not Active; Not Resource Manager                             |
-
-Resource Access is the access one person holds to one resource: an array of
-grants, each with its identifier, level, and period. The two checks bring the
-longest total access the resource permits and change nothing. The grants
-change only when an approved request creates or extends one, or a manager
-revokes one. It keeps only grants that still give, or will give, access. Access
-already held at the same or a stronger level is rejected when a request is
-submitted, not when it is approved.
 
 Projection: **Access Grant View** receives Access Grant Created, Access Grant
 Extended, and Access Grant Revoked.

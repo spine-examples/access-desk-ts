@@ -250,13 +250,6 @@ While the grant is asked, the request accepts no other decision.
 Request statuses are submission started, submission failed, pending,
 approval started, approved, approval failed, denied, and canceled.
 
-A grant has no lifecycle of its own beyond its revocation. It gives one person
-one access level to one resource for its period `[start, end)`. The grant gives
-access while it is not revoked
-and the current time is within its period. Whenever a request depends on the
-grant, the system checks against the current time whether the grant gives
-access at that moment.
-
 Any manager of the granting resource may revoke it, with a reason, until its
 end, whether its period has begun or not. The managers are those of the
 approved request, which the person's access to the resource keeps. That access
