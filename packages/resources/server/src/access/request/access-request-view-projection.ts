@@ -19,7 +19,6 @@ import {
   type AccessRequestSnapshot,
 } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import type { AccessRequestId } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
-import type { PersonId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import type {
   AccessExtensionRequestSubmitted,
   AccessRequestApprovalFailed,
@@ -41,13 +40,13 @@ export class AccessRequestViewProjection extends Projection<
   /** Seeds a newly submitted first-time request as pending a decision. */
   @Subscribe
   onAccessRequestSubmitted(event: AccessRequestSubmitted): void {
-    this.seedPending(event.snapshot, event.manager);
+    this.seedPending(event.snapshot);
   }
 
   /** Seeds a newly submitted extension request as pending a decision. */
   @Subscribe
   onAccessExtensionRequestSubmitted(event: AccessExtensionRequestSubmitted): void {
-    this.seedPending(event.snapshot, event.manager);
+    this.seedPending(event.snapshot);
   }
 
   /** Records who approved the request and when, while its access is being granted. */
@@ -83,17 +82,13 @@ export class AccessRequestViewProjection extends Projection<
     this.settle(AccessRequestStatus.CANCELED, event.snapshot);
   }
 
-  private seedPending(
-    snapshot: AccessRequestSnapshot | undefined,
-    manager: readonly PersonId[],
-  ): void {
+  private seedPending(snapshot: AccessRequestSnapshot | undefined): void {
     if (snapshot === undefined) {
       return;
     }
     this.update((draft) => {
       draft.id = this.id;
       draft.snapshot = snapshot;
-      draft.manager = [...manager];
       draft.status = AccessRequestStatus.PENDING;
     });
   }

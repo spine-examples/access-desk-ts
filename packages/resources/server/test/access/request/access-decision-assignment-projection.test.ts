@@ -13,11 +13,8 @@
  */
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { create } from "@bufbuild/protobuf";
 import { type BlackBox } from "@spine-event-engine/testing";
 import { AccessDecisionAssignmentSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_pb.js";
-import { AccessExtensionRequestSubmittedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
-import { AccessRequestSnapshotSchema } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import {
   actor,
   closeResourcesBlackBoxes,
@@ -36,12 +33,7 @@ import {
 } from "./given/access-request.js";
 import { decisionTasks, managerHasTask } from "./given/access-decision-assignment.js";
 import { SubmitAccessExtensionRequestSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/commands_pb.js";
-import {
-  givenActiveGrant,
-  minutesIn,
-  revokeGrant,
-  testClock,
-} from "../grant/given/resource-access.js";
+import { givenActiveGrant, revokeGrant, testClock } from "../grant/given/resource-access.js";
 
 // The projection reacts to the request's lifecycle facts, produced here through
 // the real submission-and-decision path (the only way to create a request now).
@@ -157,34 +149,6 @@ describe("AccessDecisionAssignmentProjection should", () => {
       await revokeGrant(box, "req-revoked", "primary", "Investigation finished.");
 
       await awaitTask(box, "primary", "ext-revoked", false);
-    });
-
-    it("keep a delayed extension submission out of the queue", async () => {
-      const box = await resourcesBlackBox(testClock());
-      const requester = await givenActiveGrant(box, "req-revoked-first", 10);
-      await revokeGrant(box, "req-revoked-first", "primary", "Investigation finished.");
-
-      await requester.postEvent(
-        AccessExtensionRequestSubmittedSchema,
-        create(AccessExtensionRequestSubmittedSchema, {
-          id: { uuid: "ext-after-revocation" },
-          snapshot: create(AccessRequestSnapshotSchema, {
-            requester: { uuid: actor },
-            justification: "Need more time.",
-            kind: {
-              case: "extension",
-              value: {
-                grant: { uuid: "req-revoked-first" },
-                resource: { uuid: resourceUuid },
-                proposedEnd: minutesIn(12),
-              },
-            },
-          }),
-          manager: [{ uuid: "primary" }],
-        }),
-      );
-
-      expect(await managerHasTask(requester, "primary", "ext-after-revocation")).toBe(false);
     });
   });
 

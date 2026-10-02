@@ -32,13 +32,13 @@ message AccessRequest {
     accessdesk.resources.AccessRequestId id = 1;
 
     // The request details.
-    accessdesk.resources.AccessRequestSnapshot snapshot = 2;
+    accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
 
     // The resource managers who may decide this request.
-    repeated accessdesk.identity.PersonId manager = 3;
+    repeated accessdesk.identity.PersonId manager = 3 [(required) = true];
 
     // The request status.
-    accessdesk.resources.AccessRequestStatus status = 4;
+    accessdesk.resources.AccessRequestStatus status = 4 [(required) = true];
 }
 
 // An access request and its current status.
@@ -50,19 +50,16 @@ message AccessRequestView {
     accessdesk.resources.AccessRequestId id = 1;
 
     // The request details.
-    accessdesk.resources.AccessRequestSnapshot snapshot = 2;
-
-    // The resource managers who may decide this request.
-    repeated accessdesk.identity.PersonId manager = 3;
+    accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
 
     // The request status.
-    accessdesk.resources.AccessRequestStatus status = 4;
+    accessdesk.resources.AccessRequestStatus status = 3 [(required) = true];
 
     // The manager who approved or denied the request.
-    accessdesk.identity.PersonId decided_by = 5;
+    accessdesk.identity.PersonId decided_by = 4;
 
     // When the request was approved or denied.
-    google.protobuf.Timestamp when_decided = 6;
+    google.protobuf.Timestamp when_decided = 5;
 }
 
 // The pending access requests assigned to a manager.
@@ -75,9 +72,6 @@ message AccessDecisionAssignment {
 
     // The requests awaiting the manager's decision.
     repeated AccessDecisionTask task = 2;
-
-    // The grants whose revocation has made later extension requests irrelevant.
-    repeated accessdesk.resources.AccessGrantId revoked_grant = 3;
 
     // A request awaiting the manager's decision.
     message AccessDecisionTask {

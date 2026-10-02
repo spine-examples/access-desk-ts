@@ -66,7 +66,6 @@ describe("AccessRequestViewProjection should", () => {
     await awaitStatus(box, requester, "view-submitted", AccessRequestStatus.PENDING);
     const row = (await readRequests(requester)).find((r) => r.id?.uuid === "view-submitted");
     expect(row?.snapshot?.requester?.uuid).toBe(actor);
-    expect(row?.manager.map((m) => m.uuid)).toEqual(["primary", "second"]);
     const kind = row?.snapshot?.kind;
     expect(kind?.case).toBe("newRequest");
     if (kind?.case === "newRequest") {

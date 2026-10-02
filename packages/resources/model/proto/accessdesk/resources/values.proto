@@ -92,37 +92,38 @@ enum Sensitivity {
     CONFIDENTIAL = 3;
 }
 
-// The lifecycle outcome of an access request.
+// The lifecycle status of an access request, in the order a request passes
+// through them.
 enum AccessRequestStatus {
 
     // The unset request status.
     ARS_UNSPECIFIED = 0;
 
+    // The requester submitted the request, and whether the access may be granted
+    // is being checked.
+    SUBMISSION_STARTED = 1;
+
+    // The requester submitted the request, but the access may not be granted.
+    SUBMISSION_FAILED = 2;
+
     // The request awaits a manager's decision.
-    PENDING = 1;
-
-    // The request was approved.
-    APPROVED = 2;
-
-    // The request was denied.
-    DENIED = 3;
-
-    // The requester canceled the request.
-    CANCELED = 4;
+    PENDING = 3;
 
     // A manager approved the request, and the access it asks for is being
     // granted.
-    APPROVAL_STARTED = 5;
+    APPROVAL_STARTED = 4;
+
+    // The request was approved.
+    APPROVED = 5;
 
     // A manager approved the request, but the access could not be granted.
     APPROVAL_FAILED = 6;
 
-    // The requester submitted the request, and whether the access may be granted
-    // is being checked.
-    SUBMISSION_STARTED = 7;
+    // The request was denied.
+    DENIED = 7;
 
-    // The requester submitted the request, but the access may not be granted.
-    SUBMISSION_FAILED = 8;
+    // The requester canceled the request.
+    CANCELED = 8;
 }
 
 // A scheduled half-open access interval.

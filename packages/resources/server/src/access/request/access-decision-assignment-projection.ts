@@ -93,9 +93,6 @@ export class AccessDecisionAssignmentProjection extends Projection<
     if (request === undefined || snapshot === undefined) {
       return;
     }
-    if (this.extendsRevokedGrant(snapshot)) {
-      return;
-    }
     this.update((draft) => {
       draft.id = this.id;
       if (!draft.task.some((task) => equals(AccessRequestIdSchema, task.request, request))) {
@@ -123,10 +120,6 @@ export class AccessDecisionAssignmentProjection extends Projection<
       return;
     }
     this.update((draft) => {
-      draft.id = this.id;
-      if (!draft.revokedGrant.some((revoked) => equals(AccessGrantIdSchema, revoked, grant))) {
-        draft.revokedGrant = [...draft.revokedGrant, grant];
-      }
       draft.task = draft.task.filter((task) => {
         const kind = task.snapshot?.kind;
         return !(
@@ -134,14 +127,5 @@ export class AccessDecisionAssignmentProjection extends Projection<
         );
       });
     });
-  }
-
-  /** Whether this is an extension for access a revocation has already made irrelevant. */
-  private extendsRevokedGrant(snapshot: AccessRequestSnapshot): boolean {
-    const kind = snapshot.kind;
-    return (
-      kind.case === "extension" &&
-      this.state.revokedGrant.some((grant) => equals(AccessGrantIdSchema, grant, kind.value.grant))
-    );
   }
 }
