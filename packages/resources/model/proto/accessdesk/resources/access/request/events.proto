@@ -25,16 +25,14 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
-// A requester submitted a first-time request, and whether its access may be
-// granted is to be checked.
+// The submission of an access request started.
 message AccessRequestSubmissionStarted {
 
     // The request the requester submitted.
     accessdesk.resources.AccessRequestId id = 1 [(required) = true];
 }
 
-// A requester submitted a first-time request, but the access it asks for may
-// not be granted, so the request ended without effect.
+// The submission of an access request failed.
 message AccessRequestSubmissionFailed {
 
     // The request whose submission failed.
@@ -44,8 +42,7 @@ message AccessRequestSubmissionFailed {
     accessdesk.identity.PersonId requester = 2 [(required) = true];
 }
 
-// A requester submitted an extension request, and whether its grant may be
-// extended is to be checked.
+// The submission of an access extension request started.
 message AccessExtensionRequestSubmissionStarted {
 
     // The extension request the requester submitted.
@@ -55,8 +52,7 @@ message AccessExtensionRequestSubmissionStarted {
     google.protobuf.Duration duration = 2 [(required) = true];
 }
 
-// A requester submitted an extension request, but its grant may not be
-// extended as asked, so the request ended without effect.
+// The submission of an access extension request failed.
 message AccessExtensionRequestSubmissionFailed {
 
     // The extension request whose submission failed.
@@ -92,7 +88,7 @@ message AccessExtensionRequestSubmitted {
     repeated accessdesk.identity.PersonId manager = 3 [(required) = true];
 }
 
-// A manager approved a request, and the access it asks for is to be granted.
+// The approval of an access request started.
 message AccessRequestApprovalStarted {
 
     // The request the manager approved.
@@ -124,8 +120,7 @@ message AccessRequestApproved {
     repeated accessdesk.identity.PersonId manager = 3 [(required) = true];
 }
 
-// A manager approved an extension request, but the grant it would extend gave
-// no access by then, so the request ended without effect.
+// The approval of an access request failed.
 message AccessRequestApprovalFailed {
 
     // The request whose approval failed.

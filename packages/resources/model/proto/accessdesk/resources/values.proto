@@ -92,8 +92,7 @@ enum Sensitivity {
     CONFIDENTIAL = 3;
 }
 
-// The lifecycle status of an access request, in the order a request passes
-// through them.
+// The lifecycle status of an access request.
 enum AccessRequestStatus {
 
     // The unset request status.
