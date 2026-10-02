@@ -75,10 +75,6 @@ import {
  * each approved extension request moves a grant's end to the end it proposed.
  * A manager of the resource may revoke a grant, with a reason, before its end.
  *
- * A request for access the person already holds at the same or a stronger
- * level is refused when it is submitted. That check changes nothing here. Only
- * an approved request, or a revocation, changes the grants.
- *
  * Only grants that still give, or will give, access are kept. A grant that
  * ended or was revoked is forgotten.
  */
@@ -173,9 +169,6 @@ export class ResourceAccessAggregate extends Aggregate<
 
   /**
    * Moves the end of a grant to the end an approved extension proposed.
-   *
-   * Only a grant that gives access now can be extended, so access revoked,
-   * ended, or not yet begun is rejected.
    */
   @Assign
   @Throws(AccessGrantNotActive)
@@ -207,9 +200,6 @@ export class ResourceAccessAggregate extends Aggregate<
 
   /**
    * Ends a grant early, with a reason, on behalf of a manager of the resource.
-   *
-   * A grant may be revoked before or after it begins, until its end. A grant
-   * already revoked, or whose end has passed, is rejected.
    */
   @Assign
   @Throws(NotResourceManager, AccessGrantNotActive)

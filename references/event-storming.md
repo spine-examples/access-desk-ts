@@ -103,7 +103,7 @@ grants, each with its identifier, level, and period. The two checks bring the
 longest total access the resource permits and change nothing. The grants
 change only when an approved request creates or extends one, or a manager
 revokes one. It keeps only grants that still give, or will give, access. Access
-already held at the same or a stronger level is refused when a request is
+already held at the same or a stronger level is rejected when a request is
 submitted, not when it is approved.
 
 Projection: **Access Grant View** receives Access Grant Created, Access Grant

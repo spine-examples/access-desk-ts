@@ -74,8 +74,8 @@ import {
 const { expectRejection, recordEvents } = eventRecording(testActorContext);
 
 // Each handler is observed through the facts it emits and the rejections it
-// throws. A command the process refuses as malformed emits neither, so its
-// refusal is proven by a later command that only a refused one explains.
+// throws. A malformed command fails without emitting either, so its failure is
+// proven by a later command that only a failed one explains.
 beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
 
@@ -277,7 +277,7 @@ describe("AccessRequestProcessManager should", () => {
       );
     });
 
-    it("refuse reuse of a request identifier", async () => {
+    it("reject reuse of a request identifier", async () => {
       const box = await resourcesBlackBox();
       const requester = await givenPending(box, "req-reused");
       const submitted = await recordEvents(requester, AccessRequestSubmittedSchema);
@@ -429,7 +429,7 @@ describe("AccessRequestProcessManager should", () => {
     });
   });
 
-  describe("refuse a 'SubmitAccessRequest'", () => {
+  describe("reject a 'SubmitAccessRequest'", () => {
     it("for immediate access that does not last", async () => {
       const box = await resourcesBlackBox();
       await seed(box, [actor, "primary"]);
@@ -631,7 +631,7 @@ describe("AccessRequestProcessManager should", () => {
     });
   });
 
-  describe("refuse a 'SubmitAccessExtensionRequest'", () => {
+  describe("reject a 'SubmitAccessExtensionRequest'", () => {
     it("that adds no time to the access", async () => {
       const box = await resourcesBlackBox(testClock());
       const requester = await givenActiveGrant(box, "req-shortened", 10);

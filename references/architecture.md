@@ -210,7 +210,7 @@ approver is assigned. Admission preserves policy order and removes duplicate
 manager identifiers. A requester who is also a manager may decide their own
 request. Approval or denial is terminal and happens at most once. Denial
 requires a reason. Concurrent decisions on one request are handled one at a
-time, so only the first is accepted and the others are refused with
+time, so only the first is accepted and the others are rejected with
 `RequestAlreadyDecided`.
 
 ## Request and grant lifecycles
@@ -226,7 +226,7 @@ A submission is checked before the request is accepted, and changes no grant:
 2. The requester's access to the resource checks what the request asks for:
    the requested access, or the requested extension of a grant. Both checks
    bring the longest total access the resource permits.
-3. When the check refuses — access already held, too long, or a grant that
+3. When the check rejects — access already held, too long, or a grant that
    gives no access — the submission fails and the request ends without effect.
    Otherwise the request is submitted and awaits a manager's decision.
 

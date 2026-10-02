@@ -126,7 +126,7 @@ fires asynchronously and never reaches the post outcome. Validation errors ack
 
 **Declare every rejection a command handler may throw with `@Throws(Companion)`**
 — the generated rejection companion, e.g. `@Throws(ResourceNameAlreadyUsed)`, on
-the `@Assign`/`@Command` method. The runtime refuses an _undeclared_ thrown
+the `@Assign`/`@Command` method. The runtime rejects an _undeclared_ thrown
 rejection, so a handler's `@Throws` must list all of them. A declared rejection
 becomes a first-class produced signal, so a client can **subscribe to the
 rejection type directly**. Prove a rejection in BlackBox by subscribing to its type,
@@ -163,7 +163,7 @@ ExtendAccessGrant`), an array (`Foo[]`, `(A | B)[]`, `readonly Foo[]`), a tuple
 generated types, and `Promise<…>` of any of these. The decorator limits them:
 
 - `@Assign` returns events, and must return at least one on success. When the
-  command cannot proceed, throw: a declared rejection only when the refusal has
+  command cannot proceed, throw: a declared rejection only when the rejection has
   business meaning and can really happen (a manager revoking access that has
   already ended); a plain `Error` when only a wrongly written handler could
   cause it (a server-only command arriving in a state its issuer never sends it

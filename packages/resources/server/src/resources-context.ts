@@ -118,9 +118,9 @@ export async function createResourcesContext(
     .route(RequestedExtensionCheckedSchema, (event) => requestOf(event))
     .route(AccessGrantCreatedSchema, (event) => requestOf(event))
     .route(AccessGrantExtendedSchema, (event) => requestOf(event))
-    .route(AccessAlreadyHeldSchema, (_rejection, context) => requestRefused(context))
-    .route(AccessGrantNotActiveSchema, (_rejection, context) => requestRefused(context))
-    .route(RequestedDurationTooLongSchema, (_rejection, context) => requestRefused(context));
+    .route(AccessAlreadyHeldSchema, (_rejection, context) => requestRejected(context))
+    .route(AccessGrantNotActiveSchema, (_rejection, context) => requestRejected(context))
+    .route(RequestedDurationTooLongSchema, (_rejection, context) => requestRejected(context));
   const grantViewRouting = EventRouting.create<AccessGrantId>()
     .route(AccessGrantCreatedSchema, (event) => grantOf(event))
     .route(AccessGrantExtendedSchema, (event) => grantOf(event))
@@ -164,18 +164,18 @@ const askedByRequest = [
 ] as const;
 
 /**
- * The request whose command a person's access to a resource refused.
+ * The request whose command a person's access to a resource rejected.
  *
- * A refusal of anything a request did not ask for, such as a revocation or a
- * submission the request itself refused, answers no request.
+ * A rejection of anything a request did not ask for, such as a revocation or a
+ * submission the request itself rejected, answers no request.
  */
-function requestRefused(context: EventContext): AccessRequestId[] {
-  const refused = context.rejection?.command?.message;
+function requestRejected(context: EventContext): AccessRequestId[] {
+  const rejected = context.rejection?.command?.message;
   const asked =
-    refused === undefined ? undefined : askedByRequest.find((schema) => anyIs(refused, schema));
-  return refused === undefined || asked === undefined
+    rejected === undefined ? undefined : askedByRequest.find((schema) => anyIs(rejected, schema));
+  return rejected === undefined || asked === undefined
     ? []
-    : requestOf(anyUnpack(refused, asked) ?? {});
+    : requestOf(anyUnpack(rejected, asked) ?? {});
 }
 
 /** The grant an event tells about. */

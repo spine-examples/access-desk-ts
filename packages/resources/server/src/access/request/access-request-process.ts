@@ -118,14 +118,13 @@ const NO_TIME = create(DurationSchema, {});
  *    the managers who may decide it.
  * 2. Have the requester's access to the resource check what the request asks
  *    for: access not already held, or a grant that may be extended. That
- *    changes nothing there. When the check refuses, the submission fails.
+ *    changes nothing there. When the check rejects, the submission fails.
  * 3. Assign the accepted request to those managers for a decision.
  * 4. A manager approves or denies it, or the requester cancels it — once.
  * 5. An approval asks for the grant to take effect: a first-time request
  *    creates a grant, and an extension request extends the grant it names.
  *    Only then does the requester's access change.
- * 6. Once the grant is created or extended, the request is approved. When the
- *    grant to extend gives no access, the approval fails.
+ * 6. Once the grant is created or extended, the request is approved.
  *
  * A first-time request asks for new access; an extension request asks to keep
  * active access longer by a duration, which fixes the end it proposes.
@@ -176,8 +175,6 @@ export class AccessRequestProcessManager extends ProcessManager<
   /**
    * Validates a request to keep active access longer against the resource's
    * policy and, when it passes, has the extension checked against its grant.
-   *
-   * The requested duration must be positive.
    */
   @Assign
   @Throws(ResourceNotOpenForRequests, RequestAlreadyPending)
@@ -216,10 +213,10 @@ export class AccessRequestProcessManager extends ProcessManager<
   }
 
   /**
-   * Has the requester's access to the resource check the access a first-time
-   * request asks for, without changing that access.
+   * Sends the requested access to be checked once the submission starts.
    *
-   * The check carries the longest total access the resource permits now.
+   * The check tells whether the requester already holds this access, and
+   * whether it would last longer than the resource permits.
    */
   @Command
   async onAccessRequestSubmissionStarted(
@@ -242,10 +239,11 @@ export class AccessRequestProcessManager extends ProcessManager<
   }
 
   /**
-   * Has the requester's access to the resource check the extension a request
-   * asks for, without changing that access.
+   * Sends the requested extension to be checked once the submission starts.
    *
-   * The check carries the longest total access the resource permits now.
+   * The check tells whether the grant gives access now, whether the extended
+   * access would last longer than the resource permits, and whether the
+   * requester already holds access for the added time.
    */
   @Command
   async onAccessExtensionRequestSubmissionStarted(
@@ -381,7 +379,7 @@ export class AccessRequestProcessManager extends ProcessManager<
   onAccessGrantNotActive(
     _rejection: GrantNotActive,
   ): AccessExtensionRequestSubmissionFailed | AccessRequestApprovalFailed {
-    const outcome = this.refused();
+    const outcome = this.rejected();
     if (outcome.$typeName === AccessRequestSubmissionFailedSchema.typeName) {
       throw new Error("Only an extension request names a grant that may give no access.");
     }
@@ -487,10 +485,10 @@ export class AccessRequestProcessManager extends ProcessManager<
   }
 
   /**
-   * The request's end without effect, at the step its access was refused at:
+   * The request's end without effect, at the step its access was rejected at:
    * its submission, or its approval.
    */
-  private refused(): SubmissionFailed | AccessRequestApprovalFailed {
+  private rejected(): SubmissionFailed | AccessRequestApprovalFailed {
     if (this.state.status === AccessRequestStatus.SUBMISSION_STARTED) {
       return this.submissionFailed();
     }
@@ -600,7 +598,7 @@ export class AccessRequestProcessManager extends ProcessManager<
     }
   }
 
-  /** Refuses a request identifier that already names a request lifecycle. */
+  /** Rejects a request identifier that already names a request lifecycle. */
   private assertUnclaimed(): void {
     if (
       this.state.status !== AccessRequestStatus.ARS_UNSPECIFIED ||
