@@ -19,6 +19,8 @@ import { PersonIdSchema } from "@access-desk/identity-model/generated/accessdesk
 import { ResourceIdSchema } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
 import { SubmitAccessExtensionRequestSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/commands_pb.js";
 import {
+  CheckRequestedAccessSchema,
+  CheckRequestedExtensionSchema,
   CreateAccessGrantSchema,
   ExtendAccessGrantSchema,
   RevokeAccessGrantSchema,
@@ -63,6 +65,12 @@ export function minutesIn(minutes: number): Timestamp {
 
 /** The longest access, in total, the resources granted in these tests permit. */
 const maximumDuration = { seconds: 7200n };
+
+/** The weaker of the two access levels these tests grant. */
+export const readLevel = { name: "Read", rank: 1 };
+
+/** The stronger of the two access levels these tests grant. */
+export const writeLevel = { name: "Write", rank: 2 };
 
 /**
  * Registers the payroll resource, managed by `primary` and permitting two hours
@@ -162,15 +170,71 @@ export function revokeGrant(box: BlackBox, id: string, manager: string, reason: 
   );
 }
 
+/** The level a directly posted grant gives, and who may revoke it. */
+export interface GrantOptions {
+  readonly accessLevel?: typeof readLevel;
+  readonly manager?: readonly string[];
+}
+
+/**
+ * Posts `CheckRequestedAccess` directly, as a submitted first-time request does,
+ * for access over `[start, end)` minutes into the test to a resource that
+ * permits two hours of access.
+ */
+export function postCheckRequestedAccess(
+  scope: BlackBoxScope,
+  request: string,
+  start: number,
+  end: number,
+  accessLevel: typeof readLevel = readLevel,
+) {
+  return scope.post(
+    CheckRequestedAccessSchema,
+    create(CheckRequestedAccessSchema, {
+      id: requesterAccess,
+      request: { uuid: request },
+      accessLevel,
+      start: minutesIn(start),
+      end: minutesIn(end),
+      maximumDuration,
+    }),
+  );
+}
+
+/**
+ * Posts `CheckRequestedExtension` directly, as a submitted extension request
+ * does, adding `minutes` to a grant of a resource that permits two hours of
+ * access.
+ */
+export function postCheckRequestedExtension(
+  scope: BlackBoxScope,
+  grant: string,
+  request: string,
+  minutes: number,
+) {
+  return scope.post(
+    CheckRequestedExtensionSchema,
+    create(CheckRequestedExtensionSchema, {
+      id: requesterAccess,
+      grant: { uuid: grant },
+      request: { uuid: request },
+      duration: { seconds: BigInt(minutes * 60) },
+      maximumDuration,
+    }),
+  );
+}
+
 /**
  * Posts `CreateAccessGrant` directly, as an approved first-time request does,
- * for read access over `[start, end)` minutes into the test.
+ * for access over `[start, end)` minutes into the test. The grant gives read
+ * access and is revocable by `primary` unless told otherwise.
  */
 export function postCreateAccessGrant(
   scope: BlackBoxScope,
   id: string,
   start: number,
   end: number,
+  { accessLevel = readLevel, manager = ["primary"] }: GrantOptions = {},
 ) {
   return scope.post(
     CreateAccessGrantSchema,
@@ -178,15 +242,15 @@ export function postCreateAccessGrant(
       id: requesterAccess,
       grant: { uuid: id },
       request: { uuid: id },
-      accessLevel: { name: "Read", rank: 1 },
+      accessLevel,
       start: minutesIn(start),
       end: minutesIn(end),
-      manager: [{ uuid: "primary" }],
+      manager: manager.map((uuid) => ({ uuid })),
     }),
   );
 }
 
-/** Posts `ExtendAccessGrant` directly, as the grant itself does when an extension is approved. */
+/** Posts `ExtendAccessGrant` directly, as an approved extension request does. */
 export function postExtendAccessGrant(
   scope: BlackBoxScope,
   id: string,

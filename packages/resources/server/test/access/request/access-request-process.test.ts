@@ -26,6 +26,7 @@ import {
   AccessRequestSubmissionFailedSchema,
   AccessRequestSubmittedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
+import { AccessGrantExtendedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
 import {
   AccessAlreadyHeldSchema,
   RequestedDurationTooLongSchema,
@@ -63,9 +64,11 @@ import {
 } from "./given/access-request.js";
 import { managerHasTask } from "./given/access-decision-assignment.js";
 import {
+  approveExtension,
   awaitGrantIssued,
   awaitGrantRevoked,
   givenActiveGrant,
+  issueGrant,
   minutesIn,
   revokeGrant,
   testClock,
@@ -768,6 +771,92 @@ describe("AccessRequestProcessManager should", () => {
       await expectRejection(box, requester, RequestAlreadyDecidedSchema, () =>
         approveAccessRequest(box, "req-twice", "primary"),
       );
+    });
+  });
+
+  describe("on 'AccessRequestApprovalStarted' for a first-time request", () => {
+    it("create a grant for immediate access counted from the approval", async () => {
+      const clock = testClock();
+      const box = await resourcesBlackBox(clock);
+      const requester = box.onBehalfOf(actor);
+      await seed(box, [actor, "primary"]); // default maximumDuration is 3600s
+      await submitAndAssign(box, requester, "req-now", "primary", {
+        period: { kind: { case: "immediateDuration", value: { seconds: 600n } } },
+      });
+      clock.advanceMinutes(5);
+
+      await approveAccessRequest(box, "req-now", "primary");
+
+      const item = await awaitGrantIssued(box, requester, "req-now");
+      expect(item.start).toEqual(minutesIn(5));
+      expect(item.end).toEqual(minutesIn(15));
+      expect(item.revoked).toBe(false);
+      expect(item.request?.uuid).toBe("req-now");
+    });
+
+    it("create a grant beginning at the approval for scheduled access approved within its interval", async () => {
+      const clock = testClock();
+      const box = await resourcesBlackBox(clock);
+      const requester = box.onBehalfOf(actor);
+      await seed(box, [actor, "primary"]);
+      clock.advanceMinutes(10);
+
+      await issueGrant(box, "req-within", { start: 0, end: 30 });
+
+      const item = await awaitGrantIssued(box, requester, "req-within");
+      expect(item.start).toEqual(minutesIn(10));
+      expect(item.end).toEqual(minutesIn(30));
+    });
+
+    it("create a grant keeping the interval of scheduled access approved before it begins", async () => {
+      const box = await resourcesBlackBox(testClock());
+      const requester = box.onBehalfOf(actor);
+      await seed(box, [actor, "primary"]);
+
+      await issueGrant(box, "req-future", { start: 30, end: 90 });
+
+      const item = await awaitGrantIssued(box, requester, "req-future");
+      expect(item.start).toEqual(minutesIn(30));
+      expect(item.end).toEqual(minutesIn(90));
+    });
+
+    it("create a grant keeping the interval of scheduled access approved only after its end", async () => {
+      const clock = testClock();
+      const box = await resourcesBlackBox(clock);
+      const requester = box.onBehalfOf(actor);
+      await seed(box, [actor, "primary"]);
+      await submitAndAssign(box, requester, "req-too-late", "primary", {
+        period: {
+          kind: { case: "scheduled", value: { start: minutesIn(0), end: minutesIn(10) } },
+        },
+      });
+      clock.advanceMinutes(10);
+
+      await approveAccessRequest(box, "req-too-late", "primary");
+
+      const item = await awaitGrantIssued(box, requester, "req-too-late");
+      expect(item.start).toEqual(minutesIn(0));
+      expect(item.end).toEqual(minutesIn(10));
+    });
+  });
+
+  describe("on 'AccessRequestApprovalStarted' for an extension request", () => {
+    it("extend the grant to the end each approved extension proposed", async () => {
+      const box = await resourcesBlackBox(testClock());
+      const requester = await givenActiveGrant(box, "req-to-extend", 10);
+      const extended = await recordEvents(requester, AccessGrantExtendedSchema);
+      try {
+        await approveExtension(box, "ext-first", "req-to-extend", 10);
+        await extended.waitFor(box, (e) => e.request?.uuid === "ext-first");
+        await approveExtension(box, "ext-second", "req-to-extend", 10);
+
+        const event = await extended.waitFor(box, (e) => e.request?.uuid === "ext-second");
+        expect(event.previousEnd).toEqual(minutesIn(20));
+        expect(event.end).toEqual(minutesIn(30));
+        expect(extended.received.map((e) => e.request?.uuid)).toEqual(["ext-first", "ext-second"]);
+      } finally {
+        await extended.cancel();
+      }
     });
   });
 
