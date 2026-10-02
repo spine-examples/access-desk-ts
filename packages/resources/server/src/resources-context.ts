@@ -12,19 +12,44 @@
  * and limitations under the License.
  */
 
-import { BoundedContext, EventRouting } from "@spine-event-engine/server";
+import { anyIs, anyUnpack } from "@bufbuild/protobuf/wkt";
+import type { EventContext } from "@spine-event-engine/proto";
+import { BoundedContext, type Clock, EventRouting, SystemClock } from "@spine-event-engine/server";
 import { ResourceAddedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
 import { ResourceDeletedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/events_pb.js";
 import { ResourceAlreadyExistsSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/rejections_pb.js";
 import { OrganizationResourceNameAlreadyUsedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/rejections_pb.js";
 import {
   AccessExtensionRequestSubmittedSchema,
+  AccessRequestApprovalFailedSchema,
   AccessRequestApprovedSchema,
   AccessRequestCanceledSchema,
   AccessRequestDeniedSchema,
   AccessRequestSubmittedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
-import { type ResourceId } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
+import {
+  type AccessGrantId,
+  type AccessRequestId,
+  type ResourceId,
+} from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
+import {
+  AccessGrantCreatedSchema,
+  AccessGrantExtendedSchema,
+  AccessGrantRevokedSchema,
+  RequestedAccessCheckedSchema,
+  RequestedExtensionCheckedSchema,
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
+import {
+  CheckRequestedAccessSchema,
+  CheckRequestedExtensionSchema,
+  CreateAccessGrantSchema,
+  ExtendAccessGrantSchema,
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/commands_pb.js";
+import { AccessGrantNotActiveSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/rejections_pb.js";
+import {
+  AccessAlreadyHeldSchema,
+  RequestedDurationTooLongSchema,
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/rejections_pb.js";
 import { type PersonId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { OrganizationAggregate } from "./organization/organization-aggregate.js";
 import { OrganizationViewProjection } from "./organization/organization-view-projection.js";
@@ -34,6 +59,20 @@ import { ResourceRegistrationProcessManager } from "./resource/resource-registra
 import { AccessRequestProcessManager } from "./access/request/access-request-process.js";
 import { AccessRequestViewProjection } from "./access/request/access-request-view-projection.js";
 import { AccessDecisionAssignmentProjection } from "./access/request/access-decision-assignment-projection.js";
+import { ResourceAccessAggregate } from "./access/grant/resource-access-aggregate.js";
+import { AccessGrantViewProjection } from "./access/grant/access-grant-view-projection.js";
+import { useClock } from "./time/clock.js";
+
+/** How the Resources context is assembled. */
+export interface ResourcesContextOptions {
+  /**
+   * Tells the domain what time it is; defaults to the system clock.
+   *
+   * Supply a controllable clock to make time-dependent behavior, such as
+   * whether a grant gives access now.
+   */
+  readonly clock?: Clock;
+}
 
 /**
  * Builds the multitenant Resources bounded context.
@@ -41,9 +80,13 @@ import { AccessDecisionAssignmentProjection } from "./access/request/access-deci
  * The organization is the tenant: `CreateOrganization` is issued in the tenant
  * scope of the organization it creates (`OrganizationId = TenantId`).
  *
+ * @param options How to assemble the context.
  * @returns The assembled Resources bounded context.
  */
-export async function createResourcesContext(): Promise<BoundedContext> {
+export async function createResourcesContext(
+  options: ResourcesContextOptions = {},
+): Promise<BoundedContext> {
+  useClock(options.clock ?? new SystemClock());
   const resourceRegistrationProcmanRouting = EventRouting.create<ResourceId>()
     .route(ResourceAddedSchema, (event) =>
       event.resourceId === undefined ? [] : [event.resourceId],
@@ -59,8 +102,22 @@ export async function createResourcesContext(): Promise<BoundedContext> {
     .route(AccessRequestSubmittedSchema, (event) => event.manager)
     .route(AccessExtensionRequestSubmittedSchema, (event) => event.manager)
     .route(AccessRequestApprovedSchema, (event) => event.manager)
+    .route(AccessRequestApprovalFailedSchema, (event) => event.manager)
     .route(AccessRequestDeniedSchema, (event) => event.manager)
-    .route(AccessRequestCanceledSchema, (event) => event.manager);
+    .route(AccessRequestCanceledSchema, (event) => event.manager)
+    .route(AccessGrantRevokedSchema, (event) => event.manager);
+  const requestRouting = EventRouting.create<AccessRequestId>()
+    .route(RequestedAccessCheckedSchema, (event) => requestOf(event))
+    .route(RequestedExtensionCheckedSchema, (event) => requestOf(event))
+    .route(AccessGrantCreatedSchema, (event) => requestOf(event))
+    .route(AccessGrantExtendedSchema, (event) => requestOf(event))
+    .route(AccessAlreadyHeldSchema, (_rejection, context) => requestRejected(context))
+    .route(AccessGrantNotActiveSchema, (_rejection, context) => requestRejected(context))
+    .route(RequestedDurationTooLongSchema, (_rejection, context) => requestRejected(context));
+  const grantViewRouting = EventRouting.create<AccessGrantId>()
+    .route(AccessGrantCreatedSchema, (event) => grantOf(event))
+    .route(AccessGrantExtendedSchema, (event) => grantOf(event))
+    .route(AccessGrantRevokedSchema, (event) => grantOf(event));
   const builder = BoundedContext.multitenant("Resources")
     .withGeneratedRegistryRoot(new URL("..", import.meta.url))
     .add(OrganizationAggregate)
@@ -68,8 +125,48 @@ export async function createResourcesContext(): Promise<BoundedContext> {
     .add(ResourceRegistrationProcessManager, { eventRouting: resourceRegistrationProcmanRouting })
     .add(ResourceAggregate)
     .add(ResourceCatalogProjection)
-    .add(AccessRequestProcessManager)
+    .add(AccessRequestProcessManager, { eventRouting: requestRouting })
     .add(AccessRequestViewProjection)
-    .add(AccessDecisionAssignmentProjection, { eventRouting: decisionRouting });
+    .add(AccessDecisionAssignmentProjection, { eventRouting: decisionRouting })
+    .add(ResourceAccessAggregate)
+    .add(AccessGrantViewProjection, { eventRouting: grantViewRouting });
   return builder.buildAsync();
+}
+
+/**
+ * The request a person's access to a resource answers.
+ *
+ * The access answers the request that asked for a check when it was submitted,
+ * or for a grant to be created or extended when it was approved.
+ */
+function requestOf(answer: { readonly request?: AccessRequestId | undefined }): AccessRequestId[] {
+  return answer.request === undefined ? [] : [answer.request];
+}
+
+/** The commands through which a request asks something of a person's access to a resource. */
+const askedByRequest = [
+  CheckRequestedAccessSchema,
+  CheckRequestedExtensionSchema,
+  CreateAccessGrantSchema,
+  ExtendAccessGrantSchema,
+] as const;
+
+/**
+ * The request whose command a person's access to a resource rejected.
+ *
+ * A rejection of anything a request did not ask for, such as a revocation or a
+ * submission the request itself rejected, answers no request.
+ */
+function requestRejected(context: EventContext): AccessRequestId[] {
+  const rejected = context.rejection?.command?.message;
+  const asked =
+    rejected === undefined ? undefined : askedByRequest.find((schema) => anyIs(rejected, schema));
+  return rejected === undefined || asked === undefined
+    ? []
+    : requestOf(anyUnpack(rejected, asked) ?? {});
+}
+
+/** The grant an event tells about. */
+function grantOf(event: { readonly id?: AccessGrantId | undefined }): AccessGrantId[] {
+  return event.id === undefined ? [] : [event.id];
 }

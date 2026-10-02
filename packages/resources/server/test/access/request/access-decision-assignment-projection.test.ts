@@ -29,8 +29,11 @@ import {
   resourceUuid,
   seed,
   submitAndAssign,
+  submitExtensionRequest,
 } from "./given/access-request.js";
 import { decisionTasks, managerHasTask } from "./given/access-decision-assignment.js";
+import { SubmitAccessExtensionRequestSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/commands_pb.js";
+import { givenActiveGrant, revokeGrant, testClock } from "../grant/given/resource-access.js";
 
 // The projection reacts to the request's lifecycle facts, produced here through
 // the real submission-and-decision path (the only way to create a request now).
@@ -80,7 +83,7 @@ describe("AccessDecisionAssignmentProjection should", () => {
       await seed(box, [actor, "primary", "second"], twoManagers);
       await submitAndAssign(box, requester, "req-approved", ["primary", "second"]);
 
-      await approveAccessRequest(requester, "req-approved", "primary");
+      await approveAccessRequest(box, "req-approved", "primary");
 
       await awaitTask(box, "primary", "req-approved", false);
       await awaitTask(box, "second", "req-approved", false);
@@ -94,7 +97,7 @@ describe("AccessDecisionAssignmentProjection should", () => {
       await seed(box, [actor, "primary", "second"], twoManagers);
       await submitAndAssign(box, requester, "req-denied", ["primary", "second"]);
 
-      await denyAccessRequest(requester, "req-denied", "primary", "Insufficient justification.");
+      await denyAccessRequest(box, "req-denied", "primary", "Insufficient justification.");
 
       await awaitTask(box, "primary", "req-denied", false);
       await awaitTask(box, "second", "req-denied", false);
@@ -115,7 +118,41 @@ describe("AccessDecisionAssignmentProjection should", () => {
     });
   });
 
-  it("clears only the decided request, keeping a manager's other tasks", async () => {
+  describe("on 'AccessRequestApprovalFailed'", () => {
+    it("remove an extension whose grant gave no access by the approval", async () => {
+      const clock = testClock();
+      const box = await resourcesBlackBox(clock);
+      const requester = await givenActiveGrant(box, "req-ended", 10);
+      await requester.post(
+        SubmitAccessExtensionRequestSchema,
+        submitExtensionRequest("ext-ended", { grant: { uuid: "req-ended" } }),
+      );
+      await awaitTask(box, "primary", "ext-ended", true);
+      clock.advanceMinutes(10);
+
+      await approveAccessRequest(box, "ext-ended", "primary");
+
+      await awaitTask(box, "primary", "ext-ended", false);
+    });
+  });
+
+  describe("on 'AccessGrantRevoked'", () => {
+    it("remove a pending extension of the revoked grant, which can no longer take effect", async () => {
+      const box = await resourcesBlackBox(testClock());
+      const requester = await givenActiveGrant(box, "req-revoked", 10);
+      await requester.post(
+        SubmitAccessExtensionRequestSchema,
+        submitExtensionRequest("ext-revoked", { grant: { uuid: "req-revoked" } }),
+      );
+      await awaitTask(box, "primary", "ext-revoked", true);
+
+      await revokeGrant(box, "req-revoked", "primary", "Investigation finished.");
+
+      await awaitTask(box, "primary", "ext-revoked", false);
+    });
+  });
+
+  it("clear only the decided request, keeping a manager's other tasks", async () => {
     const box = await resourcesBlackBox();
     const requester = box.onBehalfOf(actor);
     const teammate = box.onBehalfOf("teammate");
@@ -124,7 +161,7 @@ describe("AccessDecisionAssignmentProjection should", () => {
     // A second requester keeps the same manager busy with an independent request.
     await submitAndAssign(box, teammate, "req-b", "primary", { requester: { uuid: "teammate" } });
 
-    await denyAccessRequest(requester, "req-a", "primary", "Not this time.");
+    await denyAccessRequest(box, "req-a", "primary", "Not this time.");
 
     await box.eventually(
       () => decisionTasks(requester, "primary"),

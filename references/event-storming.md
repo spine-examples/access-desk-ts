@@ -51,13 +51,22 @@ for policy; there is no separate request-policy mirror projection.
 
 #### Request & approval
 
-| Owner               | Trigger (actor/event) | Command                         | Event(s)                           | Rejections                                                                                               |
-| ------------------- | --------------------- | ------------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Access Request (PM) | Requester             | Submit Access Request           | Access Request Submitted           | Resource Not Open For Requests; Access Level Not Offered; Requested Duration Too Long; Request Already Pending |
-| Access Request (PM) | Requester             | Submit Access Extension Request | Access Extension Request Submitted | Resource Not Open For Requests; Requested Duration Too Long; Request Already Pending                             |
-| Access Request (PM) | Manager               | Approve Access Request          | Access Request Approved            | Request Already Decided; Not An Eligible Manager                                                            |
-| Access Request (PM) | Manager               | Deny Access Request             | Access Request Denied              | Request Already Decided; Not An Eligible Manager                                                            |
-| Access Request (PM) | Requester             | Cancel Access Request           | Access Request Canceled            | Request Already Decided                                                                                  |
+| Owner               | Trigger (actor/event)                                                                                          | Command                                      | Event(s)                                    | Rejections                                                                        |
+| ------------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------- |
+| Access Request (PM) | Requester                                                                                                      | Submit Access Request                        | Access Request Submission Started           | Resource Not Open For Requests; Access Level Not Offered; Request Already Pending |
+| Access Request (PM) | Requester                                                                                                      | Submit Access Extension Request              | Access Extension Request Submission Started | Resource Not Open For Requests; Request Already Pending                           |
+| Access Request (PM) | on Access Request Submission Started                                                                           | Check Requested Access                       | —                                           | —                                                                                 |
+| Access Request (PM) | on Access Extension Request Submission Started                                                                 | Check Requested Extension                    | —                                           | —                                                                                 |
+| Access Request (PM) | on Requested Access Checked                                                                                    | —                                            | Access Request Submitted                    | —                                                                                 |
+| Access Request (PM) | on Requested Extension Checked                                                                                 | —                                            | Access Extension Request Submitted          | —                                                                                 |
+| Access Request (PM) | on Requested Duration Too Long `OR` Access Already Held, for a first-time request                              | —                                            | Access Request Submission Failed            | —                                                                                 |
+| Access Request (PM) | on Access Grant Not Active `OR` Requested Duration Too Long `OR` Access Already Held, for an extension request | —                                            | Access Extension Request Submission Failed  | —                                                                                 |
+| Access Request (PM) | Resource Manager                                                                                               | Approve Access Request                       | Access Request Approval Started             | Request Already Decided; Not An Eligible Manager                                  |
+| Access Request (PM) | on Access Request Approval Started                                                                             | Create Access Grant `OR` Extend Access Grant | —                                           | —                                                                                 |
+| Access Request (PM) | on Access Grant Created `OR` Access Grant Extended                                                             | —                                            | Access Request Approved                     | —                                                                                 |
+| Access Request (PM) | on Access Grant Not Active, at approval                                                                        | —                                            | Access Request Approval Failed              | —                                                                                 |
+| Access Request (PM) | Manager                                                                                                        | Deny Access Request                          | Access Request Denied                       | Request Already Decided; Not An Eligible Manager                                  |
+| Access Request (PM) | Requester                                                                                                      | Cancel Access Request                        | Access Request Canceled                     | Request Already Decided                                                           |
 
 Submission captures managers in policy order and removes duplicates. A
 requester who is also a manager may decide the request.
@@ -65,48 +74,27 @@ requester who is also a manager may decide the request.
 Projection inputs and outputs drawn on the board:
 
 - **Access Request View** receives Access Request Submitted, Access Extension
-  Request Submitted, Access Request Approved, Access Request Denied, and Access
-  Request Canceled — the requester's read model of each request and its status.
+  Request Submitted, Access Request Approval Started, Access Request Approved,
+  Access Request Approval Failed, Access Request Denied, and Access Request
+  Canceled — the requester's read model of each request and its status. It
+  takes who approved a request, and when, from Access Request Approval Started.
 - **Access Decision Assignment** receives Access Request Submitted, Access
-  Extension Request Submitted, Access Request Approved, Access Request Denied,
-  and Access Request Canceled.
+  Extension Request Submitted, Access Request Approved, Access Request Approval
+  Failed, Access Request Denied, and Access Request Canceled; it also receives
+  Access Grant Revoked, dropping pending extensions of that grant.
 
-#### Grant issuance — Grant Issuance PM, Access Grant aggregate (forward design)
+#### Access grant — Resource Access aggregate
 
-| Owner               | Trigger (actor/event)                 | Command                                                             | Event(s)                          |
-| ------------------- | ------------------------------------- | ------------------------------------------------------------------- | --------------------------------- |
-| Grant Issuance (PM) | on Access Request Approved            | Create Access Grant `OR` Extend Access Grant                        | —                                 |
-| Access Grant        | Grant Issuance (PM)                   | Create Access Grant                                                 | Access Grant Created              |
-| Access Grant        | Grant Issuance (PM)                   | Extend Access Grant                                                 | Access Grant Extended             |
-| Grant Issuance (PM) | on Access Grant Created               | Activate Access Grant `OR` Schedule Command (Activate Access Grant) | —                                 |
-| Access Grant        | Grant Issuance (PM), immediate branch | Activate Access Grant                                               | Access Grant Activated            |
-| Grant Issuance (PM) | on Command Scheduled                  | —                                                                   | Access Grant Activation Scheduled |
-| Access Grant        | Scheduling, due                       | Activate Access Grant                                               | Access Grant Activated            |
+| Owner           | Trigger (actor/event)              | Command                   | Event(s)                    | Rejections                                                                |
+| --------------- | ---------------------------------- | ------------------------- | --------------------------- | ------------------------------------------------------------------------- |
+| Resource Access | Access Request (PM), at submission | Check Requested Access    | Requested Access Checked    | Requested Duration Too Long; Access Already Held                          |
+| Resource Access | Access Request (PM), at submission | Check Requested Extension | Requested Extension Checked | Access Grant Not Active; Requested Duration Too Long; Access Already Held |
+| Resource Access | Access Request (PM), at approval   | Create Access Grant       | Access Grant Created        | —                                                                         |
+| Resource Access | Access Request (PM), at approval   | Extend Access Grant       | Access Grant Extended       | Access Grant Not Active                                                   |
+| Resource Access | Resource Manager                   | Revoke Access Grant       | Access Grant Revoked        | Access Grant Not Active; Not Resource Manager                             |
 
-#### Revocation & expiration (forward design)
-
-| Owner                 | Trigger (actor/event)         | Command                                | Event(s)                            | Rejections        |
-| --------------------- | ----------------------------- | -------------------------------------- | ----------------------------------- | ----------------- |
-| Access Grant          | Resource Manager              | Revoke Access Grant                    | Access Grant Revoked                | Access Not Active |
-| Grant Expiration (PM) | on Access Grant Revoked       | Cancel Scheduled Command (Optional)    | —                                   | —                 |
-| Grant Expiration (PM) | on Scheduled Command Canceled | —                                      | Access Grant Expiration Canceled    | —                 |
-| Grant Expiration (PM) | on Access Grant Activated     | Schedule Command (Expire Access Grant) | —                                   | —                 |
-| Grant Expiration (PM) | on Command Scheduled          | —                                      | Access Grant Expiration Scheduled   | —                 |
-| Grant Expiration (PM) | on Access Grant Extended      | Reschedule Command (Optional)          | —                                   | —                 |
-| Grant Expiration (PM) | on Command Rescheduled        | —                                      | Access Grant Expiration Rescheduled | —                 |
-| Access Grant          | Scheduling, due               | Expire Access Grant                    | Access Grant Expired                | —                 |
-
-#### Scheduling
-
-| Owner           | Trigger (actor/event) | Command                            | Event(s)                   |
-| --------------- | --------------------- | ---------------------------------- | -------------------------- |
-| Scheduling (PM) | —                     | Schedule Command                   | Command Scheduled          |
-| Scheduling (PM) | —                     | Reschedule Command                 | Command Rescheduled        |
-| Scheduling (PM) | —                     | Cancel Scheduled Command           | Scheduled Command Canceled |
-| Scheduling (PM) | Time Passed           | `(Scheduled Command)` (`Optional`) | —                          |
-
-Stored command values carried in the "Schedule Command" sub-notes: **Activate
-Access Grant** and **Expire Access Grant**.
+Projection: **Access Grant View** receives Access Grant Created, Access Grant
+Extended, and Access Grant Revoked.
 
 #### Audit
 

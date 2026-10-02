@@ -1,0 +1,124 @@
+/*
+ * Copyright 2026 CodeMatters, Lda.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+ * except in compliance with the License. You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under
+ * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+ * either express or implied. See the License for the specific language governing permissions
+ * and limitations under the License.
+ */
+
+syntax = "proto3";
+
+package accessdesk.resources.access.grant;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "accessdesk/resources/identifiers.proto";
+import "accessdesk/resources/values.proto";
+import "accessdesk/identity/identifiers.proto";
+import "spine/options.proto";
+
+option (type_url_prefix) = "type.accessdesk";
+
+// Checks whether the requested access may be granted.
+message CheckRequestedAccess {
+
+    // The requester, and the resource the requested access applies to.
+    accessdesk.resources.ResourceAccessId id = 1;
+
+    // The request being checked.
+    accessdesk.resources.AccessRequestId request = 2 [(required) = true];
+
+    // The requested access level.
+    accessdesk.resources.AccessLevel access_level = 3 [(required) = true, (validate) = true];
+
+    // The inclusive start of the requested access.
+    google.protobuf.Timestamp start = 4 [(required) = true];
+
+    // The exclusive end of the requested access.
+    google.protobuf.Timestamp end = 5 [(required) = true];
+
+    // The longest access the resource permits.
+    google.protobuf.Duration maximum_duration = 6 [(required) = true];
+}
+
+// Checks whether a grant may be extended as requested.
+message CheckRequestedExtension {
+
+    // The requester, and the resource the grant gives access to.
+    accessdesk.resources.ResourceAccessId id = 1;
+
+    // The grant to extend.
+    accessdesk.resources.AccessGrantId grant = 2 [(required) = true];
+
+    // The request being checked.
+    accessdesk.resources.AccessRequestId request = 3 [(required) = true];
+
+    // The time to add to the grant's end.
+    google.protobuf.Duration duration = 4 [(required) = true];
+
+    // The longest access the resource permits.
+    google.protobuf.Duration maximum_duration = 5 [(required) = true];
+}
+
+// Creates an access grant from an approved request.
+message CreateAccessGrant {
+
+    // The person who holds the access, and the resource it applies to.
+    accessdesk.resources.ResourceAccessId id = 1;
+
+    // The grant identifier.
+    accessdesk.resources.AccessGrantId grant = 2 [(required) = true];
+
+    // The approved request that issues the grant.
+    accessdesk.resources.AccessRequestId request = 3 [(required) = true];
+
+    // The access level the grant gives.
+    accessdesk.resources.AccessLevel access_level = 4 [(required) = true, (validate) = true];
+
+    // The inclusive start of the access.
+    google.protobuf.Timestamp start = 5 [(required) = true];
+
+    // The exclusive end of the access.
+    google.protobuf.Timestamp end = 6 [(required) = true];
+
+    // The resource managers who may revoke the grant.
+    repeated accessdesk.identity.PersonId manager = 7 [(required) = true];
+}
+
+// Ends a grant before its planned end.
+message RevokeAccessGrant {
+
+    // The person holding the access, and the resource it applies to.
+    accessdesk.resources.ResourceAccessId id = 1;
+
+    // The grant to revoke.
+    accessdesk.resources.AccessGrantId grant = 2 [(required) = true];
+
+    // The manager revoking the grant.
+    accessdesk.identity.PersonId manager = 3 [(required) = true];
+
+    // The business reason for revoking the grant.
+    string reason = 4 [(required) = true];
+}
+
+// Moves the end of an active grant as an approved extension request proposed.
+message ExtendAccessGrant {
+
+    // The person holding the access, and the resource it applies to.
+    accessdesk.resources.ResourceAccessId id = 1;
+
+    // The grant to extend.
+    accessdesk.resources.AccessGrantId grant = 2 [(required) = true];
+
+    // The approved extension request.
+    accessdesk.resources.AccessRequestId request = 3 [(required) = true];
+
+    // The new exclusive end of the access.
+    google.protobuf.Timestamp end = 4 [(required) = true];
+}

@@ -49,7 +49,7 @@ type PolicyChange = Partial<Omit<ResourcePolicy, "$typeName" | "$unknown">>;
  *
  * Every change publishes the complete current policy.
  */
-export class ResourceAggregate extends Aggregate<ResourceId, typeof ResourceSchema, bigint> {
+export class ResourceAggregate extends Aggregate<ResourceId, typeof ResourceSchema> {
   /**
    * Creates the initial closed policy.
    *

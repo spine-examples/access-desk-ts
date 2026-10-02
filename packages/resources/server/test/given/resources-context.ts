@@ -15,13 +15,16 @@
 import { create, type Message, type MessageShape } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { AnyMessages, TypeUrls } from "@spine-event-engine/core";
-import { SignalMetadata } from "@spine-event-engine/server";
+import { type Clock, SignalMetadata } from "@spine-event-engine/server";
 import { type ActorContext, TenantIdSchema, UserIdSchema } from "@spine-event-engine/proto";
 import {
+  CompositeFilter_CompositeOperator,
+  Filter_Operator,
   QueryIdSchema,
   QuerySchema,
   TargetSchema,
   type Query,
+  type Target,
 } from "@spine-event-engine/proto/client";
 import { BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
 
@@ -42,13 +45,20 @@ export function testActorContext(): ActorContext {
 // Imported from compiled output: vitest cannot execute the handler classes'
 // standard decorators from raw TypeScript source.
 type ResourcesModule = typeof import("../../dist/src/index.js");
-let createResourcesContext: ResourcesModule["createResourcesContext"] | undefined;
+let resources: ResourcesModule | undefined;
 
 /**
- * Loads the compiled Resources context factory once, for a suite's `beforeAll`.
+ * Loads the compiled Resources context once, for a suite's `beforeAll`.
  */
 export async function loadResourcesContext(): Promise<void> {
-  ({ createResourcesContext } = await import("../../dist/src/index.js"));
+  resources = await import("../../dist/src/index.js");
+}
+
+function loaded(): ResourcesModule {
+  if (resources === undefined) {
+    throw new Error("Call loadResourcesContext() in beforeAll before opening a BlackBox.");
+  }
+  return resources;
 }
 
 const ownedBlackBoxes = new Set<BlackBox>();
@@ -58,12 +68,20 @@ const ownedBlackBoxes = new Set<BlackBox>();
  *
  * Every box is tracked so a suite's `afterEach` can close them with
  * {@link closeResourcesBlackBoxes}.
+ *
+ * @param clock Tells the domain what time it is; the system clock by default.
  */
-export async function resourcesBlackBox(): Promise<BlackBox> {
-  if (createResourcesContext === undefined) {
-    throw new Error("Call loadResourcesContext() in beforeAll before opening a BlackBox.");
-  }
-  const box = await BlackBox.from(await createResourcesContext(), { tenant: organizationId });
+export async function resourcesBlackBox(clock?: Clock): Promise<BlackBox> {
+  // Grant flows cross several entities before a read model settles, so waits
+  // get generous headroom; they still return as soon as the outcome is visible.
+  const box = await BlackBox.from(
+    await loaded().createResourcesContext(clock === undefined ? {} : { clock }),
+    {
+      tenant: organizationId,
+      timeoutMs: 20_000,
+      intervalMs: 20,
+    },
+  );
   ownedBlackBoxes.add(box);
   return box;
 }
@@ -76,15 +94,37 @@ export async function closeResourcesBlackBoxes(): Promise<void> {
   ownedBlackBoxes.clear();
 }
 
-// Builds an include-all query for one entity type in the organization's tenant.
-function includeAll(schema: GenMessage<Message>, queryId: string): Query {
+// Builds a query for one entity type in the organization's tenant.
+function query(target: Target, queryId: string): Query {
   return create(QuerySchema, {
     id: create(QueryIdSchema, { value: queryId }),
-    target: create(TargetSchema, {
+    target,
+    context: testActorContext(),
+  });
+}
+
+// Builds an include-all query for one entity type in the organization's tenant.
+function includeAll(schema: GenMessage<Message>, queryId: string): Query {
+  return query(
+    create(TargetSchema, {
       type: TypeUrls.derive(schema),
       criterion: { case: "includeAll", value: true },
     }),
-    context: testActorContext(),
+    queryId,
+  );
+}
+
+// Unpacks the entity states a query returned.
+function statesOf<Schema extends GenMessage<Message>>(
+  schema: Schema,
+  states: readonly { state?: Parameters<typeof AnyMessages.unpack>[0] | undefined }[],
+): MessageShape<Schema>[] {
+  return states.map(({ state }) => {
+    const value = state === undefined ? undefined : AnyMessages.unpack(state, schema);
+    if (value === undefined) {
+      throw new Error(`Expected a ${schema.typeName} query state.`);
+    }
+    return value;
   });
 }
 
@@ -102,11 +142,51 @@ export async function readAll<Schema extends GenMessage<Message>>(
   queryId: string,
 ): Promise<MessageShape<Schema>[]> {
   const response = await scope.send(includeAll(schema, queryId));
-  return response.message.map(({ state }) => {
-    const value = state === undefined ? undefined : AnyMessages.unpack(state, schema);
-    if (value === undefined) {
-      throw new Error(`Expected a ${schema.typeName} query state.`);
-    }
-    return value;
+  return statesOf(schema, response.message);
+}
+
+/**
+ * Reads the projection states whose column equals a value, through the public client.
+ *
+ * @param scope The actor scope issuing the query.
+ * @param schema The projection state schema to read.
+ * @param queryId An identifier for the query.
+ * @param column The name of the queried column.
+ * @param valueSchema The schema of the column's value.
+ * @param value The value the column must equal.
+ * @returns The unpacked matching projection states.
+ */
+export async function readWhere<
+  Schema extends GenMessage<Message>,
+  ValueSchema extends GenMessage<Message>,
+>(
+  scope: BlackBoxScope,
+  schema: Schema,
+  queryId: string,
+  column: string,
+  valueSchema: ValueSchema,
+  value: MessageShape<ValueSchema>,
+): Promise<MessageShape<Schema>[]> {
+  const target = create(TargetSchema, {
+    type: TypeUrls.derive(schema),
+    criterion: {
+      case: "filters",
+      value: {
+        filter: [
+          {
+            operator: CompositeFilter_CompositeOperator.ALL,
+            filter: [
+              {
+                fieldPath: { fieldName: [column] },
+                value: AnyMessages.pack(valueSchema, value),
+                operator: Filter_Operator.EQUAL,
+              },
+            ],
+          },
+        ],
+      },
+    },
   });
+  const response = await scope.send(query(target, queryId));
+  return statesOf(schema, response.message);
 }

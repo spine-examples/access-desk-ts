@@ -13,7 +13,7 @@ Conventions for every `.proto` in
 
 ## File layout (in this order)
 
-1. Single-line `//` copyright header (see below).
+1. `/* */` copyright header block.
 2. blank line, then `syntax = "proto3";`
 3. blank line, then `package accessdesk.<context>;`
 4. blank line, then imports — one per line (`google/...` first, then `spine/...`
@@ -21,35 +21,32 @@ Conventions for every `.proto` in
 5. blank line, then `option (type_url_prefix) = "type.accessdesk";`
 6. blank line, then the messages.
 
-- **2-space** indentation.
+- **4-space** indentation, including nested messages, enums, and `oneof` blocks.
 - One blank line right after a message's opening `{`, before the first field or
   field comment. A message-level `option` (e.g. `(entity).kind`) goes immediately
   after `{` with **no** blank line before it.
 - `option (type_url_prefix)` needs `import "spine/options.proto";`, so it appears
   only in files that declare messages.
 
-## Copyright header — single-line `//`
+## Copyright header — `/* */` block
 
-Use `//` line comments, **not** a `/* */` block. Open and close with a bare `//`:
+Use a `/* */` block, word for word:
 
 ```proto
-//
-// Copyright 2026 CodeMatters, Lda.
-//
-// Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
-// except in compliance with the License. You may obtain a copy of the License at
-//
-// https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software distributed under
-// the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-// either express or implied. See the License for the specific language governing permissions
-// and limitations under the License.
-//
+/*
+ * Copyright 2026 CodeMatters, Lda.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+ * except in compliance with the License. You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under
+ * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+ * either express or implied. See the License for the specific language governing permissions
+ * and limitations under the License.
+ */
 ```
-
-(TypeScript/JS files keep the conventional `/* */` block — the `//` rule is
-proto-only.)
 
 ## `type_url_prefix`
 
@@ -58,7 +55,7 @@ Do not append a bounded-context, package, or other type suffix.
 
 ## Documentation comments
 
-Use `//` line comments (never `/** */`). Document every message and every field.
+Use `//` line comments (never `/* */`). Document every message and every field.
 
 Describe only the domain meaning. Do not mention handlers, entity kinds,
 routing, storage, queries, clients, generation, or why a field exists for an
@@ -69,8 +66,8 @@ that is not clear from the type and field names.
 // Creates an organization for members and resources.
 message CreateOrganization {
 
-  // The organization identifier.
-  OrganizationId id = 1;
+    // The organization identifier.
+    OrganizationId id = 1;
 }
 ```
 
@@ -137,6 +134,10 @@ message CreateOrganization {
   real queries filter or sort by.
 - Rejections live in `*rejections.proto`; the model then depends on
   `@spine-event-engine/core`.
+- The semantic ID of a signal, the field that identifies what an event or a
+  rejection is about, is not required by default. Mark it
+  `[(required) = true]` explicitly, e.g.
+  `accessdesk.resources.AccessGrantId id = 1 [(required) = true];`.
 
 ## Evolution & generation
 

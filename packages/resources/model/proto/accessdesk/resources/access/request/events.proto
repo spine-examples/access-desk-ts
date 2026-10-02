@@ -1,21 +1,23 @@
-//
-// Copyright 2026 CodeMatters, Lda.
-//
-// Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
-// except in compliance with the License. You may obtain a copy of the License at
-//
-// https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software distributed under
-// the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-// either express or implied. See the License for the specific language governing permissions
-// and limitations under the License.
-//
+/*
+ * Copyright 2026 CodeMatters, Lda.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+ * except in compliance with the License. You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under
+ * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+ * either express or implied. See the License for the specific language governing permissions
+ * and limitations under the License.
+ */
 
 syntax = "proto3";
 
 package accessdesk.resources.access.request;
 
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
 import "accessdesk/resources/identifiers.proto";
 import "accessdesk/resources/values.proto";
 import "accessdesk/identity/identifiers.proto";
@@ -23,76 +25,145 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
+// The submission of an access request started.
+message AccessRequestSubmissionStarted {
+
+    // The request the requester submitted.
+    accessdesk.resources.AccessRequestId id = 1 [(required) = true];
+}
+
+// The submission of an access request failed.
+message AccessRequestSubmissionFailed {
+
+    // The request whose submission failed.
+    accessdesk.resources.AccessRequestId id = 1 [(required) = true];
+
+    // The person who submitted the request.
+    accessdesk.identity.PersonId requester = 2 [(required) = true];
+}
+
+// The submission of an access extension request started.
+message AccessExtensionRequestSubmissionStarted {
+
+    // The extension request the requester submitted.
+    accessdesk.resources.AccessRequestId id = 1 [(required) = true];
+
+    // The time the request asks to add to the grant's end.
+    google.protobuf.Duration duration = 2 [(required) = true];
+}
+
+// The submission of an access extension request failed.
+message AccessExtensionRequestSubmissionFailed {
+
+    // The extension request whose submission failed.
+    accessdesk.resources.AccessRequestId id = 1 [(required) = true];
+
+    // The person who submitted the request.
+    accessdesk.identity.PersonId requester = 2 [(required) = true];
+}
+
 // An access request was accepted for a manager decision.
 message AccessRequestSubmitted {
 
-  // The submitted request.
-  accessdesk.resources.AccessRequestId id = 1 [(required) = true];
+    // The submitted request.
+    accessdesk.resources.AccessRequestId id = 1 [(required) = true];
 
-  // The request details.
-  accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
+    // The request details.
+    accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
 
-  // The resource managers who may decide the request.
-  repeated accessdesk.identity.PersonId manager = 3 [(required) = true];
+    // The resource managers who may decide the request.
+    repeated accessdesk.identity.PersonId manager = 3 [(required) = true];
 }
 
 // An access-extension request was accepted for a manager decision.
 message AccessExtensionRequestSubmitted {
 
-  // The submitted extension request.
-  accessdesk.resources.AccessRequestId id = 1 [(required) = true];
+    // The submitted extension request.
+    accessdesk.resources.AccessRequestId id = 1 [(required) = true];
 
-  // The request details.
-  accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
+    // The request details.
+    accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
 
-  // The resource managers who may decide the request.
-  repeated accessdesk.identity.PersonId manager = 3 [(required) = true];
+    // The resource managers who may decide the request.
+    repeated accessdesk.identity.PersonId manager = 3 [(required) = true];
+}
+
+// The approval of an access request started.
+message AccessRequestApprovalStarted {
+
+    // The request the manager approved.
+    accessdesk.resources.AccessRequestId id = 1 [(required) = true];
+
+    // The request details.
+    accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
+
+    // The manager who approved the request.
+    accessdesk.identity.PersonId decided_by = 3 [(required) = true];
+
+    // When the manager approved the request.
+    google.protobuf.Timestamp when_decided = 4 [(required) = true];
+
+    // The managers responsible for the request.
+    repeated accessdesk.identity.PersonId manager = 5 [(required) = true];
 }
 
 // A request was approved.
 message AccessRequestApproved {
 
-  // The approved request.
-  accessdesk.resources.AccessRequestId id = 1 [(required) = true];
+    // The approved request.
+    accessdesk.resources.AccessRequestId id = 1 [(required) = true];
 
-  // The request details.
-  accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
+    // The request details.
+    accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
 
-  // The manager who approved the request.
-  accessdesk.identity.PersonId decided_by = 3 [(required) = true];
+    // The managers responsible for the request.
+    repeated accessdesk.identity.PersonId manager = 3 [(required) = true];
+}
 
-  // The managers responsible for the request.
-  repeated accessdesk.identity.PersonId manager = 4 [(required) = true];
+// The approval of an access request failed.
+message AccessRequestApprovalFailed {
+
+    // The request whose approval failed.
+    accessdesk.resources.AccessRequestId id = 1 [(required) = true];
+
+    // The request details.
+    accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
+
+    // The managers responsible for the request.
+    repeated accessdesk.identity.PersonId manager = 3 [(required) = true];
 }
 
 // A request was denied for a business reason.
 message AccessRequestDenied {
 
-  // The denied request.
-  accessdesk.resources.AccessRequestId id = 1 [(required) = true];
+    // The denied request.
+    accessdesk.resources.AccessRequestId id = 1 [(required) = true];
 
-  // The request details.
-  accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
+    // The request details.
+    accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
 
-  // The manager who denied the request.
-  accessdesk.identity.PersonId decided_by = 3 [(required) = true];
+    // The manager who denied the request.
+    accessdesk.identity.PersonId decided_by = 3 [(required) = true];
 
-  // The business reason for denial.
-  string reason = 4 [(required) = true];
+    // When the request was denied.
+    google.protobuf.Timestamp when_decided = 4 [(required) = true];
 
-  // The managers responsible for the request.
-  repeated accessdesk.identity.PersonId manager = 5 [(required) = true];
+    // The business reason for denial.
+    string reason = 5 [(required) = true];
+
+    // The managers responsible for the request.
+    repeated accessdesk.identity.PersonId manager = 6 [(required) = true];
 }
 
 // A request was canceled by its requester.
 message AccessRequestCanceled {
 
-  // The canceled request.
-  accessdesk.resources.AccessRequestId id = 1 [(required) = true];
+    // The canceled request.
+    accessdesk.resources.AccessRequestId id = 1 [(required) = true];
 
-  // The request details.
-  accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
+    // The request details.
+    accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
 
-  // The managers responsible for the request.
-  repeated accessdesk.identity.PersonId manager = 3 [(required) = true];
+    // The managers responsible for the request.
+    repeated accessdesk.identity.PersonId manager = 3 [(required) = true];
 }

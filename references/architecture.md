@@ -29,16 +29,10 @@ baseline: Node.js 24 or newer, pnpm 11.9, strict TypeScript, and ESM.
 
 The system has two bounded contexts:
 
-| Bounded context | Owns                                                                                                                                                                                                                       | Tenant mode                        |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- |
-| Identity        | Global users, registration, authentication identity, user activity                                                                                                                                                         | Global/single-tenant control plane |
-| Resources       | Organizations, memberships, resources, ordered access levels, resource managers, request policy, requests, approval decisions, grants, extensions, revocation, the durable scheduling those rely on, and audit projections | Organization-scoped                |
-
-Resources owns the whole request-and-approval domain. What earlier drafts split
-into separate Access, Scheduling, and Audit contexts — the request, approval,
-grant, extension, and revocation lifecycles, the durable scheduling that serves
-them, and the audit projections built from durable facts — is now internal to
-Resources, not contexts of their own.
+| Bounded context | Owns                                                                                                                                                                                 | Tenant mode                        |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- |
+| Identity        | Global users, registration, authentication identity, user activity                                                                                                                   | Global/single-tenant control plane |
+| Resources       | Organizations, memberships, resources, ordered access levels, resource managers, request policy, requests, approval decisions, grants, extensions, revocation, and audit projections | Organization-scoped                |
 
 An initial deployment may co-host both contexts in one Node.js application.
 Co-location does not weaken the boundaries: each context must have its own model
@@ -53,14 +47,12 @@ flowchart LR
 ```
 
 Cross-context state propagation and lifecycle choreography use versioned
-external events. Commands are domestic to their receiving context. Sending a
-due scheduled command is the explicit exception to event-based integration: the
-Resources scheduling component posts it through the supplied same-server client,
-and it re-enters its target through normal command ingress. Shared packages may contain
-wire contracts and value types, but never another context's behavior or mutable
-state. Each context owns its cross-context event contracts in its own model
-package; a consumer depends on the publishing context's model for those schemas
-and declares its external-event receptors internally.
+external events. Commands are domestic to their receiving context. Shared
+packages may contain wire contracts and value types, but never another
+context's behavior or mutable state. Each context owns its cross-context
+event contracts in its own model package; a consumer depends on the
+publishing context's model for those schemas and declares its
+external-event receptors internally.
 
 ## Tenant, identity, and authorization model
 
@@ -68,7 +60,7 @@ Organization is the tenant.
 
 - `PersonId` is global and is not an email address.
 - A user may have memberships in multiple organizations.
-- Every tenant-scoped request, query, subscription, scheduled item, inbox row,
+- Every tenant-scoped request, query, subscription, inbox row,
   outbox row, and audit record carries exactly one `OrganizationId` represented
   at the Spine boundary as the authoritative `TenantId`.
 - The browser selects an organization explicitly. Switching organizations
@@ -80,7 +72,7 @@ Organization is the tenant.
 - Resources is multitenant. Identity remains a global context and publishes
   global identity facts to durable integration infrastructure.
 - Roles and permissions are organization-scoped. A role in one organization
-  confers no authority in another.
+  gives no authority in another.
 - Storage namespaces and context-prefixed kinds provide defense in depth; they
   never replace handler, query, subscription, and gateway authorization.
 
@@ -200,10 +192,8 @@ Submission must enforce all the following:
   accepted.
 - The requested level is offered by that resource.
 - The justification is meaningful.
-- The access period is canonical and positive: immediate durations and scheduled
-  endpoints use whole-minute precision, and a scheduled interval has a strictly
-  later exclusive end.
-- The time specification is valid and within the maximum duration.
+- The time specification is valid — the access ends after it begins — and
+  within the maximum duration.
 - The requester does not already hold same-or-stronger access for the relevant
   interval.
 - No other nonterminal request by the same requester for the same resource has
@@ -211,49 +201,77 @@ Submission must enforce all the following:
   half-open, so `[a,b)` and `[b,c)` do not overlap.
 
 Conflicting nonterminal requests use a duplicate-request rejection. Conflicts
-with scheduled or active grants use the existing-access policy and a distinct
-business rejection. Immediate requests retain a duration; overlap that can only
-be known after an approval time is established must be revalidated before a
-grant is created.
+with grants that are not revoked, whether their period has begun or not, use the
+existing-access policy and a distinct business rejection. Access already held
+is checked when a request is submitted, not again when it is approved.
 
 Any manager captured from the resource policy may decide a pending request; no
 approver is assigned. Admission preserves policy order and removes duplicate
 manager identifiers. A requester who is also a manager may decide their own
 request. Approval or denial is terminal and happens at most once. Denial
-requires a reason. Concurrent decisions are resolved by the aggregate
-transaction so only one fact is accepted.
+requires a reason. Concurrent decisions on one request are handled one at a
+time, so only the first is accepted and the others are rejected with
+`RequestAlreadyDecided`.
 
 ## Request and grant lifecycles
 
-Requests and grants are separate aggregates and lifecycles. Approval records a
-decision; it does not by itself prove that access is active or durably
-scheduled.
+Requests and grants are separate lifecycles. The request is a process. The
+grants one person holds to one resource form one aggregate, Resource Access,
+which reads nothing but its own state.
 
-Required request outcomes are pending, approved, denied, and canceled. Required
-grant outcomes are pending scheduling, scheduled, active, expired, expired
-without activation, and revoked. Contract design may use more precise internal
-substates, but the UI must never claim scheduled or active access before the
-required facts exist.
+A submission is checked before the request is accepted, and changes no grant:
 
-Scheduled and active grants may be revoked by any current manager of the granting
-resource. Revocation authority is scoped to that resource, not the organization.
-Revocation requires a reason. Revoked or expired grants never reactivate. The
-grant lifecycle is authoritative: a stale due command after revocation or expiry
-is an idempotent no-op.
+1. The requester submits a request, which is checked against the resource's
+   policy from the catalog.
+2. The requester's access to the resource checks what the request asks for:
+   the requested access, or the requested extension of a grant. Both checks
+   bring the longest total access the resource permits.
+3. When the check rejects — access already held, too long, or a grant that
+   gives no access — the submission fails and the request ends without effect.
+   Otherwise the request is submitted and awaits a manager's decision.
+
+A first-time request and an extension request tell the start and the failure
+of their submission with their own facts.
+
+Grants change only after approval.
+
+A manager's approval takes effect on the grant before the request counts as
+approved:
+
+1. The manager approves a pending request.
+2. A first-time request asks for its grant to be created, and an extension
+   request asks for the grant it names to be extended.
+3. Once the grant is created or extended, the request is approved.
+4. When the grant to extend gives no access (`AccessGrantNotActive`), the
+   approval fails and the request ends without effect.
+
+While the grant is asked, the request accepts no other decision.
+
+Request statuses are submission started, submission failed, pending,
+approval started, approved, approval failed, denied, and canceled.
+
+Any manager of the granting resource may revoke it, with a reason, until its
+end, whether its period has begun or not. The managers are those of the
+approved request, which the person's access to the resource keeps. That access
+keeps only what it decides by: each grant's level and period, and those
+managers. A grant that ended or was revoked is forgotten there. The grant's
+read model shows the request that issued it and each extension request that
+moved its end, so who approved the access is read from those requests.
+Revocation authority is scoped to that resource, not the organization.
 
 An extension:
 
-- is allowed only for an active grant;
-- proposes an additional duration and changes no other grant field;
+- submission requires a grant that gives access now;
+- adds a positive duration to the grant's end, proposing the later end it
+  would have, and changes no other grant field;
 - requires a separate approval task and decision;
 - is capped by the resource's maximum **total grant lifetime**, not an
-  independent duration per extension;
-- becomes ineffective if the grant expires or is revoked first.
+  independent duration per extension, checked when the extension is submitted.
 
-When revocation or expiry makes a pending extension/confirmation task
-irrelevant, remove that task from the pending-task projection. Immutable facts
-remain in history. Removing a task already absent from the projection is an
-idempotent no-op.
+When a grant is revoked, its pending extension tasks leave the pending-task
+projection. The projection also retains the revoked grant identifier so a
+late-arriving extension submission cannot recreate its task. Immutable facts
+remain in history.
 
 ## Time semantics
 
@@ -271,83 +289,18 @@ approval is accepted at time `A`, its effective grant interval is
 A scheduled request stores an explicit requested interval `[S,E)`. When
 approval is accepted at `A`:
 
-- `A < S`: create the grant pending scheduling; it becomes scheduled only after
-  the scheduling component confirms persistence.
-- `S <= A < E`: activation is due immediately and uses the same direct domestic
-  activation command as an immediate request, not the scheduling component.
-  Preserve requested `S` and `E` for history, but effective access begins at `A`
-  and ends at `E`.
-- `A >= E`: create the explicit expired-without-activation outcome. Never
-  activate it.
+- `A < S`: the grant keeps `[S, E)`, and gives access from `S`.
+- `S <= A < E`: the grant covers `[A, E)` and gives access at once. The
+  requested `S` and `E` are kept on the request for history.
+- `A >= E`: the grant keeps `[S, E)`, which has already ended, so it never
+  gives access.
 
-Normal expiration and expiration without activation are distinct facts. If a
-valid due activation command arrives once the clock is at or after the requested
-end `E`, Resources records the expired-without-activation outcome exactly once
-instead of activating. Duplicate, stale, revision-mismatched, canceled, revoked,
-or otherwise terminal commands are successful no-ops. All time-based code uses an
-injected clock; tests must not depend on arbitrary sleeping.
+All time-based code uses an injected clock; tests must not depend on arbitrary
+sleeping.
 
 For maximum-total-lifetime checks after a delayed scheduled approval, use the
-actual effective activation time through the proposed new end, while preserving
-the originally requested interval for audit.
-
-## Scheduling (internal Resources component)
-
-Scheduling is an internal component of Resources, not a context of its own: a
-single stateful `Scheduling` Process Manager that owns one planned command and
-manages its scheduling lifecycle. Because it lives inside Resources, the grant
-facts it reacts to and the scheduling facts it emits are domestic Resources
-events rather than cross-context integration facts.
-
-The process persists an allowlisted **application command value** in Protobuf
-`Any` together with its schedule ID, authoritative organization, approved
-purpose and target, due time, and current status. Type URLs must be registered,
-explicitly allowlisted, tenant-compatible, target-compatible, size-bounded,
-schema-compatible, and unpackable to the expected command value. The payload
-never supplies a trusted tenant, actor, target route, or credentials.
-
-The required choreography is:
-
-1. Resources commits a genuine fact such as `AccessGrantCreated` with a
-   pending-scheduling status and activation/expiration scheduling intents.
-2. The `Scheduling` process reacts to that Resources fact and accepts the
-   corresponding domestic `ScheduleCommand`.
-3. The process persists the planned command and emits `CommandScheduled` only
-   after that state is durable.
-4. The grant lifecycle consumes the scheduling confirmation and establishes
-   scheduled state only after every required schedule is confirmed. Active state
-   additionally requires successful handling and the resulting fact from the
-   target activation command.
-5. When the due time passes, the same `Scheduling` process sends its stored
-   command through the tenant-aware client supplied by the application. The
-   client sends the command to the same server, and the target receives an
-   ordinary domestic command.
-
-The process accepts `ScheduleCommand`, `RescheduleCommand`, and
-`CancelScheduledCommand`, and emits `CommandScheduled`, `CommandRescheduled`,
-and `ScheduledCommandCanceled`. Extension approval is a genuine grant fact the
-`Scheduling` process reacts to, rescheduling domestically and confirming it; the
-grant applies the extension only after confirmation. Revocation is authoritative
-in the grant lifecycle and emits a fact the `Scheduling` process reacts to,
-canceling domestically.
-
-The allowlist fixes the command schema and target route for each approved type
-and purpose. The payload cannot select an endpoint, context, actor, or tenant.
-Logs and Audit retain only the minimum redacted scheduling and correlation data,
-never the stored command payload.
-
-`ScheduleCommand`, `RescheduleCommand`, and `CancelScheduledCommand` are not
-browser/public commands; they are admitted only from an authenticated, validated
-committed integration receipt. Only due `Activate`/`Expire` receives a server-
-minted capability after a current claim, bound to organization, schedule,
-revision, purpose, route, and target type. Browser principals are denied
-schedule/reschedule/cancel and direct activate/expire commands; the capability
-is purpose-bound to the fixed route.
-
-No item may be named or presented as scheduled before the `Scheduling` process
-has persisted it. A suffix such as "requested" is unnecessary for the grant
-facts that drive scheduling; they should describe the real grant state that
-caused a scheduling intent.
+grant's effective start through the proposed new end, while preserving the
+originally requested interval for audit.
 
 ## Audit (internal Resources component)
 

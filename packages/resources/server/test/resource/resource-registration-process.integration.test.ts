@@ -46,7 +46,7 @@ beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
 
 describe("ResourceRegistrationProcessManager should", () => {
-  it("integrates resource registration through organization recording", async () => {
+  it("register a resource and record it in its organization", async () => {
     const box = await resourcesBlackBox();
     const scope = box.onBehalfOf(actor);
     expect((await createOrganization(scope)).kind).toBe("ok");
@@ -86,7 +86,7 @@ describe("ResourceRegistrationProcessManager should", () => {
     }
   });
 
-  it("compensates a name conflict by deleting the created resource", async () => {
+  it("compensate a name conflict by deleting the created resource", async () => {
     const box = await resourcesBlackBox();
     const scope = box.onBehalfOf(actor);
     expect((await createOrganization(scope)).kind).toBe("ok");

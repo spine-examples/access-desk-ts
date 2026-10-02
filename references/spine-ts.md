@@ -126,7 +126,7 @@ fires asynchronously and never reaches the post outcome. Validation errors ack
 
 **Declare every rejection a command handler may throw with `@Throws(Companion)`**
 — the generated rejection companion, e.g. `@Throws(ResourceNameAlreadyUsed)`, on
-the `@Assign`/`@Command` method. The runtime refuses an _undeclared_ thrown
+the `@Assign`/`@Command` method. The runtime rejects an _undeclared_ thrown
 rejection, so a handler's `@Throws` must list all of them. A declared rejection
 becomes a first-class produced signal, so a client can **subscribe to the
 rejection type directly**. Prove a rejection in BlackBox by subscribing to its type,
@@ -154,6 +154,38 @@ from this table rather than guessing:
 | `@Command`   | event **or** command → command | PM            | Command **reaction / substitution**. Does **not** register its trigger as a postable command.          |
 | `@React`     | event → event(s)               | PM            | Domestic event reactor (produces events, never commands).                                              |
 | `@Subscribe` | event → `void` (mutates state) | Projection    | Read-model / process state update; use `External<T>` on the parameter for a cross-context event.       |
+
+**Handler return types.** A handler declares what it produces with
+ordinary TypeScript types, resolved by `spine-proto handlers` to generated
+schemas: one message (`TaskCreated`), a union (`CreateAccessGrant |
+ExtendAccessGrant`), an array (`Foo[]`, `(A | B)[]`, `readonly Foo[]`), a tuple
+(`[A, B]`, `readonly [A, B?]`, named entries), an alias whose alternatives are
+generated types, and `Promise<…>` of any of these. The decorator limits them:
+
+- `@Assign` returns events, and must return at least one on success. When the
+  command cannot proceed, throw: a declared rejection only when the rejection has
+  business meaning and can really happen (a manager revoking access that has
+  already ended); a plain `Error` when only a wrongly written handler could
+  cause it (a server-only command arriving in a state its issuer never sends it
+  in). Rejections are domain facts; programming errors are not.
+- `@Command` reacting to an event or rejection, and `@React`, may also return
+  `undefined` (or an empty typed array) to produce nothing; entity state
+  changes are still saved.
+- `@Subscribe` returns only `void`.
+
+Entities take two type parameters — `Aggregate<Id, typeof StateSchema>` — as
+the framework manages the version. A generated `ts_type` message interface
+(`generated/interfaces/…`) is **not** accepted as a return type, and neither is
+a local type alias. Name its member commands as a union in the signature, with a
+compile-time check that the union matches the interface's members.
+
+**`this.state` is the state before the handler's transaction.** Inside an
+`@Assign`, `this.update(...)` changes only the draft; `this.state` keeps
+returning the state before the command until the transaction commits. Build an
+event from the command's values, or from values captured before the update —
+never from `this.state` fields the same handler just set. An event built from
+the old, empty state fails validation at commit, and the command is dropped
+after acking `ok`.
 
 Entity inbox replay uses the normal handler path, so effects must be replay-safe.
 Process Manager outputs must not be the only irreplaceable source of a critical
@@ -239,15 +271,6 @@ Use the Spine core `Any`/TypeRegistry helpers verified against this exact
 snapshot. The server application composes the complete generated TypeRegistry;
 do not depend on runtime package scanning or mutable global schema registration.
 
-The stateful `Scheduling` Process Manager accepts only registered and
-application-allowlisted **command** schemas. The allowlist maps `{type URL, purpose}`
-to a fixed command schema and target route, independently of the payload.
-Validate and unpack the command before the process sends it through the application-supplied,
-tenant-aware same-server client. The stored `Any` must not carry credentials or
-establish trusted tenant/actor identity, and cannot select an endpoint, context,
-actor, or tenant. Unknown, incompatible, or unpacking-failed values fail closed
-and never become arbitrary command execution.
-
 **Reading Protobuf enum custom options** (the "enum with `EnumValueOptions`
 extension" pattern): `getOption` from `@bufbuild/protobuf`,
 `getOption(EnumSchema.values.find((v) => v.number === n), extension)`. Comparing
@@ -290,9 +313,7 @@ authoritative query for reconnect/gap recovery. Command validation remains
 server-side.
 
 The gateway, not a bounded context, performs OIDC/session/CSRF/origin controls
-defined in the architecture. Internal Scheduling ingress uses a distinct trusted
-principal and never reuses a browser session or accepts caller-provided tenant,
-route, or actor claims.
+defined in the architecture.
 
 ## Testing boundaries
 
@@ -311,6 +332,17 @@ import("../dist/src/index.js")`) because vitest cannot execute Spine's standard
 decorators from raw TS source; the root `vitest.config.ts` externalizes `dist`
 so handler classes keep the identity the registry registered. Multitenant
 BlackBox: pass `{ tenant }` to `BlackBox.from`.
+
+**Emitting from a third-party context.** `ThirdPartyContext.multitenant(name)`
+emits an event into every context in the process as an external event, with the
+tenant taken from the actor passed to `emittedEvent`. It resolves the event's
+schema through `ServerEnvironment`'s `typeRegistry`, so configure
+`ServerEnvironment.when(EnvironmentType.Local).use({ typeRegistry })` with the
+complete registry before the environment first resolves. The receiving
+context's routing reads the tenant from `EventContext.origin`
+(`importContext`). In this snapshot a client subscription did not receive the
+domestic facts that followed from an imported event (observed with the Clock);
+assert those through queries or `box.assertEvents()`.
 
 **Testing an `External<T>` subscription** posts the producing fact directly to
 the consumer's BlackBox actor scope: `await box.onBehalfOf("producer")
