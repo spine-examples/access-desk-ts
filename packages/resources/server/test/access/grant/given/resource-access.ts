@@ -24,12 +24,10 @@ import {
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/commands_pb.js";
 import {
   AccessGrantViewSchema,
-  GrantCoverageSchema,
   type AccessGrantView,
-  type GrantCoverage,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/access_grant_pb.js";
 
-import { actor, readAll, readWhere } from "../../../given/resources-context.js";
+import { actor, readWhere } from "../../../given/resources-context.js";
 import { ManualClock } from "../../../given/manual-clock.js";
 import {
   approveAccessRequest,
@@ -45,6 +43,9 @@ import {
   openResource,
   type ResourceDraft,
 } from "../../../resource/given/resource.js";
+
+/** The requester's access to the payroll resource, which holds the grants these tests issue. */
+const requesterAccess = { grantee: { uuid: actor }, resource: { uuid: resourceUuid } };
 
 /** The moment every grant test starts at, on a whole minute. */
 export const startOfTest = new Date("2030-01-01T10:00:00Z");
@@ -149,12 +150,15 @@ export async function approveExtension(
 
 /** Posts `RevokeAccessGrant` on behalf of `manager`, naming them as the revoking person. */
 export function revokeGrant(box: BlackBox, id: string, manager: string, reason: string) {
-  return box
-    .onBehalfOf(manager)
-    .post(
-      RevokeAccessGrantSchema,
-      create(RevokeAccessGrantSchema, { id: { uuid: id }, manager: { uuid: manager }, reason }),
-    );
+  return box.onBehalfOf(manager).post(
+    RevokeAccessGrantSchema,
+    create(RevokeAccessGrantSchema, {
+      id: requesterAccess,
+      grant: { uuid: id },
+      manager: { uuid: manager },
+      reason,
+    }),
+  );
 }
 
 /** Posts `ExtendAccessGrant` directly, as the grant itself does when an extension is approved. */
@@ -166,7 +170,12 @@ export function postExtendAccessGrant(
 ) {
   return scope.post(
     ExtendAccessGrantSchema,
-    create(ExtendAccessGrantSchema, { id: { uuid: id }, request: { uuid: request }, end }),
+    create(ExtendAccessGrantSchema, {
+      id: requesterAccess,
+      grant: { uuid: id },
+      request: { uuid: request },
+      end,
+    }),
   );
 }
 
@@ -198,11 +207,6 @@ export function readAccessTo(
     ResourceIdSchema,
     create(ResourceIdSchema, { uuid: resource }),
   );
-}
-
-/** Every person's coverage of every resource. */
-export function readCoverage(reader: BlackBoxScope): Promise<GrantCoverage[]> {
-  return readAll(reader, GrantCoverageSchema, "grant-coverage");
 }
 
 /** Waits until the requester's view of a grant satisfies the predicate, and returns it. */

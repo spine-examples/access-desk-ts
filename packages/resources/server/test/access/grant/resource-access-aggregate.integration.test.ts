@@ -34,14 +34,14 @@ import {
   minutesIn,
   readAccessTo,
   testClock,
-} from "./given/access-grant.js";
+} from "./given/resource-access.js";
 
 // These run an access grant end to end, from a manager's approval to the
 // requester's and the resource's views, on a controlled clock.
 beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
 
-describe("AccessGrantAggregate should", () => {
+describe("ResourceAccessAggregate should", () => {
   it("issue active access on approval", async () => {
     const clock = testClock();
     const box = await resourcesBlackBox(clock);

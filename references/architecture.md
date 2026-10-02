@@ -216,8 +216,22 @@ time, so only the first is accepted and the others are refused with
 
 ## Request and grant lifecycles
 
-Requests and grants are separate lifecycles. The request is a process, and the
-grant is an aggregate that reads nothing but its own state.
+Requests and grants are separate lifecycles. The request is a process. The
+grants one person holds to one resource form one aggregate, Resource Access,
+which reads nothing but its own state.
+
+A submission is checked before the request is accepted, and changes no grant:
+
+1. The requester submits a request, which is checked against the resource's
+   policy from the catalog.
+2. The requester's access to the resource checks what the request asks for:
+   the requested access, or the requested extension of a grant. Both checks
+   bring the longest total access the resource permits.
+3. When the check refuses — access already held, too long, or a grant that
+   gives no access — the submission fails and the request ends without effect.
+   Otherwise the request is submitted and awaits a manager's decision.
+
+Grants change only after approval.
 
 A manager's approval takes effect on the grant before the request counts as
 approved:
@@ -226,14 +240,15 @@ approved:
 2. A first-time request asks for its grant to be created, and an extension
    request asks for the grant it names to be extended.
 3. Once the grant is created or extended, the request is approved.
-4. When the grant to extend gives no access, the grant refuses with
-   `AccessGrantNotActive`, the approval fails, and the request ends without
+4. When the grant to extend gives no access (`AccessGrantNotActive`), or the
+   requester has come to hold the same or stronger access since
+   (`AccessAlreadyHeld`), the approval fails and the request ends without
    effect.
 
 While the grant is asked, the request accepts no other decision.
 
-Request statuses are pending, approval requested, approved, approval failed,
-denied, and canceled.
+Request statuses are submission requested, submission failed, pending,
+approval requested, approved, approval failed, denied, and canceled.
 
 A grant has no lifecycle of its own beyond its revocation. It holds the person,
 resource, and access level it gives access for, its period `[start, end)`, and
@@ -244,12 +259,12 @@ access at that moment.
 
 Any manager of the granting resource may revoke it, with a reason, until its
 end, whether its period has begun or not. The managers are those of the
-approved request, which the grant keeps from its creation. The grant keeps only
-what it decides by: the access, its period, those managers, and whether it was
-revoked. Its read model shows the request that issued it and each extension
-request that moved its end, so who approved the access is read from those
-requests. Revocation authority is scoped to that resource, not the
-organization.
+approved request, which the person's access to the resource keeps. That access
+keeps only what it decides by: each grant's level and period, and those
+managers. A grant that ended or was revoked is forgotten there. The grant's
+read model shows the request that issued it and each extension request that
+moved its end, so who approved the access is read from those requests.
+Revocation authority is scoped to that resource, not the organization.
 
 An extension:
 

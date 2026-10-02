@@ -22,6 +22,7 @@ import {
   AccessRequestApprovalRequestedSchema,
   AccessRequestApprovedSchema,
   AccessRequestDeniedSchema,
+  AccessRequestSubmissionFailedSchema,
   AccessRequestSubmittedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
 import {
@@ -67,7 +68,7 @@ import {
   minutesIn,
   revokeGrant,
   testClock,
-} from "../grant/given/access-grant.js";
+} from "../grant/given/resource-access.js";
 
 const { expectRejection, recordEvents } = eventRecording(testActorContext);
 
@@ -259,7 +260,7 @@ describe("AccessRequestProcessManager should", () => {
             period: {
               kind: {
                 case: "scheduled",
-                value: { start: { seconds: 0n }, end: { seconds: 7200n } },
+                value: { start: { seconds: 3600n }, end: { seconds: 10800n } },
               },
             },
           }),
@@ -282,6 +283,24 @@ describe("AccessRequestProcessManager should", () => {
       await expectRejection(box, requester, AccessAlreadyHeldSchema, () =>
         requester.post(SubmitAccessRequestSchema, submitRequest("req-held-again")),
       );
+    });
+
+    it("fail the submission of a request for access already held", async () => {
+      const box = await resourcesBlackBox(testClock());
+      const requester = await givenActiveGrant(box, "req-held-first", 10);
+      const failed = await recordEvents(requester, AccessRequestSubmissionFailedSchema);
+      const submitted = await recordEvents(requester, AccessRequestSubmittedSchema);
+      try {
+        await requester.post(SubmitAccessRequestSchema, submitRequest("req-held-second"));
+
+        const event = await failed.waitFor(box, (e) => e.id?.uuid === "req-held-second");
+        expect(event.requester?.uuid).toBe(actor);
+        expect(submitted.received.map((e) => e.id?.uuid)).not.toContain("req-held-second");
+        expect(await statusOf(requester, "req-held-second")).toBeUndefined();
+      } finally {
+        await failed.cancel();
+        await submitted.cancel();
+      }
     });
 
     it("submit a request for a stronger level than the one held", async () => {
@@ -480,6 +499,25 @@ describe("AccessRequestProcessManager should", () => {
       );
     });
 
+    it("fail the submission of an extension of a grant that gives no access", async () => {
+      const clock = testClock();
+      const box = await resourcesBlackBox(clock);
+      const requester = await givenActiveGrant(box, "req-over", 10);
+      clock.advanceMinutes(10);
+      const failed = await recordEvents(requester, AccessRequestSubmissionFailedSchema);
+      try {
+        await requester.post(
+          SubmitAccessExtensionRequestSchema,
+          submitExtensionRequest("ext-over", { grant: { uuid: "req-over" } }),
+        );
+
+        await failed.waitFor(box, (e) => e.id?.uuid === "ext-over");
+        expect(await statusOf(requester, "ext-over")).toBeUndefined();
+      } finally {
+        await failed.cancel();
+      }
+    });
+
     it("reject extending into access another grant already gives ('AccessAlreadyHeld')", async () => {
       // Held: [0, 10) and, through another grant, [10, 20). Extending the first overlaps the second.
       const box = await resourcesBlackBox(testClock());
@@ -638,6 +676,39 @@ describe("AccessRequestProcessManager should", () => {
       } finally {
         await failed.cancel();
       }
+    });
+
+    it("fail the approval of access the requester came to hold after submitting", async () => {
+      // Held: [0, 10). Requested: [20, 30), clear of it when submitted.
+      const box = await resourcesBlackBox(testClock());
+      const requester = await givenActiveGrant(box, "req-held", 10);
+      await requester.post(
+        SubmitAccessExtensionRequestSchema,
+        submitExtensionRequest("ext-overlap", {
+          grant: { uuid: "req-held" },
+          duration: { seconds: 900n },
+        }),
+      );
+      await submitAndAssign(box, requester, "req-later", "primary", {
+        period: {
+          kind: { case: "scheduled", value: { start: minutesIn(20), end: minutesIn(30) } },
+        },
+      });
+      // The extension moves the held end to 25, into the requested period.
+      await approveAccessRequest(box, "ext-overlap", "primary");
+      await box.eventually(
+        () => statusOf(requester, "ext-overlap"),
+        (status) => status === AccessRequestStatus.APPROVED,
+      );
+
+      await expectRejection(box, requester, AccessAlreadyHeldSchema, () =>
+        approveAccessRequest(box, "req-later", "primary"),
+      );
+
+      await box.eventually(
+        () => statusOf(requester, "req-later"),
+        (status) => status === AccessRequestStatus.APPROVAL_FAILED,
+      );
     });
 
     it("fail the approval of an extension of access ended since it was submitted", async () => {

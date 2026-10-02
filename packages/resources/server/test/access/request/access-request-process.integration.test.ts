@@ -36,7 +36,7 @@ import {
   submitRequest,
 } from "./given/access-request.js";
 import { managerHasTask, readAssignments } from "./given/access-decision-assignment.js";
-import { givenActiveGrant, minutesIn, testClock } from "../grant/given/access-grant.js";
+import { givenActiveGrant, minutesIn, testClock } from "../grant/given/resource-access.js";
 
 const { recordEvents } = eventRecording(testActorContext);
 

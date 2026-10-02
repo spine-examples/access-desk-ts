@@ -18,6 +18,8 @@ import {
   AccessGrantCreatedSchema,
   AccessGrantExtendedSchema,
   AccessGrantRevokedSchema,
+  RequestedAccessCheckedSchema,
+  RequestedExtensionCheckedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
 import {
   AccessGrantNotActiveSchema,
@@ -32,11 +34,13 @@ import {
   testActorContext,
 } from "../../given/resources-context.js";
 import type { ManualClock } from "../../given/manual-clock.js";
+import { SubmitAccessExtensionRequestSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/commands_pb.js";
 import {
   approveAccessRequest,
   resourceUuid,
   seed,
   submitAndAssign,
+  submitExtensionRequest,
 } from "../request/given/access-request.js";
 import {
   approveExtension,
@@ -46,11 +50,12 @@ import {
   issueGrant,
   minutesIn,
   postExtendAccessGrant,
+  readAccessHeldBy,
   revokeGrant,
   seedGrantedResource,
   testClock,
   type GrantDraft,
-} from "./given/access-grant.js";
+} from "./given/resource-access.js";
 
 const { expectRejection, recordEvents } = eventRecording(testActorContext);
 
@@ -91,7 +96,7 @@ async function fence({ box, scope }: Given, id: string): Promise<void> {
   );
 }
 
-describe("AccessGrantAggregate should", () => {
+describe("ResourceAccessAggregate should", () => {
   describe("when a first-time request is approved", () => {
     it("issue immediate access counted from the approval", async () => {
       const clock = testClock();
@@ -258,6 +263,46 @@ describe("AccessGrantAggregate should", () => {
         expect(view.end).toEqual(minutesIn(60));
       } finally {
         await extended.cancel();
+      }
+    });
+  });
+
+  describe("when a request is submitted", () => {
+    it("check the requested access without creating a grant", async () => {
+      const box = await resourcesBlackBox(testClock());
+      const scope = box.onBehalfOf(actor);
+      await seedGrantedResource(box);
+      const checked = await recordEvents(scope, RequestedAccessCheckedSchema);
+      try {
+        await submitAndAssign(box, scope, "req-checked", "primary");
+
+        const event = await checked.waitFor(box, (e) => e.request?.uuid === "req-checked");
+        expect(event.id?.grantee?.uuid).toBe(actor);
+        expect(event.id?.resource?.uuid).toBe(resourceUuid);
+        expect(await readAccessHeldBy(scope)).toHaveLength(0);
+      } finally {
+        await checked.cancel();
+      }
+    });
+
+    it("check the requested extension without moving the grant's end", async () => {
+      const { box, scope } = await givenGrant("grant-checked");
+      const checked = await recordEvents(scope, RequestedExtensionCheckedSchema);
+      try {
+        await scope.post(
+          SubmitAccessExtensionRequestSchema,
+          submitExtensionRequest("ext-checked", {
+            grant: { uuid: "grant-checked" },
+            duration: { seconds: 1800n },
+          }),
+        );
+
+        const event = await checked.waitFor(box, (e) => e.request?.uuid === "ext-checked");
+        expect(event.proposedEnd).toEqual(minutesIn(90));
+        const view = await awaitGrantIssued(box, scope, "grant-checked");
+        expect(view.end).toEqual(minutesIn(60));
+      } finally {
+        await checked.cancel();
       }
     });
   });

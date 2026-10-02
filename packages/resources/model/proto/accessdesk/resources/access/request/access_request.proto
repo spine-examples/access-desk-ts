@@ -16,6 +16,7 @@ syntax = "proto3";
 
 package accessdesk.resources.access.request;
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "accessdesk/resources/identifiers.proto";
 import "accessdesk/resources/values.proto";
@@ -45,6 +46,10 @@ message AccessRequest {
 
     // When the request was approved or denied.
     google.protobuf.Timestamp when_decided = 6;
+
+    // The time an extension request asks to add to its grant, kept until the
+    // request is submitted.
+    google.protobuf.Duration extension_duration = 7;
 }
 
 // An access request and its current status.

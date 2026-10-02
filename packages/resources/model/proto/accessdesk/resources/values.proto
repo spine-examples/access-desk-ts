@@ -116,6 +116,13 @@ enum AccessRequestStatus {
 
     // A manager approved the request, but the access could not be granted.
     APPROVAL_FAILED = 6;
+
+    // The requester submitted the request, and whether the access may be granted
+    // is being checked.
+    SUBMISSION_REQUESTED = 7;
+
+    // The requester submitted the request, but the access may not be granted.
+    SUBMISSION_FAILED = 8;
 }
 
 // A scheduled half-open access interval.
@@ -163,6 +170,9 @@ message AccessExtension {
 
     // The end the grant would have once the extension is approved.
     google.protobuf.Timestamp proposed_end = 2 [(required) = true];
+
+    // The resource the grant gives access to.
+    ResourceId resource = 3 [(required) = true];
 }
 
 // The access a grant gives.

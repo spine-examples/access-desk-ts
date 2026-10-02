@@ -24,6 +24,34 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
+// The access a first-time request asks for was checked against the access the
+// requester already holds, and may be granted.
+message RequestedAccessChecked {
+
+    // The requester, and the resource the requested access applies to.
+    accessdesk.resources.ResourceAccessId id = 1 [(required) = true];
+
+    // The request that asks for the access.
+    accessdesk.resources.AccessRequestId request = 2 [(required) = true];
+}
+
+// The extension a request asks for was checked against the grant it would
+// extend and the access the requester already holds, and may be granted.
+message RequestedExtensionChecked {
+
+    // The requester, and the resource the grant gives access to.
+    accessdesk.resources.ResourceAccessId id = 1 [(required) = true];
+
+    // The grant the extension would apply to.
+    accessdesk.resources.AccessGrantId grant = 2 [(required) = true];
+
+    // The request that asks for the extension.
+    accessdesk.resources.AccessRequestId request = 3 [(required) = true];
+
+    // The end the grant would have once extended.
+    google.protobuf.Timestamp proposed_end = 4 [(required) = true];
+}
+
 // An access grant was issued from an approved request.
 message AccessGrantCreated {
 

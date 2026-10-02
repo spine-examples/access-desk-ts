@@ -24,6 +24,25 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
+// A requester submitted a request, and whether its access may be granted is to
+// be checked.
+message AccessRequestSubmissionRequested {
+
+    // The request the requester submitted.
+    accessdesk.resources.AccessRequestId id = 1 [(required) = true];
+}
+
+// A requester submitted a request, but the access it asks for may not be
+// granted, so the request ended without effect.
+message AccessRequestSubmissionFailed {
+
+    // The request whose submission failed.
+    accessdesk.resources.AccessRequestId id = 1 [(required) = true];
+
+    // The person who submitted the request.
+    accessdesk.identity.PersonId requester = 2 [(required) = true];
+}
+
 // An access request was accepted for a manager decision.
 message AccessRequestSubmitted {
 

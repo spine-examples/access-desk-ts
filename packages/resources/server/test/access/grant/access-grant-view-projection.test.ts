@@ -33,7 +33,7 @@ import {
   seedGrantedResource,
   seedOtherResource,
   testClock,
-} from "./given/access-grant.js";
+} from "./given/resource-access.js";
 
 // The projection is driven by managers approving requests, which issue and
 // extend grants, and by revoking them. It is read through both of its queries:

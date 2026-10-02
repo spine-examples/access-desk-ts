@@ -12,7 +12,6 @@
  * and limitations under the License.
  */
 
-import { create } from "@bufbuild/protobuf";
 import { anyIs, anyUnpack } from "@bufbuild/protobuf/wkt";
 import type { EventContext } from "@spine-event-engine/proto";
 import { BoundedContext, type Clock, EventRouting, SystemClock } from "@spine-event-engine/server";
@@ -29,19 +28,28 @@ import {
   AccessRequestSubmittedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
 import {
-  GrantCoverageIdSchema,
+  type AccessGrantId,
   type AccessRequestId,
-  type GrantCoverageId,
   type ResourceId,
 } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
-import type { GrantedAccess } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import {
   AccessGrantCreatedSchema,
   AccessGrantExtendedSchema,
   AccessGrantRevokedSchema,
+  RequestedAccessCheckedSchema,
+  RequestedExtensionCheckedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
-import { ExtendAccessGrantSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/commands_pb.js";
+import {
+  CheckRequestedAccessSchema,
+  CheckRequestedExtensionSchema,
+  CreateAccessGrantSchema,
+  ExtendAccessGrantSchema,
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/commands_pb.js";
 import { AccessGrantNotActiveSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/rejections_pb.js";
+import {
+  AccessAlreadyHeldSchema,
+  RequestedDurationTooLongSchema,
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/rejections_pb.js";
 import { type PersonId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { OrganizationAggregate } from "./organization/organization-aggregate.js";
 import { OrganizationViewProjection } from "./organization/organization-view-projection.js";
@@ -51,8 +59,7 @@ import { ResourceRegistrationProcessManager } from "./resource/resource-registra
 import { AccessRequestProcessManager } from "./access/request/access-request-process.js";
 import { AccessRequestViewProjection } from "./access/request/access-request-view-projection.js";
 import { AccessDecisionAssignmentProjection } from "./access/request/access-decision-assignment-projection.js";
-import { AccessGrantAggregate } from "./access/grant/access-grant-aggregate.js";
-import { GrantCoverageProjection } from "./access/grant/grant-coverage-projection.js";
+import { ResourceAccessAggregate } from "./access/grant/resource-access-aggregate.js";
 import { AccessGrantViewProjection } from "./access/grant/access-grant-view-projection.js";
 import { useClock } from "./time/clock.js";
 
@@ -100,13 +107,17 @@ export async function createResourcesContext(
     .route(AccessRequestCanceledSchema, (event) => event.manager)
     .route(AccessGrantRevokedSchema, (event) => event.manager);
   const requestRouting = EventRouting.create<AccessRequestId>()
+    .route(RequestedAccessCheckedSchema, (event) => requestOf(event))
+    .route(RequestedExtensionCheckedSchema, (event) => requestOf(event))
     .route(AccessGrantCreatedSchema, (event) => requestOf(event))
     .route(AccessGrantExtendedSchema, (event) => requestOf(event))
-    .route(AccessGrantNotActiveSchema, (_rejection, context) => requestOfRefusedExtension(context));
-  const coverageRouting = EventRouting.create<GrantCoverageId>()
-    .route(AccessGrantCreatedSchema, (event) => coverageOf(event.access))
-    .route(AccessGrantExtendedSchema, (event) => coverageOf(event.access))
-    .route(AccessGrantRevokedSchema, (event) => coverageOf(event.access));
+    .route(AccessAlreadyHeldSchema, (_rejection, context) => requestRefused(context))
+    .route(AccessGrantNotActiveSchema, (_rejection, context) => requestRefused(context))
+    .route(RequestedDurationTooLongSchema, (_rejection, context) => requestRefused(context));
+  const grantViewRouting = EventRouting.create<AccessGrantId>()
+    .route(AccessGrantCreatedSchema, (event) => grantOf(event))
+    .route(AccessGrantExtendedSchema, (event) => grantOf(event))
+    .route(AccessGrantRevokedSchema, (event) => grantOf(event));
   const builder = BoundedContext.multitenant("Resources")
     .withGeneratedRegistryRoot(new URL("..", import.meta.url))
     .add(OrganizationAggregate)
@@ -117,39 +128,45 @@ export async function createResourcesContext(
     .add(AccessRequestProcessManager, { eventRouting: requestRouting })
     .add(AccessRequestViewProjection)
     .add(AccessDecisionAssignmentProjection, { eventRouting: decisionRouting })
-    .add(AccessGrantAggregate)
-    .add(GrantCoverageProjection, { eventRouting: coverageRouting })
-    .add(AccessGrantViewProjection);
+    .add(ResourceAccessAggregate)
+    .add(AccessGrantViewProjection, { eventRouting: grantViewRouting });
   return builder.buildAsync();
 }
 
 /**
- * The approved request a grant answers, when it answers one.
+ * The request a person's access to a resource answers.
  *
- * A grant answers the request that asked it to be created or extended.
+ * The access answers the request that asked for a check when it was submitted,
+ * or for a grant to be created or extended when it was approved.
  */
 function requestOf(answer: { readonly request?: AccessRequestId | undefined }): AccessRequestId[] {
   return answer.request === undefined ? [] : [answer.request];
 }
 
+/** The commands through which a request asks something of a person's access to a resource. */
+const askedByRequest = [
+  CheckRequestedAccessSchema,
+  CheckRequestedExtensionSchema,
+  CreateAccessGrantSchema,
+  ExtendAccessGrantSchema,
+] as const;
+
 /**
- * The approved extension request whose extension a grant refused.
+ * The request whose command a person's access to a resource refused.
  *
- * The request is the one named by the refused `ExtendAccessGrant`. A refusal of
- * anything else, such as a revocation, answers no request.
+ * A refusal of anything a request did not ask for, such as a revocation or a
+ * submission the request itself refused, answers no request.
  */
-function requestOfRefusedExtension(context: EventContext): AccessRequestId[] {
+function requestRefused(context: EventContext): AccessRequestId[] {
   const refused = context.rejection?.command?.message;
-  if (refused === undefined || !anyIs(refused, ExtendAccessGrantSchema)) {
-    return [];
-  }
-  return requestOf(anyUnpack(refused, ExtendAccessGrantSchema) ?? {});
+  const asked =
+    refused === undefined ? undefined : askedByRequest.find((schema) => anyIs(refused, schema));
+  return refused === undefined || asked === undefined
+    ? []
+    : requestOf(anyUnpack(refused, asked) ?? {});
 }
 
-/** The coverage of the person and resource a grant applies to. */
-function coverageOf(access: GrantedAccess | undefined): GrantCoverageId[] {
-  const { grantee, resource } = access ?? {};
-  return grantee === undefined || resource === undefined
-    ? []
-    : [create(GrantCoverageIdSchema, { grantee, resource })];
+/** The grant an event tells about. */
+function grantOf(event: { readonly id?: AccessGrantId | undefined }): AccessGrantId[] {
+  return event.id === undefined ? [] : [event.id];
 }

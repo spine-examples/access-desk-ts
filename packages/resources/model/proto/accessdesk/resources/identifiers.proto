@@ -46,7 +46,7 @@ message AccessGrantId {
 }
 
 // Identifies the access one person holds to one resource.
-message GrantCoverageId {
+message ResourceAccessId {
 
     // The person holding the access.
     accessdesk.identity.PersonId grantee = 1 [(required) = true];

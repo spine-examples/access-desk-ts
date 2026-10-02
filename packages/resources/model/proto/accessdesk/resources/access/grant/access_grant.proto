@@ -24,32 +24,42 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
-// Access a person holds to a resource from its start until its end.
+// The access one person holds, or is about to hold, to one resource.
 //
-// An approved first-time request creates the grant, and each approved extension
-// request moves its end. A manager of the resource may revoke the grant before
-// its end.
+// It is made of grants. An approved first-time request creates a grant, and
+// each approved extension request moves a grant's end. A manager of the
+// resource may revoke a grant before its end.
 //
-message AccessGrant {
+// The person never holds the same or a stronger access level through two
+// grants at the same time.
+//
+message ResourceAccess {
     option (entity).kind = AGGREGATE;
 
-    // The grant identifier.
-    accessdesk.resources.AccessGrantId id = 1;
+    // The person holding the access, and the resource it applies to.
+    accessdesk.resources.ResourceAccessId id = 1;
 
-    // The person, resource, and access level the grant gives access for.
-    accessdesk.resources.GrantedAccess access = 2 [(required) = true];
+    // The grants that give, or will give, the person access to the resource.
+    repeated Grant grant = 2 [(validate) = true];
 
-    // The inclusive start of the access.
-    google.protobuf.Timestamp start = 3 [(required) = true];
+    // The resource managers who may revoke the grants.
+    repeated accessdesk.identity.PersonId manager = 3;
 
-    // The exclusive end of the access.
-    google.protobuf.Timestamp end = 4 [(required) = true];
+    // Access of one level from its start until its end.
+    message Grant {
 
-    // The resource managers who may revoke the grant.
-    repeated accessdesk.identity.PersonId manager = 5 [(required) = true];
+        // The grant identifier.
+        accessdesk.resources.AccessGrantId id = 1 [(required) = true];
 
-    // Whether a manager revoked the grant before its end.
-    bool revoked = 6;
+        // The access level the grant gives.
+        accessdesk.resources.AccessLevel access_level = 2 [(required) = true];
+
+        // The inclusive start of the access.
+        google.protobuf.Timestamp start = 3 [(required) = true];
+
+        // The exclusive end of the access.
+        google.protobuf.Timestamp end = 4 [(required) = true];
+    }
 }
 
 // An access grant as its grantee and the resource's managers see it.
@@ -84,32 +94,4 @@ message AccessGrantView {
     // The approved extension requests that moved the end of the access, in the
     // order they took effect.
     repeated accessdesk.resources.AccessRequestId extension = 9;
-}
-
-// The access a person holds, or is about to hold, to one resource.
-message GrantCoverage {
-    option (entity).kind = PROJECTION;
-    option (entity).visibility = FULL;
-
-    // The person holding the access, and the resource it applies to.
-    accessdesk.resources.GrantCoverageId id = 1;
-
-    // The grants that give the person access to the resource.
-    repeated CoveringGrant grant = 2 [(validate) = true];
-
-    // A grant that gives, or will give, the person access to the resource.
-    message CoveringGrant {
-
-        // The grant that gives the person the access.
-        accessdesk.resources.AccessGrantId id = 1 [(required) = true];
-
-        // The access level the grant gives.
-        accessdesk.resources.AccessLevel access_level = 2 [(required) = true];
-
-        // The inclusive start of the access.
-        google.protobuf.Timestamp start = 3 [(required) = true];
-
-        // The exclusive end of the access.
-        google.protobuf.Timestamp end = 4 [(required) = true];
-    }
 }
