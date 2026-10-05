@@ -16,6 +16,7 @@ syntax = "proto3";
 
 package accessdesk.identity;
 
+import "accessdesk/identity/values.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
@@ -24,4 +25,16 @@ option (type_url_prefix) = "type.accessdesk";
 message PersonId {
 
     string uuid = 1 [(required) = true];
+}
+
+// Identifies an account a person holds with an identity provider, such as
+// their GitHub or Google account.
+message ExternalIdentityId {
+
+    // The identity provider that vouches for the account.
+    IdentityProvider provider = 1 [(required) = true];
+
+    // The name the provider gives the account, which never changes for that
+    // provider.
+    string subject = 2 [(required) = true];
 }
