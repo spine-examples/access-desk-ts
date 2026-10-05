@@ -1,0 +1,94 @@
+/*
+ * Copyright 2026 CodeMatters, Lda.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+ * except in compliance with the License. You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under
+ * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+ * either express or implied. See the License for the specific language governing permissions
+ * and limitations under the License.
+ */
+
+syntax = "proto3";
+
+package accessdesk.resources.access.grant;
+
+import "google/protobuf/timestamp.proto";
+import "accessdesk/resources/identifiers.proto";
+import "accessdesk/resources/values.proto";
+import "accessdesk/identity/identifiers.proto";
+import "spine/options.proto";
+
+option (type_url_prefix) = "type.accessdesk";
+
+// The access one person holds, or is about to hold, to one resource.
+//
+// It is made of grants. An approved first-time request creates a grant, and
+// each approved extension request moves a grant's end. A manager of the
+// resource may revoke a grant before its end.
+//
+message ResourceAccess {
+    option (entity).kind = AGGREGATE;
+
+    // The person holding the access, and the resource it applies to.
+    accessdesk.resources.ResourceAccessId id = 1;
+
+    // The grants that give, or will give, the person access to the resource.
+    repeated Grant grant = 2 [(validate) = true];
+
+    // The resource managers who may revoke the grants.
+    repeated accessdesk.identity.PersonId manager = 3;
+
+    // Access of one level from its start until its end.
+    message Grant {
+
+        // The grant identifier.
+        accessdesk.resources.AccessGrantId id = 1 [(required) = true];
+
+        // The access level the grant gives.
+        accessdesk.resources.AccessLevel access_level = 2 [(required) = true];
+
+        // The inclusive start of the access.
+        google.protobuf.Timestamp start = 3 [(required) = true];
+
+        // The exclusive end of the access.
+        google.protobuf.Timestamp end = 4 [(required) = true];
+    }
+}
+
+// An access grant as its grantee and the resource's managers see it.
+message AccessGrantView {
+    option (entity).kind = PROJECTION;
+    option (entity).visibility = FULL;
+
+    // The grant identifier.
+    accessdesk.resources.AccessGrantId id = 1;
+
+    // The person who holds the access.
+    accessdesk.identity.PersonId grantee = 2 [(required) = true, (column) = true];
+
+    // The resource the access applies to.
+    accessdesk.resources.ResourceId resource = 3 [(required) = true, (column) = true];
+
+    // The access level held.
+    accessdesk.resources.AccessLevel access_level = 4 [(required) = true];
+
+    // The inclusive start of the access.
+    google.protobuf.Timestamp start = 5 [(required) = true];
+
+    // The exclusive end of the access.
+    google.protobuf.Timestamp end = 6 [(required) = true];
+
+    // Whether a manager revoked the grant before its end.
+    bool revoked = 7;
+
+    // The approved request that authorized the access.
+    accessdesk.resources.AccessRequestId request = 8 [(required) = true];
+
+    // The approved extension requests that moved the end of the access, in the
+    // order they took effect.
+    repeated accessdesk.resources.AccessRequestId extension = 9;
+}

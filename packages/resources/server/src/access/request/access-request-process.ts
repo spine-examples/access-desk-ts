@@ -13,26 +13,44 @@
  */
 
 import { create } from "@bufbuild/protobuf";
-import { Assign, ProcessManager, Throws } from "@spine-event-engine/server";
+import { type Duration, DurationSchema } from "@bufbuild/protobuf/wkt";
+import { Assign, Command, ProcessManager, React, Throws } from "@spine-event-engine/server";
 import { equals } from "../../proto/equals.js";
 import {
   PersonIdSchema,
   type PersonId,
 } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import {
+  type AccessExtension,
   type AccessLevel,
+  type NewAccessRequest,
   type ResourcePolicy,
 } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import {
   AccessRequestSchema,
   AccessRequestViewSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_pb.js";
+import {
+  CheckRequestedAccessSchema,
+  CheckRequestedExtensionSchema,
+  CreateAccessGrantSchema,
+  ExtendAccessGrantSchema,
+  type CheckRequestedAccess,
+  type CheckRequestedExtension,
+  type CreateAccessGrant,
+  type ExtendAccessGrant,
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/commands_pb.js";
+import type {
+  AccessGrantCreated,
+  AccessGrantExtended,
+  RequestedAccessChecked,
+  RequestedExtensionChecked,
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
+import type { AccessGrantNotActive as GrantNotActive } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/rejections_pb.js";
 import { ResourceCatalogItemSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_pb.js";
 import {
-  AccessPeriodSchema,
   AccessRequestSnapshotSchema,
   AccessRequestStatus,
-  type AccessPeriod,
   type AccessRequestSnapshot,
 } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import {
@@ -51,52 +69,78 @@ import type {
   SubmitAccessRequest,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/commands_pb.js";
 import {
+  AccessExtensionRequestSubmissionFailedSchema,
+  AccessExtensionRequestSubmissionStartedSchema,
   AccessExtensionRequestSubmittedSchema,
+  AccessRequestApprovalFailedSchema,
+  AccessRequestApprovalStartedSchema,
   AccessRequestApprovedSchema,
   AccessRequestCanceledSchema,
   AccessRequestDeniedSchema,
+  AccessRequestSubmissionFailedSchema,
+  AccessRequestSubmissionStartedSchema,
   AccessRequestSubmittedSchema,
+  type AccessExtensionRequestSubmissionFailed,
+  type AccessExtensionRequestSubmissionStarted,
   type AccessExtensionRequestSubmitted,
+  type AccessRequestApprovalFailed,
+  type AccessRequestApprovalStarted,
   type AccessRequestApproved,
   type AccessRequestCanceled,
   type AccessRequestDenied,
+  type AccessRequestSubmissionFailed,
+  type AccessRequestSubmissionStarted,
   type AccessRequestSubmitted,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
+import type {
+  AccessAlreadyHeld as AlreadyHeld,
+  RequestedDurationTooLong as DurationTooLong,
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/rejections_pb.js";
 import {
-  RequestedDurationTooLong,
   AccessLevelNotOffered,
   RequestAlreadyPending,
   NotAnEligibleManager,
   RequestAlreadyDecided,
   ResourceNotOpenForRequests,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/rejections.js";
+import { effectiveInterval, requestedInterval } from "../access-period.js";
+import { now } from "../../time/clock.js";
+import { compare, longerThan } from "../../time/interval.js";
+
+/** No time at all, which every extension must exceed. */
+const NO_TIME = create(DurationSchema, {});
 
 /**
  * One access request for a protected resource, driven from submission to a
  * terminal decision.
  *
- * 1. Validate a submission against the resource's request policy and capture
+ * 1. Validate a submission against the resource's request policy, and capture
  *    the managers who may decide it.
- * 2. Assign the accepted request to those managers for a decision.
- * 3. A manager approves or denies it, or the requester cancels it — once.
+ * 2. Have the requester's access to the resource check what the request asks
+ *    for: access not already held, or a grant that may be extended. That
+ *    changes nothing there. When the check rejects, the submission fails.
+ * 3. Assign the accepted request to those managers for a decision.
+ * 4. A manager approves or denies it, or the requester cancels it — once.
+ * 5. An approval asks for the grant to take effect: a first-time request
+ *    creates a grant, and an extension request extends the grant it names.
+ *    Only then does the requester's access change.
+ * 6. Once the grant is created or extended, the request is approved.
  *
- * A first-time request and an access-extension request differ only in what the
- * client submits and in the snapshot's `kind`; everything downstream is shared.
+ * A first-time request asks for new access; an extension request asks to keep
+ * active access longer by a duration, which fixes the end it proposes.
  */
 export class AccessRequestProcessManager extends ProcessManager<
   AccessRequestId,
-  typeof AccessRequestSchema,
-  bigint
+  typeof AccessRequestSchema
 > {
-  /** Validates a first-time access request and, when it passes, submits it. */
+  /**
+   * Validates a first-time access request against the resource's policy and,
+   * when it passes, has the access it asks for checked against the access the
+   * requester already holds.
+   */
   @Assign
-  @Throws(
-    ResourceNotOpenForRequests,
-    AccessLevelNotOffered,
-    RequestedDurationTooLong,
-    RequestAlreadyPending,
-  )
-  async submitAccessRequest(command: SubmitAccessRequest): Promise<AccessRequestSubmitted> {
+  @Throws(ResourceNotOpenForRequests, AccessLevelNotOffered, RequestAlreadyPending)
+  async submitAccessRequest(command: SubmitAccessRequest): Promise<AccessRequestSubmissionStarted> {
     const id = command.id ?? this.id;
     const requester = command.requester;
     const resource = command.resource;
@@ -110,9 +154,13 @@ export class AccessRequestProcessManager extends ProcessManager<
     ) {
       throw new Error("SubmitAccessRequest requires a requester, resource, level, and period.");
     }
+    const requested = requestedInterval(period, now());
+    if (requested === undefined || compare(requested.start, requested.end) >= 0) {
+      throw new Error("Requested access must end after it begins.");
+    }
+    this.assertUnclaimed();
     const policy = await this.requestablePolicy(id, resource);
     const level = this.matchLevel(id, policy, accessLevel);
-    this.assertWithinMaxDuration(id, policy, period);
     await this.assertNoDuplicate(id, requester, resource);
     const manager = this.managers(policy);
     const snapshot = create(AccessRequestSnapshotSchema, {
@@ -121,15 +169,18 @@ export class AccessRequestProcessManager extends ProcessManager<
       kind: { case: "newRequest", value: { resource, accessLevel: level, period } },
     });
     this.store(snapshot, manager);
-    return create(AccessRequestSubmittedSchema, { id, snapshot, manager });
+    return create(AccessRequestSubmissionStartedSchema, { id });
   }
 
-  /** Validates an access-extension request and, when it passes, submits it. */
+  /**
+   * Validates a request to keep active access longer against the resource's
+   * policy and, when it passes, has the extension checked against its grant.
+   */
   @Assign
-  @Throws(ResourceNotOpenForRequests, RequestedDurationTooLong, RequestAlreadyPending)
+  @Throws(ResourceNotOpenForRequests, RequestAlreadyPending)
   async submitAccessExtensionRequest(
     command: SubmitAccessExtensionRequest,
-  ): Promise<AccessExtensionRequestSubmitted> {
+  ): Promise<AccessExtensionRequestSubmissionStarted> {
     const id = command.id ?? this.id;
     const requester = command.requester;
     const grant = command.grant;
@@ -145,40 +196,194 @@ export class AccessRequestProcessManager extends ProcessManager<
         "SubmitAccessExtensionRequest requires a requester, grant, duration, and resource.",
       );
     }
-    // An extension renews an existing grant: its level is implied by the grant, so
-    // it is neither re-validated nor treated as a duplicate of a first-time request.
-    const period = create(AccessPeriodSchema, {
-      kind: { case: "immediateDuration", value: duration },
-    });
+    if (!longerThan(duration, NO_TIME)) {
+      throw new Error("An extension must add time to the access.");
+    }
+    this.assertUnclaimed();
     const policy = await this.requestablePolicy(id, resource);
-    this.assertWithinMaxDuration(id, policy, period);
     await this.assertNoDuplicate(id, requester, resource, grant);
     const manager = this.managers(policy);
     const snapshot = create(AccessRequestSnapshotSchema, {
       requester,
       justification: command.justification,
-      kind: { case: "extension", value: { grant, duration } },
+      kind: { case: "extension", value: { grant, resource } },
     });
     this.store(snapshot, manager);
-    return create(AccessExtensionRequestSubmittedSchema, { id, snapshot, manager });
+    return create(AccessExtensionRequestSubmissionStartedSchema, { id, duration });
   }
 
-  /** Approves a request that has not yet been decided. */
+  /**
+   * Sends the requested access to be checked once the submission starts.
+   *
+   * The check tells whether the requester already holds this access, and
+   * whether it would last longer than the resource permits.
+   */
+  @Command
+  async onAccessRequestSubmissionStarted(
+    _event: AccessRequestSubmissionStarted,
+  ): Promise<CheckRequestedAccess> {
+    const snapshot = this.requireSnapshot();
+    if (snapshot.kind.case !== "newRequest") {
+      throw new Error("Only a first-time request asks for new access.");
+    }
+    const { resource, accessLevel, period } = snapshot.kind.value;
+    const requested = period === undefined ? undefined : requestedInterval(period, now());
+    return create(CheckRequestedAccessSchema, {
+      id: { grantee: snapshot.requester, resource },
+      request: this.id,
+      accessLevel,
+      start: requested?.start,
+      end: requested?.end,
+      maximumDuration: await this.maximumDuration(resource),
+    });
+  }
+
+  /**
+   * Sends the requested extension to be checked once the submission starts.
+   *
+   * The check tells whether the grant gives access now, whether the extended
+   * access would last longer than the resource permits, and whether the
+   * requester already holds access for the added time.
+   */
+  @Command
+  async onAccessExtensionRequestSubmissionStarted(
+    event: AccessExtensionRequestSubmissionStarted,
+  ): Promise<CheckRequestedExtension> {
+    const snapshot = this.requireSnapshot();
+    if (snapshot.kind.case !== "extension") {
+      throw new Error("Only an extension request asks for a grant to be extended.");
+    }
+    const { grant, resource } = snapshot.kind.value;
+    return create(CheckRequestedExtensionSchema, {
+      id: { grantee: snapshot.requester, resource },
+      grant,
+      request: this.id,
+      duration: event.duration,
+      maximumDuration: await this.maximumDuration(resource),
+    });
+  }
+
+  /** Submits a first-time request once the access it asks for is checked. */
+  @React
+  onRequestedAccessChecked(_event: RequestedAccessChecked): AccessRequestSubmitted {
+    const snapshot = this.requireSubmissionStarted();
+    this.update((draft) => {
+      draft.status = AccessRequestStatus.PENDING;
+    });
+    return create(AccessRequestSubmittedSchema, {
+      id: this.id,
+      snapshot,
+      manager: this.state.manager,
+    });
+  }
+
+  /** Submits an extension request once the extension is checked, fixing the end it proposes. */
+  @React
+  onRequestedExtensionChecked(event: RequestedExtensionChecked): AccessExtensionRequestSubmitted {
+    const requested = this.requireSubmissionStarted();
+    if (requested.kind.case !== "extension") {
+      throw new Error("Only an extension request extends a grant.");
+    }
+    const snapshot = create(AccessRequestSnapshotSchema, {
+      ...requested,
+      kind: {
+        case: "extension",
+        value: { ...requested.kind.value, proposedEnd: event.proposedEnd },
+      },
+    });
+    this.update((draft) => {
+      draft.snapshot = snapshot;
+      draft.status = AccessRequestStatus.PENDING;
+    });
+    return create(AccessExtensionRequestSubmittedSchema, {
+      id: this.id,
+      snapshot,
+      manager: this.state.manager,
+    });
+  }
+
+  /** Ends the request without effect when the requester already holds the access it asks for. */
+  @React
+  onAccessAlreadyHeld(
+    _rejection: AlreadyHeld,
+  ): AccessRequestSubmissionFailed | AccessExtensionRequestSubmissionFailed {
+    return this.submissionFailed();
+  }
+
+  /** Ends the request without effect when the access it asks for would last too long. */
+  @React
+  onRequestedDurationTooLong(
+    _rejection: DurationTooLong,
+  ): AccessRequestSubmissionFailed | AccessExtensionRequestSubmissionFailed {
+    return this.submissionFailed();
+  }
+
+  /** Accepts a manager's approval of a pending request, and asks for its access to be granted. */
   @Assign
   @Throws(RequestAlreadyDecided, NotAnEligibleManager)
-  approveAccessRequest(command: ApproveAccessRequest): AccessRequestApproved {
+  approveAccessRequest(command: ApproveAccessRequest): AccessRequestApprovalStarted {
     this.assertPending(command.id);
     const snapshot = this.requireSnapshot();
     const decidedBy = this.assertEligibleDecider(command.id, command.manager);
+    const whenDecided = now();
     this.update((draft) => {
-      draft.status = AccessRequestStatus.APPROVED;
+      draft.status = AccessRequestStatus.APPROVAL_STARTED;
     });
-    return create(AccessRequestApprovedSchema, {
+    return create(AccessRequestApprovalStartedSchema, {
       id: this.id,
       snapshot,
       decidedBy,
+      whenDecided,
       manager: this.state.manager,
     });
+  }
+
+  /**
+   * Asks the grant to give an approval its effect.
+   *
+   * A first-time request creates its grant, which shares the request's
+   * identifier. An extension request extends the grant it names.
+   */
+  @Command
+  onAccessRequestApprovalStarted(
+    event: AccessRequestApprovalStarted,
+  ): CreateAccessGrant | ExtendAccessGrant {
+    const kind = event.snapshot?.kind;
+    switch (kind?.case) {
+      case "newRequest":
+        return this.creation(event, kind.value);
+      case "extension":
+        return this.extension(event, kind.value);
+      default:
+        throw new Error("An approved request must ask for new access or for an extension.");
+    }
+  }
+
+  /** Approves the request once its grant is created. */
+  @React
+  onAccessGrantCreated(_event: AccessGrantCreated): AccessRequestApproved {
+    return this.approved();
+  }
+
+  /** Approves the request once its grant is extended. */
+  @React
+  onAccessGrantExtended(_event: AccessGrantExtended): AccessRequestApproved {
+    return this.approved();
+  }
+
+  /**
+   * Ends an extension request without effect when its grant gives no access,
+   * whether that shows at submission or at approval.
+   */
+  @React
+  onAccessGrantNotActive(
+    _rejection: GrantNotActive,
+  ): AccessExtensionRequestSubmissionFailed | AccessRequestApprovalFailed {
+    const outcome = this.rejected();
+    if (outcome.$typeName === AccessRequestSubmissionFailedSchema.typeName) {
+      throw new Error("Only an extension request names a grant that may give no access.");
+    }
+    return outcome;
   }
 
   /** Denies a request, with a reason, when it has not yet been decided. */
@@ -188,6 +393,7 @@ export class AccessRequestProcessManager extends ProcessManager<
     this.assertPending(command.id);
     const snapshot = this.requireSnapshot();
     const decidedBy = this.assertEligibleDecider(command.id, command.manager);
+    const whenDecided = now();
     this.update((draft) => {
       draft.status = AccessRequestStatus.DENIED;
     });
@@ -195,6 +401,7 @@ export class AccessRequestProcessManager extends ProcessManager<
       id: this.id,
       snapshot,
       decidedBy,
+      whenDecided,
       reason: command.reason,
       manager: this.state.manager,
     });
@@ -216,13 +423,127 @@ export class AccessRequestProcessManager extends ProcessManager<
     });
   }
 
-  /** Stores the immutable request details and its manager pool as pending. */
+  /**
+   * The grant for the access an approved first-time request grants.
+   *
+   * 1. Immediate access counts its duration from the approval.
+   * 2. Scheduled access approved within its interval begins at the approval.
+   * 3. Scheduled access approved before its start keeps its interval.
+   * 4. Scheduled access approved after its end keeps its interval, so the grant
+   *    never gives access.
+   */
+  private creation(
+    approval: AccessRequestApprovalStarted,
+    request: NewAccessRequest,
+  ): CreateAccessGrant {
+    const approvedAt = approval.whenDecided;
+    const { resource, accessLevel, period } = request;
+    const interval =
+      approvedAt === undefined || period === undefined
+        ? undefined
+        : (effectiveInterval(period, approvedAt) ?? requestedInterval(period, approvedAt));
+    if (interval === undefined || resource === undefined) {
+      throw new Error(
+        "An approved first-time request must carry its approval time, resource, and period.",
+      );
+    }
+    return create(CreateAccessGrantSchema, {
+      id: { grantee: approval.snapshot?.requester, resource },
+      grant: { uuid: this.id.uuid },
+      request: this.id,
+      accessLevel,
+      start: interval.start,
+      end: interval.end,
+      manager: approval.manager,
+    });
+  }
+
+  /** The move of a grant's end to the end an approved extension request proposed. */
+  private extension(
+    approval: AccessRequestApprovalStarted,
+    extension: AccessExtension,
+  ): ExtendAccessGrant {
+    return create(ExtendAccessGrantSchema, {
+      id: { grantee: approval.snapshot?.requester, resource: extension.resource },
+      grant: extension.grant,
+      request: this.id,
+      end: extension.proposedEnd,
+    });
+  }
+
+  /** The request's approval, now that its grant was created or extended. */
+  private approved(): AccessRequestApproved {
+    const snapshot = this.requireApprovalStarted();
+    this.update((draft) => {
+      draft.status = AccessRequestStatus.APPROVED;
+    });
+    return create(AccessRequestApprovedSchema, {
+      id: this.id,
+      snapshot,
+      manager: this.state.manager,
+    });
+  }
+
+  /**
+   * The request's end without effect, at the step its access was rejected at:
+   * its submission, or its approval.
+   */
+  private rejected(): SubmissionFailed | AccessRequestApprovalFailed {
+    if (this.state.status === AccessRequestStatus.SUBMISSION_STARTED) {
+      return this.submissionFailed();
+    }
+    const snapshot = this.requireApprovalStarted();
+    this.update((draft) => {
+      draft.status = AccessRequestStatus.APPROVAL_FAILED;
+    });
+    return create(AccessRequestApprovalFailedSchema, {
+      id: this.id,
+      snapshot,
+      manager: this.state.manager,
+    });
+  }
+
+  /**
+   * The failure of a submission whose access may not be granted, told for the
+   * kind of request it is.
+   */
+  private submissionFailed(): SubmissionFailed {
+    const snapshot = this.requireSubmissionStarted();
+    this.update((draft) => {
+      draft.status = AccessRequestStatus.SUBMISSION_FAILED;
+    });
+    const failure = { id: this.id, requester: snapshot.requester };
+    return snapshot.kind.case === "extension"
+      ? create(AccessExtensionRequestSubmissionFailedSchema, failure)
+      : create(AccessRequestSubmissionFailedSchema, failure);
+  }
+
+  /** The request details while it is asked whether its access may be granted. */
+  private requireSubmissionStarted(): AccessRequestSnapshot {
+    if (this.state.status !== AccessRequestStatus.SUBMISSION_STARTED) {
+      throw new Error("Only a request being submitted is settled by its access.");
+    }
+    return this.requireSnapshot();
+  }
+
+  /** The request details while its grant is asked to give the approval its effect. */
+  private requireApprovalStarted(): AccessRequestSnapshot {
+    if (this.state.status !== AccessRequestStatus.APPROVAL_STARTED) {
+      throw new Error("Only a request a manager approved is settled by its grant.");
+    }
+    return this.requireSnapshot();
+  }
+
+  /**
+   * Stores the request details and its manager pool while it is asked whether
+   * the access may be granted.
+   */
   private store(snapshot: AccessRequestSnapshot, manager: readonly PersonId[]): void {
     this.update((draft) => {
       draft.id = this.id;
       draft.snapshot = snapshot;
       draft.manager = [...manager];
-      draft.status = AccessRequestStatus.PENDING;
+      draft.status = AccessRequestStatus.SUBMISSION_STARTED;
     });
   }
 
@@ -237,6 +558,14 @@ export class AccessRequestProcessManager extends ProcessManager<
       throw ResourceNotOpenForRequests.create({ id });
     }
     return policy;
+  }
+
+  /** The longest total access the resource permits, as its catalog entry tells now. */
+  private async maximumDuration(resource: ResourceId | undefined): Promise<Duration | undefined> {
+    return resource === undefined
+      ? undefined
+      : (await this.select(ResourceCatalogItemSchema, {}).findById(resource as never))?.policy
+          ?.maximumDuration;
   }
 
   /** The authoritative policy level matching the request, or `AccessLevelNotOffered`. */
@@ -257,20 +586,6 @@ export class AccessRequestProcessManager extends ProcessManager<
     return level;
   }
 
-  /** Rejects a requested period longer than the resource's maximum access duration. */
-  private assertWithinMaxDuration(
-    id: AccessRequestId,
-    policy: ResourcePolicy,
-    period: AccessPeriod,
-  ): void {
-    if (
-      policy.maximumDuration !== undefined &&
-      this.durationExceedsMaximum(period, policy.maximumDuration)
-    ) {
-      throw RequestedDurationTooLong.create({ id });
-    }
-  }
-
   /** Rejects a request that conflicts with one already pending for this requester. */
   private async assertNoDuplicate(
     id: AccessRequestId,
@@ -280,6 +595,16 @@ export class AccessRequestProcessManager extends ProcessManager<
   ): Promise<void> {
     if (await this.hasPendingRequest(requester, resource, id, grant)) {
       throw RequestAlreadyPending.create({ id });
+    }
+  }
+
+  /** Rejects a request identifier that already names a request lifecycle. */
+  private assertUnclaimed(): void {
+    if (
+      this.state.status !== AccessRequestStatus.ARS_UNSPECIFIED ||
+      this.state.snapshot !== undefined
+    ) {
+      throw new Error("A request identifier names only one request.");
     }
   }
 
@@ -297,7 +622,15 @@ export class AccessRequestProcessManager extends ProcessManager<
     return managers;
   }
 
-  /** Whether an equivalent request from the same requester is already pending. */
+  /**
+   * Whether a conflicting request from the same requester is already pending.
+   *
+   * 1. A pending first-time request for the resource conflicts with any other
+   *    request for it.
+   * 2. A pending extension request conflicts with a first-time request for the
+   *    resource its grant gives access to, and with another extension of the
+   *    same grant.
+   */
   private async hasPendingRequest(
     requester: PersonId,
     resource: ResourceId,
@@ -320,41 +653,14 @@ export class AccessRequestProcessManager extends ProcessManager<
         const requested = snapshot.kind.value.resource;
         return requested !== undefined && equals(ResourceIdSchema, requested, resource);
       }
-      if (snapshot.kind.case === "extension" && grant !== undefined) {
-        const extended = snapshot.kind.value.grant;
-        return extended !== undefined && equals(AccessGrantIdSchema, extended, grant);
+      if (snapshot.kind.case === "extension") {
+        const { grant: extended, resource: extendedOn } = snapshot.kind.value;
+        return grant === undefined
+          ? extendedOn !== undefined && equals(ResourceIdSchema, extendedOn, resource)
+          : extended !== undefined && equals(AccessGrantIdSchema, extended, grant);
       }
       return false;
     });
-  }
-
-  private durationExceedsMaximum(
-    period: AccessPeriod,
-    maximum: { seconds: bigint; nanos: number },
-  ): boolean {
-    const requested = this.durationOf(period);
-    if (requested === undefined) {
-      return false;
-    }
-    return (
-      requested.seconds > maximum.seconds ||
-      (requested.seconds === maximum.seconds && requested.nanos > maximum.nanos)
-    );
-  }
-
-  private durationOf(period: AccessPeriod): { seconds: bigint; nanos: number } | undefined {
-    if (period.kind.case === "immediateDuration") {
-      return period.kind.value;
-    }
-    if (period.kind.case === "scheduled") {
-      const start = period.kind.value.start;
-      const end = period.kind.value.end;
-      if (start === undefined || end === undefined) {
-        return undefined;
-      }
-      return { seconds: end.seconds - start.seconds, nanos: end.nanos - start.nanos };
-    }
-    return undefined;
   }
 
   private assertPending(id: AccessRequestId | undefined): void {
@@ -384,3 +690,6 @@ export class AccessRequestProcessManager extends ProcessManager<
     return decidedBy;
   }
 }
+
+/** The failure of a submission, of a first-time request or of an extension request. */
+type SubmissionFailed = AccessRequestSubmissionFailed | AccessExtensionRequestSubmissionFailed;

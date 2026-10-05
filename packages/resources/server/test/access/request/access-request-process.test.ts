@@ -17,12 +17,18 @@ import { create } from "@bufbuild/protobuf";
 import { type BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
 import { eventRecording } from "../../given/event-recording.js";
 import {
+  AccessExtensionRequestSubmissionFailedSchema,
   AccessExtensionRequestSubmittedSchema,
+  AccessRequestApprovalFailedSchema,
+  AccessRequestApprovalStartedSchema,
   AccessRequestApprovedSchema,
   AccessRequestDeniedSchema,
+  AccessRequestSubmissionFailedSchema,
   AccessRequestSubmittedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
+import { AccessGrantExtendedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
 import {
+  AccessAlreadyHeldSchema,
   RequestedDurationTooLongSchema,
   AccessLevelNotOfferedSchema,
   RequestAlreadyPendingSchema,
@@ -30,6 +36,7 @@ import {
   RequestAlreadyDecidedSchema,
   ResourceNotOpenForRequestsSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/rejections_pb.js";
+import { AccessGrantNotActiveSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/rejections_pb.js";
 import {
   SubmitAccessExtensionRequestSchema,
   SubmitAccessRequestSchema,
@@ -56,11 +63,22 @@ import {
   submitRequest,
 } from "./given/access-request.js";
 import { managerHasTask } from "./given/access-decision-assignment.js";
+import {
+  approveExtension,
+  awaitGrantIssued,
+  awaitGrantRevoked,
+  givenActiveGrant,
+  issueGrant,
+  minutesIn,
+  revokeGrant,
+  testClock,
+} from "../grant/given/resource-access.js";
 
 const { expectRejection, recordEvents } = eventRecording(testActorContext);
 
-// The process manager keeps no queryable state, so each handler is observed
-// through the facts it emits and the rejections it throws.
+// Each handler is observed through the facts it emits and the rejections it
+// throws. A malformed command fails without emitting either, so its failure is
+// proven by a later command that only a failed one explains.
 beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
 
@@ -72,9 +90,72 @@ async function givenPending(box: BlackBox, id: string): Promise<BlackBoxScope> {
   return requester;
 }
 
+/** The payroll resource offering a weaker and a stronger level. */
+const twoLevels = {
+  accessLevel: [
+    create(AccessLevelSchema, { name: "Read", rank: 1 }),
+    create(AccessLevelSchema, { name: "Write", rank: 2 }),
+  ],
+};
+
+/**
+ * Has the requester of ten minutes of active access ask to extend it, and
+ * waits until the extension is pending.
+ */
+async function givenPendingExtension(
+  box: BlackBox,
+  grant: string,
+  extension: string,
+): Promise<BlackBoxScope> {
+  const requester = await givenActiveGrant(box, grant, 10);
+  await requester.post(
+    SubmitAccessExtensionRequestSchema,
+    submitExtensionRequest(extension, { grant: { uuid: grant } }),
+  );
+  await box.eventually(
+    () => statusOf(requester, extension),
+    (status) => status === AccessRequestStatus.PENDING,
+  );
+  return requester;
+}
+
+/**
+ * Has the requester ask for access over `[start, end)` minutes into the test and
+ * `primary` approve it, and waits until the grant is issued.
+ */
+async function givenScheduledGrant(
+  box: BlackBox,
+  requester: BlackBoxScope,
+  request: string,
+  start: number,
+  end: number,
+): Promise<void> {
+  await submitAndAssign(box, requester, request, "primary", {
+    period: {
+      kind: { case: "scheduled", value: { start: minutesIn(start), end: minutesIn(end) } },
+    },
+  });
+  await approveAccessRequest(box, request, "primary");
+  await awaitGrantIssued(box, requester, request);
+}
+
+/**
+ * Proves that no request was submitted under the identifier: a request that was
+ * never submitted cannot be cancelled, as though it were already decided.
+ */
+async function expectNotSubmitted(
+  box: BlackBox,
+  requester: BlackBoxScope,
+  id: string,
+): Promise<void> {
+  await expectRejection(box, requester, RequestAlreadyDecidedSchema, () =>
+    cancelAccessRequest(requester, id),
+  );
+}
+
 /** Approves a request and waits until it is terminal. */
 async function givenApproved(box: BlackBox, requester: BlackBoxScope, id: string): Promise<void> {
-  await approveAccessRequest(requester, id, "primary");
+  await approveAccessRequest(box, id, "primary");
   await box.eventually(
     () => statusOf(requester, id),
     (status) => status === AccessRequestStatus.APPROVED,
@@ -183,7 +264,7 @@ describe("AccessRequestProcessManager should", () => {
             period: {
               kind: {
                 case: "scheduled",
-                value: { start: { seconds: 0n }, end: { seconds: 7200n } },
+                value: { start: { seconds: 3600n }, end: { seconds: 10800n } },
               },
             },
           }),
@@ -196,6 +277,125 @@ describe("AccessRequestProcessManager should", () => {
       const requester = await givenPending(box, "req-first");
       await expectRejection(box, requester, RequestAlreadyPendingSchema, () =>
         requester.post(SubmitAccessRequestSchema, submitRequest("req-second")),
+      );
+    });
+
+    it("reject reuse of a request identifier", async () => {
+      const box = await resourcesBlackBox();
+      const requester = await givenPending(box, "req-reused");
+      const submitted = await recordEvents(requester, AccessRequestSubmittedSchema);
+      try {
+        await requester.post(SubmitAccessRequestSchema, submitRequest("req-reused"));
+        await requester.post(
+          SubmitAccessExtensionRequestSchema,
+          submitExtensionRequest("req-reused", { grant: { uuid: "grant-unused" } }),
+        );
+        await cancelAccessRequest(requester, "req-reused");
+
+        await box.eventually(
+          () => statusOf(requester, "req-reused"),
+          (status) => status === AccessRequestStatus.CANCELED,
+        );
+        expect(submitted.received).toHaveLength(0);
+      } finally {
+        await submitted.cancel();
+      }
+    });
+
+    it("reject access already held for the requested period ('AccessAlreadyHeld')", async () => {
+      const box = await resourcesBlackBox(testClock());
+      const requester = await givenActiveGrant(box, "req-held", 10);
+
+      await expectRejection(box, requester, AccessAlreadyHeldSchema, () =>
+        requester.post(SubmitAccessRequestSchema, submitRequest("req-held-again")),
+      );
+    });
+
+    it("fail the submission of a request for access already held", async () => {
+      const box = await resourcesBlackBox(testClock());
+      const requester = await givenActiveGrant(box, "req-held-first", 10);
+      const failed = await recordEvents(requester, AccessRequestSubmissionFailedSchema);
+      const submitted = await recordEvents(requester, AccessRequestSubmittedSchema);
+      try {
+        await requester.post(SubmitAccessRequestSchema, submitRequest("req-held-second"));
+
+        const event = await failed.waitFor(box, (e) => e.id?.uuid === "req-held-second");
+        expect(event.requester?.uuid).toBe(actor);
+        expect(submitted.received.map((e) => e.id?.uuid)).not.toContain("req-held-second");
+        expect(await statusOf(requester, "req-held-second")).toBeUndefined();
+      } finally {
+        await failed.cancel();
+        await submitted.cancel();
+      }
+    });
+
+    it("submit a request for a stronger level than the one held", async () => {
+      const box = await resourcesBlackBox(testClock());
+      const requester = await givenActiveGrant(box, "req-read", 10, twoLevels);
+
+      await submitAndAssign(box, requester, "req-write", "primary", {
+        accessLevel: { name: "Write", rank: 2 },
+      });
+
+      expect(await statusOf(requester, "req-write")).toBe(AccessRequestStatus.PENDING);
+    });
+
+    it("submit a request for a period starting when held access ends", async () => {
+      const box = await resourcesBlackBox(testClock());
+      const requester = await givenActiveGrant(box, "req-first-slot", 10);
+
+      await submitAndAssign(box, requester, "req-next-slot", "primary", {
+        period: {
+          kind: { case: "scheduled", value: { start: minutesIn(10), end: minutesIn(20) } },
+        },
+      });
+
+      expect(await statusOf(requester, "req-next-slot")).toBe(AccessRequestStatus.PENDING);
+    });
+
+    it("submit a request for a scheduled period that is already over", async () => {
+      const box = await resourcesBlackBox(testClock());
+      await seed(box, [actor, "primary"]);
+      const requester = box.onBehalfOf(actor);
+
+      await submitAndAssign(box, requester, "req-already-over", "primary", {
+        period: {
+          kind: { case: "scheduled", value: { start: minutesIn(-30), end: minutesIn(-10) } },
+        },
+      });
+
+      expect(await statusOf(requester, "req-already-over")).toBe(AccessRequestStatus.PENDING);
+    });
+
+    it("submit a request for a period overlapping access that has ended", async () => {
+      // Held: [0, 10), which is over by minute 10. Requested: [5, 30).
+      const clock = testClock();
+      const box = await resourcesBlackBox(clock);
+      const requester = await givenActiveGrant(box, "req-over-by-now", 10);
+      clock.advanceMinutes(10);
+
+      await submitAndAssign(box, requester, "req-across-ended", "primary", {
+        period: {
+          kind: { case: "scheduled", value: { start: minutesIn(5), end: minutesIn(30) } },
+        },
+      });
+
+      expect(await statusOf(requester, "req-across-ended")).toBe(AccessRequestStatus.PENDING);
+    });
+
+    it("reject a request for a resource whose access awaits an extension ('RequestAlreadyPending')", async () => {
+      const box = await resourcesBlackBox(testClock());
+      const requester = await givenPendingExtension(box, "req-being-extended", "ext-awaiting");
+
+      await expectRejection(box, requester, RequestAlreadyPendingSchema, () =>
+        requester.post(
+          SubmitAccessRequestSchema,
+          submitRequest("req-beside-extension", {
+            period: {
+              kind: { case: "scheduled", value: { start: minutesIn(12), end: minutesIn(20) } },
+            },
+          }),
+        ),
       );
     });
 
@@ -232,18 +432,51 @@ describe("AccessRequestProcessManager should", () => {
     });
   });
 
-  describe("handle 'SubmitAccessExtensionRequest', and", () => {
-    it("submit a renewal, emitting 'AccessExtensionRequestSubmitted' with the extension snapshot", async () => {
+  describe("reject a 'SubmitAccessRequest'", () => {
+    it("for immediate access that does not last", async () => {
       const box = await resourcesBlackBox();
       await seed(box, [actor, "primary"]);
       const requester = box.onBehalfOf(actor);
+
+      await requester.post(
+        SubmitAccessRequestSchema,
+        submitRequest("req-negative", {
+          period: { kind: { case: "immediateDuration", value: { seconds: -60n } } },
+        }),
+      );
+
+      await expectNotSubmitted(box, requester, "req-negative");
+    });
+
+    it("for scheduled access that ends before it begins", async () => {
+      const box = await resourcesBlackBox(testClock());
+      await seed(box, [actor, "primary"]);
+      const requester = box.onBehalfOf(actor);
+
+      await requester.post(
+        SubmitAccessRequestSchema,
+        submitRequest("req-reversed", {
+          period: {
+            kind: { case: "scheduled", value: { start: minutesIn(30), end: minutesIn(20) } },
+          },
+        }),
+      );
+
+      await expectNotSubmitted(box, requester, "req-reversed");
+    });
+  });
+
+  describe("handle 'SubmitAccessExtensionRequest', and", () => {
+    it("submit an extension of active access, fixing the proposed end", async () => {
+      const box = await resourcesBlackBox(testClock());
+      const requester = await givenActiveGrant(box, "req-renewed", 10);
       const submitted = await recordEvents(requester, AccessExtensionRequestSubmittedSchema);
       try {
         expect(
           (
             await requester.post(
               SubmitAccessExtensionRequestSchema,
-              submitExtensionRequest("ext-ok"),
+              submitExtensionRequest("ext-ok", { grant: { uuid: "req-renewed" } }),
             )
           ).kind,
         ).toBe("ok");
@@ -256,8 +489,8 @@ describe("AccessRequestProcessManager should", () => {
         const kind = event.snapshot?.kind;
         expect(kind?.case).toBe("extension");
         if (kind?.case === "extension") {
-          expect(kind.value.grant?.uuid).toBe("grant-1");
-          expect(kind.value.duration?.seconds).toBe(120n);
+          expect(kind.value.grant?.uuid).toBe("req-renewed");
+          expect(kind.value.proposedEnd).toEqual(minutesIn(12));
         }
       } finally {
         await submitted.cancel();
@@ -273,27 +506,117 @@ describe("AccessRequestProcessManager should", () => {
       );
     });
 
-    it("reject an added duration beyond the maximum ('RequestedDurationTooLong')", async () => {
+    it("reject a grant the requester does not hold ('AccessGrantNotActive')", async () => {
       const box = await resourcesBlackBox();
-      await seed(box, [actor, "primary"]); // default maximumDuration is 3600s
+      await seed(box, [actor, "primary"]);
       const requester = box.onBehalfOf(actor);
+      await expectRejection(box, requester, AccessGrantNotActiveSchema, () =>
+        requester.post(SubmitAccessExtensionRequestSchema, submitExtensionRequest("ext-unheld")),
+      );
+    });
+
+    it("reject a grant that was revoked ('AccessGrantNotActive')", async () => {
+      const box = await resourcesBlackBox(testClock());
+      const requester = await givenActiveGrant(box, "req-revoked", 10);
+      await revokeGrant(box, "req-revoked", "primary", "No longer needed.");
+      await awaitGrantRevoked(box, requester, "req-revoked");
+
+      await expectRejection(box, requester, AccessGrantNotActiveSchema, () =>
+        requester.post(
+          SubmitAccessExtensionRequestSchema,
+          submitExtensionRequest("ext-revoked", { grant: { uuid: "req-revoked" } }),
+        ),
+      );
+    });
+
+    it("reject a grant whose access has not yet begun ('AccessGrantNotActive')", async () => {
+      const box = await resourcesBlackBox(testClock());
+      const requester = box.onBehalfOf(actor);
+      await seed(box, [actor, "primary"]);
+      await givenScheduledGrant(box, requester, "req-not-begun", 30, 60);
+
+      await expectRejection(box, requester, AccessGrantNotActiveSchema, () =>
+        requester.post(
+          SubmitAccessExtensionRequestSchema,
+          submitExtensionRequest("ext-not-begun", { grant: { uuid: "req-not-begun" } }),
+        ),
+      );
+    });
+
+    it("reject a grant whose access has ended ('AccessGrantNotActive')", async () => {
+      const clock = testClock();
+      const box = await resourcesBlackBox(clock);
+      const requester = await givenActiveGrant(box, "req-ended", 10);
+      clock.advanceMinutes(10);
+
+      await expectRejection(box, requester, AccessGrantNotActiveSchema, () =>
+        requester.post(
+          SubmitAccessExtensionRequestSchema,
+          submitExtensionRequest("ext-ended", { grant: { uuid: "req-ended" } }),
+        ),
+      );
+    });
+
+    it("fail the submission of an extension of a grant that gives no access", async () => {
+      const clock = testClock();
+      const box = await resourcesBlackBox(clock);
+      const requester = await givenActiveGrant(box, "req-over", 10);
+      clock.advanceMinutes(10);
+      const failed = await recordEvents(requester, AccessExtensionRequestSubmissionFailedSchema);
+      try {
+        await requester.post(
+          SubmitAccessExtensionRequestSchema,
+          submitExtensionRequest("ext-over", { grant: { uuid: "req-over" } }),
+        );
+
+        await failed.waitFor(box, (e) => e.id?.uuid === "ext-over");
+        expect(await statusOf(requester, "ext-over")).toBeUndefined();
+      } finally {
+        await failed.cancel();
+      }
+    });
+
+    it("reject extending into access another grant already gives ('AccessAlreadyHeld')", async () => {
+      // Held: [0, 10) and, through another grant, [10, 20). Extending the first overlaps the second.
+      const box = await resourcesBlackBox(testClock());
+      const requester = await givenActiveGrant(box, "req-this-slot", 10);
+      await givenScheduledGrant(box, requester, "req-next-slot", 10, 20);
+
+      await expectRejection(box, requester, AccessAlreadyHeldSchema, () =>
+        requester.post(
+          SubmitAccessExtensionRequestSchema,
+          submitExtensionRequest("ext-into-next", {
+            grant: { uuid: "req-this-slot" },
+            duration: { seconds: 600n },
+          }),
+        ),
+      );
+    });
+
+    it("reject access lasting longer in total than the resource permits ('RequestedDurationTooLong')", async () => {
+      // Ten minutes held plus fifty-one more exceeds the default hour.
+      const box = await resourcesBlackBox(testClock());
+      const requester = await givenActiveGrant(box, "req-long", 10);
       await expectRejection(box, requester, RequestedDurationTooLongSchema, () =>
         requester.post(
           SubmitAccessExtensionRequestSchema,
-          submitExtensionRequest("ext-toolong", { duration: { seconds: 7200n } }),
+          submitExtensionRequest("ext-toolong", {
+            grant: { uuid: "req-long" },
+            duration: { seconds: 3060n },
+          }),
         ),
       );
     });
 
     it("reject a second pending extension for the same requester and grant ('RequestAlreadyPending')", async () => {
-      const box = await resourcesBlackBox();
-      await seed(box, [actor, "primary"]);
-      const requester = box.onBehalfOf(actor);
+      const box = await resourcesBlackBox(testClock());
+      const requester = await givenActiveGrant(box, "req-extended", 10);
+      const extension = { grant: { uuid: "req-extended" } };
       expect(
         (
           await requester.post(
             SubmitAccessExtensionRequestSchema,
-            submitExtensionRequest("ext-first"),
+            submitExtensionRequest("ext-first", extension),
           )
         ).kind,
       ).toBe("ok");
@@ -303,25 +626,69 @@ describe("AccessRequestProcessManager should", () => {
       );
 
       await expectRejection(box, requester, RequestAlreadyPendingSchema, () =>
-        requester.post(SubmitAccessExtensionRequestSchema, submitExtensionRequest("ext-second")),
+        requester.post(
+          SubmitAccessExtensionRequestSchema,
+          submitExtensionRequest("ext-second", extension),
+        ),
       );
     });
   });
 
+  describe("reject a 'SubmitAccessExtensionRequest'", () => {
+    it("that adds no time to the access", async () => {
+      const box = await resourcesBlackBox(testClock());
+      const requester = await givenActiveGrant(box, "req-shortened", 10);
+
+      await requester.post(
+        SubmitAccessExtensionRequestSchema,
+        submitExtensionRequest("ext-negative", {
+          grant: { uuid: "req-shortened" },
+          duration: { seconds: -60n },
+        }),
+      );
+
+      await expectNotSubmitted(box, requester, "ext-negative");
+    });
+  });
+
   describe("handle 'ApproveAccessRequest', and", () => {
-    it("emit 'AccessRequestApproved' recording the deciding manager", async () => {
-      const box = await resourcesBlackBox();
+    it("emit 'AccessRequestApproved' once the grant is created", async () => {
+      const clock = testClock();
+      const box = await resourcesBlackBox(clock);
       const requester = await givenPending(box, "req-approve");
       const approved = await recordEvents(requester, AccessRequestApprovedSchema);
       try {
-        expect((await approveAccessRequest(requester, "req-approve", "primary")).kind).toBe("ok");
+        clock.advanceMinutes(5);
+
+        expect((await approveAccessRequest(box, "req-approve", "primary")).kind).toBe("ok");
+
         const event = await approved.waitFor(
           box,
           (approvedEvent) => approvedEvent.id?.uuid === "req-approve",
         );
-        expect(event.decidedBy?.uuid).toBe("primary");
+        expect(event.manager.map((manager) => manager.uuid)).toEqual(["primary"]);
+        expect(event.snapshot?.requester?.uuid).toBe(actor);
       } finally {
         await approved.cancel();
+      }
+    });
+
+    it("emit 'AccessRequestApprovalStarted' recording the deciding manager and the time", async () => {
+      const clock = testClock();
+      const box = await resourcesBlackBox(clock);
+      const requester = await givenPending(box, "req-approval-requested");
+      const requested = await recordEvents(requester, AccessRequestApprovalStartedSchema);
+      try {
+        clock.advanceMinutes(5);
+
+        await approveAccessRequest(box, "req-approval-requested", "primary");
+
+        const event = await requested.waitFor(box, (e) => e.id?.uuid === "req-approval-requested");
+        expect(event.decidedBy?.uuid).toBe("primary");
+        expect(event.whenDecided).toEqual(minutesIn(5));
+        expect(event.manager.map((manager) => manager.uuid)).toEqual(["primary"]);
+      } finally {
+        await requested.cancel();
       }
     });
 
@@ -329,8 +696,9 @@ describe("AccessRequestProcessManager should", () => {
       const box = await resourcesBlackBox();
       const requester = await givenPending(box, "req-outsider");
       await expectRejection(box, requester, NotAnEligibleManagerSchema, () =>
-        approveAccessRequest(requester, "req-outsider", "outsider"),
+        approveAccessRequest(box, "req-outsider", "outsider"),
       );
+      expect(await statusOf(requester, "req-outsider")).toBe(AccessRequestStatus.PENDING);
     });
 
     it("allow a requester who manages the resource to approve their own request", async () => {
@@ -339,10 +707,60 @@ describe("AccessRequestProcessManager should", () => {
       const requester = box.onBehalfOf(actor);
       await submitAndAssign(box, requester, "req-self", actor);
 
-      expect((await approveAccessRequest(requester, "req-self", actor)).kind).toBe("ok");
+      expect((await approveAccessRequest(box, "req-self", actor)).kind).toBe("ok");
       await box.eventually(
         () => statusOf(requester, "req-self"),
         (status) => status === AccessRequestStatus.APPROVED,
+      );
+    });
+
+    it("fail the approval of an extension of access revoked since it was submitted", async () => {
+      const box = await resourcesBlackBox(testClock());
+      const requester = await givenPendingExtension(box, "req-revoked-since", "ext-too-late");
+      await revokeGrant(box, "req-revoked-since", "primary", "No longer needed.");
+      await awaitGrantRevoked(box, requester, "req-revoked-since");
+      const failed = await recordEvents(requester, AccessRequestApprovalFailedSchema);
+      try {
+        await approveAccessRequest(box, "ext-too-late", "primary");
+
+        const event = await failed.waitFor(box, (e) => e.id?.uuid === "ext-too-late");
+        expect(event.manager.map((manager) => manager.uuid)).toEqual(["primary"]);
+        await box.eventually(
+          () => statusOf(requester, "ext-too-late"),
+          (status) => status === AccessRequestStatus.APPROVAL_FAILED,
+        );
+      } finally {
+        await failed.cancel();
+      }
+    });
+
+    it("fail the approval of an extension of access ended since it was submitted", async () => {
+      const clock = testClock();
+      const box = await resourcesBlackBox(clock);
+      const requester = await givenPendingExtension(box, "req-ended-since", "ext-after-end");
+      clock.advanceMinutes(10);
+
+      await approveAccessRequest(box, "ext-after-end", "primary");
+
+      await box.eventually(
+        () => statusOf(requester, "ext-after-end"),
+        (status) => status === AccessRequestStatus.APPROVAL_FAILED,
+      );
+    });
+
+    it("reject a decision on a request whose approval failed ('RequestAlreadyDecided')", async () => {
+      const clock = testClock();
+      const box = await resourcesBlackBox(clock);
+      const requester = await givenPendingExtension(box, "req-ended-before", "ext-failed");
+      clock.advanceMinutes(10);
+      await approveAccessRequest(box, "ext-failed", "primary");
+      await box.eventually(
+        () => statusOf(requester, "ext-failed"),
+        (status) => status === AccessRequestStatus.APPROVAL_FAILED,
+      );
+
+      await expectRejection(box, requester, RequestAlreadyDecidedSchema, () =>
+        denyAccessRequest(box, "ext-failed", "primary", "Too late."),
       );
     });
 
@@ -351,20 +769,108 @@ describe("AccessRequestProcessManager should", () => {
       const requester = await givenPending(box, "req-twice");
       await givenApproved(box, requester, "req-twice");
       await expectRejection(box, requester, RequestAlreadyDecidedSchema, () =>
-        approveAccessRequest(requester, "req-twice", "primary"),
+        approveAccessRequest(box, "req-twice", "primary"),
       );
     });
   });
 
+  describe("on 'AccessRequestApprovalStarted' for a first-time request", () => {
+    it("create a grant for immediate access counted from the approval", async () => {
+      const clock = testClock();
+      const box = await resourcesBlackBox(clock);
+      const requester = box.onBehalfOf(actor);
+      await seed(box, [actor, "primary"]); // default maximumDuration is 3600s
+      await submitAndAssign(box, requester, "req-now", "primary", {
+        period: { kind: { case: "immediateDuration", value: { seconds: 600n } } },
+      });
+      clock.advanceMinutes(5);
+
+      await approveAccessRequest(box, "req-now", "primary");
+
+      const item = await awaitGrantIssued(box, requester, "req-now");
+      expect(item.start).toEqual(minutesIn(5));
+      expect(item.end).toEqual(minutesIn(15));
+      expect(item.revoked).toBe(false);
+      expect(item.request?.uuid).toBe("req-now");
+    });
+
+    it("create a grant beginning at the approval for scheduled access approved within its interval", async () => {
+      const clock = testClock();
+      const box = await resourcesBlackBox(clock);
+      const requester = box.onBehalfOf(actor);
+      await seed(box, [actor, "primary"]);
+      clock.advanceMinutes(10);
+
+      await issueGrant(box, "req-within", { start: 0, end: 30 });
+
+      const item = await awaitGrantIssued(box, requester, "req-within");
+      expect(item.start).toEqual(minutesIn(10));
+      expect(item.end).toEqual(minutesIn(30));
+    });
+
+    it("create a grant keeping the interval of scheduled access approved before it begins", async () => {
+      const box = await resourcesBlackBox(testClock());
+      const requester = box.onBehalfOf(actor);
+      await seed(box, [actor, "primary"]);
+
+      await issueGrant(box, "req-future", { start: 30, end: 90 });
+
+      const item = await awaitGrantIssued(box, requester, "req-future");
+      expect(item.start).toEqual(minutesIn(30));
+      expect(item.end).toEqual(minutesIn(90));
+    });
+
+    it("create a grant keeping the interval of scheduled access approved only after its end", async () => {
+      const clock = testClock();
+      const box = await resourcesBlackBox(clock);
+      const requester = box.onBehalfOf(actor);
+      await seed(box, [actor, "primary"]);
+      await submitAndAssign(box, requester, "req-too-late", "primary", {
+        period: {
+          kind: { case: "scheduled", value: { start: minutesIn(0), end: minutesIn(10) } },
+        },
+      });
+      clock.advanceMinutes(10);
+
+      await approveAccessRequest(box, "req-too-late", "primary");
+
+      const item = await awaitGrantIssued(box, requester, "req-too-late");
+      expect(item.start).toEqual(minutesIn(0));
+      expect(item.end).toEqual(minutesIn(10));
+    });
+  });
+
+  describe("on 'AccessRequestApprovalStarted' for an extension request", () => {
+    it("extend the grant to the end each approved extension proposed", async () => {
+      const box = await resourcesBlackBox(testClock());
+      const requester = await givenActiveGrant(box, "req-to-extend", 10);
+      const extended = await recordEvents(requester, AccessGrantExtendedSchema);
+      try {
+        await approveExtension(box, "ext-first", "req-to-extend", 10);
+        await extended.waitFor(box, (e) => e.request?.uuid === "ext-first");
+        await approveExtension(box, "ext-second", "req-to-extend", 10);
+
+        const event = await extended.waitFor(box, (e) => e.request?.uuid === "ext-second");
+        expect(event.previousEnd).toEqual(minutesIn(20));
+        expect(event.end).toEqual(minutesIn(30));
+        expect(extended.received.map((e) => e.request?.uuid)).toEqual(["ext-first", "ext-second"]);
+      } finally {
+        await extended.cancel();
+      }
+    });
+  });
+
   describe("handle 'DenyAccessRequest', and", () => {
-    it("emit 'AccessRequestDenied' carrying the reason and the deciding manager", async () => {
-      const box = await resourcesBlackBox();
+    it("emit 'AccessRequestDenied' carrying the reason, the deciding manager, and the time", async () => {
+      const clock = testClock();
+      const box = await resourcesBlackBox(clock);
       const requester = await givenPending(box, "req-deny");
       const denied = await recordEvents(requester, AccessRequestDeniedSchema);
       try {
+        clock.advanceMinutes(5);
+
         expect(
-          (await denyAccessRequest(requester, "req-deny", "primary", "Insufficient justification."))
-            .kind,
+          (await denyAccessRequest(box, "req-deny", "primary", "Insufficient justification.")).kind,
         ).toBe("ok");
         const event = await denied.waitFor(
           box,
@@ -372,6 +878,7 @@ describe("AccessRequestProcessManager should", () => {
         );
         expect(event.decidedBy?.uuid).toBe("primary");
         expect(event.reason).toBe("Insufficient justification.");
+        expect(event.whenDecided).toEqual(minutesIn(5));
       } finally {
         await denied.cancel();
       }
@@ -383,9 +890,9 @@ describe("AccessRequestProcessManager should", () => {
       const requester = box.onBehalfOf(actor);
       await submitAndAssign(box, requester, "req-deny-self", actor);
 
-      expect(
-        (await denyAccessRequest(requester, "req-deny-self", actor, "Changed my mind.")).kind,
-      ).toBe("ok");
+      expect((await denyAccessRequest(box, "req-deny-self", actor, "Changed my mind.")).kind).toBe(
+        "ok",
+      );
       await box.eventually(
         () => statusOf(requester, "req-deny-self"),
         (status) => status === AccessRequestStatus.DENIED,
@@ -397,7 +904,7 @@ describe("AccessRequestProcessManager should", () => {
       const requester = await givenPending(box, "req-deny-twice");
       await givenApproved(box, requester, "req-deny-twice");
       await expectRejection(box, requester, RequestAlreadyDecidedSchema, () =>
-        denyAccessRequest(requester, "req-deny-twice", "primary", "Too late."),
+        denyAccessRequest(box, "req-deny-twice", "primary", "Too late."),
       );
     });
   });

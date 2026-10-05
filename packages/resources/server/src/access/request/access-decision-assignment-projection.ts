@@ -19,18 +19,22 @@ import {
   AccessDecisionAssignment_AccessDecisionTaskSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_pb.js";
 import {
+  AccessGrantIdSchema,
   AccessRequestIdSchema,
+  type AccessGrantId,
   type AccessRequestId,
 } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
 import type { AccessRequestSnapshot } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import type { PersonId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import type {
   AccessExtensionRequestSubmitted,
+  AccessRequestApprovalFailed,
   AccessRequestApproved,
   AccessRequestCanceled,
   AccessRequestDenied,
   AccessRequestSubmitted,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
+import type { AccessGrantRevoked } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
 import { equals } from "../../proto/equals.js";
 
 /**
@@ -38,8 +42,7 @@ import { equals } from "../../proto/equals.js";
  */
 export class AccessDecisionAssignmentProjection extends Projection<
   PersonId,
-  typeof AccessDecisionAssignmentSchema,
-  bigint
+  typeof AccessDecisionAssignmentSchema
 > {
   /** Adds a newly submitted first-time request to this manager's decision queue. */
   @Subscribe
@@ -59,6 +62,12 @@ export class AccessDecisionAssignmentProjection extends Projection<
     this.close(event.id);
   }
 
+  /** Clears a request whose approval failed from this manager's decision queue. */
+  @Subscribe
+  onAccessRequestApprovalFailed(event: AccessRequestApprovalFailed): void {
+    this.close(event.id);
+  }
+
   /** Clears a denied request from this manager's decision queue. */
   @Subscribe
   onAccessRequestDenied(event: AccessRequestDenied): void {
@@ -69,6 +78,12 @@ export class AccessDecisionAssignmentProjection extends Projection<
   @Subscribe
   onAccessRequestCanceled(event: AccessRequestCanceled): void {
     this.close(event.id);
+  }
+
+  /** Drops extension requests for access that was revoked, as they can no longer take effect. */
+  @Subscribe
+  onAccessGrantRevoked(event: AccessGrantRevoked): void {
+    this.dropExtensionsOf(event.id);
   }
 
   private assign(
@@ -97,6 +112,20 @@ export class AccessDecisionAssignmentProjection extends Projection<
       draft.task = draft.task.filter(
         (task) => !equals(AccessRequestIdSchema, task.request, request),
       );
+    });
+  }
+
+  private dropExtensionsOf(grant: AccessGrantId | undefined): void {
+    if (grant === undefined) {
+      return;
+    }
+    this.update((draft) => {
+      draft.task = draft.task.filter((task) => {
+        const kind = task.snapshot?.kind;
+        return !(
+          kind?.case === "extension" && equals(AccessGrantIdSchema, kind.value.grant, grant)
+        );
+      });
     });
   }
 }

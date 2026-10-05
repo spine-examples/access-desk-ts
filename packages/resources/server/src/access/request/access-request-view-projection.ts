@@ -19,9 +19,10 @@ import {
   type AccessRequestSnapshot,
 } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import type { AccessRequestId } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
-import type { PersonId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import type {
   AccessExtensionRequestSubmitted,
+  AccessRequestApprovalFailed,
+  AccessRequestApprovalStarted,
   AccessRequestApproved,
   AccessRequestCanceled,
   AccessRequestDenied,
@@ -29,24 +30,32 @@ import type {
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
 
 /**
- * An access request as its requester follows it: the request and its status,
- * from submission to a terminal decision.
+ * An access request as its requester follows it, showing the request and its
+ * status from submission to a terminal decision.
  */
 export class AccessRequestViewProjection extends Projection<
   AccessRequestId,
-  typeof AccessRequestViewSchema,
-  bigint
+  typeof AccessRequestViewSchema
 > {
   /** Seeds a newly submitted first-time request as pending a decision. */
   @Subscribe
   onAccessRequestSubmitted(event: AccessRequestSubmitted): void {
-    this.seedPending(event.snapshot, event.manager);
+    this.seedPending(event.snapshot);
   }
 
   /** Seeds a newly submitted extension request as pending a decision. */
   @Subscribe
   onAccessExtensionRequestSubmitted(event: AccessExtensionRequestSubmitted): void {
-    this.seedPending(event.snapshot, event.manager);
+    this.seedPending(event.snapshot);
+  }
+
+  /** Records who approved the request and when, while its access is being granted. */
+  @Subscribe
+  onAccessRequestApprovalStarted(event: AccessRequestApprovalStarted): void {
+    this.update((draft) => {
+      draft.decidedBy = event.decidedBy;
+      draft.whenDecided = event.whenDecided;
+    });
   }
 
   /** Records an approved request as its terminal outcome. */
@@ -55,10 +64,16 @@ export class AccessRequestViewProjection extends Projection<
     this.settle(AccessRequestStatus.APPROVED, event.snapshot);
   }
 
-  /** Records a denied request as its terminal outcome. */
+  /** Records a failed approval as the request's terminal outcome. */
+  @Subscribe
+  onAccessRequestApprovalFailed(event: AccessRequestApprovalFailed): void {
+    this.settle(AccessRequestStatus.APPROVAL_FAILED, event.snapshot);
+  }
+
+  /** Records a denied request as its terminal outcome, with who denied it and when. */
   @Subscribe
   onAccessRequestDenied(event: AccessRequestDenied): void {
-    this.settle(AccessRequestStatus.DENIED, event.snapshot);
+    this.settle(AccessRequestStatus.DENIED, event.snapshot, event);
   }
 
   /** Records a canceled request as its terminal outcome. */
@@ -67,28 +82,35 @@ export class AccessRequestViewProjection extends Projection<
     this.settle(AccessRequestStatus.CANCELED, event.snapshot);
   }
 
-  private seedPending(
-    snapshot: AccessRequestSnapshot | undefined,
-    manager: readonly PersonId[],
-  ): void {
+  private seedPending(snapshot: AccessRequestSnapshot | undefined): void {
     if (snapshot === undefined) {
       return;
     }
     this.update((draft) => {
       draft.id = this.id;
       draft.snapshot = snapshot;
-      draft.manager = [...manager];
       draft.status = AccessRequestStatus.PENDING;
     });
   }
 
-  private settle(status: AccessRequestStatus, snapshot: AccessRequestSnapshot | undefined): void {
+  private settle(
+    status: AccessRequestStatus,
+    snapshot: AccessRequestSnapshot | undefined,
+    decision?: Decision,
+  ): void {
     this.update((draft) => {
       draft.id = this.id;
       if (snapshot !== undefined) {
         draft.snapshot = snapshot;
       }
       draft.status = status;
+      if (decision !== undefined) {
+        draft.decidedBy = decision.decidedBy;
+        draft.whenDecided = decision.whenDecided;
+      }
     });
   }
 }
+
+/** Who approved or denied a request, and when. */
+type Decision = Pick<AccessRequestDenied, "decidedBy" | "whenDecided">;

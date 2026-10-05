@@ -36,8 +36,7 @@ import {
  */
 export class OrganizationViewProjection extends Projection<
   OrganizationId,
-  typeof OrganizationViewSchema,
-  bigint
+  typeof OrganizationViewSchema
 > {
   /**
    * Records one organization in the catalog view.
