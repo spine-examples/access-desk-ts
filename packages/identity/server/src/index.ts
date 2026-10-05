@@ -13,11 +13,6 @@
  */
 
 /**
- * Identity bounded context: domain handlers and context assembly.
- *
- * Decorated handlers (aggregates, projections, process managers) and the
- * createIdentityContext() factory are added in a later iteration. They live in
- * this package because spine-proto handlers discovers decorated classes only in
- * the application-mode package that runs it, not in its dependencies.
+ * The Identity bounded context, which says who a person is.
  */
-export {};
+export { createIdentityContext } from "./identity-context.js";

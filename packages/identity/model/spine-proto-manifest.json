@@ -1,13 +1,37 @@
 {
   "formatVersion": 2,
-  "generationId": "9d4e3d74-1eed-4332-ab60-667004d3233e",
+  "generationId": "a7e8170b-bdf3-4db7-869d-a202db97cb80",
   "packageName": "@access-desk/identity-model",
   "packageVersion": "0.0.0",
   "protoFiles": [
-    "accessdesk/identity/identifiers.proto"
+    "accessdesk/identity/identifiers.proto",
+    "accessdesk/identity/person/commands.proto",
+    "accessdesk/identity/person/events.proto",
+    "accessdesk/identity/person/external_identity.proto",
+    "accessdesk/identity/person/external_identity_commands.proto",
+    "accessdesk/identity/person/external_identity_events.proto",
+    "accessdesk/identity/person/external_identity_rejections.proto",
+    "accessdesk/identity/person/person.proto",
+    "accessdesk/identity/person/person_email.proto",
+    "accessdesk/identity/person/person_email_commands.proto",
+    "accessdesk/identity/person/person_email_events.proto",
+    "accessdesk/identity/person/person_email_rejections.proto",
+    "accessdesk/identity/values.proto"
   ],
   "generatedExports": {
-    "accessdesk/identity/identifiers.proto": "generated/accessdesk/identity/identifiers_pb.js"
+    "accessdesk/identity/identifiers.proto": "generated/accessdesk/identity/identifiers_pb.js",
+    "accessdesk/identity/person/commands.proto": "generated/accessdesk/identity/person/commands_pb.js",
+    "accessdesk/identity/person/events.proto": "generated/accessdesk/identity/person/events_pb.js",
+    "accessdesk/identity/person/external_identity.proto": "generated/accessdesk/identity/person/external_identity_pb.js",
+    "accessdesk/identity/person/external_identity_commands.proto": "generated/accessdesk/identity/person/external_identity_commands_pb.js",
+    "accessdesk/identity/person/external_identity_events.proto": "generated/accessdesk/identity/person/external_identity_events_pb.js",
+    "accessdesk/identity/person/external_identity_rejections.proto": "generated/accessdesk/identity/person/external_identity_rejections_pb.js",
+    "accessdesk/identity/person/person.proto": "generated/accessdesk/identity/person/person_pb.js",
+    "accessdesk/identity/person/person_email.proto": "generated/accessdesk/identity/person/person_email_pb.js",
+    "accessdesk/identity/person/person_email_commands.proto": "generated/accessdesk/identity/person/person_email_commands_pb.js",
+    "accessdesk/identity/person/person_email_events.proto": "generated/accessdesk/identity/person/person_email_events_pb.js",
+    "accessdesk/identity/person/person_email_rejections.proto": "generated/accessdesk/identity/person/person_email_rejections_pb.js",
+    "accessdesk/identity/values.proto": "generated/accessdesk/identity/values_pb.js"
   },
   "dependencies": [
     "@spine-event-engine/proto"
