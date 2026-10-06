@@ -108,9 +108,6 @@ importers:
         specifier: 2.0.0-snapshot.21
         version: 2.0.0-snapshot.21
     devDependencies:
-      '@spine-event-engine/client-web':
-        specifier: 2.0.0-snapshot.21
-        version: 2.0.0-snapshot.21
       '@spine-event-engine/proto-tools':
         specifier: 2.0.0-snapshot.21
         version: 2.0.0-snapshot.21
@@ -253,12 +250,6 @@ importers:
 
   packages/web:
     dependencies:
-      '@access-desk/identity-model':
-        specifier: 0.0.0
-        version: link:../identity/model
-      '@access-desk/resources-model':
-        specifier: 0.0.0
-        version: link:../resources/model
       '@bufbuild/protobuf':
         specifier: 2.12.1
         version: 2.12.1
@@ -268,34 +259,10 @@ importers:
       '@spine-event-engine/client-web':
         specifier: 2.0.0-snapshot.21
         version: 2.0.0-snapshot.21
-      '@spine-event-engine/core':
-        specifier: 2.0.0-snapshot.21
-        version: 2.0.0-snapshot.21
-      '@spine-event-engine/proto':
-        specifier: 2.0.0-snapshot.21
-        version: 2.0.0-snapshot.21
-      react:
-        specifier: 19.2.8
-        version: 19.2.8
-      react-dom:
-        specifier: 19.2.8
-        version: 19.2.8(react@19.2.8)
     devDependencies:
-      '@types/node':
-        specifier: 24.13.2
-        version: 24.13.2
-      '@types/react':
-        specifier: 19.2.18
-        version: 19.2.18
-      '@types/react-dom':
-        specifier: 19.2.3
-        version: 19.2.3(@types/react@19.2.18)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
-      vite:
-        specifier: 8.2.2
-        version: 8.2.2(@types/node@24.13.2)
       vitest:
         specifier: 4.1.9
         version: 4.1.9(@types/node@24.13.2)(@vitest/coverage-v8@4.1.9)(vite@8.2.2(@types/node@24.13.2))
@@ -724,11 +691,6 @@ packages:
 
   '@types/node@26.4.0':
     resolution: {integrity: sha512-faiGnoIrLH/V8cibOMEAZ8pMw6oXqSukl29ra4mN8GdaB2ZewzeaLj+INpV5N+Z1eKWzY+IzaIZH2EIR6YZRNQ==}
-
-  '@types/react-dom@19.2.3':
-    resolution: {integrity: sha512-jp2L/eY6fn+KgVVQAOqYItbF0VY/YApe5Mz2F0aykSO8gx31bYCZyvSeYxCHKvzHG5eZjc+zyaS5BrBWya2+kQ==}
-    peerDependencies:
-      '@types/react': ^19.2.0
 
   '@types/react@19.2.18':
     resolution: {integrity: sha512-AnzbBERsrLKtk2XSfTbYRLjQPdy116Sty4q+T+Bp3IC4l6jNBvreVPAHmpq9qhXQM7CXZPjLVmGMw9sy+hxQ3w==}
@@ -1483,11 +1445,6 @@ packages:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
     engines: {node: '>=6'}
 
-  react-dom@19.2.8:
-    resolution: {integrity: sha512-rVprimfGBG3DR+Tq0IQG2DT5PxKth1WIGDmj5yPmlzr4YBe7uyE+Du4oVqTDXZSHGGGXRtTJEGSSePyQCMBglQ==}
-    peerDependencies:
-      react: ^19.2.8
-
   react@19.2.8:
     resolution: {integrity: sha512-PWaYA1L/q9u2u7xYQi+Y3L3Yfnie7XyLeaJICV1MGD6LprsBxcAqGjYyr0eY3p+QdsA+x/Irkt4Qif8D63+Sbw==}
     engines: {node: '>=0.10.0'}
@@ -1519,9 +1476,6 @@ packages:
 
   safe-buffer@5.2.1:
     resolution: {integrity: sha512-rp3So07KcdmmKbGvgaNxQSJr7bGVSVk5S9Eq1F+ppbRo70+YeaDxkw5Dd8NPN+GD6bjnYm2VuPuCXmpuYvmCXQ==}
-
-  scheduler@0.27.0:
-    resolution: {integrity: sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==}
 
   semver@7.8.5:
     resolution: {integrity: sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==}
@@ -2218,10 +2172,6 @@ snapshots:
     dependencies:
       undici-types: 8.3.0
     optional: true
-
-  '@types/react-dom@19.2.3(@types/react@19.2.18)':
-    dependencies:
-      '@types/react': 19.2.18
 
   '@types/react@19.2.18':
     dependencies:
@@ -3031,11 +2981,6 @@ snapshots:
 
   punycode@2.3.1: {}
 
-  react-dom@19.2.8(react@19.2.8):
-    dependencies:
-      react: 19.2.8
-      scheduler: 0.27.0
-
   react@19.2.8: {}
 
   readable-stream@3.6.2:
@@ -3081,8 +3026,6 @@ snapshots:
       '@rolldown/binding-win32-x64-msvc': 1.2.6
 
   safe-buffer@5.2.1: {}
-
-  scheduler@0.27.0: {}
 
   semver@7.8.5: {}
 
