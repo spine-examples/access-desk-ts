@@ -94,7 +94,7 @@ describe("ResourceRegistrationProcessManager should", () => {
     });
   });
 
-  describe("handle 'ResourceRegistrationRequested', and", () => {
+  describe("react on 'ResourceRegistrationRequested', and", () => {
     it("create the requested resource with its initial policy", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
@@ -110,7 +110,7 @@ describe("ResourceRegistrationProcessManager should", () => {
     });
   });
 
-  describe("handle 'ResourceCreated', and", () => {
+  describe("react on 'ResourceCreated', and", () => {
     it("emit 'ResourceAdded' for the organization that owns the resource", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
@@ -130,7 +130,7 @@ describe("ResourceRegistrationProcessManager should", () => {
     });
   });
 
-  describe("handle 'ResourceAdded', and", () => {
+  describe("react on 'ResourceAdded', and", () => {
     it("emit 'ResourceRegistered' once the resource is recorded", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);

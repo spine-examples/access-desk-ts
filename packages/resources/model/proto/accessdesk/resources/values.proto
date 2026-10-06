@@ -38,6 +38,27 @@ message OrganizationMember {
     OrganizationRole role = 3;
 }
 
+// The status of an invitation to join an organization.
+enum InvitationStatus {
+
+    IS_UNSPECIFIED = 0;
+
+    // The invitation was issued and waits for the invited person to accept or
+    // decline it.
+    INVITATION_PENDING = 1;
+
+    // The invited person accepted the invitation and became a member of the
+    // organization.
+    INVITATION_ACCEPTED = 2;
+
+    // The invited person declined the invitation and did not become a member.
+    INVITATION_DECLINED = 3;
+
+    // An administrator took the invitation back before the invited person
+    // answered it.
+    INVITATION_REVOKED = 4;
+}
+
 // What a member may do in an organization, apart from what managing a
 // particular resource lets them do.
 enum OrganizationRole {
