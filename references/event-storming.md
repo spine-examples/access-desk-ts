@@ -33,27 +33,27 @@ Registered and Sign-In Account Added.
 
 ### Resources
 
-| Owner                      | Trigger (actor/event)                 | Command                     | Event(s)                        | Rejections                           |
-| -------------------------- |---------------------------------------| --------------------------- | ------------------------------- | ------------------------------------ |
-| Organization               | Developer, at assembly                | Create Organization         | Organization Created            | Organization Already Exists          |
-| Invitation (PM)            | Organization Administrator            | Invite Member               | Member Invited                  | Member Already Invited               |
-| Invitation (PM)            | Organization Administrator            | Revoke Invitation           | Invitation Revoked              | Invitation Not Pending               |
-| Invitation (PM)            | Invited person, signed in             | Accept Invitation           | Invitation Accepted             | Invitation Not Pending               |
-| Invitation (PM)            | Invited person, signed in             | Decline Invitation          | Invitation Declined             | Invitation Not Pending               |
-| Invitation (PM)            | on Invitation Accepted                | Add Organization Member     | —                               | —                                    |
-| Organization               | Invitation (PM)                       | Add Organization Member     | Organization Member Added       | —                                    |
-| Resource Registration (PM) | Organization Administrator            | Register Resource           | Resource Registration Requested | —                                    |
-| Resource Registration (PM) | on Resource Registration Requested    | Create Resource             | —                               | —                                    |
-| Resource                   | Resource Registration (PM)            | Create Resource             | Resource Created                | Resource Already Exists              |
-| Resource Registration (PM) | on Resource Already Exists            | —                           | Resource Registration Failed    | —                                    |
-| Resource Registration (PM) | on Resource Created                   | Add Resource                | —                               | —                                    |
-| Organization               | Resource Registration (PM)            | Add Resource                | Resource Added                  | Resource Name Already Used           |
-| Resource Registration (PM) | on Resource Name Already Used         | Delete Resource             | —                               | —                                    |
-| Resource                   | Resource Registration (PM)            | Delete Resource             | Resource Deleted                | —                                    |
-| Resource Registration (PM) | on Resource Added                     | —                           | Resource Registered             | —                                    |
-| Resource Registration (PM) | on Resource Deleted                   | —                           | Resource Registration Failed    | —                                    |
-| Resource                   | Resource Manager                      | Open Resource For Requests  | Resource Opened For Requests    | Resource Already Open For Requests   |
-| Resource                   | Resource Manager                      | Close Resource For Requests | Resource Closed For Requests    | Resource Already Closed For Requests |
+| Owner                      | Trigger (actor/event)              | Command                     | Event(s)                        | Rejections                           |
+| -------------------------- | ---------------------------------- | --------------------------- | ------------------------------- | ------------------------------------ |
+| Organization               | Developer, at assembly             | Create Organization         | Organization Created            | Organization Already Exists          |
+| Invitation (PM)            | Organization Administrator         | Invite Member               | Member Invited                  | Member Already Invited               |
+| Invitation (PM)            | Organization Administrator         | Revoke Invitation           | Invitation Revoked              | Invitation Not Pending               |
+| Invitation (PM)            | Invited person, signed in          | Accept Invitation           | Invitation Accepted             | Invitation Not Pending               |
+| Invitation (PM)            | Invited person, signed in          | Decline Invitation          | Invitation Declined             | Invitation Not Pending               |
+| Invitation (PM)            | on Invitation Accepted             | Add Organization Member     | —                               | —                                    |
+| Organization               | Invitation (PM)                    | Add Organization Member     | Organization Member Added       | —                                    |
+| Resource Registration (PM) | Organization Administrator         | Register Resource           | Resource Registration Requested | —                                    |
+| Resource Registration (PM) | on Resource Registration Requested | Create Resource             | —                               | —                                    |
+| Resource                   | Resource Registration (PM)         | Create Resource             | Resource Created                | Resource Already Exists              |
+| Resource Registration (PM) | on Resource Already Exists         | —                           | Resource Registration Failed    | —                                    |
+| Resource Registration (PM) | on Resource Created                | Add Resource                | —                               | —                                    |
+| Organization               | Resource Registration (PM)         | Add Resource                | Resource Added                  | Resource Name Already Used           |
+| Resource Registration (PM) | on Resource Name Already Used      | Delete Resource             | —                               | —                                    |
+| Resource                   | Resource Registration (PM)         | Delete Resource             | Resource Deleted                | —                                    |
+| Resource Registration (PM) | on Resource Added                  | —                           | Resource Registered             | —                                    |
+| Resource Registration (PM) | on Resource Deleted                | —                           | Resource Registration Failed    | —                                    |
+| Resource                   | Resource Manager                   | Open Resource For Requests  | Resource Opened For Requests    | Resource Already Open For Requests   |
+| Resource                   | Resource Manager                   | Close Resource For Requests | Resource Closed For Requests    | Resource Already Closed For Requests |
 
 Process: **Resource Registration** runs `Register Resource → Resource
 Registration Requested → Create Resource → Resource Created → Add Resource →

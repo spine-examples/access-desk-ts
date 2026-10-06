@@ -30,7 +30,7 @@ baseline: Node.js 24 or newer, pnpm 11.9, strict TypeScript, and ESM.
 The system has two bounded contexts:
 
 | Bounded context | Owns                                                                                                                                                                                              | Tenant mode          |
-| --------------- |---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------| -------------------- |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
 | Identity        | People, the accounts they sign in with, and their email addresses                                                                                                                                 | Global/single-tenant |
 | Resources       | Organizations, invitations, memberships, resources, ordered access levels, resource managers, request policy, requests, approval decisions, grants, extensions, revocation, and audit projections | Organization-scoped  |
 

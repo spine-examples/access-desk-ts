@@ -33,6 +33,7 @@ yarn-error.log*
 .env
 .env.*
 !.env.example
+.certs/
 
 # --- Editor / IDE ---
 .idea/*
