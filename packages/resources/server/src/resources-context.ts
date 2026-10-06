@@ -53,6 +53,8 @@ import {
 import { type PersonId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { OrganizationAggregate } from "./organization/organization-aggregate.js";
 import { OrganizationViewProjection } from "./organization/organization-view-projection.js";
+import { InvitationProcessManager } from "./organization/invitation/invitation-process.js";
+import { InvitationViewProjection } from "./organization/invitation/invitation-view-projection.js";
 import { ResourceAggregate } from "./resource/resource-aggregate.js";
 import { ResourceCatalogProjection } from "./resource/resource-catalog-projection.js";
 import { ResourceRegistrationProcessManager } from "./resource/resource-registration-process.js";
@@ -122,6 +124,8 @@ export async function createResourcesContext(
     .withGeneratedRegistryRoot(new URL("..", import.meta.url))
     .add(OrganizationAggregate)
     .add(OrganizationViewProjection)
+    .add(InvitationProcessManager)
+    .add(InvitationViewProjection)
     .add(ResourceRegistrationProcessManager, { eventRouting: resourceRegistrationProcmanRouting })
     .add(ResourceAggregate)
     .add(ResourceCatalogProjection)

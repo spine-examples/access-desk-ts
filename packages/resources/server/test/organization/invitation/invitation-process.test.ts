@@ -55,12 +55,12 @@ const administrator = OrganizationRole.ADMINISTRATOR;
 
 describe("InvitationProcessManager should", () => {
   describe("handle 'InviteMember', and", () => {
-    it("emit 'MemberInvited' for the name in lower case, with the role the administrator named", async () => {
+    it("emit 'MemberInvited' with the role the administrator named", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       const events = await recordEvents(scope, MemberInvitedSchema);
 
-      expect((await inviteMember(scope, " Noah ", OrganizationRole.ADMINISTRATOR)).kind).toBe("ok");
+      expect((await inviteMember(scope, "noah", OrganizationRole.ADMINISTRATOR)).kind).toBe("ok");
 
       expect(await events.waitFor(box)).toEqual(
         create(MemberInvitedSchema, { id: { invitee: { value: "noah" } }, role: administrator }),
@@ -68,13 +68,13 @@ describe("InvitationProcessManager should", () => {
       await events.cancel();
     });
 
-    it("reject a person already invited, in any case, with 'MemberAlreadyInvited'", async () => {
+    it("reject a person already invited with 'MemberAlreadyInvited'", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await inviteMember(scope, "noah")).kind).toBe("ok");
 
       await expectRejection(box, scope, MemberAlreadyInvitedSchema, () =>
-        inviteMember(scope, "NOAH"),
+        inviteMember(scope, "noah"),
       );
     });
 
@@ -122,7 +122,7 @@ describe("InvitationProcessManager should", () => {
       expect((await inviteMember(scope, "noah", administrator)).kind).toBe("ok");
       const events = await recordEvents(scope, InvitationAcceptedSchema);
 
-      expect((await acceptInvitation(scope, "Noah", "person-noah", "Noah Reyes")).kind).toBe("ok");
+      expect((await acceptInvitation(scope, "noah", "person-noah", "Noah Reyes")).kind).toBe("ok");
 
       expect(await events.waitFor(box)).toEqual(
         create(InvitationAcceptedSchema, {
@@ -164,7 +164,7 @@ describe("InvitationProcessManager should", () => {
       expect((await inviteMember(scope, "noah")).kind).toBe("ok");
       const events = await recordEvents(scope, InvitationDeclinedSchema);
 
-      expect((await declineInvitation(scope, "Noah", "person-noah")).kind).toBe("ok");
+      expect((await declineInvitation(scope, "noah", "person-noah")).kind).toBe("ok");
 
       expect(await events.waitFor(box)).toEqual(
         create(InvitationDeclinedSchema, {

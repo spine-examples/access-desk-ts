@@ -16,7 +16,11 @@ import { create } from "@bufbuild/protobuf";
 import { InvitationStatus } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import type { EventContext } from "@spine-event-engine/proto";
 import { Assign, Command, ProcessManager, Throws } from "@spine-event-engine/server";
-import type { InvitationId } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
+import {
+  OrganizationIdSchema,
+  type InvitationId,
+  type OrganizationId,
+} from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
 import {
   AddOrganizationMemberSchema,
   type AddOrganizationMember,
@@ -42,7 +46,6 @@ import {
   InvitationNotPending,
   MemberAlreadyInvited,
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/invitation/rejections.js";
-import { organizationOf } from "../organization-of.js";
 
 /**
  * An organization's invitation of one person to become its member.
@@ -122,11 +125,32 @@ export class InvitationProcessManager extends ProcessManager<
   @Command
   onInvitationAccepted(event: InvitationAccepted, context: EventContext): AddOrganizationMember {
     return create(AddOrganizationMemberSchema, {
-      organizationId: organizationOf(context),
+      organizationId: this.organizationOf(context),
       person: event.person,
       name: event.name,
       role: event.role,
     });
+  }
+
+  /**
+   * The organization a fact happened in.
+   *
+   * Each organization is its own tenant, so the organization is the tenant the
+   * fact was recorded for, never one the fact itself names.
+   */
+  private organizationOf(context: EventContext): OrganizationId {
+    const origin = context.origin;
+    const actor =
+      origin.case === "importContext"
+        ? origin.value
+        : origin.case === "pastMessage"
+          ? origin.value.actorContext
+          : undefined;
+    const tenant = actor?.tenantId?.kind;
+    if (tenant?.case !== "value" || tenant.value === "") {
+      throw new Error("A fact in the Resources context must happen in an organization.");
+    }
+    return create(OrganizationIdSchema, { uuid: tenant.value });
   }
 
   private assertPending(): void {
