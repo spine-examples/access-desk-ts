@@ -17,7 +17,7 @@ Classify work before editing:
 - **Standard:** one bounded behavior slice with local contracts, handlers,
   projections, UI, or tests.
 - **High-risk:** new bounded context; Event Storming replacement; public/wire
-  contract; tenant/security boundary; Scheduling-process `Any` intake;
+  contract; tenant/security boundary;
   same-server command delivery; delivery strategy or Process Manager inbox
   durability; outbox/relay; persistence
   transaction/index; concurrency; idempotency; migration; or cross-context
@@ -82,7 +82,7 @@ convergence:
 2. targeted typecheck/lint for the affected package;
 3. deterministic unit tests;
 4. affected-context BlackBox tests;
-5. choreography and crash/replay tests for integration/scheduling changes;
+5. choreography and crash/replay tests for integration changes;
 6. gateway/browser tests for auth, subscriptions, and UI changes;
 7. workspace verification profile once repository scripts exist.
 

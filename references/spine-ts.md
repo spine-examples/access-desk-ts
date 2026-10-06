@@ -103,11 +103,12 @@ scripts should expose this sequence. Generated sources, manifests, registries,
 declarations, and build output are never hand-edited.
 
 For one model to import another's `.proto` (e.g. Resources using Identity's
-`PersonId`, or Access referencing Resources types), add the producer package to
-the consumer model's `spine-proto.json` `dependencies` **and** to its
-`package.json` `dependencies`, then `pnpm install`; declare
-transitive proto deps too (Access declares both Resources and Identity).
-Reference cross-package types by full proto path (`accessdesk.identity.PersonId`).
+`PersonId`), add the producer package to the consumer model's `spine-proto.json`
+`dependencies` **and** to its `package.json` `dependencies`, then `pnpm install`;
+declare transitive proto deps too. Reference cross-package types by full proto path
+(`accessdesk.identity.PersonId`). Spine's own value types are imported the same way:
+`import "spine/net/email_address.proto";` gives `spine.net.EmailAddress`, whose
+schema `EmailAddressSchema` comes from `@spine-event-engine/proto`.
 Authored helper TS (e.g. enum-option accessors) lives in a model's `src/`; add
 `src/**/*.ts` to that package's tsconfig `include` and an `exports` subpath.
 
@@ -247,6 +248,12 @@ true cause, temporarily log in the `catch` of `#post` in
 not commit or leave `node_modules` edits. This is how the single-field-id and
 `UNSUPPORTED_COMMAND` causes above were found.
 
+A process manager's `@React` or `@Command` handler updates state like any other
+handler, so the state must pass its `(required)` checks afterwards. A process
+that was never started by its entry command cannot react to a later fact when
+its required fields are still empty. Test such reactions by running the process
+from its entry command.
+
 ## External events
 
 Mark a cross-context event receptor with direct first-parameter
@@ -260,10 +267,8 @@ Mark a cross-context event receptor with direct first-parameter
   production delivery guarantee.
 
 A single-tenant producer's event has no tenant, while a multitenant entity
-handler requires one. Global Identity events therefore pass through the
-documented durable tenant fan-out adapter, which derives tenant-scoped
-integration facts. Do not wire a raw single-tenant Identity event directly to a
-multitenant Resources handler.
+handler requires one, so a raw Identity event cannot reach a Resources handler.
+Access Desk needs no such delivery: Identity and Resources exchange no facts.
 
 ## Protobuf Any and type registries
 
@@ -341,8 +346,8 @@ schema through `ServerEnvironment`'s `typeRegistry`, so configure
 complete registry before the environment first resolves. The receiving
 context's routing reads the tenant from `EventContext.origin`
 (`importContext`). In this snapshot a client subscription did not receive the
-domestic facts that followed from an imported event (observed with the Clock);
-assert those through queries or `box.assertEvents()`.
+domestic facts that followed from an imported event; assert those through
+queries or `box.assertEvents()`.
 
 **Testing an `External<T>` subscription** posts the producing fact directly to
 the consumer's BlackBox actor scope: `await box.onBehalfOf("producer")

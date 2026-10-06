@@ -14,10 +14,10 @@ Runtime baseline: **Node ≥ 24, pnpm 11.9, strict TypeScript, ESM**.
 
 Two contexts (`references/architecture.md`):
 
-| Context    | Owns                                                                                                                           | Tenancy                  |
-| ---------- |--------------------------------------------------------------------------------------------------------------------------------| ------------------------ |
-| Identity   | Global users, registration, auth identity                                                                                      | Global / single-tenant   |
-| Resources  | Organizations, membership, resources, policy, managers, requests, approvals, grants, extensions, revocation, audit projections | Org-scoped (multitenant) |
+| Context    | Owns                                                                                                                                        | Tenancy                  |
+| ---------- |---------------------------------------------------------------------------------------------------------------------------------------------| ------------------------ |
+| Identity   | People, the accounts they sign in with, and their email addresses                                                                           | Global / single-tenant   |
+| Resources  | Organizations, invitations, membership, resources, policy, managers, requests, approvals, grants, extensions, revocation, audit projections | Org-scoped (multitenant) |
 
 Resources owns the whole request-and-approval domain. What earlier drafts split
 into separate Access and Audit contexts is now internal to
@@ -36,15 +36,15 @@ Each context is **two packages** under `packages/<context>/`:
 packages/
   identity/    { model, server }      # global / single-tenant
   resources/   { model, server }
-  app/                                # composition root: complete registry + (later) Server assembly, gateway, fan-out
+  app/                                # composition root: complete registry + (later) Server assembly, gateway
   web/                                # React + Vite browser client (later iterations)
 ```
 
 - **`<context>/model`** — `@access-desk/<context>-model`, `spine-proto.json` `mode: "model"`.
   Canonical `.proto` under `proto/accessdesk/<context>/` plus the generated
   `ProtoModule`; pure wire contracts, no behavior. Resources subdivides its protos
-  into per-area folders (`organization/`, `resource/`, `access/request/`,
-  `access/grant/`), each its
+  into per-area folders (`organization/`, `organization/invitation/`, `resource/`,
+  `access/request/`, `access/grant/`), each its
   own sub-package under `accessdesk.resources.*`, with shared `identifiers.proto`
   and `values.proto` at the top level (filename conventions in the `protobuf-style` skill).
 - **`<context>/server`** — `@access-desk/<context>-server`, `spine-proto.json`
@@ -56,7 +56,7 @@ packages/
   `spine-proto handlers` discovers decorated classes only in the package that runs it.
 - **`app`** — `@access-desk/app`, `mode: "application"`, composes **both** context
   models into the complete application `TypeRegistry`; will assemble the `Server`
-  (`Server.add(ctx)` per context), the gateway, and the Identity→tenant fan-out.
+  (`Server.add(ctx)` per context) and the gateway.
 - **`web`** — `@access-desk/web`, the React/Vite client.
 
 **Dependency rule:** a `server` may depend on another context's `model` (wire
