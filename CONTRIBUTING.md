@@ -3,7 +3,7 @@
 Thank you for wanting to contribute to Access Desk — a demo-sized,
 production-shaped [Spine TS](https://github.com/SpineEventEngine/spine-ts)
 application for organization-scoped resource access requests, approvals,
-scheduling, and audit. The following resources will help you get started:
+grants, and audit. The following resources will help you get started:
 
 - [What the project is and how to build and run it](README.md).
 - [Product background](PRD.md).

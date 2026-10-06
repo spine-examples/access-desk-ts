@@ -57,6 +57,7 @@ Organization is the tenant.
   account is named by its provider and the permanent name the provider gives
   it. Accounts are one person when their providers confirm the same email
   address. Only an address the provider has verified counts.
+- An account is linked to its person once.
 - A user may have memberships in multiple organizations.
 - Every tenant-scoped request, query, subscription, inbox row,
   outbox row, and audit record carries exactly one `OrganizationId` represented
@@ -70,6 +71,8 @@ Organization is the tenant.
 - Resources is multitenant. Identity is singletenant.
 - A person joins an organization by invitation. An administrator invites the
   person's email address, and the signed-in person accepts or declines.
+  The invited person answers for themselves; nobody accepts or declines on
+  behalf of another.
 - Roles and permissions are organization-scoped. A role in one organization
   gives no authority in another.
 - Storage namespaces and context-prefixed kinds provide defense in depth; they
