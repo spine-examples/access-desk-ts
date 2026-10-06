@@ -20,7 +20,7 @@ import { type ActorContext, UserIdSchema } from "@spine-event-engine/proto";
 import { QueryIdSchema, QuerySchema, TargetSchema } from "@spine-event-engine/proto/client";
 import { BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
 
-import { eventRecording } from "../../../../resources/server/test/given/event-recording.js";
+import { eventRecording } from "./event-recording.js";
 
 /** The gateway acting in the tests, once a provider has confirmed a person. */
 export const actor = "gateway";
