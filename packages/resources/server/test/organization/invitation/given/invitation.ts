@@ -51,14 +51,18 @@ export function revokeInvitation(scope: BlackBoxScope, invitee: string) {
   );
 }
 
-/** Posts `AcceptInvitation` on behalf of the invited person. */
+/**
+ * Posts `AcceptInvitation` for the person, who acts for themselves unless
+ * somebody else is named as acting.
+ */
 export function acceptInvitation(
-  scope: BlackBoxScope,
+  box: BlackBox,
   invitee: string,
   person: string,
   name: string = person,
+  acting: string = person,
 ) {
-  return scope.post(
+  return box.onBehalfOf(acting).post(
     AcceptInvitationSchema,
     create(AcceptInvitationSchema, {
       id: { invitee: { value: invitee } },
@@ -68,9 +72,17 @@ export function acceptInvitation(
   );
 }
 
-/** Posts `DeclineInvitation` on behalf of the invited person. */
-export function declineInvitation(scope: BlackBoxScope, invitee: string, person: string) {
-  return scope.post(
+/**
+ * Posts `DeclineInvitation` for the person, who acts for themselves unless
+ * somebody else is named as acting.
+ */
+export function declineInvitation(
+  box: BlackBox,
+  invitee: string,
+  person: string,
+  acting: string = person,
+) {
+  return box.onBehalfOf(acting).post(
     DeclineInvitationSchema,
     create(DeclineInvitationSchema, {
       id: { invitee: { value: invitee } },

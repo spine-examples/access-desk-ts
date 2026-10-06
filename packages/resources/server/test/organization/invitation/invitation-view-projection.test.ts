@@ -69,7 +69,7 @@ describe("InvitationViewProjection should", () => {
       expect((await createOrganization(scope)).kind).toBe("ok");
       expect((await inviteMember(scope, "noah")).kind).toBe("ok");
 
-      expect((await acceptInvitation(scope, "noah", "person-noah")).kind).toBe("ok");
+      expect((await acceptInvitation(box, "noah", "person-noah")).kind).toBe("ok");
 
       const view = await awaitInvitation(box, scope, "noah", InvitationStatus.INVITATION_ACCEPTED);
       expect(view.acceptedBy?.uuid).toBe("person-noah");
@@ -82,7 +82,7 @@ describe("InvitationViewProjection should", () => {
       const scope = box.onBehalfOf(actor);
       expect((await inviteMember(scope, "noah")).kind).toBe("ok");
 
-      expect((await declineInvitation(scope, "noah", "person-noah")).kind).toBe("ok");
+      expect((await declineInvitation(box, "noah", "person-noah")).kind).toBe("ok");
 
       const view = await awaitInvitation(box, scope, "noah", InvitationStatus.INVITATION_DECLINED);
       expect(view.acceptedBy).toBeUndefined();

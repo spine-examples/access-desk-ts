@@ -48,7 +48,7 @@ describe("InvitationProcessManager should", () => {
     expect((await createOrganization(scope)).kind).toBe("ok");
     expect((await inviteMember(scope, "noah", OrganizationRole.ADMINISTRATOR)).kind).toBe("ok");
 
-    expect((await acceptInvitation(scope, "noah", "person-noah", "Noah Reyes")).kind).toBe("ok");
+    expect((await acceptInvitation(box, "noah", "person-noah", "Noah Reyes")).kind).toBe("ok");
 
     const member = await awaitMember(box, scope, "person-noah");
     expect(member).toMatchObject({
@@ -66,7 +66,7 @@ describe("InvitationProcessManager should", () => {
     expect((await revokeInvitation(scope, "noah")).kind).toBe("ok");
 
     await expectRejection(box, scope, InvitationNotPendingSchema, () =>
-      acceptInvitation(scope, "noah", "person-noah"),
+      acceptInvitation(box, "noah", "person-noah"),
     );
 
     const [view] = await readOrganizationViews(scope);
@@ -79,11 +79,11 @@ describe("InvitationProcessManager should", () => {
     expect((await createOrganization(scope)).kind).toBe("ok");
     expect((await inviteMember(scope, "noah")).kind).toBe("ok");
 
-    expect((await declineInvitation(scope, "noah", "person-noah")).kind).toBe("ok");
+    expect((await declineInvitation(box, "noah", "person-noah")).kind).toBe("ok");
 
     await awaitInvitation(box, scope, "noah", InvitationStatus.INVITATION_DECLINED);
     await expectRejection(box, scope, InvitationNotPendingSchema, () =>
-      acceptInvitation(scope, "noah", "person-noah"),
+      acceptInvitation(box, "noah", "person-noah"),
     );
     const [view] = await readOrganizationViews(scope);
     expect(view?.member).toEqual([]);
@@ -94,12 +94,12 @@ describe("InvitationProcessManager should", () => {
     const scope = box.onBehalfOf(actor);
     expect((await createOrganization(scope)).kind).toBe("ok");
     expect((await inviteMember(scope, "noah")).kind).toBe("ok");
-    expect((await declineInvitation(scope, "noah", "person-noah")).kind).toBe("ok");
+    expect((await declineInvitation(box, "noah", "person-noah")).kind).toBe("ok");
     await awaitInvitation(box, scope, "noah", InvitationStatus.INVITATION_DECLINED);
 
     expect((await inviteMember(scope, "noah", OrganizationRole.ADMINISTRATOR)).kind).toBe("ok");
     await awaitInvitation(box, scope, "noah", InvitationStatus.INVITATION_PENDING);
-    expect((await acceptInvitation(scope, "noah", "person-noah", "Noah Reyes")).kind).toBe("ok");
+    expect((await acceptInvitation(box, "noah", "person-noah", "Noah Reyes")).kind).toBe("ok");
 
     const member = await awaitMember(box, scope, "person-noah");
     expect(member).toMatchObject({

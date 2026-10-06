@@ -17,6 +17,7 @@ syntax = "proto3";
 package accessdesk.resources.organization.invitation;
 
 import "accessdesk/resources/identifiers.proto";
+import "accessdesk/identity/identifiers.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
@@ -32,4 +33,15 @@ message MemberAlreadyInvited {
 message InvitationNotPending {
 
     accessdesk.resources.InvitationId id = 1 [(required) = true];
+}
+
+// Somebody other than the invited person tried to accept or decline the
+// invitation.
+message NotInvitedPerson {
+
+    // The ID of the invitation.
+    accessdesk.resources.InvitationId id = 1 [(required) = true];
+
+    // The person for whom the invitation was to be accepted or declined.
+    accessdesk.identity.PersonId person = 2 [(required) = true];
 }

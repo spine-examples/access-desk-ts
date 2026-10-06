@@ -14,8 +14,9 @@
 
 import { create } from "@bufbuild/protobuf";
 import { InvitationStatus } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
-import type { EventContext } from "@spine-event-engine/proto";
+import type { CommandContext, EventContext } from "@spine-event-engine/proto";
 import { Assign, Command, ProcessManager, Throws } from "@spine-event-engine/server";
+import type { PersonId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import {
   OrganizationIdSchema,
   type InvitationId,
@@ -43,6 +44,7 @@ import {
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/invitation/events_pb.js";
 import { InvitationSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/invitation/invitation_pb.js";
 import {
+  NotInvitedPerson,
   InvitationNotPending,
   MemberAlreadyInvited,
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/invitation/rejections.js";
@@ -54,8 +56,9 @@ import {
  *    role they will hold.
  * 2. The invitation waits. An administrator may take it back, and may later
  *    invite the same person again.
- * 3. The person, having signed in, accepts the invitation or declines it. A
- *    person who declined may be invited again.
+ * 3. The person, having signed in, accepts the invitation or declines it.
+ *    They answer for themselves: nobody accepts or declines on behalf of
+ *    another person. A person who declined may be invited again.
  * 4. The organization adds the person as a member with the role the
  *    invitation gives.
  */
@@ -94,10 +97,15 @@ export class InvitationProcessManager extends ProcessManager<
     return create(InvitationRevokedSchema, { id: this.id });
   }
 
-  /** Accepts the invitation for the invited person while it is waiting. */
+  /**
+   * Accepts the invitation for the invited person while it is waiting.
+   *
+   * The person who accepts is the one acting, never somebody they name.
+   */
   @Assign
-  @Throws(InvitationNotPending)
-  acceptInvitation(command: AcceptInvitation): InvitationAccepted {
+  @Throws(NotInvitedPerson, InvitationNotPending)
+  acceptInvitation(command: AcceptInvitation, context: CommandContext): InvitationAccepted {
+    this.assertAnswersForThemselves(command.person, context);
     this.assertPending();
     this.update((draft) => {
       draft.status = InvitationStatus.INVITATION_ACCEPTED;
@@ -110,10 +118,15 @@ export class InvitationProcessManager extends ProcessManager<
     });
   }
 
-  /** Declines the invitation for the invited person while it is waiting. */
+  /**
+   * Declines the invitation for the invited person while it is waiting.
+   *
+   * The person who declines is the one acting, never somebody they name.
+   */
   @Assign
-  @Throws(InvitationNotPending)
-  declineInvitation(command: DeclineInvitation): InvitationDeclined {
+  @Throws(NotInvitedPerson, InvitationNotPending)
+  declineInvitation(command: DeclineInvitation, context: CommandContext): InvitationDeclined {
+    this.assertAnswersForThemselves(command.person, context);
     this.assertPending();
     this.update((draft) => {
       draft.status = InvitationStatus.INVITATION_DECLINED;
@@ -151,6 +164,16 @@ export class InvitationProcessManager extends ProcessManager<
       throw new Error("A fact in the Resources context must happen in an organization.");
     }
     return create(OrganizationIdSchema, { uuid: tenant.value });
+  }
+
+  private assertAnswersForThemselves(person: PersonId | undefined, context: CommandContext): void {
+    if (person === undefined) {
+      throw new Error("An invitation is answered by a person.");
+    }
+    const acting = context.actorContext?.actor?.value ?? "";
+    if (person.uuid !== acting) {
+      throw NotInvitedPerson.create({ id: this.id, person });
+    }
   }
 
   private assertPending(): void {
