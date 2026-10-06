@@ -28,7 +28,7 @@ export class AccessGrantViewProjection extends Projection<
   AccessGrantId,
   typeof AccessGrantViewSchema
 > {
-  /** Lists a newly issued grant. */
+  /** Creates the view of a newly created grant. */
   @Subscribe
   onAccessGrantCreated(event: AccessGrantCreated): void {
     this.update((draft) => {
@@ -42,7 +42,7 @@ export class AccessGrantViewProjection extends Projection<
     });
   }
 
-  /** Shows the new end of extended access, and the request that extended it. */
+  /** Sets the new end of an extended grant, and the request that extended it. */
   @Subscribe
   onAccessGrantExtended(event: AccessGrantExtended): void {
     const { end, request } = event;
@@ -54,7 +54,7 @@ export class AccessGrantViewProjection extends Projection<
     });
   }
 
-  /** Shows the access as revoked. */
+  /** Marks the grant as revoked. */
   @Subscribe
   onAccessGrantRevoked(_event: AccessGrantRevoked): void {
     this.update((draft) => (draft.revoked = true));

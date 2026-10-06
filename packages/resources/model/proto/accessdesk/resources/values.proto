@@ -32,6 +32,24 @@ message OrganizationMember {
 
     // The member's display name.
     string name = 2 [(required) = true];
+
+    // The role the member holds in the organization, which says what they may
+    // do there.
+    OrganizationRole role = 3;
+}
+
+// What a member may do in an organization, apart from what managing a
+// particular resource lets them do.
+enum OrganizationRole {
+
+    OR_UNSPECIFIED = 0;
+
+    // May browse the organization's resources and request access to them.
+    MEMBER = 1;
+
+    // May do everything a member may, and also invite people, take invitations
+    // back, and register resources.
+    ADMINISTRATOR = 2;
 }
 
 // A resource owned by an organization.

@@ -29,16 +29,6 @@ message OrganizationAlreadyExists {
     accessdesk.resources.OrganizationId id = 1 [(required) = true];
 }
 
-// A person who is already a member of an organization.
-message OrganizationMemberAlreadyAdded {
-
-    // The organization where the person is already a member.
-    accessdesk.resources.OrganizationId organization_id = 1 [(required) = true];
-
-    // The person who is already a member.
-    accessdesk.identity.PersonId person = 2 [(required) = true];
-}
-
 // A resource name already used in the organization.
 message OrganizationResourceNameAlreadyUsed {
 

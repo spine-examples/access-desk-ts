@@ -25,6 +25,11 @@ import {
   type OrganizationView,
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
 
+import {
+  OrganizationRole,
+  type OrganizationMember,
+} from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
+
 import { organizationId, readAll } from "../../given/resources-context.js";
 
 /** Posts `CreateOrganization` for the tenant organization under the given name. */
@@ -35,14 +40,20 @@ export function createOrganization(scope: BlackBoxScope, name = "Acme") {
   );
 }
 
-/** Posts `AddOrganizationMember` for the person with the given identifier and name. */
-export function addOrganizationMember(scope: BlackBoxScope, person: string, name: string = person) {
+/** Posts `AddOrganizationMember` for the person with the given identifier, name, and role. */
+export function addOrganizationMember(
+  scope: BlackBoxScope,
+  person: string,
+  name: string = person,
+  role: OrganizationRole = OrganizationRole.MEMBER,
+) {
   return scope.post(
     AddOrganizationMemberSchema,
     create(AddOrganizationMemberSchema, {
       organizationId: { uuid: organizationId },
       person: { uuid: person },
       name,
+      role,
     }),
   );
 }
@@ -74,4 +85,21 @@ export function awaitOrganizationView(
     () => readOrganizationViews(scope),
     (views) => views.some(accept),
   );
+}
+
+/** Waits until the organization's view shows the member as the predicate expects. */
+export async function awaitMember(
+  box: BlackBox,
+  scope: BlackBoxScope,
+  person: string,
+  accept: (member: OrganizationMember) => boolean = () => true,
+): Promise<OrganizationMember> {
+  const matches = (member: OrganizationMember): boolean =>
+    member.person?.uuid === person && accept(member);
+  const views = await awaitOrganizationView(box, scope, (view) => view.member.some(matches));
+  const found = views.flatMap((view) => view.member).find(matches);
+  if (found === undefined) {
+    throw new Error(`Member "${person}" not found.`);
+  }
+  return found;
 }

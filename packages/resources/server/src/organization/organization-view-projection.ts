@@ -64,10 +64,7 @@ export class OrganizationViewProjection extends Projection<
       if (!draft.member.some((existing) => equals(PersonIdSchema, existing.person, person))) {
         draft.member = [
           ...draft.member,
-          create(OrganizationMemberSchema, {
-            person,
-            name: event.name,
-          }),
+          create(OrganizationMemberSchema, { person, name: event.name, role: event.role }),
         ];
       }
     });
