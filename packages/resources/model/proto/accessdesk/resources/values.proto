@@ -35,7 +35,7 @@ message OrganizationMember {
 
     // The role the member holds in the organization, which says what they may
     // do there.
-    OrganizationRole role = 3;
+    OrganizationRole role = 3 [(required) = true];
 }
 
 // The status of an invitation to join an organization.

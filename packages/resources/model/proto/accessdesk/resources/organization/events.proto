@@ -47,7 +47,7 @@ message OrganizationMemberAdded {
     string name = 3 [(required) = true];
 
     // The role the member holds in the organization.
-    accessdesk.resources.OrganizationRole role = 4;
+    accessdesk.resources.OrganizationRole role = 4 [(required) = true];
 }
 
 // A resource was added to an organization.
