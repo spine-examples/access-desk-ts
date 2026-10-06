@@ -78,6 +78,17 @@ describe("InvitationProcessManager should", () => {
       );
     });
 
+    it("find the invitation by the email address in lower case, however it is written", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      expect((await inviteMember(scope, " Noah@Acme.example ")).kind).toBe("ok");
+      await awaitInvitation(box, scope, "noah@acme.example", InvitationStatus.INVITATION_PENDING);
+
+      await expectRejection(box, scope, MemberAlreadyInvitedSchema, () =>
+        inviteMember(scope, "NOAH@ACME.EXAMPLE"),
+      );
+    });
+
     it("invite again a person whose invitation was taken back", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
