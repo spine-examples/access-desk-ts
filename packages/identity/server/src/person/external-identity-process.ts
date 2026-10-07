@@ -69,7 +69,6 @@ export class ExternalIdentityProcessManager extends ProcessManager<
       value: (command.emailAddress?.value ?? "").trim().toLowerCase(),
     });
     this.update((draft) => {
-      draft.id = this.id;
       draft.emailAddress = emailAddress;
       draft.name = name;
     });

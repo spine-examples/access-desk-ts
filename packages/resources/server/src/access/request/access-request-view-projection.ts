@@ -87,7 +87,6 @@ export class AccessRequestViewProjection extends Projection<
       return;
     }
     this.update((draft) => {
-      draft.id = this.id;
       draft.snapshot = snapshot;
       draft.status = AccessRequestStatus.PENDING;
     });
@@ -99,7 +98,6 @@ export class AccessRequestViewProjection extends Projection<
     decision?: Decision,
   ): void {
     this.update((draft) => {
-      draft.id = this.id;
       if (snapshot !== undefined) {
         draft.snapshot = snapshot;
       }

@@ -28,10 +28,7 @@ export class ExternalIdentityViewProjection extends Projection<
   @Subscribe
   onExternalIdentityLinked(event: ExternalIdentityLinked): void {
     this.update((draft) => {
-      draft.id = event.id ?? this.id;
-      if (event.person !== undefined) {
-        draft.person = event.person;
-      }
+      draft.person = event.person;
     });
   }
 }

@@ -79,7 +79,6 @@ export class InvitationProcessManager extends ProcessManager<
     }
     const role = command.role;
     this.update((draft) => {
-      draft.id = this.id;
       draft.role = role;
       draft.status = InvitationStatus.INVITATION_PENDING;
     });

@@ -48,7 +48,6 @@ export class PersonAggregate extends Aggregate<PersonId, typeof PersonSchema> {
       throw new Error("A person is registered once, under an email address and with an account.");
     }
     this.update((draft) => {
-      draft.id = this.id;
       draft.emailAddress = emailAddress;
       draft.name = name;
       draft.account = [account];

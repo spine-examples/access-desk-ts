@@ -43,9 +43,7 @@ export class OrganizationViewProjection extends Projection<
    */
   @Subscribe
   onOrganizationCreated(event: OrganizationCreated): void {
-    const id = event.id ?? this.id;
     this.update((draft) => {
-      draft.id = id;
       draft.name = event.name;
     });
   }
@@ -60,7 +58,6 @@ export class OrganizationViewProjection extends Projection<
       return;
     }
     this.update((draft) => {
-      draft.id = event.organizationId ?? this.id;
       if (!draft.member.some((existing) => equals(PersonIdSchema, existing.person, person))) {
         draft.member = [
           ...draft.member,
@@ -80,7 +77,6 @@ export class OrganizationViewProjection extends Projection<
       return;
     }
     this.update((draft) => {
-      draft.id = event.organizationId ?? this.id;
       if (!draft.resource.some((existing) => equals(ResourceIdSchema, existing.id, resourceId))) {
         draft.resource = [
           ...draft.resource,

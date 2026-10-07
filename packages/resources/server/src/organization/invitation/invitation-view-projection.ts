@@ -34,7 +34,6 @@ export class InvitationViewProjection extends Projection<
   @Subscribe
   onMemberInvited(event: MemberInvited): void {
     this.update((draft) => {
-      draft.id = event.id ?? this.id;
       draft.role = event.role;
       draft.status = InvitationStatus.INVITATION_PENDING;
     });
@@ -52,7 +51,6 @@ export class InvitationViewProjection extends Projection<
   @Subscribe
   onInvitationAccepted(event: InvitationAccepted): void {
     this.update((draft) => {
-      draft.id = event.id ?? this.id;
       draft.status = InvitationStatus.INVITATION_ACCEPTED;
       if (event.person !== undefined) {
         draft.acceptedBy = event.person;
