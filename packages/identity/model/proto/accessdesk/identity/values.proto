@@ -37,7 +37,4 @@ enum IdentityProvider {
     // https://developers.google.com/identity/openid-connect/openid-connect#an-id-tokens-payload.
     //
     GOOGLE = 2;
-
-    // The sign-in for the seeded people of the demonstration.
-    DEVELOPMENT = 3;
 }
