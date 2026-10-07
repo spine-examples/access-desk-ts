@@ -22,8 +22,8 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
-// An account with an identity provider, and how it comes to belong to a
-// person of Access Desk.
+// The linking of an account, held with an identity provider such as GitHub or
+// Google, to the person who signs in with it.
 message ExternalIdentity {
     option (entity).kind = PROCESS_MANAGER;
 

@@ -43,7 +43,8 @@ import { ExternalIdentitySchema } from "@access-desk/identity-model/generated/ac
 import { ExternalIdentityAlreadyKnown } from "@access-desk/identity-model/generated/accessdesk/identity/person/external_identity_rejections.js";
 
 /**
- * An account with an identity provider, and how it comes to belong to a person.
+ * The linking of an account, held with an identity provider such as GitHub or
+ * Google, to the person who signs in with it.
  *
  * 1. Somebody signs in with an account Access Desk has not seen, and the
  *    provider confirms the account's email address.

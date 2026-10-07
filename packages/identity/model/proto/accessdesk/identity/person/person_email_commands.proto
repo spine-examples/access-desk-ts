@@ -23,9 +23,6 @@ import "spine/options.proto";
 option (type_url_prefix) = "type.accessdesk";
 
 // Registers the email address an identity provider confirmed for an account.
-//
-// It leads to a new person when the address is not registered yet.
-//
 message RegisterPersonEmail {
 
     // The email address.
