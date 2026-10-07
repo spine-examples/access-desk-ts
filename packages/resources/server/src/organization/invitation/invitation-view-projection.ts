@@ -52,9 +52,7 @@ export class InvitationViewProjection extends Projection<
   onInvitationAccepted(event: InvitationAccepted): void {
     this.update((draft) => {
       draft.status = InvitationStatus.INVITATION_ACCEPTED;
-      if (event.person !== undefined) {
-        draft.acceptedBy = event.person;
-      }
+      draft.acceptedBy = event.person;
     });
   }
 

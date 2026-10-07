@@ -136,10 +136,10 @@ export async function createResourcesContext(
     .route(AccessGrantExtendedSchema, (event) => grantOf(event))
     .route(AccessGrantRevokedSchema, (event) => grantOf(event));
   const invitationCommands = CommandRouting.create<InvitationId>()
-    .route(InviteMemberSchema, (command) => invitationOf(command.id?.invitee?.value))
-    .route(RevokeInvitationSchema, (command) => invitationOf(command.id?.invitee?.value))
-    .route(AcceptInvitationSchema, (command) => invitationOf(command.id?.invitee?.value))
-    .route(DeclineInvitationSchema, (command) => invitationOf(command.id?.invitee?.value));
+    .route(InviteMemberSchema, invitationOf)
+    .route(RevokeInvitationSchema, invitationOf)
+    .route(AcceptInvitationSchema, invitationOf)
+    .route(DeclineInvitationSchema, invitationOf);
   const builder = BoundedContext.multitenant("Resources")
     .withGeneratedRegistryRoot(new URL("..", import.meta.url))
     .add(OrganizationAggregate)
@@ -191,14 +191,14 @@ function requestRejected(context: EventContext): AccessRequestId[] {
 }
 
 /**
- * The invitation of a person, by their email address.
+ * The invitation a command is about, by the invited person's email address.
  *
  * A signed-in person's address is kept in lower case, so an invitation is
  * found by the address in lower case, however it was written.
  */
-function invitationOf(address: string | undefined): InvitationId {
+function invitationOf(command: { readonly id?: InvitationId | undefined }): InvitationId {
   return create(InvitationIdSchema, {
-    invitee: { value: (address ?? "").trim().toLowerCase() },
+    invitee: { value: (command.id?.invitee?.value ?? "").trim().toLowerCase() },
   });
 }
 
