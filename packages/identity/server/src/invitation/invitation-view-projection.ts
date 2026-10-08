@@ -12,16 +12,16 @@
  * and limitations under the License.
  */
 
-import { InvitationStatus } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
+import { InvitationStatus } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 import { Projection, Subscribe } from "@spine-event-engine/server";
-import type { InvitationId } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
+import type { InvitationId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import type {
   InvitationAccepted,
   InvitationDeclined,
   InvitationRevoked,
   MemberInvited,
-} from "@access-desk/resources-model/generated/accessdesk/resources/organization/invitation/events_pb.js";
-import { InvitationViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/invitation/invitation_pb.js";
+} from "@access-desk/identity-model/generated/accessdesk/identity/invitation/events_pb.js";
+import { InvitationViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/invitation/invitation_pb.js";
 
 /**
  * Each invitation an organization has issued, and how far it has got.
@@ -34,8 +34,9 @@ export class InvitationViewProjection extends Projection<
   @Subscribe
   onMemberInvited(event: MemberInvited): void {
     this.update((draft) => {
+      draft.invitee = event.id?.invitee;
       draft.role = event.role;
-      draft.status = InvitationStatus.INVITATION_PENDING;
+      draft.status = InvitationStatus.PENDING;
     });
   }
 
@@ -43,7 +44,7 @@ export class InvitationViewProjection extends Projection<
   @Subscribe
   onInvitationRevoked(_event: InvitationRevoked): void {
     this.update((draft) => {
-      draft.status = InvitationStatus.INVITATION_REVOKED;
+      draft.status = InvitationStatus.REVOKED;
     });
   }
 
@@ -51,7 +52,7 @@ export class InvitationViewProjection extends Projection<
   @Subscribe
   onInvitationAccepted(event: InvitationAccepted): void {
     this.update((draft) => {
-      draft.status = InvitationStatus.INVITATION_ACCEPTED;
+      draft.status = InvitationStatus.ACCEPTED;
       draft.acceptedBy = event.person;
     });
   }
@@ -60,7 +61,7 @@ export class InvitationViewProjection extends Projection<
   @Subscribe
   onInvitationDeclined(_event: InvitationDeclined): void {
     this.update((draft) => {
-      draft.status = InvitationStatus.INVITATION_DECLINED;
+      draft.status = InvitationStatus.DECLINED;
     });
   }
 }

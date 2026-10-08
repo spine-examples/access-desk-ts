@@ -13,55 +13,69 @@
  */
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { InvitationNotPendingSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/invitation/rejections_pb.js";
+import { InvitationNotPendingSchema } from "@access-desk/identity-model/generated/accessdesk/identity/invitation/rejections_pb.js";
 import {
   InvitationStatus,
   OrganizationRole,
-} from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
+} from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 
-import { eventRecording } from "../../given/event-recording.js";
 import {
   actor,
-  closeResourcesBlackBoxes,
-  loadResourcesContext,
-  resourcesBlackBox,
-  testActorContext,
-} from "../../given/resources-context.js";
+  closeIdentityBlackBoxes,
+  loadIdentityContext,
+  expectRejection,
+  identityBlackBox,
+  organizations,
+} from "../given/identity-context.js";
 import {
   acceptInvitation,
   awaitInvitation,
   declineInvitation,
   inviteMember,
+  organizationId,
   revokeInvitation,
 } from "./given/invitation.js";
-import { awaitMember, createOrganization, readOrganizationViews } from "../given/organization.js";
 
-const { expectRejection } = eventRecording(testActorContext);
-
-beforeAll(loadResourcesContext, 30_000);
-afterEach(closeResourcesBlackBoxes);
+beforeAll(loadIdentityContext, 30_000);
+afterEach(closeIdentityBlackBoxes);
 
 describe("InvitationProcessManager should", () => {
   it("make the invited person a member with the role they were invited to", async () => {
-    const box = await resourcesBlackBox();
+    const box = await identityBlackBox();
     const scope = box.onBehalfOf(actor);
-    expect((await createOrganization(scope)).kind).toBe("ok");
     expect((await inviteMember(scope, "noah", OrganizationRole.ADMINISTRATOR)).kind).toBe("ok");
 
     expect((await acceptInvitation(box, "noah", "person-noah", "Noah Reyes")).kind).toBe("ok");
 
-    const member = await awaitMember(box, scope, "person-noah");
-    expect(member).toMatchObject({
-      name: "Noah Reyes",
-      role: OrganizationRole.ADMINISTRATOR,
-    });
-    await awaitInvitation(box, scope, "noah", InvitationStatus.INVITATION_ACCEPTED);
+    await awaitInvitation(box, scope, "noah", InvitationStatus.ACCEPTED);
+    expect(organizations.added).toEqual([
+      {
+        organization: organizationId,
+        person: "person-noah",
+        name: "Noah Reyes",
+        role: OrganizationRole.ADMINISTRATOR,
+      },
+    ]);
+  });
+
+  it("keep the invitation waiting when the organization does not add the person", async () => {
+    const box = await identityBlackBox();
+    const scope = box.onBehalfOf(actor);
+    expect((await inviteMember(scope, "noah")).kind).toBe("ok");
+    await awaitInvitation(box, scope, "noah", InvitationStatus.PENDING);
+    organizations.refusing = true;
+
+    await acceptInvitation(box, "noah", "person-noah").catch(() => undefined);
+
+    organizations.refusing = false;
+    expect((await acceptInvitation(box, "noah", "person-noah", "Noah Reyes")).kind).toBe("ok");
+    await awaitInvitation(box, scope, "noah", InvitationStatus.ACCEPTED);
+    expect(organizations.added.map((member) => member.person)).toEqual(["person-noah"]);
   });
 
   it("add nobody for an invitation that was taken back", async () => {
-    const box = await resourcesBlackBox();
+    const box = await identityBlackBox();
     const scope = box.onBehalfOf(actor);
-    expect((await createOrganization(scope)).kind).toBe("ok");
     expect((await inviteMember(scope, "noah")).kind).toBe("ok");
     expect((await revokeInvitation(scope, "noah")).kind).toBe("ok");
 
@@ -69,51 +83,43 @@ describe("InvitationProcessManager should", () => {
       acceptInvitation(box, "noah", "person-noah"),
     );
 
-    const [view] = await readOrganizationViews(scope);
-    expect(view?.member).toEqual([]);
+    expect(organizations.added).toEqual([]);
   });
 
   it("add nobody for an invitation the invited person declined", async () => {
-    const box = await resourcesBlackBox();
+    const box = await identityBlackBox();
     const scope = box.onBehalfOf(actor);
-    expect((await createOrganization(scope)).kind).toBe("ok");
     expect((await inviteMember(scope, "noah")).kind).toBe("ok");
 
     expect((await declineInvitation(box, "noah", "person-noah")).kind).toBe("ok");
 
-    await awaitInvitation(box, scope, "noah", InvitationStatus.INVITATION_DECLINED);
+    await awaitInvitation(box, scope, "noah", InvitationStatus.DECLINED);
     await expectRejection(box, scope, InvitationNotPendingSchema, () =>
       acceptInvitation(box, "noah", "person-noah"),
     );
-    const [view] = await readOrganizationViews(scope);
-    expect(view?.member).toEqual([]);
+    expect(organizations.added).toEqual([]);
   });
 
   it("make a person a member who declined a first invitation and accepted a second", async () => {
-    const box = await resourcesBlackBox();
+    const box = await identityBlackBox();
     const scope = box.onBehalfOf(actor);
-    expect((await createOrganization(scope)).kind).toBe("ok");
     expect((await inviteMember(scope, "noah")).kind).toBe("ok");
     expect((await declineInvitation(box, "noah", "person-noah")).kind).toBe("ok");
-    await awaitInvitation(box, scope, "noah", InvitationStatus.INVITATION_DECLINED);
+    await awaitInvitation(box, scope, "noah", InvitationStatus.DECLINED);
 
     expect((await inviteMember(scope, "noah", OrganizationRole.ADMINISTRATOR)).kind).toBe("ok");
-    await awaitInvitation(box, scope, "noah", InvitationStatus.INVITATION_PENDING);
+    await awaitInvitation(box, scope, "noah", InvitationStatus.PENDING);
     expect((await acceptInvitation(box, "noah", "person-noah", "Noah Reyes")).kind).toBe("ok");
 
-    const member = await awaitMember(box, scope, "person-noah");
-    expect(member).toMatchObject({
-      name: "Noah Reyes",
-      role: OrganizationRole.ADMINISTRATOR,
-    });
-    const invitation = await awaitInvitation(
-      box,
-      scope,
-      "noah",
-      InvitationStatus.INVITATION_ACCEPTED,
-    );
+    const invitation = await awaitInvitation(box, scope, "noah", InvitationStatus.ACCEPTED);
     expect(invitation.acceptedBy?.uuid).toBe("person-noah");
-    const [view] = await readOrganizationViews(scope);
-    expect(view?.member).toHaveLength(1);
+    expect(organizations.added).toEqual([
+      {
+        organization: organizationId,
+        person: "person-noah",
+        name: "Noah Reyes",
+        role: OrganizationRole.ADMINISTRATOR,
+      },
+    ]);
   });
 });

@@ -19,58 +19,59 @@ import {
   InvitationDeclinedSchema,
   InvitationRevokedSchema,
   MemberInvitedSchema,
-} from "@access-desk/resources-model/generated/accessdesk/resources/organization/invitation/events_pb.js";
+} from "@access-desk/identity-model/generated/accessdesk/identity/invitation/events_pb.js";
 import {
   NotInvitedPersonSchema,
   InvitationNotPendingSchema,
   MemberAlreadyInvitedSchema,
-} from "@access-desk/resources-model/generated/accessdesk/resources/organization/invitation/rejections_pb.js";
+} from "@access-desk/identity-model/generated/accessdesk/identity/invitation/rejections_pb.js";
 import {
   InvitationStatus,
   OrganizationRole,
-} from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
+} from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 
-import { eventRecording } from "../../given/event-recording.js";
 import {
   actor,
-  closeResourcesBlackBoxes,
-  loadResourcesContext,
-  resourcesBlackBox,
-  testActorContext,
-} from "../../given/resources-context.js";
+  closeIdentityBlackBoxes,
+  loadIdentityContext,
+  expectRejection,
+  identityBlackBox,
+  recordEvents,
+} from "../given/identity-context.js";
 import {
   acceptInvitation,
   awaitInvitation,
   declineInvitation,
+  invitationId,
   inviteMember,
   revokeInvitation,
 } from "./given/invitation.js";
-import { createOrganization } from "../given/organization.js";
 
-const { expectRejection, recordEvents } = eventRecording(testActorContext);
-
-beforeAll(loadResourcesContext, 30_000);
-afterEach(closeResourcesBlackBoxes);
+beforeAll(loadIdentityContext, 30_000);
+afterEach(closeIdentityBlackBoxes);
 
 const administrator = OrganizationRole.ADMINISTRATOR;
 
 describe("InvitationProcessManager should", () => {
   describe("handle 'InviteMember', and", () => {
     it("emit 'MemberInvited' with the role the administrator named", async () => {
-      const box = await resourcesBlackBox();
+      const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
       const events = await recordEvents(scope, MemberInvitedSchema);
 
       expect((await inviteMember(scope, "noah", OrganizationRole.ADMINISTRATOR)).kind).toBe("ok");
 
       expect(await events.waitFor(box)).toEqual(
-        create(MemberInvitedSchema, { id: { invitee: { value: "noah" } }, role: administrator }),
+        create(MemberInvitedSchema, {
+          id: invitationId("noah"),
+          role: administrator,
+        }),
       );
       await events.cancel();
     });
 
     it("reject a person already invited with 'MemberAlreadyInvited'", async () => {
-      const box = await resourcesBlackBox();
+      const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await inviteMember(scope, "noah")).kind).toBe("ok");
 
@@ -80,10 +81,10 @@ describe("InvitationProcessManager should", () => {
     });
 
     it("find the invitation by the email address in lower case, however it is written", async () => {
-      const box = await resourcesBlackBox();
+      const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await inviteMember(scope, " Noah@Acme.example ")).kind).toBe("ok");
-      await awaitInvitation(box, scope, "noah@acme.example", InvitationStatus.INVITATION_PENDING);
+      await awaitInvitation(box, scope, "noah@acme.example", InvitationStatus.PENDING);
 
       await expectRejection(box, scope, MemberAlreadyInvitedSchema, () =>
         inviteMember(scope, "NOAH@ACME.EXAMPLE"),
@@ -91,33 +92,37 @@ describe("InvitationProcessManager should", () => {
     });
 
     it("invite again a person whose invitation was taken back", async () => {
-      const box = await resourcesBlackBox();
+      const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await inviteMember(scope, "noah")).kind).toBe("ok");
       expect((await revokeInvitation(scope, "noah")).kind).toBe("ok");
-      await awaitInvitation(box, scope, "noah", InvitationStatus.INVITATION_REVOKED);
+      await awaitInvitation(box, scope, "noah", InvitationStatus.REVOKED);
 
       expect((await inviteMember(scope, "noah")).kind).toBe("ok");
 
-      await awaitInvitation(box, scope, "noah", InvitationStatus.INVITATION_PENDING);
+      await awaitInvitation(box, scope, "noah", InvitationStatus.PENDING);
     });
   });
 
   describe("handle 'RevokeInvitation', and", () => {
     it("emit 'InvitationRevoked'", async () => {
-      const box = await resourcesBlackBox();
+      const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await inviteMember(scope, "noah")).kind).toBe("ok");
       const events = await recordEvents(scope, InvitationRevokedSchema);
 
       expect((await revokeInvitation(scope, "noah")).kind).toBe("ok");
 
-      expect((await events.waitFor(box)).id?.invitee?.value).toBe("noah");
+      expect(await events.waitFor(box)).toEqual(
+        create(InvitationRevokedSchema, {
+          id: invitationId("noah"),
+        }),
+      );
       await events.cancel();
     });
 
     it("reject an invitation that is not waiting with 'InvitationNotPending'", async () => {
-      const box = await resourcesBlackBox();
+      const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
 
       await expectRejection(box, scope, InvitationNotPendingSchema, () =>
@@ -128,9 +133,8 @@ describe("InvitationProcessManager should", () => {
 
   describe("handle 'AcceptInvitation', and", () => {
     it("emit 'InvitationAccepted' with the role the invitation gives", async () => {
-      const box = await resourcesBlackBox();
+      const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
-      expect((await createOrganization(scope)).kind).toBe("ok");
       expect((await inviteMember(scope, "noah", administrator)).kind).toBe("ok");
       const events = await recordEvents(scope, InvitationAcceptedSchema);
 
@@ -138,7 +142,7 @@ describe("InvitationProcessManager should", () => {
 
       expect(await events.waitFor(box)).toEqual(
         create(InvitationAcceptedSchema, {
-          id: { invitee: { value: "noah" } },
+          id: invitationId("noah"),
           person: { uuid: "person-noah" },
           name: "Noah Reyes",
           role: administrator,
@@ -148,9 +152,8 @@ describe("InvitationProcessManager should", () => {
     });
 
     it("reject an answer somebody else gives for the person with 'NotInvitedPerson'", async () => {
-      const box = await resourcesBlackBox();
+      const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
-      expect((await createOrganization(scope)).kind).toBe("ok");
       expect((await inviteMember(scope, "noah", administrator)).kind).toBe("ok");
 
       const rejection = await expectRejection(box, scope, NotInvitedPersonSchema, () =>
@@ -159,15 +162,15 @@ describe("InvitationProcessManager should", () => {
 
       expect(rejection).toEqual(
         create(NotInvitedPersonSchema, {
-          id: { invitee: { value: "noah" } },
+          id: invitationId("noah"),
           person: { uuid: "person-noah" },
         }),
       );
-      await awaitInvitation(box, scope, "noah", InvitationStatus.INVITATION_PENDING);
+      await awaitInvitation(box, scope, "noah", InvitationStatus.PENDING);
     });
 
     it("reject an invitation nobody issued with 'InvitationNotPending'", async () => {
-      const box = await resourcesBlackBox();
+      const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
 
       await expectRejection(box, scope, InvitationNotPendingSchema, () =>
@@ -176,9 +179,8 @@ describe("InvitationProcessManager should", () => {
     });
 
     it("reject an invitation already accepted with 'InvitationNotPending'", async () => {
-      const box = await resourcesBlackBox();
+      const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
-      expect((await createOrganization(scope)).kind).toBe("ok");
       expect((await inviteMember(scope, "noah")).kind).toBe("ok");
       expect((await acceptInvitation(box, "noah", "person-noah")).kind).toBe("ok");
 
@@ -190,7 +192,7 @@ describe("InvitationProcessManager should", () => {
 
   describe("handle 'DeclineInvitation', and", () => {
     it("emit 'InvitationDeclined' with the person who declined", async () => {
-      const box = await resourcesBlackBox();
+      const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await inviteMember(scope, "noah")).kind).toBe("ok");
       const events = await recordEvents(scope, InvitationDeclinedSchema);
@@ -199,7 +201,7 @@ describe("InvitationProcessManager should", () => {
 
       expect(await events.waitFor(box)).toEqual(
         create(InvitationDeclinedSchema, {
-          id: { invitee: { value: "noah" } },
+          id: invitationId("noah"),
           person: { uuid: "person-noah" },
         }),
       );
@@ -207,7 +209,7 @@ describe("InvitationProcessManager should", () => {
     });
 
     it("reject an answer somebody else gives for the person with 'NotInvitedPerson'", async () => {
-      const box = await resourcesBlackBox();
+      const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await inviteMember(scope, "noah")).kind).toBe("ok");
 
@@ -216,11 +218,11 @@ describe("InvitationProcessManager should", () => {
       );
 
       expect(rejection.person?.uuid).toBe("person-noah");
-      await awaitInvitation(box, scope, "noah", InvitationStatus.INVITATION_PENDING);
+      await awaitInvitation(box, scope, "noah", InvitationStatus.PENDING);
     });
 
     it("reject an invitation nobody issued with 'InvitationNotPending'", async () => {
-      const box = await resourcesBlackBox();
+      const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
 
       await expectRejection(box, scope, InvitationNotPendingSchema, () =>
@@ -229,11 +231,11 @@ describe("InvitationProcessManager should", () => {
     });
 
     it("reject an invitation already declined with 'InvitationNotPending'", async () => {
-      const box = await resourcesBlackBox();
+      const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await inviteMember(scope, "noah")).kind).toBe("ok");
       expect((await declineInvitation(box, "noah", "person-noah")).kind).toBe("ok");
-      await awaitInvitation(box, scope, "noah", InvitationStatus.INVITATION_DECLINED);
+      await awaitInvitation(box, scope, "noah", InvitationStatus.DECLINED);
 
       await expectRejection(box, scope, InvitationNotPendingSchema, () =>
         declineInvitation(box, "noah", "person-noah"),
@@ -241,15 +243,15 @@ describe("InvitationProcessManager should", () => {
     });
 
     it("let an administrator invite again a person who declined", async () => {
-      const box = await resourcesBlackBox();
+      const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await inviteMember(scope, "noah")).kind).toBe("ok");
       expect((await declineInvitation(box, "noah", "person-noah")).kind).toBe("ok");
-      await awaitInvitation(box, scope, "noah", InvitationStatus.INVITATION_DECLINED);
+      await awaitInvitation(box, scope, "noah", InvitationStatus.DECLINED);
 
       expect((await inviteMember(scope, "noah")).kind).toBe("ok");
 
-      await awaitInvitation(box, scope, "noah", InvitationStatus.INVITATION_PENDING);
+      await awaitInvitation(box, scope, "noah", InvitationStatus.PENDING);
     });
   });
 });

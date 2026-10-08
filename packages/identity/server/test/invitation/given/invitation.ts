@@ -14,40 +14,57 @@
 
 import { create } from "@bufbuild/protobuf";
 import { type BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
+import { InvitationIdSchema } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import {
   AcceptInvitationSchema,
   DeclineInvitationSchema,
   InviteMemberSchema,
   RevokeInvitationSchema,
-} from "@access-desk/resources-model/generated/accessdesk/resources/organization/invitation/commands_pb.js";
+} from "@access-desk/identity-model/generated/accessdesk/identity/invitation/commands_pb.js";
 import {
   InvitationViewSchema,
   type InvitationView,
-} from "@access-desk/resources-model/generated/accessdesk/resources/organization/invitation/invitation_pb.js";
+} from "@access-desk/identity-model/generated/accessdesk/identity/invitation/invitation_pb.js";
 import {
   InvitationStatus,
   OrganizationRole,
-} from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
+} from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 
-import { readAll } from "../../../given/resources-context.js";
+import { readAll } from "../../given/identity-context.js";
+
+/** The organization that invites people in these tests. */
+export const organizationId = "acme";
+
+/** The invitation the organization issues to the email address. */
+export function invitationId(invitee: string, organization: string = organizationId) {
+  return create(InvitationIdSchema, {
+    organization: { uuid: organization },
+    invitee: { value: invitee },
+  });
+}
 
 /** Posts `InviteMember` for the person with the given email address. */
 export function inviteMember(
   scope: BlackBoxScope,
   invitee: string,
   role: OrganizationRole = OrganizationRole.MEMBER,
+  organization: string = organizationId,
 ) {
   return scope.post(
     InviteMemberSchema,
-    create(InviteMemberSchema, { id: { invitee: { value: invitee } }, role }),
+    create(InviteMemberSchema, { id: invitationId(invitee, organization), role }),
   );
 }
 
 /** Posts `RevokeInvitation` for the invitation of the person. */
-export function revokeInvitation(scope: BlackBoxScope, invitee: string) {
+export function revokeInvitation(
+  scope: BlackBoxScope,
+  invitee: string,
+  organization: string = organizationId,
+) {
   return scope.post(
     RevokeInvitationSchema,
-    create(RevokeInvitationSchema, { id: { invitee: { value: invitee } } }),
+    create(RevokeInvitationSchema, { id: invitationId(invitee, organization) }),
   );
 }
 
@@ -61,11 +78,12 @@ export function acceptInvitation(
   person: string,
   name: string = person,
   acting: string = person,
+  organization: string = organizationId,
 ) {
   return box.onBehalfOf(acting).post(
     AcceptInvitationSchema,
     create(AcceptInvitationSchema, {
-      id: { invitee: { value: invitee } },
+      id: invitationId(invitee, organization),
       person: { uuid: person },
       name,
     }),
@@ -81,11 +99,12 @@ export function declineInvitation(
   invitee: string,
   person: string,
   acting: string = person,
+  organization: string = organizationId,
 ) {
   return box.onBehalfOf(acting).post(
     DeclineInvitationSchema,
     create(DeclineInvitationSchema, {
-      id: { invitee: { value: invitee } },
+      id: invitationId(invitee, organization),
       person: { uuid: person },
     }),
   );
@@ -96,7 +115,7 @@ export async function awaitInvitation(
   box: BlackBox,
   scope: BlackBoxScope,
   invitee: string,
-  status: InvitationStatus = InvitationStatus.INVITATION_PENDING,
+  status: InvitationStatus = InvitationStatus.PENDING,
 ): Promise<InvitationView> {
   const matches = (view: InvitationView): boolean =>
     view.id?.invitee?.value === invitee && view.status === status;

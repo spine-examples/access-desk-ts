@@ -16,14 +16,14 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   InvitationStatus,
   OrganizationRole,
-} from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
+} from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 
 import {
   actor,
-  closeResourcesBlackBoxes,
-  loadResourcesContext,
-  resourcesBlackBox,
-} from "../../given/resources-context.js";
+  closeIdentityBlackBoxes,
+  loadIdentityContext,
+  identityBlackBox,
+} from "../given/identity-context.js";
 import {
   acceptInvitation,
   awaitInvitation,
@@ -31,60 +31,59 @@ import {
   revokeInvitation,
   declineInvitation,
 } from "./given/invitation.js";
-import { createOrganization } from "../given/organization.js";
 
-beforeAll(loadResourcesContext, 30_000);
-afterEach(closeResourcesBlackBoxes);
+beforeAll(loadIdentityContext, 30_000);
+afterEach(closeIdentityBlackBoxes);
 
 describe("InvitationViewProjection should", () => {
   describe("react on 'MemberInvited', and", () => {
     it("list the invitation as waiting to be accepted", async () => {
-      const box = await resourcesBlackBox();
+      const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
 
       expect((await inviteMember(scope, "noah", OrganizationRole.ADMINISTRATOR)).kind).toBe("ok");
 
       const view = await awaitInvitation(box, scope, "noah");
       expect(view.role).toBe(OrganizationRole.ADMINISTRATOR);
+      expect(view.invitee?.value).toBe("noah");
       expect(view.acceptedBy).toBeUndefined();
     });
   });
 
   describe("react on 'InvitationRevoked', and", () => {
     it("show the invitation as taken back", async () => {
-      const box = await resourcesBlackBox();
+      const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await inviteMember(scope, "noah")).kind).toBe("ok");
 
       expect((await revokeInvitation(scope, "noah")).kind).toBe("ok");
 
-      await awaitInvitation(box, scope, "noah", InvitationStatus.INVITATION_REVOKED);
+      await awaitInvitation(box, scope, "noah", InvitationStatus.REVOKED);
     });
   });
 
   describe("react on 'InvitationAccepted', and", () => {
     it("show the invitation as accepted, and by whom", async () => {
-      const box = await resourcesBlackBox();
+      const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
-      expect((await createOrganization(scope)).kind).toBe("ok");
       expect((await inviteMember(scope, "noah")).kind).toBe("ok");
 
       expect((await acceptInvitation(box, "noah", "person-noah")).kind).toBe("ok");
 
-      const view = await awaitInvitation(box, scope, "noah", InvitationStatus.INVITATION_ACCEPTED);
+      const view = await awaitInvitation(box, scope, "noah", InvitationStatus.ACCEPTED);
       expect(view.acceptedBy?.uuid).toBe("person-noah");
     });
   });
 
   describe("react on 'InvitationDeclined', and", () => {
     it("mark the invitation as declined, with nobody having accepted it", async () => {
-      const box = await resourcesBlackBox();
+      const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await inviteMember(scope, "noah")).kind).toBe("ok");
 
       expect((await declineInvitation(box, "noah", "person-noah")).kind).toBe("ok");
 
-      const view = await awaitInvitation(box, scope, "noah", InvitationStatus.INVITATION_DECLINED);
+      const view = await awaitInvitation(box, scope, "noah", InvitationStatus.DECLINED);
       expect(view.acceptedBy).toBeUndefined();
     });
   });

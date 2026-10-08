@@ -18,10 +18,12 @@ import type {
   PersonRegistered,
   SignInAccountAdded,
 } from "@access-desk/identity-model/generated/accessdesk/identity/person/events_pb.js";
+import type { InvitationAccepted } from "@access-desk/identity-model/generated/accessdesk/identity/invitation/events_pb.js";
 import { PersonViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/person_pb.js";
 
 /**
- * Each person who has signed in.
+ * Each person who has signed in, with the accounts they sign in with and the
+ * organizations they are a member of.
  */
 export class PersonViewProjection extends Projection<PersonId, typeof PersonViewSchema> {
   /** Creates the view of a newly registered person. */
@@ -40,6 +42,20 @@ export class PersonViewProjection extends Projection<PersonId, typeof PersonView
     this.update((draft) => {
       if (event.account !== undefined) {
         draft.account.push(event.account);
+      }
+    });
+  }
+
+  /** Adds the organization whose invitation the person accepted to those they are a member of. */
+  @Subscribe
+  onInvitationAccepted(event: InvitationAccepted): void {
+    const organization = event.id?.organization;
+    if (organization === undefined) {
+      return;
+    }
+    this.update((draft) => {
+      if (!draft.organization.some((joined) => joined.uuid === organization.uuid)) {
+        draft.organization.push(organization);
       }
     });
   }

@@ -13,25 +13,19 @@
  */
 
 import { create } from "@bufbuild/protobuf";
-import { InvitationStatus } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
-import type { CommandContext, EventContext } from "@spine-event-engine/proto";
-import { Assign, Command, ProcessManager, Throws } from "@spine-event-engine/server";
-import type { PersonId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
-import {
-  OrganizationIdSchema,
-  type InvitationId,
-  type OrganizationId,
-} from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
-import {
-  AddOrganizationMemberSchema,
-  type AddOrganizationMember,
-} from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
+import { InvitationStatus } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
+import type { CommandContext } from "@spine-event-engine/proto";
+import { Assign, ProcessManager, Throws, type EntityOptions } from "@spine-event-engine/server";
+import type {
+  InvitationId,
+  PersonId,
+} from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import type {
   AcceptInvitation,
   DeclineInvitation,
   InviteMember,
   RevokeInvitation,
-} from "@access-desk/resources-model/generated/accessdesk/resources/organization/invitation/commands_pb.js";
+} from "@access-desk/identity-model/generated/accessdesk/identity/invitation/commands_pb.js";
 import {
   InvitationAcceptedSchema,
   InvitationDeclinedSchema,
@@ -41,13 +35,14 @@ import {
   type InvitationDeclined,
   type InvitationRevoked,
   type MemberInvited,
-} from "@access-desk/resources-model/generated/accessdesk/resources/organization/invitation/events_pb.js";
-import { InvitationSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/invitation/invitation_pb.js";
+} from "@access-desk/identity-model/generated/accessdesk/identity/invitation/events_pb.js";
+import { InvitationSchema } from "@access-desk/identity-model/generated/accessdesk/identity/invitation/invitation_pb.js";
 import {
   NotInvitedPerson,
   InvitationNotPending,
   MemberAlreadyInvited,
-} from "@access-desk/resources-model/generated/accessdesk/resources/organization/invitation/rejections.js";
+} from "@access-desk/identity-model/generated/accessdesk/identity/invitation/rejections.js";
+import type { OrganizationMembers } from "./organization-members.js";
 
 /**
  * An organization's invitation of one person to become its member.
@@ -59,28 +54,43 @@ import {
  * 3. The person, having signed in, accepts the invitation or declines it.
  *    They answer for themselves: nobody accepts or declines on behalf of
  *    another person. A person who declined may be invited again.
- * 4. The organization adds the person as a member with the role the
- *    invitation gives.
+ * 4. When a person accepts, the organization adds them to its members with
+ *    the role the invitation gives. The invitation is accepted once the
+ *    organization has done so.
  */
 export class InvitationProcessManager extends ProcessManager<
   InvitationId,
   typeof InvitationSchema
 > {
+  /**
+   * The service that adds a person to the members of an organization.
+   */
+  readonly #members: OrganizationMembers;
+
+  /**
+   * @param options What Spine gives every invitation it constructs.
+   * @param members The service that adds a person to the members of an organization.
+   */
+  constructor(
+    options: EntityOptions<InvitationId, typeof InvitationSchema>,
+    members: OrganizationMembers,
+  ) {
+    super(options);
+    this.#members = members;
+  }
+
   /** Invites the person, unless they are already invited or have already accepted. */
   @Assign
   @Throws(MemberAlreadyInvited)
   inviteMember(command: InviteMember): MemberInvited {
     const status = this.state.status;
-    if (
-      status === InvitationStatus.INVITATION_PENDING ||
-      status === InvitationStatus.INVITATION_ACCEPTED
-    ) {
+    if (status === InvitationStatus.PENDING || status === InvitationStatus.ACCEPTED) {
       throw MemberAlreadyInvited.create({ id: this.id });
     }
     const role = command.role;
     this.update((draft) => {
       draft.role = role;
-      draft.status = InvitationStatus.INVITATION_PENDING;
+      draft.status = InvitationStatus.PENDING;
     });
     return create(MemberInvitedSchema, { id: this.id, role });
   }
@@ -91,7 +101,7 @@ export class InvitationProcessManager extends ProcessManager<
   revokeInvitation(_command: RevokeInvitation): InvitationRevoked {
     this.assertPending();
     this.update((draft) => {
-      draft.status = InvitationStatus.INVITATION_REVOKED;
+      draft.status = InvitationStatus.REVOKED;
     });
     return create(InvitationRevokedSchema, { id: this.id });
   }
@@ -99,22 +109,29 @@ export class InvitationProcessManager extends ProcessManager<
   /**
    * Accepts the invitation for the invited person while it is waiting.
    *
-   * The person who accepts is the one acting, never somebody they name.
+   * The person who accepts is the one acting, never somebody they name. The
+   * organization adds them to its members first. Only when it has done so is
+   * the invitation accepted. Otherwise, it keeps waiting.
    */
   @Assign
   @Throws(NotInvitedPerson, InvitationNotPending)
-  acceptInvitation(command: AcceptInvitation, context: CommandContext): InvitationAccepted {
-    this.assertAnswersForThemselves(command.person, context);
+  async acceptInvitation(
+    command: AcceptInvitation,
+    context: CommandContext,
+  ): Promise<InvitationAccepted> {
+    const { person, name } = command;
+    const organization = this.id.organization;
+    this.assertAnswersForThemselves(person, context);
     this.assertPending();
+    if (person === undefined || organization === undefined) {
+      throw new Error("An invitation is accepted by a person, for an organization.");
+    }
+    const role = this.state.role;
+    await this.#members.add({ organization, person, name, role });
     this.update((draft) => {
-      draft.status = InvitationStatus.INVITATION_ACCEPTED;
+      draft.status = InvitationStatus.ACCEPTED;
     });
-    return create(InvitationAcceptedSchema, {
-      id: this.id,
-      person: command.person,
-      name: command.name,
-      role: this.state.role,
-    });
+    return create(InvitationAcceptedSchema, { id: this.id, person, name, role });
   }
 
   /**
@@ -128,41 +145,9 @@ export class InvitationProcessManager extends ProcessManager<
     this.assertAnswersForThemselves(command.person, context);
     this.assertPending();
     this.update((draft) => {
-      draft.status = InvitationStatus.INVITATION_DECLINED;
+      draft.status = InvitationStatus.DECLINED;
     });
     return create(InvitationDeclinedSchema, { id: this.id, person: command.person });
-  }
-
-  /** Adds the person who accepted the invitation to the organization. */
-  @Command
-  onInvitationAccepted(event: InvitationAccepted, context: EventContext): AddOrganizationMember {
-    return create(AddOrganizationMemberSchema, {
-      organizationId: this.organizationOf(context),
-      person: event.person,
-      name: event.name,
-      role: event.role,
-    });
-  }
-
-  /**
-   * The organization a fact happened in.
-   *
-   * Each organization is its own tenant, so the organization is the tenant the
-   * fact was recorded for, never one the fact itself names.
-   */
-  private organizationOf(context: EventContext): OrganizationId {
-    const origin = context.origin;
-    const actor =
-      origin.case === "importContext"
-        ? origin.value
-        : origin.case === "pastMessage"
-          ? origin.value.actorContext
-          : undefined;
-    const tenant = actor?.tenantId?.kind;
-    if (tenant?.case !== "value" || tenant.value === "") {
-      throw new Error("A fact in the Resources context must happen in an organization.");
-    }
-    return create(OrganizationIdSchema, { uuid: tenant.value });
   }
 
   private assertAnswersForThemselves(person: PersonId | undefined, context: CommandContext): void {
@@ -176,7 +161,7 @@ export class InvitationProcessManager extends ProcessManager<
   }
 
   private assertPending(): void {
-    if (this.state.status !== InvitationStatus.INVITATION_PENDING) {
+    if (this.state.status !== InvitationStatus.PENDING) {
       throw InvitationNotPending.create({ id: this.id });
     }
   }

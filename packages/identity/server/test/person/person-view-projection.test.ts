@@ -28,6 +28,8 @@ import {
   google,
   registerPerson,
 } from "./given/person.js";
+import { acceptInvitation, inviteMember } from "../invitation/given/invitation.js";
+import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 
 beforeAll(loadIdentityContext, 30_000);
 afterEach(closeIdentityBlackBoxes);
@@ -59,6 +61,28 @@ describe("PersonViewProjection should", () => {
 
       const person = await awaitPerson(box, scope, "noah", (view) => view.account.length === 2);
       expect(person.account.map((held) => held.provider)).toEqual([github, google]);
+    });
+  });
+
+  describe("react on 'InvitationAccepted', and", () => {
+    it("show every organization whose invitation the person accepted", async () => {
+      const box = await identityBlackBox();
+      const scope = box.onBehalfOf(actor);
+      await registerPerson(scope, "noah", "noah@acme.example", account(github, "1001"));
+      await awaitPerson(box, scope, "noah");
+      await inviteMember(scope, "noah@acme.example", OrganizationRole.MEMBER, "acme");
+      await inviteMember(scope, "noah@acme.example", OrganizationRole.MEMBER, "globex");
+
+      await acceptInvitation(box, "noah@acme.example", "noah", "Noah", "noah", "acme");
+      await acceptInvitation(box, "noah@acme.example", "noah", "Noah", "noah", "globex");
+
+      const person = await awaitPerson(
+        box,
+        scope,
+        "noah",
+        (view) => view.organization.length === 2,
+      );
+      expect(person.organization.map((joined) => joined.uuid).sort()).toEqual(["acme", "globex"]);
     });
   });
 });
