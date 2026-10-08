@@ -12,6 +12,7 @@
  * and limitations under the License.
  */
 
+import { Time } from "@spine-event-engine/core/time";
 import { create } from "@bufbuild/protobuf";
 import { type Duration, DurationSchema } from "@bufbuild/protobuf/wkt";
 import { Assign, Command, ProcessManager, React, Throws } from "@spine-event-engine/server";
@@ -104,7 +105,6 @@ import {
   ResourceNotOpenForRequests,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/rejections.js";
 import { effectiveInterval, requestedInterval } from "../access-period.js";
-import { now } from "../../time/clock.js";
 import { compare, longerThan } from "../../time/interval.js";
 
 /** No time at all, which every extension must exceed. */
@@ -154,7 +154,7 @@ export class AccessRequestProcessManager extends ProcessManager<
     ) {
       throw new Error("SubmitAccessRequest requires a requester, resource, level, and period.");
     }
-    const requested = requestedInterval(period, now());
+    const requested = requestedInterval(period, Time.currentTime());
     if (requested === undefined || compare(requested.start, requested.end) >= 0) {
       throw new Error("Requested access must end after it begins.");
     }
@@ -227,7 +227,8 @@ export class AccessRequestProcessManager extends ProcessManager<
       throw new Error("Only a first-time request asks for new access.");
     }
     const { resource, accessLevel, period } = snapshot.kind.value;
-    const requested = period === undefined ? undefined : requestedInterval(period, now());
+    const requested =
+      period === undefined ? undefined : requestedInterval(period, Time.currentTime());
     return create(CheckRequestedAccessSchema, {
       id: { grantee: snapshot.requester, resource },
       request: this.id,
@@ -325,7 +326,7 @@ export class AccessRequestProcessManager extends ProcessManager<
     this.assertPending(command.id);
     const snapshot = this.requireSnapshot();
     const decidedBy = this.assertEligibleDecider(command.id, command.manager);
-    const whenDecided = now();
+    const whenDecided = Time.currentTime();
     this.update((draft) => {
       draft.status = AccessRequestStatus.APPROVAL_STARTED;
     });
@@ -393,7 +394,7 @@ export class AccessRequestProcessManager extends ProcessManager<
     this.assertPending(command.id);
     const snapshot = this.requireSnapshot();
     const decidedBy = this.assertEligibleDecider(command.id, command.manager);
-    const whenDecided = now();
+    const whenDecided = Time.currentTime();
     this.update((draft) => {
       draft.status = AccessRequestStatus.DENIED;
     });

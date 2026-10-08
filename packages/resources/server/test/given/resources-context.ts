@@ -15,7 +15,8 @@
 import { create, type Message, type MessageShape } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { AnyMessages, TypeUrls } from "@spine-event-engine/core";
-import { type Clock, SignalMetadata } from "@spine-event-engine/server";
+import { Time, type TimeProvider } from "@spine-event-engine/core/time";
+import { SignalMetadata } from "@spine-event-engine/server";
 import { type ActorContext, TenantIdSchema, UserIdSchema } from "@spine-event-engine/proto";
 import {
   CompositeFilter_CompositeOperator,
@@ -69,29 +70,32 @@ const ownedBlackBoxes = new Set<BlackBox>();
  * Every box is tracked so a suite's `afterEach` can close them with
  * {@link closeResourcesBlackBoxes}.
  *
- * @param clock Tells the domain what time it is; the system clock by default.
+ * @param clock Tells what time it is until the boxes are closed; the system
+ *   clock by default.
  */
-export async function resourcesBlackBox(clock?: Clock): Promise<BlackBox> {
+export async function resourcesBlackBox(clock?: TimeProvider): Promise<BlackBox> {
+  if (clock !== undefined) {
+    Time.setProvider(clock);
+  }
   // Grant flows cross several entities before a read model settles, so waits
   // get generous headroom; they still return as soon as the outcome is visible.
-  const box = await BlackBox.from(
-    await loaded().createResourcesContext(clock === undefined ? {} : { clock }),
-    {
-      tenant: organizationId,
-      timeoutMs: 20_000,
-      intervalMs: 20,
-    },
-  );
+  const box = await BlackBox.from(await loaded().createResourcesContext(), {
+    tenant: organizationId,
+    timeoutMs: 20_000,
+    intervalMs: 20,
+  });
   ownedBlackBoxes.add(box);
   return box;
 }
 
 /**
- * Closes and forgets every BlackBox opened through {@link resourcesBlackBox}.
+ * Closes and forgets every BlackBox opened through {@link resourcesBlackBox},
+ * and puts the system clock back.
  */
 export async function closeResourcesBlackBoxes(): Promise<void> {
   await Promise.all([...ownedBlackBoxes].map((box) => box.close()));
   ownedBlackBoxes.clear();
+  Time.resetProvider();
 }
 
 // Builds a query for one entity type in the organization's tenant.

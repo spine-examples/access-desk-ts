@@ -86,8 +86,9 @@ convergence:
 6. gateway/browser tests for auth, subscriptions, and UI changes;
 7. workspace verification profile once repository scripts exist.
 
-Do not use arbitrary sleeps for domain-time tests. Use an injected clock and
-bounded eventual assertions only for truly asynchronous propagation.
+Do not use arbitrary sleeps for domain-time tests. Use a test time provider
+installed through Spine's `Time` and bounded eventual assertions only for
+truly asynchronous propagation.
 
 Cross-package contract changes need a clean build to be trusted. Because a
 package consumes another through `node_modules` (not a TS project reference),

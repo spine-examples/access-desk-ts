@@ -573,9 +573,9 @@ describe("ResourceAccessAggregate should", () => {
   describe("handle 'RevokeAccessGrant', and", () => {
     it("emit 'AccessGrantRevoked' with the revoking manager, the reason, and the time", async () => {
       const { box, scope, clock } = await givenGrant("grant-revoked", 0, 60);
+      clock.advanceMinutes(20);
       const revoked = await recordEvents(scope, AccessGrantRevokedSchema);
       try {
-        clock.advanceMinutes(20);
         expect(
           (await revokeGrant(box, "grant-revoked", "primary", "Investigation finished.")).kind,
         ).toBe("ok");

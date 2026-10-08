@@ -656,10 +656,9 @@ describe("AccessRequestProcessManager should", () => {
       const clock = testClock();
       const box = await resourcesBlackBox(clock);
       const requester = await givenPending(box, "req-approve");
+      clock.advanceMinutes(5);
       const approved = await recordEvents(requester, AccessRequestApprovedSchema);
       try {
-        clock.advanceMinutes(5);
-
         expect((await approveAccessRequest(box, "req-approve", "primary")).kind).toBe("ok");
 
         const event = await approved.waitFor(
@@ -677,10 +676,11 @@ describe("AccessRequestProcessManager should", () => {
       const clock = testClock();
       const box = await resourcesBlackBox(clock);
       const requester = await givenPending(box, "req-approval-requested");
+      // Time moves before the events are watched. A jump of the clock while they
+      // are watched stops their delivery.
+      clock.advanceMinutes(5);
       const requested = await recordEvents(requester, AccessRequestApprovalStartedSchema);
       try {
-        clock.advanceMinutes(5);
-
         await approveAccessRequest(box, "req-approval-requested", "primary");
 
         const event = await requested.waitFor(box, (e) => e.id?.uuid === "req-approval-requested");
@@ -865,10 +865,11 @@ describe("AccessRequestProcessManager should", () => {
       const clock = testClock();
       const box = await resourcesBlackBox(clock);
       const requester = await givenPending(box, "req-deny");
+      // Time moves before the events are watched. A jump of the clock while they
+      // are watched stops their delivery.
+      clock.advanceMinutes(5);
       const denied = await recordEvents(requester, AccessRequestDeniedSchema);
       try {
-        clock.advanceMinutes(5);
-
         expect(
           (await denyAccessRequest(box, "req-deny", "primary", "Insufficient justification.")).kind,
         ).toBe("ok");

@@ -12,6 +12,7 @@
  * and limitations under the License.
  */
 
+import { Time } from "@spine-event-engine/core/time";
 import { create } from "@bufbuild/protobuf";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { Aggregate, Assign, Throws } from "@spine-event-engine/server";
@@ -58,7 +59,6 @@ import {
   RequestedDurationTooLong,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/rejections.js";
 import { equals } from "../../proto/equals.js";
-import { now } from "../../time/clock.js";
 import {
   between,
   compare,
@@ -205,7 +205,7 @@ export class ResourceAccessAggregate extends Aggregate<
   revokeAccessGrant(command: RevokeAccessGrant): AccessGrantRevoked {
     const { grant, reason } = command;
     const revokedBy = this.assertManager(command.manager, grant);
-    const whenRevoked = now();
+    const whenRevoked = Time.currentTime();
     const revoked = this.grantsNotEnded().find((kept) =>
       equals(AccessGrantIdSchema, kept.id, grant),
     );
@@ -249,7 +249,7 @@ export class ResourceAccessAggregate extends Aggregate<
   private activeGrant(grant: AccessGrantId | undefined): ActiveGrant {
     const held = this.state.grant.find((kept) => equals(AccessGrantIdSchema, kept.id, grant));
     const { accessLevel, start, end } = held ?? {};
-    const time = now();
+    const time = Time.currentTime();
     if (
       accessLevel === undefined ||
       start === undefined ||
@@ -264,7 +264,7 @@ export class ResourceAccessAggregate extends Aggregate<
 
   /** The grants whose end has not passed. */
   private grantsNotEnded(): Grant[] {
-    const time = now();
+    const time = Time.currentTime();
     return this.state.grant.filter(({ end }) => end !== undefined && compare(time, end) < 0);
   }
 

@@ -12,7 +12,8 @@
  * and limitations under the License.
  */
 
-import type { Clock } from "@spine-event-engine/server";
+import { timestampFromDate, type Timestamp } from "@bufbuild/protobuf/wkt";
+import type { TimeProvider } from "@spine-event-engine/core/time";
 
 /**
  * A clock that stands still until a test moves it.
@@ -20,7 +21,7 @@ import type { Clock } from "@spine-event-engine/server";
  * Lets a test reach a point in time — the start or end of access — at once,
  * instead of waiting for it.
  */
-export class ManualClock implements Clock {
+export class ManualClock implements TimeProvider {
   #time: number;
 
   /**
@@ -32,8 +33,8 @@ export class ManualClock implements Clock {
     this.#time = time.getTime();
   }
 
-  now(): Date {
-    return new Date(this.#time);
+  currentTime(): Timestamp {
+    return timestampFromDate(new Date(this.#time));
   }
 
   /**
