@@ -3,7 +3,8 @@
   "compilerOptions": {
     "rootDir": ".",
     "outDir": "dist",
-    "types": ["node"]
+    "types": ["node"],
+    "lib": ["ES2024", "decorators", "DOM", "DOM.Iterable"]
   },
   "include": ["src/**/*.ts", "generated/**/*.ts"]
 }
