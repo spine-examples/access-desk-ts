@@ -26,7 +26,7 @@ option (type_url_prefix) = "type.accessdesk";
 message OrganizationAlreadyExists {
 
     // The organization that already exists.
-    accessdesk.resources.OrganizationId id = 1 [(required) = true];
+    accessdesk.identity.OrganizationId id = 1 [(required) = true];
 }
 
 // A resource name already used in the organization.

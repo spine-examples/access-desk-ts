@@ -17,6 +17,7 @@ syntax = "proto3";
 package accessdesk.resources.organization;
 
 import "accessdesk/resources/identifiers.proto";
+import "accessdesk/identity/identifiers.proto";
 import "accessdesk/resources/values.proto";
 import "spine/options.proto";
 
@@ -27,7 +28,7 @@ message Organization {
     option (entity).kind = AGGREGATE;
 
     // Identifies the organization.
-    accessdesk.resources.OrganizationId id = 1;
+    accessdesk.identity.OrganizationId id = 1;
 
     // The organization's display name, unique across organizations and compared
     // case-insensitively.
@@ -46,7 +47,7 @@ message OrganizationView {
     option (entity).visibility = FULL;
 
     // Identifies the organization.
-    accessdesk.resources.OrganizationId id = 1;
+    accessdesk.identity.OrganizationId id = 1;
 
     // The organization's display name, unique across organizations and compared
     // case-insensitively.

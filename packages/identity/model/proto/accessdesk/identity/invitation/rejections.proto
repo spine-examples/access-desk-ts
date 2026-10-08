@@ -14,9 +14,8 @@
 
 syntax = "proto3";
 
-package accessdesk.resources.organization.invitation;
+package accessdesk.identity.invitation;
 
-import "accessdesk/resources/identifiers.proto";
 import "accessdesk/identity/identifiers.proto";
 import "spine/options.proto";
 
@@ -25,14 +24,14 @@ option (type_url_prefix) = "type.accessdesk";
 // The person is already invited, or has already accepted an invitation.
 message MemberAlreadyInvited {
 
-    accessdesk.resources.InvitationId id = 1 [(required) = true];
+    accessdesk.identity.InvitationId id = 1 [(required) = true];
 }
 
 // The invitation is not waiting for the invited person's answer, so it can be
 // neither accepted, nor declined, nor revoked.
 message InvitationNotPending {
 
-    accessdesk.resources.InvitationId id = 1 [(required) = true];
+    accessdesk.identity.InvitationId id = 1 [(required) = true];
 }
 
 // Somebody other than the invited person tried to accept or decline the
@@ -40,7 +39,7 @@ message InvitationNotPending {
 message NotInvitedPerson {
 
     // The ID of the invitation.
-    accessdesk.resources.InvitationId id = 1 [(required) = true];
+    accessdesk.identity.InvitationId id = 1 [(required) = true];
 
     // The person for whom the invitation was to be accepted or declined.
     accessdesk.identity.PersonId person = 2 [(required) = true];

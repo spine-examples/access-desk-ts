@@ -17,6 +17,7 @@ syntax = "proto3";
 package accessdesk.identity;
 
 import "accessdesk/identity/values.proto";
+import "spine/net/email_address.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
@@ -36,4 +37,20 @@ message ExternalIdentityId {
     // The name the provider gives the account, which never changes for that
     // provider.
     string subject = 2 [(required) = true];
+}
+
+// Identifies an organization.
+message OrganizationId {
+
+    string uuid = 1 [(required) = true];
+}
+
+// Identifies an organization's invitation of one person.
+message InvitationId {
+
+    // The organization that invites the person.
+    OrganizationId organization = 1 [(required) = true];
+
+    // The email address of the invited person.
+    spine.net.EmailAddress invitee = 2 [(required) = true];
 }

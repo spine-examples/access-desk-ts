@@ -14,11 +14,11 @@
 
 syntax = "proto3";
 
-package accessdesk.resources.organization.invitation;
+package accessdesk.identity.invitation;
 
-import "accessdesk/resources/identifiers.proto";
-import "accessdesk/resources/values.proto";
 import "accessdesk/identity/identifiers.proto";
+import "accessdesk/identity/values.proto";
+import "spine/net/email_address.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
@@ -27,15 +27,16 @@ option (type_url_prefix) = "type.accessdesk";
 message Invitation {
     option (entity).kind = PROCESS_MANAGER;
 
-    // The invited person, by their email address.
-    accessdesk.resources.InvitationId id = 1;
+    // The invitation, which names the organization and the invited email
+    // address.
+    accessdesk.identity.InvitationId id = 1;
 
     // The role the invited person will hold in the organization once they
     // accept.
-    accessdesk.resources.OrganizationRole role = 2 [(required) = true];
+    accessdesk.identity.OrganizationRole role = 2 [(required) = true];
 
     // The status of the invitation.
-    accessdesk.resources.InvitationStatus status = 3 [(required) = true];
+    accessdesk.identity.InvitationStatus status = 3 [(required) = true];
 }
 
 // An invitation specifying the role it grants and the person who accepted it.
@@ -43,15 +44,19 @@ message InvitationView {
     option (entity).kind = PROJECTION;
     option (entity).visibility = FULL;
 
-    // The invited person, by their email address.
-    accessdesk.resources.InvitationId id = 1;
+    // The invitation, which names the organization and the invited email
+    // address.
+    accessdesk.identity.InvitationId id = 1;
+
+    // The email address of the invited person.
+    spine.net.EmailAddress invitee = 2 [(required) = true, (column) = true];
 
     // The role the invitation gives the invited person.
-    accessdesk.resources.OrganizationRole role = 2 [(required) = true];
+    accessdesk.identity.OrganizationRole role = 3 [(required) = true];
 
     // The current status of the invitation.
-    accessdesk.resources.InvitationStatus status = 3 [(required) = true];
+    accessdesk.identity.InvitationStatus status = 4 [(required) = true];
 
     // The person who accepted the invitation.
-    accessdesk.identity.PersonId accepted_by = 4;
+    accessdesk.identity.PersonId accepted_by = 5;
 }

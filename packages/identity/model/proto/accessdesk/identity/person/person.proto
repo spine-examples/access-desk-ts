@@ -41,7 +41,8 @@ message Person {
     repeated accessdesk.identity.ExternalIdentityId account = 4;
 }
 
-// A registered person with every account they sign in with.
+// A registered person with every account they sign in with and every
+// organization they are a member of.
 message PersonView {
     option (entity).kind = PROJECTION;
     option (entity).visibility = FULL;
@@ -57,4 +58,7 @@ message PersonView {
 
     // The accounts the person signs in with.
     repeated accessdesk.identity.ExternalIdentityId account = 4;
+
+    // The organizations the person is a member of.
+    repeated accessdesk.identity.OrganizationId organization = 5;
 }

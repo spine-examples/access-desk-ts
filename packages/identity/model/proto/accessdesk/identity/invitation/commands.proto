@@ -14,38 +14,38 @@
 
 syntax = "proto3";
 
-package accessdesk.resources.organization.invitation;
+package accessdesk.identity.invitation;
 
-import "accessdesk/resources/identifiers.proto";
-import "accessdesk/resources/values.proto";
 import "accessdesk/identity/identifiers.proto";
+import "accessdesk/identity/values.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
-// Invites a person to become a member of the organization.
+// Invites a person to become a member of an organization.
 message InviteMember {
 
-    // The person to invite, by their email address.
-    accessdesk.resources.InvitationId id = 1;
+    // The invitation, which names the organization and the email address of
+    // the person to invite.
+    accessdesk.identity.InvitationId id = 1;
 
     // The role the invited person will hold in the organization once they
     // accept.
-    accessdesk.resources.OrganizationRole role = 2 [(required) = true];
+    accessdesk.identity.OrganizationRole role = 2 [(required) = true];
 }
 
 // Takes back an invitation nobody has accepted yet.
 message RevokeInvitation {
 
     // The invitation to take back.
-    accessdesk.resources.InvitationId id = 1;
+    accessdesk.identity.InvitationId id = 1;
 }
 
 // Accepts an invitation on behalf of the invited person.
 message AcceptInvitation {
 
     // The invitation to accept.
-    accessdesk.resources.InvitationId id = 1;
+    accessdesk.identity.InvitationId id = 1;
 
     // The person who accepts the invitation.
     accessdesk.identity.PersonId person = 2 [(required) = true];
@@ -58,7 +58,7 @@ message AcceptInvitation {
 message DeclineInvitation {
 
     // The invitation to decline.
-    accessdesk.resources.InvitationId id = 1;
+    accessdesk.identity.InvitationId id = 1;
 
     // The person who declines the invitation.
     accessdesk.identity.PersonId person = 2 [(required) = true];

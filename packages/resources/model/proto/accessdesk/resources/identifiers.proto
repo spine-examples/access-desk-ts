@@ -17,23 +17,9 @@ syntax = "proto3";
 package accessdesk.resources;
 
 import "accessdesk/identity/identifiers.proto";
-import "spine/net/email_address.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
-
-// Identifies an organization.
-message OrganizationId {
-
-    string uuid = 1 [(required) = true];
-}
-
-// Identifies an organization's invitation of one person.
-message InvitationId {
-
-    // The email address of the invited person.
-    spine.net.EmailAddress invitee = 1 [(required) = true];
-}
 
 // Identifies a resource within exactly one organization.
 message ResourceId {

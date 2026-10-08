@@ -17,8 +17,8 @@ syntax = "proto3";
 package accessdesk.resources.organization;
 
 import "accessdesk/resources/identifiers.proto";
-import "accessdesk/resources/values.proto";
 import "accessdesk/identity/identifiers.proto";
+import "accessdesk/identity/values.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
@@ -27,7 +27,7 @@ option (type_url_prefix) = "type.accessdesk";
 message OrganizationCreated {
 
     // The identifier of the created organization.
-    accessdesk.resources.OrganizationId id = 1 [(required) = true];
+    accessdesk.identity.OrganizationId id = 1 [(required) = true];
 
     // The human-readable organization name, unique across organizations and
     // compared case-insensitively.
@@ -38,7 +38,7 @@ message OrganizationCreated {
 message OrganizationMemberAdded {
 
     // The organization that owns this membership.
-    accessdesk.resources.OrganizationId organization_id = 1 [(required) = true];
+    accessdesk.identity.OrganizationId organization_id = 1 [(required) = true];
 
     // The person added as a member.
     accessdesk.identity.PersonId person = 2 [(required) = true];
@@ -47,14 +47,14 @@ message OrganizationMemberAdded {
     string name = 3 [(required) = true];
 
     // The role the member holds in the organization.
-    accessdesk.resources.OrganizationRole role = 4 [(required) = true];
+    accessdesk.identity.OrganizationRole role = 4 [(required) = true];
 }
 
 // A resource was added to an organization.
 message ResourceAdded {
 
     // The organization that owns the resource.
-    accessdesk.resources.OrganizationId organization_id = 1 [(required) = true];
+    accessdesk.identity.OrganizationId organization_id = 1 [(required) = true];
 
     // The resource that was added.
     accessdesk.resources.ResourceId resource_id = 2 [(required) = true];

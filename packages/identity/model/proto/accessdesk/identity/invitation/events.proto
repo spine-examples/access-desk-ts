@@ -14,11 +14,10 @@
 
 syntax = "proto3";
 
-package accessdesk.resources.organization.invitation;
+package accessdesk.identity.invitation;
 
-import "accessdesk/resources/identifiers.proto";
-import "accessdesk/resources/values.proto";
 import "accessdesk/identity/identifiers.proto";
+import "accessdesk/identity/values.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
@@ -26,26 +25,27 @@ option (type_url_prefix) = "type.accessdesk";
 // A person was invited to become a member of the organization.
 message MemberInvited {
 
-    // The invited person, by their email address.
-    accessdesk.resources.InvitationId id = 1 [(required) = true];
+    // The invitation, which names the organization and the invited email
+    // address.
+    accessdesk.identity.InvitationId id = 1 [(required) = true];
 
     // The role the invited person will hold in the organization once they
     // accept.
-    accessdesk.resources.OrganizationRole role = 2 [(required) = true];
+    accessdesk.identity.OrganizationRole role = 2 [(required) = true];
 }
 
 // An invitation was taken back before anybody accepted it.
 message InvitationRevoked {
 
     // The invitation that was taken back.
-    accessdesk.resources.InvitationId id = 1 [(required) = true];
+    accessdesk.identity.InvitationId id = 1 [(required) = true];
 }
 
 // The invited person accepted the invitation.
 message InvitationAccepted {
 
     // The invitation that was accepted.
-    accessdesk.resources.InvitationId id = 1 [(required) = true];
+    accessdesk.identity.InvitationId id = 1 [(required) = true];
 
     // The person who accepted the invitation.
     accessdesk.identity.PersonId person = 2 [(required) = true];
@@ -55,14 +55,14 @@ message InvitationAccepted {
 
     // The role the invitation gave, which the person holds in the organization
     // from now on.
-    accessdesk.resources.OrganizationRole role = 4 [(required) = true];
+    accessdesk.identity.OrganizationRole role = 4 [(required) = true];
 }
 
 // The invited person declined the invitation.
 message InvitationDeclined {
 
     // The invitation that was declined.
-    accessdesk.resources.InvitationId id = 1 [(required) = true];
+    accessdesk.identity.InvitationId id = 1 [(required) = true];
 
     // The person who declined the invitation.
     accessdesk.identity.PersonId person = 2 [(required) = true];
