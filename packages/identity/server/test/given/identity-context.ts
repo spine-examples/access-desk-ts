@@ -53,6 +53,26 @@ export function identityModule(): IdentityModule {
   return identity;
 }
 
+/** A person the organizations were asked to add to their members. */
+export interface AddedMember {
+  readonly organization: string;
+  readonly person: string;
+  readonly name: string;
+  readonly role: number;
+}
+
+/**
+ * The organizations' members, standing in for the Resources context.
+ *
+ * It keeps who was added, and refuses to add anybody while told to.
+ */
+export const organizations = {
+  /** Everybody the organizations were asked to add, in order. */
+  added: [] as AddedMember[],
+  /** Whether the organizations refuse to add anybody. */
+  refusing: false,
+};
+
 const ownedBlackBoxes = new Set<BlackBox>();
 
 /**
@@ -62,7 +82,23 @@ const ownedBlackBoxes = new Set<BlackBox>();
  * {@link closeIdentityBlackBoxes}.
  */
 export async function identityBlackBox(): Promise<BlackBox> {
-  const box = await BlackBox.from(await identityModule().createIdentityContext(), {
+  const context = await identityModule().createIdentityContext({
+    members: {
+      add: (member) => {
+        if (organizations.refusing) {
+          return Promise.reject(new Error("The organization did not add the person."));
+        }
+        organizations.added.push({
+          organization: member.organization.uuid,
+          person: member.person.uuid,
+          name: member.name,
+          role: member.role,
+        });
+        return Promise.resolve();
+      },
+    },
+  });
+  const box = await BlackBox.from(context, {
     timeoutMs: 20_000,
     intervalMs: 20,
   });
@@ -74,6 +110,8 @@ export async function identityBlackBox(): Promise<BlackBox> {
 export async function closeIdentityBlackBoxes(): Promise<void> {
   await Promise.all([...ownedBlackBoxes].map((box) => box.close()));
   ownedBlackBoxes.clear();
+  organizations.added = [];
+  organizations.refusing = false;
 }
 
 /**

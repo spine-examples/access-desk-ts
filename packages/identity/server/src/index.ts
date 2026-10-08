@@ -15,4 +15,5 @@
 /**
  * The Identity bounded context, which says who a person is.
  */
-export { createIdentityContext } from "./identity-context.js";
+export { createIdentityContext, type IdentityContextOptions } from "./identity-context.js";
+export type { NewMember, OrganizationMembers } from "./invitation/organization-members.js";
