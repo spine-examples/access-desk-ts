@@ -1,0 +1,40 @@
+/*
+ * Copyright 2026 CodeMatters, Lda.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+ * except in compliance with the License. You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under
+ * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+ * either express or implied. See the License for the specific language governing permissions
+ * and limitations under the License.
+ */
+
+syntax = "proto3";
+
+package accessdesk.identity;
+
+// An identity provider people sign in through.
+enum IdentityProvider {
+
+    IP_UNSPECIFIED = 0;
+
+    // GitHub.
+    //
+    // An account is named by the number GitHub gives the user, the
+    // `id` of https://docs.github.com/en/rest/users/users#get-the-authenticated-user.
+    // The email address is the primary one GitHub has verified, from
+    // https://docs.github.com/en/rest/users/emails#list-email-addresses-for-the-authenticated-user.
+    //
+    GITHUB = 1;
+
+    // Google.
+    //
+    // An account is named by the `sub` claim of the ID token, and the
+    // email address is its `email` claim when `email_verified` is true. See
+    // https://developers.google.com/identity/openid-connect/openid-connect#an-id-tokens-payload.
+    //
+    GOOGLE = 2;
+}

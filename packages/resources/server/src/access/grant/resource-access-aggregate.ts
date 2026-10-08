@@ -154,7 +154,6 @@ export class ResourceAccessAggregate extends Aggregate<
     }
     const created = create(ResourceAccess_GrantSchema, { id: grant, accessLevel, start, end });
     this.update((draft) => {
-      draft.id = this.id;
       draft.manager = [...manager];
       draft.grant = [...this.grantsNotEnded(), created];
     });

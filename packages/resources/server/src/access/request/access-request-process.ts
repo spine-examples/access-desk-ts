@@ -540,7 +540,6 @@ export class AccessRequestProcessManager extends ProcessManager<
    */
   private store(snapshot: AccessRequestSnapshot, manager: readonly PersonId[]): void {
     this.update((draft) => {
-      draft.id = this.id;
       draft.snapshot = snapshot;
       draft.manager = [...manager];
       draft.status = AccessRequestStatus.SUBMISSION_STARTED;

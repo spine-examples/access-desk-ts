@@ -17,6 +17,7 @@ syntax = "proto3";
 package accessdesk.resources.organization;
 
 import "accessdesk/resources/identifiers.proto";
+import "accessdesk/resources/values.proto";
 import "accessdesk/identity/identifiers.proto";
 import "spine/options.proto";
 
@@ -44,6 +45,9 @@ message AddOrganizationMember {
 
     // The member's display name.
     string name = 3 [(required) = true];
+
+    // The role the person will hold in the organization.
+    accessdesk.resources.OrganizationRole role = 4 [(required) = true];
 }
 
 // Adds a resource to an organization.

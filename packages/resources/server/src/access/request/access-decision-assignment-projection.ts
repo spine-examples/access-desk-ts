@@ -94,7 +94,6 @@ export class AccessDecisionAssignmentProjection extends Projection<
       return;
     }
     this.update((draft) => {
-      draft.id = this.id;
       if (!draft.task.some((task) => equals(AccessRequestIdSchema, task.request, request))) {
         draft.task = [
           ...draft.task,

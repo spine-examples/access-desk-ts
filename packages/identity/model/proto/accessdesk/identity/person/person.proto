@@ -1,0 +1,60 @@
+/*
+ * Copyright 2026 CodeMatters, Lda.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+ * except in compliance with the License. You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under
+ * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+ * either express or implied. See the License for the specific language governing permissions
+ * and limitations under the License.
+ */
+
+syntax = "proto3";
+
+package accessdesk.identity.person;
+
+import "accessdesk/identity/identifiers.proto";
+import "spine/net/email_address.proto";
+import "spine/options.proto";
+
+option (type_url_prefix) = "type.accessdesk";
+
+// A person who signs in to Access Desk, through any of the accounts they hold
+// with identity providers.
+message Person {
+    option (entity).kind = AGGREGATE;
+
+    // The person's identifier.
+    accessdesk.identity.PersonId id = 1;
+
+    // The email address the person was registered under, which their identity
+    // provider confirmed.
+    spine.net.EmailAddress email_address = 2 [(required) = true];
+
+    // The person's display name when they were registered.
+    string name = 3 [(required) = true];
+
+    // The accounts the person signs in with.
+    repeated accessdesk.identity.ExternalIdentityId account = 4;
+}
+
+// A registered person with every account they sign in with.
+message PersonView {
+    option (entity).kind = PROJECTION;
+    option (entity).visibility = FULL;
+
+    // The person's identifier.
+    accessdesk.identity.PersonId id = 1;
+
+    // The email address the person was registered under.
+    spine.net.EmailAddress email_address = 2 [(required) = true];
+
+    // The person's display name when they were registered.
+    string name = 3 [(required) = true];
+
+    // The accounts the person signs in with.
+    repeated accessdesk.identity.ExternalIdentityId account = 4;
+}

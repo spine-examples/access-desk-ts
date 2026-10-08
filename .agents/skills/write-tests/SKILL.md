@@ -32,8 +32,8 @@ Do **not** keep per-flow or per-scenario files. Aggregate rules live
 in the aggregate test; the end-to-end flow lives in the one integration test.
 
 `describe` naming: `describe("<Entity> should", () => describe("handle
-'<Command|Event>', and", () => it("emit '<Event>' …" | "reject … with
-'<Rejection>'")))`.
+'<Command>', and" | "react on '<Event>', and", () => it("emit '<Event>' …" |
+"reject … with '<Rejection>'")))`.
 
 ## `given/` — fixtures
 

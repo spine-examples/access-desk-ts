@@ -23,9 +23,10 @@ import {
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
 import {
   OrganizationAlreadyExistsSchema,
-  OrganizationMemberAlreadyAddedSchema,
   OrganizationResourceNameAlreadyUsedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/rejections_pb.js";
+
+import { OrganizationRole } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 
 import {
   actor,
@@ -92,20 +93,26 @@ describe("OrganizationAggregate should", () => {
           organizationId: { uuid: organizationId },
           person: { uuid: "maya" },
           name: "maya",
+          role: OrganizationRole.MEMBER,
         }),
       );
       await events.cancel();
     });
+  });
 
-    it("reject a duplicate member with 'OrganizationMemberAlreadyAdded'", async () => {
+  describe("handle 'AddOrganizationMember' as an administrator, and", () => {
+    it("emit 'OrganizationMemberAdded' with the administrator role", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await createOrganization(scope)).kind).toBe("ok");
-      expect((await addOrganizationMember(scope, "maya")).kind).toBe("ok");
+      const events = await recordEvents(scope, OrganizationMemberAddedSchema);
 
-      await expectRejection(box, scope, OrganizationMemberAlreadyAddedSchema, () =>
-        addOrganizationMember(scope, "maya"),
-      );
+      expect(
+        (await addOrganizationMember(scope, "noah", "noah", OrganizationRole.ADMINISTRATOR)).kind,
+      ).toBe("ok");
+
+      expect((await events.waitFor(box)).role).toBe(OrganizationRole.ADMINISTRATOR);
+      await events.cancel();
     });
   });
 

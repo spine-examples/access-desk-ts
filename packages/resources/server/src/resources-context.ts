@@ -12,10 +12,23 @@
  * and limitations under the License.
  */
 
+import { create } from "@bufbuild/protobuf";
 import { anyIs, anyUnpack } from "@bufbuild/protobuf/wkt";
 import type { EventContext } from "@spine-event-engine/proto";
-import { BoundedContext, type Clock, EventRouting, SystemClock } from "@spine-event-engine/server";
+import {
+  BoundedContext,
+  type Clock,
+  CommandRouting,
+  EventRouting,
+  SystemClock,
+} from "@spine-event-engine/server";
 import { ResourceAddedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
+import {
+  AcceptInvitationSchema,
+  DeclineInvitationSchema,
+  InviteMemberSchema,
+  RevokeInvitationSchema,
+} from "@access-desk/resources-model/generated/accessdesk/resources/organization/invitation/commands_pb.js";
 import { ResourceDeletedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/events_pb.js";
 import { ResourceAlreadyExistsSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/rejections_pb.js";
 import { OrganizationResourceNameAlreadyUsedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/rejections_pb.js";
@@ -28,8 +41,10 @@ import {
   AccessRequestSubmittedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
 import {
+  InvitationIdSchema,
   type AccessGrantId,
   type AccessRequestId,
+  type InvitationId,
   type ResourceId,
 } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
 import {
@@ -53,6 +68,8 @@ import {
 import { type PersonId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { OrganizationAggregate } from "./organization/organization-aggregate.js";
 import { OrganizationViewProjection } from "./organization/organization-view-projection.js";
+import { InvitationProcessManager } from "./organization/invitation/invitation-process.js";
+import { InvitationViewProjection } from "./organization/invitation/invitation-view-projection.js";
 import { ResourceAggregate } from "./resource/resource-aggregate.js";
 import { ResourceCatalogProjection } from "./resource/resource-catalog-projection.js";
 import { ResourceRegistrationProcessManager } from "./resource/resource-registration-process.js";
@@ -118,10 +135,17 @@ export async function createResourcesContext(
     .route(AccessGrantCreatedSchema, (event) => grantOf(event))
     .route(AccessGrantExtendedSchema, (event) => grantOf(event))
     .route(AccessGrantRevokedSchema, (event) => grantOf(event));
+  const invitationCommands = CommandRouting.create<InvitationId>()
+    .route(InviteMemberSchema, invitationOf)
+    .route(RevokeInvitationSchema, invitationOf)
+    .route(AcceptInvitationSchema, invitationOf)
+    .route(DeclineInvitationSchema, invitationOf);
   const builder = BoundedContext.multitenant("Resources")
     .withGeneratedRegistryRoot(new URL("..", import.meta.url))
     .add(OrganizationAggregate)
     .add(OrganizationViewProjection)
+    .add(InvitationProcessManager, { commandRouting: invitationCommands })
+    .add(InvitationViewProjection)
     .add(ResourceRegistrationProcessManager, { eventRouting: resourceRegistrationProcmanRouting })
     .add(ResourceAggregate)
     .add(ResourceCatalogProjection)
@@ -164,6 +188,18 @@ function requestRejected(context: EventContext): AccessRequestId[] {
   return rejected === undefined || asked === undefined
     ? []
     : requestOf(anyUnpack(rejected, asked) ?? {});
+}
+
+/**
+ * The invitation a command is about, by the invited person's email address.
+ *
+ * A signed-in person's address is kept in lower case, so an invitation is
+ * found by the address in lower case, however it was written.
+ */
+function invitationOf(command: { readonly id?: InvitationId | undefined }): InvitationId {
+  return create(InvitationIdSchema, {
+    invitee: { value: (command.id?.invitee?.value ?? "").trim().toLowerCase() },
+  });
 }
 
 /** The grant an event tells about. */

@@ -1,9 +1,6 @@
 {
   "formatVersion": 1,
   "mode": "application",
-  "modelPackages": [
-    "@access-desk/identity-model",
-    "@access-desk/resources-model"
-  ],
+  "modelPackages": ["@access-desk/identity-model", "@access-desk/resources-model"],
   "registryOutput": "generated/model-registry.ts"
 }
