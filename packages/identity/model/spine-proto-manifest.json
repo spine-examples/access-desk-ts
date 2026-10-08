@@ -1,10 +1,14 @@
 {
   "formatVersion": 2,
-  "generationId": "f4bb4b04-b1b2-4a5f-a4be-ae4c4c04461a",
+  "generationId": "fcc5dae6-5804-4b75-9f16-22c41344166f",
   "packageName": "@access-desk/identity-model",
   "packageVersion": "0.0.0",
   "protoFiles": [
     "accessdesk/identity/identifiers.proto",
+    "accessdesk/identity/invitation/commands.proto",
+    "accessdesk/identity/invitation/events.proto",
+    "accessdesk/identity/invitation/invitation.proto",
+    "accessdesk/identity/invitation/rejections.proto",
     "accessdesk/identity/person/commands.proto",
     "accessdesk/identity/person/events.proto",
     "accessdesk/identity/person/external_identity.proto",
@@ -20,6 +24,10 @@
   ],
   "generatedExports": {
     "accessdesk/identity/identifiers.proto": "generated/accessdesk/identity/identifiers_pb.js",
+    "accessdesk/identity/invitation/commands.proto": "generated/accessdesk/identity/invitation/commands_pb.js",
+    "accessdesk/identity/invitation/events.proto": "generated/accessdesk/identity/invitation/events_pb.js",
+    "accessdesk/identity/invitation/invitation.proto": "generated/accessdesk/identity/invitation/invitation_pb.js",
+    "accessdesk/identity/invitation/rejections.proto": "generated/accessdesk/identity/invitation/rejections_pb.js",
     "accessdesk/identity/person/commands.proto": "generated/accessdesk/identity/person/commands_pb.js",
     "accessdesk/identity/person/events.proto": "generated/accessdesk/identity/person/events_pb.js",
     "accessdesk/identity/person/external_identity.proto": "generated/accessdesk/identity/person/external_identity_pb.js",

@@ -25,10 +25,7 @@ import {
   type OrganizationView,
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
 
-import {
-  OrganizationRole,
-  type OrganizationMember,
-} from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
+import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 
 import { organizationId, readAll } from "../../given/resources-context.js";
 
@@ -85,21 +82,4 @@ export function awaitOrganizationView(
     () => readOrganizationViews(scope),
     (views) => views.some(accept),
   );
-}
-
-/** Waits until the organization's view shows the member as the predicate expects. */
-export async function awaitMember(
-  box: BlackBox,
-  scope: BlackBoxScope,
-  person: string,
-  accept: (member: OrganizationMember) => boolean = () => true,
-): Promise<OrganizationMember> {
-  const matches = (member: OrganizationMember): boolean =>
-    member.person?.uuid === person && accept(member);
-  const views = await awaitOrganizationView(box, scope, (view) => view.member.some(matches));
-  const found = views.flatMap((view) => view.member).find(matches);
-  if (found === undefined) {
-    throw new Error(`Member "${person}" not found.`);
-  }
-  return found;
 }

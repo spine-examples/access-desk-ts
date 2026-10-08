@@ -26,7 +26,7 @@ import {
   OrganizationResourceNameAlreadyUsedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/rejections_pb.js";
 
-import { OrganizationRole } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
+import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 
 import {
   actor,
