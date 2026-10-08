@@ -32,6 +32,6 @@
     "@spine-event-engine/testing": "2.0.0-snapshot.22",
     "@types/node": "24.13.2",
     "typescript": "6.0.3",
-    "vitest": "4.1.9"
+    "vitest": "5.0.3"
   }
 }
