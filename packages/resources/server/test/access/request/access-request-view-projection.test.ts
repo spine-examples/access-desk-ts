@@ -65,6 +65,8 @@ describe("AccessRequestViewProjection should", () => {
 
     await awaitStatus(box, requester, "view-submitted", AccessRequestStatus.PENDING);
     const row = (await readRequests(requester)).find((r) => r.id?.uuid === "view-submitted");
+    expect(row?.requester?.uuid).toBe(actor);
+    expect(row?.resource?.uuid).toBe(resourceUuid);
     expect(row?.snapshot?.requester?.uuid).toBe(actor);
     const kind = row?.snapshot?.kind;
     expect(kind?.case).toBe("newRequest");
@@ -104,6 +106,8 @@ describe("AccessRequestViewProjection should", () => {
 
     await awaitStatus(box, requester, "view-failed", AccessRequestStatus.APPROVAL_FAILED);
     const row = (await readRequests(requester)).find((r) => r.id?.uuid === "view-failed");
+    expect(row?.requester?.uuid).toBe(actor);
+    expect(row?.resource?.uuid).toBe(resourceUuid);
     expect(row?.decidedBy?.uuid).toBe("primary");
     expect(row?.whenDecided).toEqual(minutesIn(10));
   });

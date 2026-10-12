@@ -30,8 +30,9 @@ import type {
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
 
 /**
- * An access request as its requester follows it, showing the request and its
- * status from submission to a terminal decision.
+ * An access request as its requester and the managers of the requested
+ * resource follow it, showing the request and its status from submission to a
+ * terminal decision.
  */
 export class AccessRequestViewProjection extends Projection<
   AccessRequestId,
@@ -87,6 +88,8 @@ export class AccessRequestViewProjection extends Projection<
       return;
     }
     this.update((draft) => {
+      draft.requester = snapshot.requester;
+      draft.resource = snapshot.kind.value?.resource;
       draft.snapshot = snapshot;
       draft.status = AccessRequestStatus.PENDING;
     });
