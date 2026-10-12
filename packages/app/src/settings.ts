@@ -86,7 +86,7 @@ class Reading {
   /** A port that must be there. */
   port(name: string): number {
     const text = this.text(name);
-    const port = Number(text);
+    const port = /^\d+$/.test(text) ? Number(text) : Number.NaN;
     if (text !== "" && (!Number.isInteger(port) || port < 1 || port > 65_535)) {
       this.#problems.push(`${name} must be a port between 1 and 65535, and is "${text}".`);
     }
@@ -163,4 +163,24 @@ export function gatewaySettingsOf(environment: NodeJS.ProcessEnv): GatewaySettin
     github: reading.provider("GITHUB"),
     google: reading.provider("GOOGLE"),
   });
+}
+
+/**
+ * Refuses to start a program as a production one.
+ *
+ * Access Desk keeps everything in memory: people, organizations, sessions, and
+ * what each browser watches. Spine starts neither program that way when
+ * `NODE_ENV` is `production`, because it then requires storage that outlasts
+ * the program. Access Desk has none yet, so it says so itself.
+ *
+ * @param environment The environment the program runs in.
+ * @throws When `NODE_ENV` is `production`.
+ */
+export function refuseProduction(environment: NodeJS.ProcessEnv): void {
+  if (environment.NODE_ENV?.trim() === "production") {
+    throw new Error(
+      "Access Desk keeps everything in memory, which Spine refuses when NODE_ENV is " +
+        "`production`. Start it without that setting until Access Desk has storage that lasts.",
+    );
+  }
 }

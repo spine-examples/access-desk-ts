@@ -14,7 +14,7 @@
 
 import { Server } from "@spine-event-engine/server";
 import { assembleAccessDesk } from "./access-desk.js";
-import { serverSettingsOf } from "../settings.js";
+import { refuseProduction, serverSettingsOf } from "../settings.js";
 
 /**
  * The application server.
@@ -30,6 +30,7 @@ import { serverSettingsOf } from "../settings.js";
  * else. `README.md` tells the whole of it.
  */
 
+refuseProduction(process.env);
 const { host, port } = serverSettingsOf(process.env).listening;
 
 // The contexts are assembled before the server listens, and reach it only

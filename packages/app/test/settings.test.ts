@@ -14,7 +14,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { gatewaySettingsOf, serverSettingsOf } from "../src/settings.js";
+import { gatewaySettingsOf, refuseProduction, serverSettingsOf } from "../src/settings.js";
 
 const server = { ACCESS_DESK_SERVER_HOST: "127.0.0.1", ACCESS_DESK_SERVER_PORT: "8090" };
 const gateway = {
@@ -67,6 +67,24 @@ describe("The settings should", () => {
     expect(() => gatewaySettingsOf({ ...gateway, ACCESS_DESK_WEB_PORT: "0" })).toThrow(
       /ACCESS_DESK_WEB_PORT must be a port/,
     );
+  });
+
+  it("refuse a port written as anything but plain digits", () => {
+    for (const written of ["0x1F90", "1e3", "8090.0", "+8090"]) {
+      expect(() => serverSettingsOf({ ...server, ACCESS_DESK_SERVER_PORT: written })).toThrow(
+        /ACCESS_DESK_SERVER_PORT must be a port/,
+      );
+    }
+  });
+
+  it("refuse to start as a production program, and start as any other", () => {
+    expect(() => {
+      refuseProduction({ NODE_ENV: "production" });
+    }).toThrow(/keeps everything in memory/);
+    expect(() => {
+      refuseProduction({ NODE_ENV: "development" });
+      refuseProduction({});
+    }).not.toThrow();
   });
 
   it("refuse an identity provider that is only partly set up", () => {

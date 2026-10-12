@@ -13,7 +13,7 @@
  */
 
 import { typeRegistry } from "../../generated/model-registry.js";
-import { gatewaySettingsOf } from "../settings.js";
+import { gatewaySettingsOf, refuseProduction } from "../settings.js";
 import { startGateway } from "./gateway.js";
 import { gitHubSignIn, googleSignIn } from "./providers.js";
 import type { ExternalSignIn } from "./routes/sign-in-routes.js";
@@ -26,6 +26,7 @@ import type { ExternalSignIn } from "./routes/sign-in-routes.js";
  * application server, a separate program, where that server listens.
  */
 
+refuseProduction(process.env);
 const settings = gatewaySettingsOf(process.env);
 
 const external: Record<string, ExternalSignIn> = {};
@@ -67,7 +68,10 @@ if (Object.keys(external).length === 0) {
 const CANCELLED = 1;
 process.on("unhandledRejection", (reason) => {
   if ((reason as { code?: unknown } | null)?.code === CANCELLED) {
-    console.warn("A browser abandoned a request before it was answered.");
+    console.warn(
+      "A browser abandoned a request before it was answered:",
+      reason instanceof Error ? reason.message : reason,
+    );
     return;
   }
   console.error(reason);
