@@ -13,6 +13,15 @@
  */
 
 /**
- * Application composition root.
+ * Access Desk as two programs: the application server, which hosts the
+ * contexts, and the gateway, the only one a browser talks to.
  */
 export { typeRegistry } from "../generated/model-registry.js";
+export {
+  assembleAccessDesk,
+  type AccessDesk,
+  type AccessDeskOptions,
+} from "./server/access-desk.js";
+export { startGateway, type Gateway, type GatewayOptions } from "./gateway/gateway.js";
+export type { ExternalSignIn } from "./gateway/routes/sign-in-routes.js";
+export { type SignInProvider } from "./gateway/providers.js";
