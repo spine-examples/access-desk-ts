@@ -217,10 +217,10 @@ export interface Answered {
 }
 
 /**
- * Sends a body, as it is written, to a sign-in or session address of the gateway.
+ * Sends a body, as it is written, to a sign-in or session endpoint of the gateway.
  *
  * @param running The running application.
- * @param path The address.
+ * @param path The endpoint's path.
  * @param body The body, which need not be JSON.
  * @param by The session's token, when the call carries one, and the page the
  *   call comes from. The application's own page when left out.
@@ -244,10 +244,10 @@ export function request(
 }
 
 /**
- * Calls a sign-in or session address of the gateway from the application's page.
+ * Calls a sign-in or session endpoint of the gateway from the application's page.
  *
  * @param running The running application.
- * @param path The address.
+ * @param path The endpoint's path.
  * @param body What to send. An empty object when left out.
  * @param token The session's token, when the call carries one.
  * @param origin The page the call comes from. The application's own when left out.

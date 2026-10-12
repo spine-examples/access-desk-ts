@@ -58,7 +58,7 @@ packages/
   `src/server/` is the application server, which hosts both contexts;
   `src/gateway/` is the browser-facing gateway
   (sign-in, sessions, authorization), which reaches the server over the
-  network. The gateway's own addresses live in `src/gateway/routes/`, and
+  network. The gateway's own endpoints live in `src/gateway/routes/`, and
   are only for signing in and the session; everything else passes through
   as Spine requests judged by `src/gateway/policy.ts`.
   `pnpm --dir packages/app run server` and `run gateway` start each.

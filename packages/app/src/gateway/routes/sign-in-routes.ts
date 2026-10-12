@@ -30,7 +30,7 @@ export interface ExternalSignIn {
   readonly callbackUri: string;
 }
 
-/** The addresses through which people sign in, and how to stop what they hold open. */
+/** The endpoints through which people sign in, and how to stop what they hold open. */
 export interface SignInRoutes {
   /** Browser auth routes registered with BrowserServer. */
   readonly routes: BrowserAuthRoute[];
@@ -39,7 +39,7 @@ export interface SignInRoutes {
 }
 
 /**
- * The addresses through which people sign in.
+ * The endpoints through which people sign in.
  *
  * A person signs in through an outside identity provider, such as GitHub or
  * Google.
@@ -51,7 +51,7 @@ export interface SignInRoutes {
  *
  * Whichever account a person signs in with, Identity says who they are.
  *
- * @param route How an address is made.
+ * @param route How an endpoint is made.
  * @param desk What the gateway asks of the application.
  * @param sessions The sessions of the people who have signed in.
  * @param external The identity providers to sign people in through, by the

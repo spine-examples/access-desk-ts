@@ -26,9 +26,9 @@ export const UNAUTHENTICATED: Answer = [401, { error: "not signed in" }];
 export const UNAVAILABLE: Answer = [503, { error: "try again" }];
 
 /**
- * Makes one address of the gateway that takes JSON and answers JSON.
+ * Makes one endpoint of the gateway that takes JSON and answers JSON.
  *
- * @param path The address.
+ * @param path The endpoint's path.
  * @param answer Answers a request, given what it sent and the session it carries.
  */
 export type Route = (
@@ -37,9 +37,9 @@ export type Route = (
 ) => BrowserAuthRoute;
 
 /**
- * Tells how the gateway's own addresses are made.
+ * Tells how the gateway's own endpoints are made.
  *
- * Every address works the same way:
+ * Every endpoint works the same way:
  *
  * - It takes `POST` with a JSON object as the body, `{}` when there is
  *   nothing to send, of at most 16 KiB.

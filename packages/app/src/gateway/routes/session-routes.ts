@@ -21,10 +21,10 @@ import type { Sessions } from "../sessions.js";
 import { REFUSED, UNAUTHENTICATED, UNAVAILABLE, type Route } from "./route.js";
 
 /**
- * The addresses through which a signed-in person sees who they are, enters an
+ * The endpoints through which a signed-in person sees who they are, enters an
  * organization, and signs out.
  *
- * @param route How an address is made.
+ * @param route How an endpoint is made.
  * @param desk What the gateway asks of the application.
  * @param sessions The sessions of the people who have signed in.
  */

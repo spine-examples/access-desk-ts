@@ -122,7 +122,7 @@ describe("The gateway should", () => {
       expect(answered.status).toBe(403);
     });
 
-    it("refuse malformed, scalar, and array JSON at a browser auth address", async () => {
+    it("refuse malformed, scalar, and array JSON at a browser auth endpoint", async () => {
       const running = await givenGateway();
 
       for (const body of ["not-json", "null", "7", '"word"', "[]"]) {

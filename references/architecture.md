@@ -112,7 +112,7 @@ command, query, and subscription the gateway takes the actor and the
 organization from the session, refuses a request that names another, checks
 that the person is a member, and admits only the commands a person may give. A
 command only the application gives, such as creating a grant, is refused from
-any client. The gateway keeps addresses of its own only for signing in, the session,
+any client. The gateway keeps endpoints of its own only for signing in, the session,
 entering an organization, and signing out. Everything else is a command, a
 query, or a subscription it judges as it passes, including the commands and
 the query about invitations. A request about an invitation names no
