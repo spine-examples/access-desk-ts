@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "access-desk-server",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--env-file-if-exists=.env", "packages/app/dist/src/server/main.js"],
+      "port": 8090
+    },
+    {
+      "name": "access-desk-gateway",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--env-file-if-exists=.env", "packages/app/dist/src/gateway/main.js"],
+      "port": 8080
+    },
+    {
+      "name": "access-desk-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "packages/web", "run", "dev"],
+      "port": 5173
+    }
+  ]
+}
