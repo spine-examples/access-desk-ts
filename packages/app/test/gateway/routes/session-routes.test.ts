@@ -21,7 +21,7 @@ import {
 } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 import { OrganizationViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
-import type { AccessDesk } from "../../../src/gateway/access_desk.js";
+import type { AccessDesk } from "../../../src/gateway/access-desk.js";
 import { routing } from "../../../src/gateway/routes/route.js";
 import { sessionRoutes } from "../../../src/gateway/routes/session-routes.js";
 import type { Issued, Session, Sessions } from "../../../src/gateway/sessions.js";
@@ -33,6 +33,7 @@ const person = {
 };
 const organization = create(OrganizationIdSchema, { uuid: "acme" });
 const session: Session = {
+  id: "session-1",
   credential: { kind: "cookie", value: "old-token" },
   person,
   organization: undefined,
@@ -45,7 +46,11 @@ function fixture() {
     end: vi.fn().mockResolvedValue(undefined),
   };
   const desk = {
-    standings: vi.fn().mockResolvedValue([{ organization, standing: "member" }]),
+    profile: vi.fn().mockResolvedValue({
+      accounts: [{ provider: "github", subject: "1" }],
+      standings: [{ organization, standing: "member" }],
+    }),
+    joined: vi.fn().mockResolvedValue(true),
     organization: vi.fn().mockResolvedValue(
       create(OrganizationViewSchema, {
         id: organization,
@@ -53,7 +58,6 @@ function fixture() {
         member: [{ person: person.id, role: OrganizationRole.ADMINISTRATOR }],
       }),
     ),
-    accounts: vi.fn().mockResolvedValue([{ provider: "github", subject: "1" }]),
     member: vi.fn().mockResolvedValue({ person: person.id, role: OrganizationRole.ADMINISTRATOR }),
   };
   const routes = sessionRoutes(
@@ -82,10 +86,13 @@ describe("Gateway session routes should", () => {
   it("serialize typed session values and skip organizations without a view", async () => {
     const { call, desk } = fixture();
     const missing = create(OrganizationIdSchema, { uuid: "missing" });
-    desk.standings.mockResolvedValueOnce([
-      { organization, standing: "member" },
-      { organization: missing, standing: "invited" },
-    ]);
+    desk.profile.mockResolvedValueOnce({
+      accounts: [{ provider: "github", subject: "1" }],
+      standings: [
+        { organization, standing: "member" },
+        { organization: missing, standing: "invited" },
+      ],
+    });
     desk.organization
       .mockResolvedValueOnce(
         create(OrganizationViewSchema, {
@@ -116,7 +123,36 @@ describe("Gateway session routes should", () => {
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: "not signed in" });
-    expect(desk.standings).not.toHaveBeenCalled();
+    expect(desk.profile).not.toHaveBeenCalled();
+  });
+
+  it("refuse an organization Identity does not list for the person, without asking it", async () => {
+    const { call, sessions, desk } = fixture();
+    desk.joined.mockResolvedValueOnce(false);
+
+    const response = await call("/auth/organization", { organization: "made-up" });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "refused" });
+    expect(desk.joined).toHaveBeenCalledWith(
+      person.id,
+      expect.objectContaining({ uuid: "made-up" }),
+    );
+    expect(desk.member).not.toHaveBeenCalled();
+    expect(sessions.issue).not.toHaveBeenCalled();
+  });
+
+  it("answer 503 when the application server cannot be asked", async () => {
+    const { call, desk } = fixture();
+    desk.profile.mockRejectedValueOnce(new Error("The application server is away."));
+    const silenced = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const response = await call("/auth/session");
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "try again" });
+    expect(silenced).toHaveBeenCalled();
+    silenced.mockRestore();
   });
 
   it("return 503 without ending the old session when a replacement cannot be issued", async () => {

@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { AccessDesk } from "../../../src/gateway/access_desk.js";
+import type { AccessDesk } from "../../../src/gateway/access-desk.js";
 import { routing } from "../../../src/gateway/routes/route.js";
 import { signInRoutes } from "../../../src/gateway/routes/sign-in-routes.js";
 import { Sessions } from "../../../src/gateway/sessions.js";

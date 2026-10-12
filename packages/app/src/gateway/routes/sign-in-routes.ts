@@ -14,7 +14,7 @@
 
 import { OidcFlow } from "@spine-event-engine/auth";
 import type { BrowserAuthRoute } from "@spine-event-engine/server/browser";
-import type { AccessDesk } from "../access_desk.js";
+import type { AccessDesk } from "../access-desk.js";
 import { personIn, type SignInProvider } from "../providers.js";
 import type { Issued, Sessions } from "../sessions.js";
 import { REFUSED, type Route } from "./route.js";

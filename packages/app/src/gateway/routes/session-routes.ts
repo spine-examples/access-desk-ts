@@ -16,7 +16,7 @@ import type { BrowserAuthRoute } from "@spine-event-engine/server/browser";
 import { create } from "@bufbuild/protobuf";
 import { OrganizationIdSchema } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
-import type { AccessDesk } from "../access_desk.js";
+import type { AccessDesk } from "../access-desk.js";
 import type { Sessions } from "../sessions.js";
 import { REFUSED, UNAUTHENTICATED, UNAVAILABLE, type Route } from "./route.js";
 
@@ -61,22 +61,28 @@ export function sessionRoutes(
       if (session === undefined) {
         return UNAUTHENTICATED;
       }
-      const organizations = [];
       // Which organizations are a person's to see is the application server's to say.
-      for (const { organization, standing } of await desk.standings(session.person)) {
-        const view = await desk.organization(organization);
-        if (view !== undefined) {
-          const member = view.member.find(
-            (candidate) => candidate.person?.uuid === session.person.id.uuid,
-          );
-          organizations.push({
+      const { accounts, standings } = await desk.profile(session.person);
+      const views = await Promise.all(
+        standings.map(({ organization }) => desk.organization(organization)),
+      );
+      const organizations = standings.flatMap(({ organization, standing }, index) => {
+        const view = views[index];
+        if (view === undefined) {
+          return [];
+        }
+        const member = view.member.find(
+          (candidate) => candidate.person?.uuid === session.person.id.uuid,
+        );
+        return [
+          {
             id: organization.uuid,
             name: view.name,
             standing,
             role: member === undefined ? null : OrganizationRole[member.role].toLowerCase(),
-          });
-        }
-      }
+          },
+        ];
+      });
       return [
         200,
         {
@@ -85,7 +91,7 @@ export function sessionRoutes(
             email: session.person.email.value,
             name: session.person.name,
           },
-          accounts: await desk.accounts(session.person.id),
+          accounts,
           organization: session.organization?.uuid ?? null,
           organizations,
         },
@@ -120,8 +126,11 @@ export function sessionRoutes(
         typeof organization === "string" && organization !== ""
           ? create(OrganizationIdSchema, { uuid: organization })
           : undefined;
+      // Only an organization Identity lists for the person is asked about
+      // them. A made-up identifier never reaches an organization.
       if (
         organizationId === undefined ||
+        !(await desk.joined(session.person.id, organizationId)) ||
         (await desk.member(organizationId, session.person.id)) === undefined
       ) {
         return REFUSED;

@@ -47,6 +47,7 @@ import { ResourceCatalogItemSchema } from "@access-desk/resources-model/generate
 import type { OrganizationMember } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import {
   find,
+  memberOf,
   postAndAwait,
   readById,
   type ServerConnection,
@@ -81,6 +82,20 @@ export interface SignedIn {
  * An invited person holds a pending invitation and may enter once they accept.
  */
 export type Standing = "member" | "invited";
+
+/** What Identity tells about a signed-in person. */
+export interface Profile {
+  /**
+   * The accounts the person signs in with, each as its provider and the name
+   * the provider gives it.
+   */
+  readonly accounts: readonly { readonly provider: string; readonly subject: string }[];
+  /** Each organization the person may see, paired with their standing in it. */
+  readonly standings: readonly {
+    readonly organization: OrganizationId;
+    readonly standing: Standing;
+  }[];
+}
 
 /**
  * What the gateway asks of Identity and Resources.
@@ -162,45 +177,48 @@ export class AccessDesk {
   }
 
   /**
-   * The accounts a person signs in with, each as its provider and the name the
-   * provider gives it.
-   */
-  async accounts(person: PersonId): Promise<{ provider: string; subject: string }[]> {
-    const view = await readById(this.#identity, PersonViewSchema, PersonIdSchema, person);
-    return (view?.account ?? []).map((account) => ({
-      provider: IdentityProvider[account.provider].toLowerCase(),
-      subject: account.subject,
-    }));
-  }
-
-  /**
-   * Each organization a signed-in person may see, paired with their standing
-   * in it.
+   * The accounts a signed-in person signs in with, and each organization they
+   * may see, paired with their standing in it.
    *
    * A person is a member of the organizations whose invitations they
    * accepted, and is invited to those whose invitations of their email
    * address still wait.
    */
-  async standings(
-    person: SignedIn,
-  ): Promise<{ organization: OrganizationId; standing: Standing }[]> {
-    const standings = new Map<string, { organization: OrganizationId; standing: Standing }>();
-    const invitations = await find(
-      this.#identity,
-      InvitationViewSchema,
-      InvitationViewQuery.create().invitee().is(person.email).build(),
-    );
+  async profile(person: SignedIn): Promise<Profile> {
+    const [invitations, view] = await Promise.all([
+      find(
+        this.#identity,
+        InvitationViewSchema,
+        InvitationViewQuery.create().invitee().is(person.email).build(),
+      ),
+      readById(this.#identity, PersonViewSchema, PersonIdSchema, person.id),
+    ]);
+    const standings = new Map<string, Profile["standings"][number]>();
     for (const invitation of invitations) {
       const organization = invitation.id?.organization;
       if (invitation.status === InvitationStatus.PENDING && organization !== undefined) {
         standings.set(organization.uuid, { organization, standing: "invited" });
       }
     }
-    const view = await readById(this.#identity, PersonViewSchema, PersonIdSchema, person.id);
     for (const organization of view?.organization ?? []) {
       standings.set(organization.uuid, { organization, standing: "member" });
     }
-    return [...standings.values()];
+    return {
+      accounts: (view?.account ?? []).map((account) => ({
+        provider: IdentityProvider[account.provider].toLowerCase(),
+        subject: account.subject,
+      })),
+      standings: [...standings.values()],
+    };
+  }
+
+  /**
+   * Whether Identity lists an organization among those a person is a member
+   * of, which it does once they have accepted its invitation.
+   */
+  async joined(person: PersonId, organization: OrganizationId): Promise<boolean> {
+    const view = await readById(this.#identity, PersonViewSchema, PersonIdSchema, person);
+    return view?.organization.some((joined) => joined.uuid === organization.uuid) ?? false;
   }
 
   /** What an organization records about itself, when it exists. */
@@ -214,12 +232,8 @@ export class AccessDesk {
   }
 
   /** A person's membership in an organization, when they are a member. */
-  async member(
-    organization: OrganizationId,
-    person: PersonId,
-  ): Promise<OrganizationMember | undefined> {
-    const view = await this.organization(organization);
-    return view?.member.find((candidate) => candidate.person?.uuid === person.uuid);
+  member(organization: OrganizationId, person: PersonId): Promise<OrganizationMember | undefined> {
+    return memberOf(this.#in(organization), organization, person);
   }
 
   /** Whether the person is one of the managers of a resource of the organization. */

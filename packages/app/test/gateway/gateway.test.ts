@@ -18,17 +18,25 @@ import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { Client } from "@spine-event-engine/client-web";
 import { AnyMessages, SignalEnvelopes, TypeUrls } from "@spine-event-engine/core";
 import { TenantIdSchema, UserIdSchema } from "@spine-event-engine/proto";
-import { QueryIdSchema, QuerySchema, TargetSchema } from "@spine-event-engine/proto/client";
+import {
+  QueryIdSchema,
+  QuerySchema,
+  TargetSchema,
+  TopicSchema,
+  type Query,
+} from "@spine-event-engine/proto/client";
 import { type BoundedContext, Server, SignalMetadata } from "@spine-event-engine/server";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   AccessRequestViewSchema,
   type AccessRequestView,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_pb.js";
+import { AccessRequestViewQuery } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_query.js";
 import { SubmitAccessRequestSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/commands_pb.js";
 import {
   InvitationIdSchema,
   OrganizationIdSchema,
+  PersonIdSchema,
 } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import {
   AcceptInvitationSchema,
@@ -63,9 +71,12 @@ import {
 // Imported from compiled output, like the contexts it assembles: vitest cannot
 // execute the handler classes' standard decorators from raw TypeScript source.
 type AppModule = typeof import("../../dist/src/index.js");
+type ProvidersModule = typeof import("../../dist/src/gateway/providers.js");
 let app: AppModule;
+let providers: ProvidersModule;
 beforeAll(async () => {
   app = await import("../../dist/src/index.js");
+  providers = await import("../../dist/src/gateway/providers.js");
 }, 30_000);
 
 let stop: (() => Promise<void>) | undefined;
@@ -116,7 +127,7 @@ function fakeProvider(kind: IdentityProvider, issuer: string): External[string] 
           return Promise.resolve(
             subject === "" || email === ""
               ? undefined
-              : app.describeIdentity(issuer, subject, email, name === "" ? undefined : name),
+              : providers.describe(issuer, subject, email, name === "" ? undefined : name),
           );
         },
       },
@@ -440,29 +451,57 @@ async function post<Schema extends GenMessage<Message>>(
   }
 }
 
-/** Reads the requests of an organization through the gateway as the browser client does. */
+/** What the browser client takes as a request for read models. */
+type Asking = Parameters<ReturnType<ReturnType<typeof Client.forGrpcWeb>["onBehalfOf"]>["send"]>[0];
+
+/**
+ * Everything there is of one kind of read model, as a request that names nobody.
+ *
+ * @param schema The kind of read model.
+ * @param as Who asks, and in which organization.
+ * @returns The request.
+ */
+function everything(
+  schema: typeof AccessRequestViewSchema | typeof ResourceCatalogItemSchema,
+  as: { readonly person: string; readonly organization: string },
+): Query {
+  return create(QuerySchema, {
+    id: create(QueryIdSchema, { value: `all-${crypto.randomUUID()}` }),
+    target: create(TargetSchema, {
+      type: TypeUrls.derive(schema),
+      criterion: { case: "includeAll", value: true },
+    }),
+    context: new SignalMetadata().actorContext({
+      actor: create(UserIdSchema, { value: as.person }),
+      tenantId: tenant(as.organization),
+    }),
+  });
+}
+
+/**
+ * Reads requests through the gateway as the browser client does.
+ *
+ * @param running The running application behind its gateway.
+ * @param as Who reads: their session, their identifier, and the organization
+ *   the request names.
+ * @param asking What to ask for. The person's own requests when left out.
+ * @returns The requests, or `"refused"` when the gateway or the application
+ *   server did not answer the request.
+ */
 async function readRequests(
   running: Running,
   as: { readonly token: string; readonly person: string; readonly organization: string },
+  asking: Asking = AccessRequestViewQuery.create()
+    .requester()
+    .is(create(PersonIdSchema, { uuid: as.person }))
+    .build(),
 ): Promise<AccessRequestView[] | "refused"> {
   const client = Client.forGrpcWeb(running.url, {
     tenant: as.organization,
     onRequestMetadata: () => ({ origin: ORIGIN, authorization: `Bearer ${as.token}` }),
   });
   try {
-    const response = await client.onBehalfOf(as.person).send(
-      create(QuerySchema, {
-        id: create(QueryIdSchema, { value: "requests" }),
-        target: create(TargetSchema, {
-          type: TypeUrls.derive(AccessRequestViewSchema),
-          criterion: { case: "includeAll", value: true },
-        }),
-        context: new SignalMetadata().actorContext({
-          actor: create(UserIdSchema, { value: as.person }),
-          tenantId: tenant(as.organization),
-        }),
-      }),
-    );
+    const response = await client.onBehalfOf(as.person).send(asking);
     return response.message.flatMap(({ state }) => {
       const view =
         state === undefined ? undefined : AnyMessages.unpack(state, AccessRequestViewSchema);
@@ -473,6 +512,135 @@ async function readRequests(
   } finally {
     await client.close();
   }
+}
+
+/** What a browser has been told while it watches the catalog of an organization. */
+interface Watched {
+  /** The resources it was told about, in the order it was told. */
+  readonly told: string[];
+  /** Whether it is told nothing more. */
+  ended(): boolean;
+  /** Stops watching. */
+  close(): Promise<void>;
+}
+
+/**
+ * Watches the catalog of an organization through the gateway as the browser client does.
+ *
+ * @param running The running application behind its gateway.
+ * @param as Who watches: their session, their identifier, and the organization
+ *   whose catalog it is.
+ * @returns What the browser has been told since, once its subscription is opened.
+ */
+async function watchCatalog(
+  running: Running,
+  as: { readonly token: string; readonly person: string; readonly organization: string },
+): Promise<Watched> {
+  const client = Client.forGrpcWeb(running.url, {
+    tenant: as.organization,
+    onRequestMetadata: () => ({ origin: ORIGIN, authorization: `Bearer ${as.token}` }),
+  });
+  const subscription = await client.onBehalfOf(as.person).createSubscription(
+    create(TopicSchema, {
+      id: { value: `catalog-${crypto.randomUUID()}` },
+      target: {
+        type: TypeUrls.derive(ResourceCatalogItemSchema),
+        criterion: { case: "includeAll", value: true },
+      },
+    }),
+    { kind: "entity", authoritativeQuery: () => everything(ResourceCatalogItemSchema, as) },
+  );
+  const told: string[] = [];
+  let ended = false;
+  void (async () => {
+    try {
+      for await (const delivery of subscription.updates) {
+        if (delivery.kind !== "update" || delivery.update.update.case !== "entityUpdates") {
+          continue;
+        }
+        for (const { kind } of delivery.update.update.value.update) {
+          const item =
+            kind.case === "state"
+              ? AnyMessages.unpack(kind.value, ResourceCatalogItemSchema)
+              : undefined;
+          if (item?.id !== undefined) {
+            told.push(item.id.uuid);
+          }
+        }
+      }
+    } catch {
+      // A stream the gateway ended is one the browser is told nothing more on.
+    } finally {
+      ended = true;
+    }
+  })();
+  await subscription.activate();
+  return {
+    told,
+    ended: () => ended,
+    close: () => client.close().catch(() => undefined),
+  };
+}
+
+/**
+ * Waits until a browser is really being told what it watches.
+ *
+ * A subscription tells only what happens after it has opened all the way to
+ * the application server, which is a moment after the browser's call returns.
+ * So an administrator registers resources until the browser hears of one.
+ *
+ * @param running The running application behind its gateway.
+ * @param administrator An administrator of Acme who has entered it, to register the resources.
+ * @param watched What the browser has been told, as `watchCatalog` returned it.
+ */
+async function givenTold(running: Running, administrator: Signed, watched: Watched): Promise<void> {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const probe = `probe-${crypto.randomUUID()}`;
+    expect(await registerResource(running, administrator, probe)).toBe("ok");
+    const deadline = Date.now() + 500;
+    while (Date.now() < deadline) {
+      if (watched.told.includes(probe)) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  }
+  throw new Error("The browser was never told what it watches.");
+}
+
+/**
+ * Has an administrator of Acme register a resource they manage themselves.
+ *
+ * @param running The running application behind its gateway.
+ * @param administrator An administrator of Acme who has entered it.
+ * @param resource The identifier of the resource, which is also its name.
+ * @param organization The organization the command names. Acme when left
+ *   out. The administrator acts in Acme either way, so any other organization
+ *   here is one the gateway must refuse.
+ * @returns `"ok"` when the gateway let the command through, and why not otherwise.
+ */
+function registerResource(
+  running: Running,
+  administrator: Signed,
+  resource: string,
+  organization = "acme",
+): Promise<string> {
+  return post(
+    running,
+    { ...administrator, organization: "acme" },
+    RegisterResourceSchema,
+    create(RegisterResourceSchema, {
+      id: { uuid: resource },
+      organizationId: organizationId(organization),
+      name: resource,
+      description: `${resource} production`,
+      category: "application",
+      sensitivity: Sensitivity.RESTRICTED,
+      manager: [{ uuid: administrator.person }],
+      accessLevel: [{ name: "Read", rank: 1 }],
+      maximumDuration: { seconds: 3600n },
+    }),
+  );
 }
 
 /** Reads until the value is accepted, for outcomes that become visible later. */
@@ -990,6 +1158,147 @@ describe("The gateway should", () => {
       expect(requests).toMatchObject([
         { id: { uuid: "req-1" }, snapshot: { requester: { uuid: maya.person } } },
       ]);
+    });
+
+    it("show a member their own requests, and nobody else's", async () => {
+      const running = await givenGateway();
+      const noah = await givenOpenResource(running);
+      const maya = await givenMaya(running, noah);
+      const asMaya = { ...maya, organization: "acme" };
+      const asNoah = { ...noah, organization: "acme" };
+      expect(
+        await post(running, asMaya, SubmitAccessRequestSchema, submission("req-maya", maya.person)),
+      ).toBe("ok");
+      expect(
+        await post(running, asNoah, SubmitAccessRequestSchema, submission("req-noah", noah.person)),
+      ).toBe("ok");
+
+      const own = await eventually(
+        () => readRequests(running, asMaya),
+        (views) => views !== "refused" && views.length === 1,
+      );
+
+      expect(own).toMatchObject([{ id: { uuid: "req-maya" } }]);
+      // Everything of the organization, and what somebody else asked for, are not hers to see.
+      expect(await readRequests(running, asMaya, everything(AccessRequestViewSchema, asMaya))).toBe(
+        "refused",
+      );
+      expect(
+        await readRequests(
+          running,
+          asMaya,
+          AccessRequestViewQuery.create()
+            .requester()
+            .is(create(PersonIdSchema, { uuid: noah.person }))
+            .build(),
+        ),
+      ).toBe("refused");
+    });
+
+    it("show a manager the requests for a resource they manage, and no other member", async () => {
+      const running = await givenGateway();
+      const noah = await givenOpenResource(running);
+      const maya = await givenMaya(running, noah);
+      const asMaya = { ...maya, organization: "acme" };
+      const asNoah = { ...noah, organization: "acme" };
+      expect(
+        await post(running, asMaya, SubmitAccessRequestSchema, submission("req-maya", maya.person)),
+      ).toBe("ok");
+      const forPayroll = () =>
+        AccessRequestViewQuery.create()
+          .resource()
+          .is(create(ResourceIdSchema, { uuid: "payroll" }))
+          .build();
+
+      const managed = await eventually(
+        () => readRequests(running, asNoah, forPayroll()),
+        (views) => views !== "refused" && views.length === 1,
+      );
+
+      expect(managed).toMatchObject([
+        { id: { uuid: "req-maya" }, requester: { uuid: maya.person } },
+      ]);
+      expect(await readRequests(running, asMaya, forPayroll())).toBe("refused");
+    });
+
+    it("refuse an administrator a resource registered for another organization", async () => {
+      const running = await givenGateway();
+      const noah = await givenMember(running, "noah", "acme");
+
+      const outcome = await registerResource(running, noah, "ledger", "globex");
+
+      expect(outcome).not.toBe("ok");
+      expect(
+        await running.resources
+          .stand()
+          .read(ResourceCatalogItemSchema, create(ResourceIdSchema, { uuid: "ledger" }), {
+            tenantId: tenant("acme"),
+          }),
+      ).toBeUndefined();
+    });
+
+    it("tell a browser nothing more of what it watched once its person signs out", async () => {
+      const running = await givenGateway();
+      const noah = await givenMember(running, "noah", "acme");
+      const maya = await givenMaya(running, noah);
+      const hers = await watchCatalog(running, { ...maya, organization: "acme" });
+      const his = await watchCatalog(running, { ...noah, organization: "acme" });
+      try {
+        await givenTold(running, noah, hers);
+        await givenTold(running, noah, his);
+        expect(await registerResource(running, noah, "payroll")).toBe("ok");
+        await eventually(
+          () => Promise.resolve(hers.told),
+          (told) => told.includes("payroll"),
+        );
+        expect(hers.told).toContain("payroll");
+
+        expect((await call(running, "/auth/sign-out", {}, maya.token)).status).toBe(200);
+        expect(await registerResource(running, noah, "ledger")).toBe("ok");
+
+        // Whoever is still signed in is told, so the news did go out.
+        await eventually(
+          () => Promise.resolve(his.told),
+          (told) => told.includes("ledger"),
+        );
+        expect(his.told).toContain("ledger");
+        expect(hers.told).not.toContain("ledger");
+        await eventually(
+          () => Promise.resolve(hers.ended()),
+          (ended) => ended,
+        );
+        expect(hers.ended()).toBe(true);
+      } finally {
+        await hers.close();
+        await his.close();
+      }
+    });
+
+    it("stop what a person watched in an organization once they enter it anew", async () => {
+      const running = await givenGateway();
+      const noah = await givenMember(running, "noah", "acme");
+      const earlier = await watchCatalog(running, { ...noah, organization: "acme" });
+      try {
+        await givenTold(running, noah, earlier);
+        // Entering exchanges the session, and the earlier one ends.
+        const entered = await enter(running, noah, "acme");
+        const later = await watchCatalog(running, { ...entered, organization: "acme" });
+        try {
+          await givenTold(running, entered, later);
+          expect(await registerResource(running, entered, "payroll")).toBe("ok");
+
+          await eventually(
+            () => Promise.resolve(later.told),
+            (told) => told.includes("payroll"),
+          );
+          expect(later.told).toContain("payroll");
+          expect(earlier.told).not.toContain("payroll");
+        } finally {
+          await later.close();
+        }
+      } finally {
+        await earlier.close();
+      }
     });
 
     it("refuse a command given in another person's name", async () => {

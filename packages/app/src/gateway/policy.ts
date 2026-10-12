@@ -14,6 +14,7 @@
 
 import { create, isMessage, type Message, type MessageShape } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
+import type { Any } from "@bufbuild/protobuf/wkt";
 import type { AuthenticatedPrincipal, IncomingRequest } from "@spine-event-engine/auth";
 import { AnyMessages, TypeUrls } from "@spine-event-engine/core";
 import { Filter_Operator, type Target } from "@spine-event-engine/proto/client";
@@ -45,7 +46,10 @@ import {
   type OrganizationId,
   type PersonId,
 } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
-import type { ResourceId } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
+import {
+  ResourceIdSchema,
+  type ResourceId,
+} from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
 import {
   AcceptInvitationSchema,
   DeclineInvitationSchema,
@@ -54,7 +58,7 @@ import {
 } from "@access-desk/identity-model/generated/accessdesk/identity/invitation/commands_pb.js";
 import { InvitationViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/invitation/invitation_pb.js";
 import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
-import type { AccessDesk } from "./access_desk.js";
+import type { AccessDesk } from "./access-desk.js";
 
 /** Who has signed in, as the session says. */
 interface Signed {
@@ -159,7 +163,11 @@ const MEMBER_COMMANDS: readonly CommandRule<Asking>[] = [
   ),
   rule(OpenResourceForRequestsSchema, managesOrAdministers),
   rule(CloseResourceForRequestsSchema, managesOrAdministers),
-  rule(RegisterResourceSchema, (_command, asking: Asking) => asking.administrator),
+  rule(
+    RegisterResourceSchema,
+    (command, asking: Asking) =>
+      asking.administrator && command.organizationId?.uuid === asking.organization.uuid,
+  ),
   rule(
     InviteMemberSchema,
     (command, asking: Asking) =>
@@ -183,16 +191,131 @@ function managesOrAdministers(
   );
 }
 
-/** What every member of an organization may read and watch there. */
-const MEMBER_READS: ReadonlySet<string> = new Set(
+/**
+ * The one condition a request puts on the read models it asks for, when it
+ * puts exactly one: that a column of theirs equals a value.
+ *
+ * A request that names read models by their identifiers, or puts several
+ * conditions or none, has no such condition.
+ */
+function onlyCondition(
+  target: Target,
+): { readonly column: string; readonly value: Any } | undefined {
+  if (target.criterion.case !== "filters") {
+    return undefined;
+  }
+  const { idFilter, filter: composites } = target.criterion.value;
+  const [composite] = composites;
+  const [only] = composite?.filter ?? [];
+  const [column] = only?.fieldPath?.fieldName ?? [];
+  if (
+    (idFilter?.id.length ?? 0) > 0 ||
+    composites.length !== 1 ||
+    composite === undefined ||
+    composite.compositeFilter.length > 0 ||
+    composite.filter.length !== 1 ||
+    only?.value === undefined ||
+    only.operator !== Filter_Operator.EQUAL ||
+    only.fieldPath?.fieldName.length !== 1 ||
+    column === undefined
+  ) {
+    return undefined;
+  }
+  return { column, value: only.value };
+}
+
+/**
+ * Whether a request asks only for the read models that name the person in one
+ * of their columns, such as the requests they made or the grants they hold.
+ */
+function asksForOwn(target: Target, column: string, person: PersonId): boolean {
+  const condition = onlyCondition(target);
+  return (
+    condition?.column === column &&
+    AnyMessages.unpack(condition.value, PersonIdSchema)?.uuid === person.uuid
+  );
+}
+
+/**
+ * Whether a request asks only for what concerns one resource, and the person
+ * is one of that resource's managers.
+ */
+function asksForManaged(
+  target: Target,
+  asking: Asking,
+  desk: AccessDesk,
+): boolean | Promise<boolean> {
+  const condition = onlyCondition(target);
+  const resource =
+    condition?.column === "resource"
+      ? AnyMessages.unpack(condition.value, ResourceIdSchema)
+      : undefined;
+  return (
+    resource !== undefined &&
+    resource.uuid !== "" &&
+    desk.manages(asking.organization, asking.person, resource)
+  );
+}
+
+/**
+ * Whether a request asks for the one read model kept under the person's own
+ * identifier, and nothing else.
+ */
+function asksForOwnById(target: Target, person: PersonId): boolean {
+  if (target.criterion.case !== "filters") {
+    return false;
+  }
+  const { idFilter, filter: conditions } = target.criterion.value;
+  const [id, ...others] = idFilter?.id ?? [];
+  return (
+    conditions.length === 0 &&
+    id !== undefined &&
+    others.length === 0 &&
+    AnyMessages.unpack(id, PersonIdSchema)?.uuid === person.uuid
+  );
+}
+
+/** Says whether a member may read or watch one kind of read model, by what the request asks for. */
+type ReadRule = (target: Target, asking: Asking, desk: AccessDesk) => boolean | Promise<boolean>;
+
+/**
+ * What a member may read and watch in the organization they have entered, and
+ * on what condition.
+ *
+ * The organization and its catalog of resources are every member's to see.
+ * Everything else a person sees only where it concerns them:
+ *
+ * - the requests they made, and those for a resource they manage;
+ * - the grants they hold, and those to a resource they manage;
+ * - their own queue of requests awaiting their decision.
+ *
+ * So a request for requests or grants must say whose it wants, or which
+ * resource's, by that one column alone. A read model that is not listed is
+ * nobody's to see.
+ */
+const MEMBER_READS: ReadonlyMap<string, ReadRule> = new Map<string, ReadRule>([
+  [TypeUrls.derive(OrganizationViewSchema), () => true],
+  [TypeUrls.derive(ResourceCatalogItemSchema), () => true],
   [
-    OrganizationViewSchema,
-    ResourceCatalogItemSchema,
-    AccessRequestViewSchema,
-    AccessDecisionAssignmentSchema,
-    AccessGrantViewSchema,
-  ].map((schema) => TypeUrls.derive(schema)),
-);
+    TypeUrls.derive(AccessRequestViewSchema),
+    (target, asking, desk) =>
+      asksForOwn(target, "requester", asking.person) || asksForManaged(target, asking, desk),
+  ],
+  [
+    TypeUrls.derive(AccessGrantViewSchema),
+    (target, asking, desk) =>
+      asksForOwn(target, "grantee", asking.person) || asksForManaged(target, asking, desk),
+  ],
+  [
+    TypeUrls.derive(AccessDecisionAssignmentSchema),
+    (target, asking) => asksForOwnById(target, asking.person),
+  ],
+]);
+
+/** Whether a member may read or watch what a request asks for. */
+function mayRead(target: Target, asking: Asking, desk: AccessDesk): boolean | Promise<boolean> {
+  return MEMBER_READS.get(target.type)?.(target, asking, desk) ?? false;
+}
 
 const INVITATIONS = TypeUrls.derive(InvitationViewSchema);
 
@@ -236,25 +359,11 @@ export function concernsNoOrganization(request: IncomingRequest): boolean {
  * must say which organization's it wants, by that column alone.
  */
 function asksForInvitationsOf(target: Target, organization: OrganizationId): boolean {
-  if (target.type !== INVITATIONS || target.criterion.case !== "filters") {
-    return false;
-  }
-  const { idFilter, filter: composites } = target.criterion.value;
-  const [composite] = composites;
-  const [only] = composite?.filter ?? [];
-  if (
-    (idFilter?.id.length ?? 0) > 0 ||
-    composites.length !== 1 ||
-    composite === undefined ||
-    composite.compositeFilter.length > 0 ||
-    composite.filter.length !== 1 ||
-    only?.value === undefined ||
-    only.operator !== Filter_Operator.EQUAL ||
-    only.fieldPath?.fieldName.join(".") !== "organization"
-  ) {
-    return false;
-  }
-  return AnyMessages.unpack(only.value, OrganizationIdSchema)?.uuid === organization.uuid;
+  const condition = target.type === INVITATIONS ? onlyCondition(target) : undefined;
+  return (
+    condition?.column === "organization" &&
+    AnyMessages.unpack(condition.value, OrganizationIdSchema)?.uuid === organization.uuid
+  );
 }
 
 /**
@@ -266,8 +375,10 @@ function asksForInvitationsOf(target: Target, organization: OrganizationId): boo
  * 2. For anything else the person must have entered an organization, and be
  *    a member of it, as the organization says now.
  * 3. A command must be one a member may give, on its condition.
- * 4. A query or a subscription must be for something a member may see. An
- *    administrator may also read the organization's invitations.
+ * 4. A query or a subscription must be for something the member may see:
+ *    the organization and its catalog, or what concerns the member
+ *    themselves. An administrator may also read the organization's
+ *    invitations.
  *
  * @param desk What the gateway asks of the contexts.
  * @returns The decision the gateway asks for each request.
@@ -319,11 +430,11 @@ export function authorization(
       }
       case "query":
         return (
-          MEMBER_READS.has(request.target.type) ||
+          (await mayRead(request.target, asking, desk)) ||
           (asking.administrator && asksForInvitationsOf(request.target, organizationId))
         );
       case "subscribe":
-        return MEMBER_READS.has(request.target.type);
+        return mayRead(request.target, asking, desk);
       case "activate":
       case "cancel":
         return true;

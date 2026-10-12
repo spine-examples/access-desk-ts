@@ -13,8 +13,9 @@
  */
 
 import { create } from "@bufbuild/protobuf";
+import { createGrpcWebTransport } from "@connectrpc/connect-node";
 import {
-  InMemorySubscriptionBindings,
+  NativeSubscriptionCreator,
   type AuthenticatedPrincipal,
   type RequestCredential,
 } from "@spine-event-engine/auth";
@@ -23,12 +24,16 @@ import { Time } from "@spine-event-engine/core/time";
 import { TenantIdSchema, UserIdSchema } from "@spine-event-engine/proto";
 import { BrowserServer } from "@spine-event-engine/server/browser";
 import { ServerConnection } from "../server/client.js";
-import { AccessDesk } from "./access_desk.js";
+import { AccessDesk } from "./access-desk.js";
 import { authorization, concernsNoOrganization } from "./policy.js";
 import { routing } from "./routes/route.js";
 import { sessionRoutes } from "./routes/session-routes.js";
 import { signInRoutes, type ExternalSignIn } from "./routes/sign-in-routes.js";
 import { Sessions } from "./sessions.js";
+import { Watching, type CancelAsBrowser } from "./watching.js";
+
+/** How long the gateway waits for a subscription of an ending session to be cancelled. */
+const CANCEL_MS = 5_000; // 5 seconds.
 
 /** How the gateway is set up. */
 export interface GatewayOptions {
@@ -80,7 +85,8 @@ export interface Gateway {
  * itself may give.
  *
  * Sessions are kept in memory, so everybody is signed out when the gateway
- * stops.
+ * stops. What a browser watches belongs to its session: when the session
+ * ends, the watching stops with it.
  *
  * @param options How to set the gateway up.
  * @returns The running gateway.
@@ -88,18 +94,18 @@ export interface Gateway {
 export async function startGateway(options: GatewayOptions): Promise<Gateway> {
   const server = new ServerConnection(() => options.backend);
   const desk = new AccessDesk(server);
-  const sessions = new Sessions();
   const origins = [...options.origins];
+  const listening: { address?: string } = {};
+  const watching = new Watching(cancellingThrough(() => listening.address, origins[0]));
+  const sessions = new Sessions(watching);
   const route = routing(origins, sessions);
   const signIn = signInRoutes(route, desk, sessions, options.external);
+  const allows = authorization(desk);
 
   const running = await BrowserServer.open(undefined, {
     backend: { baseUrl: options.backend },
     // The gateway remembers which browser watches what only while it runs.
-    bindings: new InMemorySubscriptionBindings({
-      nextId: () => crypto.randomUUID(),
-      dispose: () => Promise.resolve(),
-    }),
+    bindings: watching,
     host: options.host ?? "127.0.0.1",
     port: options.port,
     origins,
@@ -110,13 +116,20 @@ export async function startGateway(options: GatewayOptions): Promise<Gateway> {
       // The gateway hands its session out as a bearer token.
       resolve: (credential: RequestCredential) => sessions.resolve(credential.value),
     },
-    authorize: authorization(desk),
+    authorize: async (principal, request) => {
+      const allowed = await allows(principal, request);
+      if (allowed) {
+        watching.claim(principal, request);
+      }
+      return allowed;
+    },
     contexts: {
       resolve: (principal, request, clock) =>
         Promise.resolve(trusted(principal, clock.now(), !concernsNoOrganization(request))),
       resolveContext: (principal, clock) => Promise.resolve(trusted(principal, clock.now(), true)),
     },
   });
+  listening.address = running.baseUrl;
   return {
     url: running.baseUrl,
     close: async () => {
@@ -125,6 +138,44 @@ export async function startGateway(options: GatewayOptions): Promise<Gateway> {
       await server.close();
       await sessions.close();
     },
+  };
+}
+
+/**
+ * Tells how the gateway cancels a subscription as the browser that holds a
+ * session would.
+ *
+ * Spine clears a subscription everywhere it is kept only when it is cancelled
+ * through the gateway's own address. So the gateway calls itself there, from
+ * a page it answers, with the session's token.
+ *
+ * @param address Tells the address the gateway listens at, once it listens.
+ * @param origin The address of a page that may call the gateway, when there is one.
+ */
+function cancellingThrough(
+  address: () => string | undefined,
+  origin: string | undefined,
+): CancelAsBrowser {
+  return async (subscription, token) => {
+    const baseUrl = address();
+    if (baseUrl === undefined || origin === undefined) {
+      throw new Error("The gateway cannot be called at its own address.");
+    }
+    const transport = createGrpcWebTransport({
+      baseUrl,
+      httpVersion: "1.1",
+      interceptors: [
+        (next) => (request) => {
+          request.header.set("origin", origin);
+          request.header.set("authorization", `Bearer ${token}`);
+          return next(request);
+        },
+      ],
+    });
+    await new NativeSubscriptionCreator(transport).cancel(
+      { wire: subscription },
+      AbortSignal.timeout(CANCEL_MS),
+    );
   };
 }
 

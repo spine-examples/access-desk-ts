@@ -22,7 +22,7 @@ import {
   type OidcVerifiedIdentityProvider,
 } from "@spine-event-engine/auth";
 import { IdentityProvider } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
-import type { VerifiedPerson } from "./access_desk.js";
+import type { VerifiedPerson } from "./access-desk.js";
 
 /**
  * An outside identity provider, such as GitHub or Google, and how the gateway

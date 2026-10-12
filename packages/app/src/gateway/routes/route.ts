@@ -50,6 +50,8 @@ export type Route = (
  *   `{ error: "refused" }`, a missing session `401` with `{ error: "not
  *   signed in" }`, and a passing failure `503` with `{ error: "try again" }`.
  *   A body that is not a JSON object is refused.
+ * - A failure nobody foresaw, such as an application server that cannot be
+ *   reached, is a passing one. The console says what failed.
  *
  * @param origins The addresses of the pages that may call the gateway.
  * @param sessions The sessions of the people who have signed in.
@@ -68,10 +70,17 @@ export function routing(origins: string[], sessions: Sessions): Route {
       } catch {
         body = undefined;
       }
-      const [status, value] =
-        typeof body === "object" && body !== null && !Array.isArray(body)
-          ? await answer(body as Record<string, unknown>, await sessions.of(request))
-          : REFUSED;
+      let answered: Answer;
+      try {
+        answered =
+          typeof body === "object" && body !== null && !Array.isArray(body)
+            ? await answer(body as Record<string, unknown>, await sessions.of(request))
+            : REFUSED;
+      } catch (error) {
+        console.warn(`The gateway could not answer ${path}.`, error);
+        answered = UNAVAILABLE;
+      }
+      const [status, value] = answered;
       return new Response(JSON.stringify(value), {
         status,
         headers: { "content-type": "application/json", "cache-control": "no-store" },

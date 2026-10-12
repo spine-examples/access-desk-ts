@@ -28,19 +28,20 @@ import {
 import { PersonViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/person_pb.js";
 import { ExternalIdentityViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/external_identity_pb.js";
 import { ExternalIdentityLinkedSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/external_identity_events_pb.js";
-import { OrganizationViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
+import { OrganizationMemberSchema } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import { ResourceCatalogItemSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_pb.js";
 import { AccessRequestViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_pb.js";
 import {
   AccessRequestIdSchema,
   ResourceIdSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
-import { AccessDesk } from "../../src/gateway/access_desk.js";
+import { AccessDesk } from "../../src/gateway/access-desk.js";
 import type { ServerConnection } from "../../src/server/client.js";
 
 const reads = vi.hoisted(() => ({
   readById: vi.fn(),
   find: vi.fn(),
+  memberOf: vi.fn(),
   postAndAwait: vi.fn(),
 }));
 vi.mock("../../src/server/client.js", () => reads);
@@ -141,6 +142,7 @@ describe("AccessDesk should", () => {
 
   it("list provider accounts as browser scalars", async () => {
     const { desk } = givenDesk();
+    reads.find.mockResolvedValueOnce([]);
     reads.readById.mockResolvedValueOnce(
       create(PersonViewSchema, {
         account: [
@@ -153,10 +155,13 @@ describe("AccessDesk should", () => {
       }),
     );
 
-    expect(await desk.accounts(person)).toEqual([
+    const profile = await desk.profile({ id: person, email, name: "Maya" });
+
+    expect(profile.accounts).toEqual([
       { provider: "github", subject: "github-1" },
       { provider: "google", subject: "google-2" },
     ]);
+    expect(reads.readById).toHaveBeenCalledTimes(1);
   });
 
   it("let a membership override a pending invitation with an equal organization UUID", async () => {
@@ -172,7 +177,7 @@ describe("AccessDesk should", () => {
       create(PersonViewSchema, { organization: [anotherInstance] }),
     );
 
-    const standings = await desk.standings({ id: person, email, name: "Maya" });
+    const { standings } = await desk.profile({ id: person, email, name: "Maya" });
 
     expect(standings).toEqual([{ organization: anotherInstance, standing: "member" }]);
     expect(reads.find).toHaveBeenCalledWith(
@@ -197,19 +202,34 @@ describe("AccessDesk should", () => {
     ]);
     reads.readById.mockResolvedValueOnce(undefined);
 
-    expect(await desk.standings({ id: person, email, name: "Maya" })).toEqual([
+    expect((await desk.profile({ id: person, email, name: "Maya" })).standings).toEqual([
       { organization, standing: "invited" },
     ]);
+  });
+
+  it("tell whether Identity lists an organization among a person's own", async () => {
+    const { desk, inOrganization } = givenDesk();
+    reads.readById
+      .mockResolvedValueOnce(create(PersonViewSchema, { organization: [organization] }))
+      .mockResolvedValueOnce(create(PersonViewSchema, { organization: [organization] }))
+      .mockResolvedValueOnce(undefined);
+
+    expect(await desk.joined(person, create(OrganizationIdSchema, { uuid: "acme" }))).toBe(true);
+    expect(await desk.joined(person, create(OrganizationIdSchema, { uuid: "globex" }))).toBe(false);
+    expect(await desk.joined(person, organization)).toBe(false);
+    // Identity is asked, which belongs to no organization.
+    expect(inOrganization).toHaveBeenCalledWith();
+    expect(inOrganization).not.toHaveBeenCalledWith(expect.anything());
   });
 
   it("read organization membership, management, and request ownership by typed IDs", async () => {
     const { desk, inOrganization } = givenDesk();
     const resource = create(ResourceIdSchema, { uuid: "payroll" });
     const accessRequest = create(AccessRequestIdSchema, { uuid: "request-1" });
+    reads.memberOf.mockResolvedValueOnce(
+      create(OrganizationMemberSchema, { person, name: "Maya" }),
+    );
     reads.readById
-      .mockResolvedValueOnce(
-        create(OrganizationViewSchema, { id: organization, member: [{ person, name: "Maya" }] }),
-      )
       .mockResolvedValueOnce(
         create(ResourceCatalogItemSchema, { id: resource, policy: { manager: [person] } }),
       )
@@ -221,8 +241,9 @@ describe("AccessDesk should", () => {
     expect(await desk.manages(organization, person, resource)).toBe(true);
     expect(await desk.requested(organization, person, accessRequest)).toBe(true);
     expect(inOrganization).toHaveBeenCalledWith(organization);
+    // The organization is asked as its own tenant, about that person.
+    expect(reads.memberOf).toHaveBeenCalledWith(expect.anything(), organization, person);
     expect(reads.readById.mock.calls.map((call): unknown => call[3])).toEqual([
-      organization,
       resource,
       accessRequest,
     ]);

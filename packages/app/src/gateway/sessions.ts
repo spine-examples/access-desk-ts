@@ -20,19 +20,47 @@ import {
   PersonIdSchema,
   type OrganizationId,
 } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
-import type { SignedIn } from "./access_desk.js";
+import type { SignedIn } from "./access-desk.js";
+
+/**
+ * The name under which a session's principal carries what the gateway knows
+ * the session by, apart from its token.
+ */
+export const SESSION = "session";
 
 /** How long a session lasts. */
 const SESSION_MILLISECONDS = 8 * 60 * 60 * 1_000; // 8 hours.
 
 /** A session a request carries. */
 export interface Session {
-  /** What the gateway knows the session by. */
+  /**
+   * What the gateway knows the session by, apart from its token. It never
+   * leaves the gateway.
+   */
+  readonly id: string;
+  /** The token the browser presents the session with. */
   readonly credential: { readonly kind: "cookie"; readonly value: string };
   /** The signed-in person. */
   readonly person: SignedIn;
   /** The organization the person has entered, when they have. */
   readonly organization: OrganizationId | undefined;
+}
+
+/** Whatever is opened under sessions and must not outlast them. */
+export interface OpenedUnderSessions {
+  /**
+   * Closes what is opened under a session that is about to end, in the
+   * session's own name.
+   *
+   * @param session The session, while its token still works.
+   */
+  closeFor(session: Session): Promise<void>;
+  /**
+   * Stops what is still open under a session that has ended.
+   *
+   * @param session What the gateway knows the session by.
+   */
+  stop(session: string): Promise<void>;
 }
 
 /** The signed-in person as the gateway sends them over HTTP. */
@@ -61,6 +89,8 @@ export interface Issued {
  * A session says who a person is and, once they have entered one, which
  * organization they work in. The browser holds it as a bearer token. Sessions
  * are kept in memory, so everybody is signed out when the gateway stops.
+ *
+ * When a session is ended, whatever was opened under it is stopped too.
  */
 export class Sessions {
   /**
@@ -68,6 +98,16 @@ export class Sessions {
    * ends after eight hours, or when it is ended.
    */
   readonly #sessions = new OpaqueSessions({ ttlMilliseconds: SESSION_MILLISECONDS });
+  /** Whatever is opened under the sessions, when anything is. */
+  readonly #opened: OpenedUnderSessions | undefined;
+
+  /**
+   * @param opened Whatever is opened under the sessions and must not outlast
+   *   them. Nothing when left out.
+   */
+  constructor(opened?: OpenedUnderSessions) {
+    this.#opened = opened;
+  }
 
   /**
    * Gives a signed-in person a session.
@@ -96,7 +136,10 @@ export class Sessions {
 
   /** Starts a session for whoever a sign-in through an outside provider confirmed. */
   create(principal: AuthenticatedPrincipal): ReturnType<OpaqueSessions["create"]> {
-    return this.#sessions.create(principal);
+    return this.#sessions.create({
+      ...principal,
+      attributes: { ...principal.attributes, [SESSION]: crypto.randomUUID() },
+    });
   }
 
   /** Whoever a bearer token stands for, when its session is still good. */
@@ -111,10 +154,11 @@ export class Sessions {
       return undefined;
     }
     const principal = (await this.resolve(token))?.principal;
-    const { email, name, organization } = principal?.attributes ?? {};
-    return principal === undefined || email === undefined
+    const { email, name, organization, [SESSION]: id } = principal?.attributes ?? {};
+    return principal === undefined || email === undefined || id === undefined
       ? undefined
       : {
+          id,
           credential: { kind: "cookie", value: token },
           person: {
             id: create(PersonIdSchema, { uuid: principal.id }),
@@ -128,9 +172,20 @@ export class Sessions {
         };
   }
 
-  /** Ends a session, so its token stops working. */
+  /**
+   * Ends a session, so its token stops working and whatever was opened under
+   * it stops.
+   *
+   * 1. What is opened under the session is closed in the session's own name,
+   *    while its token still works.
+   * 2. The token stops working.
+   * 3. What is still open under the session, or was opened meanwhile, is
+   *    stopped.
+   */
   async end(session: Session): Promise<void> {
+    await this.#opened?.closeFor(session);
     await this.#sessions.logout(session.credential);
+    await this.#opened?.stop(session.id);
   }
 
   /** Ends every session. */
