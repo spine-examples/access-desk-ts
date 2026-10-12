@@ -268,7 +268,22 @@ Mark a cross-context event receptor with direct first-parameter
 
 A single-tenant producer's event has no tenant, while a multitenant entity
 handler requires one, so a raw Identity event cannot reach a Resources handler.
-Access Desk needs no such delivery: Identity and Resources exchange no facts.
+Access Desk needs no such delivery: Identity and Resources exchange no facts,
+and the gateway carries the signed-in person to Resources as the actor.
+
+The other direction is refused too. An event of a multitenant context carries
+its tenant, and a single-tenant context will not take it (`Produced signal
+handling failed`). To let a single-tenant context follow a multitenant one,
+add a raw `EventDispatcher` to the multitenant context with
+`builder.addEventDispatcher(...)`. It receives the events of every tenant. Have
+it post each event into the consumer's own event bus,
+`consumer.eventBus().post(event)`, as a new `Event` that carries the same
+message under an `importContext` origin with no tenant. The consumer handles
+the type as an ordinary event, without `External<T>`. Do not subscribe to the
+type as `External<T>`: the multitenant context then also publishes its own
+tenant-carrying event to the consumer, which refuses it, and the refusals fail
+the context's shutdown. Access Desk used this while invitations lived in
+Resources. It needs none of it now that they live in Identity.
 
 ## Protobuf Any and type registries
 
@@ -317,8 +332,50 @@ Subscriptions are best-effort notices. Entity subscriptions need an
 authoritative query for reconnect/gap recovery. Command validation remains
 server-side.
 
-The gateway, not a bounded context, performs OIDC/session/CSRF/origin controls
-defined in the architecture.
+The gateway, not a bounded context, performs the provider, session, and origin
+controls defined in the architecture. What `2.0.0-snapshot.22` requires of it,
+as found while building `packages/app/src/gateway/`:
+
+- `BrowserServer.open(undefined, { backend: { baseUrl }, … })` starts a
+  standalone gateway that forwards to an application server running as its own
+  program, as the Message Board example does. `BrowserServer.open(runningServer,
+options)` instead puts the gateway in front of a server in the same process.
+  `authorize` and `contexts` run for every request; pass `registry` so
+  `authorize` receives each command decoded.
+- A standalone gateway with sessions needs `bindings`. Locally that is
+  `new InMemorySubscriptionBindings({ nextId, dispose })` from
+  `@spine-event-engine/auth`; production requires `DurableSubscriptionBindings`.
+- A standalone gateway cannot call the contexts. It asks the application server
+  through `Client.connectTo(baseUrl, { tenant })` from
+  `@spine-event-engine/client-node`, posting commands and reading read models
+  by an id filter. Only read models are readable this way, not process state.
+- A request whose own actor or tenant differs from what `contexts` resolves is
+  refused, so the client sends the person and organization it learned from the
+  gateway.
+- `authRoutes` match the request's whole address, query string included, so
+  they suit `POST` with a body, not a provider callback carrying `?code=`. The
+  provider sends the person back to a page of the application, which posts the
+  answer on. Their preflight answers allow no headers, so they are for pages
+  served from the same origin as the gateway, as through a development proxy.
+- Without the `cookies` option the gateway takes its session as a bearer
+  token. `OpaqueSessions.resolve` accepts only `kind: "cookie"`, so the session
+  resolver passes the bearer value on as one.
+- `OidcFlow` accepts only HTTPS addresses and requires the `openid` scope.
+  `createGitHubProvider` returns the issuer and the account number, and with
+  `includeVerifiedPrimaryEmail` the verified primary email address as the
+  `email` claim; the display name is noted through its `fetch` option from the
+  same profile answer. `createGoogleProvider` looks Google's addresses up when it
+  is created and returns the `email` and `email_verified` claims as text.
+- `createGoogleProvider` sends no client secret unless told how. Pass
+  `clientAuthentication: "client_secret_post"`, or Google refuses the code
+  exchange with `client_secret is missing`.
+- The sign-in flow reports every provider failure the same way and prints
+  nothing. Pass the provider a `fetch` that logs a refused answer, and log the
+  `reason` of a rejected `OidcFlow.callback`.
+- In the application server, post a command in-process with `context.commandBus().post(SignalEnvelopes
+.command({ context, schema, message }))`, and read any tenant's state with
+  `context.stand().read(Schema, id, { tenantId })`; a message-valued id must be
+  made with `create(IdSchema, …)`.
 
 ## Testing boundaries
 

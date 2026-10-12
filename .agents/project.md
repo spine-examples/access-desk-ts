@@ -12,12 +12,12 @@ Runtime baseline: **Node ≥ 24, pnpm 11.9, strict TypeScript, ESM**.
 
 ## Bounded contexts
 
-Two contexts (`references/architecture.md`):
+Three contexts (`references/architecture.md`):
 
 | Context    | Owns                                                                                                                                        | Tenancy                  |
 | ---------- |---------------------------------------------------------------------------------------------------------------------------------------------| ------------------------ |
-| Identity   | People, the accounts they sign in with, and their email addresses                                                                           | Global / single-tenant   |
-| Resources  | Organizations, invitations, membership, resources, policy, managers, requests, approvals, grants, extensions, revocation, audit projections | Org-scoped (multitenant) |
+| Identity   | People, the accounts they sign in with, their email addresses, and invitations to organizations | Global / single-tenant   |
+| Resources  | Organizations, membership, resources, policy, managers, requests, approvals, grants, extensions, revocation, audit projections | Org-scoped (multitenant) |
 
 Resources owns the whole request-and-approval domain. What earlier drafts split
 into separate Access and Audit contexts is now internal to
@@ -36,14 +36,17 @@ Each context is **two packages** under `packages/<context>/`:
 packages/
   identity/    { model, server }      # global / single-tenant
   resources/   { model, server }
-  app/                                # composition root: complete registry + (later) Server assembly, gateway
-  web/                                # React + Vite browser client (later iterations)
+  app/                                # composition root: complete registry, organization setup, gateway
+  web/                                # React + Vite browser client
 ```
+
+`deploy/` holds the Dockerfile and the compose file that run the application
+server, the gateway, and the web client as three containers.
 
 - **`<context>/model`** — `@access-desk/<context>-model`, `spine-proto.json` `mode: "model"`.
   Canonical `.proto` under `proto/accessdesk/<context>/` plus the generated
   `ProtoModule`; pure wire contracts, no behavior. Resources subdivides its protos
-  into per-area folders (`organization/`, `organization/invitation/`, `resource/`,
+  into per-area folders (`organization/`, `resource/`,
   `access/request/`, `access/grant/`), each its
   own sub-package under `accessdesk.resources.*`, with shared `identifiers.proto`
   and `values.proto` at the top level (filename conventions in the `protobuf-style` skill).
@@ -55,9 +58,20 @@ packages/
   BlackBox tests. It is an _application_ package because
   `spine-proto handlers` discovers decorated classes only in the package that runs it.
 - **`app`** — `@access-desk/app`, `mode: "application"`, composes **both** context
-  models into the complete application `TypeRegistry`; will assemble the `Server`
-  (`Server.add(ctx)` per context) and the gateway.
-- **`web`** — `@access-desk/web`, the React/Vite client.
+  models into the complete application `TypeRegistry`. It runs as two programs:
+  `src/server/` is the application server, which hosts both contexts;
+  `src/gateway/` is the browser-facing gateway
+  (sign-in, sessions, authorization), which reaches the server over the
+  network. The gateway's own addresses live in `src/gateway/routes/`, and
+  are only for signing in and the session; everything else passes through
+  as Spine requests judged by `src/gateway/policy.ts`.
+  `pnpm --dir packages/app run server` and `run gateway` start each.
+  Every program is configured in one `.env` in the repository root (see
+  `.env.example`); `src/settings.ts` reads it, requires every setting, and
+  assumes nothing.
+- **`web`** — `@access-desk/web`, the React/Vite client. It reaches the gateway
+  through the Vite proxy, so the browser sees one address. Run it with
+  `pnpm --dir packages/web run dev` beside the gateway.
 
 **Dependency rule:** a `server` may depend on another context's `model` (wire
 contracts) but **never** on another context's `server` (behavior) — the pnpm graph
@@ -105,19 +119,24 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
   `test/**`, and externalizes `dist` (`server.deps.external`) so the handler registry's
   classes keep the same identity as the classes the context registers (otherwise the
   registry lookup fails with "missing metadata").
+- The gateway is tested in `packages/app/test/gateway/` over HTTP, against an
+  application server it reaches by address, with the browser client for
+  commands and queries and fake identity providers.
 - Multitenant BlackBox: pass `{ tenant }` to `BlackBox.from`; assert the immediate
   command ack directly and use `box.eventually(...)` only for async read-side visibility.
-- **Time is injected.** `createResourcesContext({ clock })` takes a Spine `Clock`
-  (the system clock by default); every Resources decision that depends on the
-  current time reads it. Spine constructs entities itself, so the clock is
-  process-wide — one per Resources process. Time-dependent tests pass a
-  `ManualClock` (`test/given/manual-clock.ts`) to `resourcesBlackBox(clock)` and
-  move it forward instead of sleeping. Signal timestamps come from the
-  framework's own clock and are never used for domain time.
+- **Time comes from Spine's `Time`.** Every Resources decision that depends on
+  the current time reads `Time.currentTime()` from
+  `@spine-event-engine/core/time`. Time-dependent tests pass a `ManualClock`
+  (`test/given/manual-clock.ts`, a `TimeProvider`) to `resourcesBlackBox(clock)`,
+  which installs it with `Time.setProvider` until the boxes are closed, and move
+  it forward instead of sleeping. The framework reads the same `Time` for
+  signal timestamps and delivery leases, so a test moves the clock before it
+  starts watching events. A jump of more than about thirty seconds while
+  events are watched stops their delivery.
 
 ## Dependencies
 
-- One exact Spine family pinned at **`@spine-event-engine/* 2.0.0-snapshot.21`** with
+- One exact Spine family pinned at **`@spine-event-engine/* 2.0.0-snapshot.22`** with
   `@bufbuild/protobuf 2.12.1`. Never invent an API. Keep the whole family on one
   version; upgrade it together in a dedicated task.
 
