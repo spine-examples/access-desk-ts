@@ -17,21 +17,6 @@ flowchart LR
   Gateway --> Provider[Identity provider]
 ```
 
-## What is not here yet
-
-- **The web client.** `packages/web` holds only its foundation. Nothing in
-  this repository serves the page people sign in from, so the gateway can be
-  run and tested, but nobody can sign in through a browser yet. Wherever this
-  guide speaks of the web client, it speaks of what is to come.
-- **Creating an organization.** Nothing creates an organization or its first
-  administrator. The tests give those commands to the application server
-  themselves.
-- **Storage that lasts.** Both programs keep everything in memory: people,
-  organizations, sessions, and what each browser watches. Stopping the
-  application server loses the first two, and stopping the gateway signs
-  everybody out. Spine refuses to start either program this way when
-  `NODE_ENV` is `production`, so both refuse it themselves and say why.
-
 ## Set it up
 
 All of Access Desk is configured in one file, `.env`, in the root of the
@@ -54,19 +39,10 @@ assumed: a program that misses a setting refuses to start and names it.
 | `GOOGLE_CLIENT_ID`         | gateway             | Optional. The client identifier of the Google OAuth application. |
 | `GOOGLE_CLIENT_SECRET`     | gateway             | Optional. The client secret of the Google OAuth application.     |
 
-What follows from these is worked out and is no settings of its own.
-
-- The gateway reaches the application server where that server listens.
-- The web client's development server reaches the gateway where the gateway
-  listens.
-- People open the application over HTTPS where the web client listens, at
-  `https://<ACCESS_DESK_WEB_HOST>:<ACCESS_DESK_WEB_PORT>/`.
-- An identity provider sends a person back to that address. Register it with
-  each provider as the callback address.
-- Only the page at that address may call the gateway.
-
-The connection between the gateway and the application server is not secured.
-See [Why the application server is not secured](#why-the-application-server-is-not-secured).
+Sign-in through GitHub is on when both GitHub variables are set, and through
+Google when both Google variables are. Setting only one of a provider's
+variables is refused. Nobody can sign in without at least one
+provider.
 
 ## Run it
 
@@ -78,70 +54,13 @@ pnpm --dir packages/app run server
 pnpm --dir packages/app run gateway
 ```
 
-Sign-in through GitHub is on when both GitHub variables are set, and through
-Google when both Google variables are. Setting only one of a provider's
-variables is refused. Nobody can sign in without at least one
-provider. Each needs one OAuth
-application for the whole installation; organizations set up nothing. Somebody
-who signs in through both is one person when both confirm the same verified
-email address. An account without a verified email address cannot sign in.
+## The gateway's endpoints
 
-## Sign in through GitHub and Google
-
-Both providers send people back only to an HTTPS address, so the web client
-must run on `https://127.0.0.1:5173`. The web client is not in this repository
-yet, so these steps cannot be finished from it alone.
-
-1. Copy `.env.example` to `.env` in the root of the repository. It is
-   ignored by Git.
-2. Register an OAuth application with each provider you want, with the
-   address of the web client, such as `https://127.0.0.1:5173/`, as the
-   callback address, and put its client
-   identifier and secret into `.env`.
-3. Start the application and sign in from the web client.
-
-## Why the application server is not secured
-
-The gateway talks to the application server over plain HTTP/2. Nothing
-encrypts what passes between them, and the server does not check who is
-calling. It takes the caller's word for who is acting and in which
-organization.
-
-This is a limit of the Spine version in use, not a choice made here.
-
-- Spine's server opens only a plain HTTP/2 listener. It takes no certificate.
-- It has no place to check a caller before a request is handled.
-
-So the server is protected by where it listens, and only by that.
-
-- Outside containers it listens on `127.0.0.1`, which only programs on the
-  same machine can reach.
-- In containers it publishes no port. Only the gateway's container can reach
-  it, over a network private to the three containers.
-
-In both cases what passes between the gateway and the server never leaves the
-machine, so there is nothing on a network to listen in on.
-
-That stops being enough once the two run on different machines. Anybody who
-can then reach the server can act as anybody, and can read what passes. Do
-not set `ACCESS_DESK_SERVER_HOST` to an address others can reach. To run the
-two apart, put what Spine lacks around the server:
-
-- a proxy in front of it that accepts only the gateway, by mutual TLS; or
-- on Kubernetes, a service mesh, which gives mutual TLS between the two
-  without changing either.
-
-Neither is set up here. The browser's side is a different matter: people open
-the application over HTTPS, and every request of theirs carries a session the
-gateway checks.
-
-## The gateway's addresses
-
-The gateway has six addresses of its own, for signing in and for the session.
+The gateway has six endpoints of its own, for signing in and for the session.
 Everything else a browser does is a Spine command, query, or subscription sent
 to the same address; see [What passes through](#what-passes-through).
 
-Every address of its own works the same way:
+Every endpoint of its own works the same way:
 
 - It takes `POST` with a JSON object as the body. Send `{}` when there is
   nothing to send. The body may be at most 16 KiB.
@@ -150,15 +69,12 @@ Every address of its own works the same way:
 - Where it needs a session, send the session as `Authorization: Bearer <token>`.
 - It answers JSON, which must not be cached.
 
-| Status | Body                           | Means                                                           |
-| ------ | ------------------------------ | --------------------------------------------------------------- |
-| `200`  | as each address tells          | Done.                                                           |
-| `401`  | `{ "error": "not signed in" }` | The address needs a session, and there is none or it has ended. |
-| `403`  | `{ "error": "refused" }`       | The person may not do this, or the request is malformed.        |
-| `503`  | `{ "error": "try again" }`     | The gateway could not do it just now.                           |
-
-A failure nobody foresaw, such as an application server that cannot be
-reached, is answered `503` too. The gateway's console says what failed.
+| Status | Body                           | Means                                                            |
+| ------ | ------------------------------ | ---------------------------------------------------------------- |
+| `200`  | as each endpoint tells         | Done.                                                            |
+| `401`  | `{ "error": "not signed in" }` | The endpoint needs a session, and there is none or it has ended. |
+| `403`  | `{ "error": "refused" }`       | The person may not do this, or the request is malformed.         |
+| `503`  | `{ "error": "try again" }`     | The gateway could not do it just now.                            |
 
 ### Signing in
 
@@ -344,13 +260,6 @@ refused.
 | `AccessGrantView`          | `grantee` equal to the person's own identifier   | The member themselves.               |
 | `AccessGrantView`          | `resource` equal to one resource's identifier    | A manager of that resource.          |
 | `AccessDecisionAssignment` | the one kept under the person's own identifier   | The member themselves, as a manager. |
-
-The generated query builders say it this way:
-
-```ts
-AccessRequestViewQuery.create().requester().is(me).build();
-AccessGrantViewQuery.create().resource().is(payroll).build();
-```
 
 A subscription takes the same condition as a filter on its topic. The decision
 queue is asked for by its identifier, which is the manager's own.
