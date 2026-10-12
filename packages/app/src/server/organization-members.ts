@@ -15,13 +15,16 @@
 import { create } from "@bufbuild/protobuf";
 import type { NewMember, OrganizationMembers } from "@access-desk/identity-server";
 import { AddOrganizationMemberSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
-import type { OrganizationId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
+import {
+  type OrganizationId,
+  OrganizationIdSchema,
+} from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import {
   type OrganizationMemberAdded,
   OrganizationMemberAddedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
-import { alreadyMember } from "../gateway/access-desk.js";
-import { PATIENCE_MS, postAndAwait, ServerConnection } from "./client.js";
+import { OrganizationViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
+import { PATIENCE_MS, postAndAwait, readById, ServerConnection } from "./client.js";
 
 /** The name under which the application itself acts. */
 const SYSTEM = "access-desk";
@@ -61,11 +64,27 @@ export function organizationMembersThrough(
   const organizationOf = (organization: OrganizationId) =>
     connection.in(organization).onBehalfOf(SYSTEM);
 
+  const alreadyMember = async ({ organization, person, role }: NewMember): Promise<boolean> => {
+    const view = await readById(
+      organizationOf(organization),
+      OrganizationViewSchema,
+      OrganizationIdSchema,
+      organization,
+    );
+    const held = view?.member.find((member) => member.person?.uuid === person.uuid);
+    if (held !== undefined && held.role !== role) {
+      console.warn(
+        `Organization ${organization.uuid} already has person ${person.uuid} ` +
+          "as a member, in another role than the one they were to be added with.",
+      );
+    }
+    return held !== undefined;
+  };
+
   return {
     async add(member: NewMember): Promise<void> {
       const { organization, person, name, role } = member;
-      const inOrganization = organizationOf(organization);
-      if (await alreadyMember(inOrganization, organization, person, role)) {
+      if (await alreadyMember(member)) {
         return;
       }
       const awaited = {
@@ -79,11 +98,8 @@ export function organizationMembersThrough(
         event: OrganizationMemberAddedSchema,
         answers: (event: OrganizationMemberAdded) => event.person?.uuid === person.uuid,
       };
-      const added = await postAndAwait(inOrganization, awaited, patienceMs);
-      if (
-        added === undefined &&
-        !(await alreadyMember(inOrganization, organization, person, role))
-      ) {
+      const added = await postAndAwait(organizationOf(organization), awaited, patienceMs);
+      if (added === undefined && !(await alreadyMember(member))) {
         console.warn(
           `Organization ${organization.uuid} did not add person ${person.uuid} to its members.`,
         );

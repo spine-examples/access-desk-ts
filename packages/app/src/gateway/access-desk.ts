@@ -47,7 +47,6 @@ import { ResourceCatalogItemSchema } from "@access-desk/resources-model/generate
 import type { OrganizationMember } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import {
   find,
-  memberOf,
   postAndAwait,
   readById,
   type ServerConnection,
@@ -232,8 +231,12 @@ export class AccessDesk {
   }
 
   /** A person's membership in an organization, when they are a member. */
-  member(organization: OrganizationId, person: PersonId): Promise<OrganizationMember | undefined> {
-    return memberOf(this.#in(organization), organization, person);
+  async member(
+    organization: OrganizationId,
+    person: PersonId,
+  ): Promise<OrganizationMember | undefined> {
+    const view = await this.organization(organization);
+    return view?.member.find((candidate) => candidate.person?.uuid === person.uuid);
   }
 
   /** Whether the person is one of the managers of a resource of the organization. */
