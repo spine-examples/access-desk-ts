@@ -12,737 +12,50 @@
  * and limitations under the License.
  */
 
-import { createHash } from "node:crypto";
-import { create, type Message, type MessageShape } from "@bufbuild/protobuf";
-import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
-import { Client } from "@spine-event-engine/client-web";
-import { AnyMessages, SignalEnvelopes, TypeUrls } from "@spine-event-engine/core";
-import { TenantIdSchema, UserIdSchema } from "@spine-event-engine/proto";
+import { afterEach, describe, expect, it } from "vitest";
+import type { InvitationView } from "@access-desk/identity-model/generated/accessdesk/identity/invitation/invitation_pb.js";
 import {
-  QueryIdSchema,
-  QuerySchema,
-  TargetSchema,
-  TopicSchema,
-  type Query,
-} from "@spine-event-engine/proto/client";
-import { type BoundedContext, Server, SignalMetadata } from "@spine-event-engine/server";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import {
-  AccessRequestViewSchema,
-  type AccessRequestView,
-} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_pb.js";
-import { AccessRequestViewQuery } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_query.js";
-import { SubmitAccessRequestSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/commands_pb.js";
-import {
-  InvitationIdSchema,
-  OrganizationIdSchema,
-  PersonIdSchema,
-} from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
-import {
-  AcceptInvitationSchema,
-  DeclineInvitationSchema,
-  InviteMemberSchema,
-  RevokeInvitationSchema,
-} from "@access-desk/identity-model/generated/accessdesk/identity/invitation/commands_pb.js";
-import {
-  InvitationViewSchema,
-  type InvitationView,
-} from "@access-desk/identity-model/generated/accessdesk/identity/invitation/invitation_pb.js";
-import { InvitationViewQuery } from "@access-desk/identity-model/generated/accessdesk/identity/invitation/invitation_query.js";
-import {
-  IdentityProvider,
   InvitationStatus,
   OrganizationRole,
 } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
+
+import { call, eventually, givenGateway, request, stopGateways } from "./given/gateway.js";
 import {
-  AccessRequestIdSchema,
-  ResourceIdSchema,
-} from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
-import { OpenResourceForRequestsSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/commands_pb.js";
-import { ResourceCatalogItemSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_pb.js";
-import { RegisterResourceSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_registration_commands_pb.js";
-import { CreateOrganizationSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
-import { OrganizationViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
+  acceptInvitation,
+  declineInvitation,
+  givenInvited,
+  givenMaya,
+  givenMember,
+  invitation,
+  inviteMember,
+  member,
+  readInvitations,
+  revokeInvitation,
+} from "./given/membership.js";
 import {
-  Sensitivity,
-  type OrganizationMember,
-} from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
+  accessRequest,
+  catalogItem,
+  givenOpenResource,
+  givenTold,
+  readRequests,
+  registerResource,
+  submitRequest,
+  watchCatalog,
+} from "./given/resources.js";
+import {
+  challenge,
+  complete,
+  enter,
+  entering,
+  session,
+  signIn,
+  signInWith,
+  signOut,
+  start,
+  verifier,
+} from "./given/sign-in.js";
 
-// Imported from compiled output, like the contexts it assembles: vitest cannot
-// execute the handler classes' standard decorators from raw TypeScript source.
-type AppModule = typeof import("../../dist/src/index.js");
-type ProvidersModule = typeof import("../../dist/src/gateway/providers.js");
-let app: AppModule;
-let providers: ProvidersModule;
-beforeAll(async () => {
-  app = await import("../../dist/src/index.js");
-  providers = await import("../../dist/src/gateway/providers.js");
-}, 30_000);
-
-let stop: (() => Promise<void>) | undefined;
-afterEach(async () => {
-  await stop?.();
-  stop = undefined;
-});
-
-/** The address of the page that calls the gateway. */
-const ORIGIN = "http://app.test";
-/** The page an outside identity provider sends people back to. */
-const CALLBACK = "https://app.test/signed-in";
-
-/** The people of the tests, by the key each is chosen with. */
-const PEOPLE = {
-  maya: { email: "maya@acme.example", name: "Maya Chen" },
-  noah: { email: "noah@acme.example", name: "Noah Reyes" },
-  olivia: { email: "olivia@acme.example", name: "Olivia Park" },
-};
-
-/** The identity providers of the tests, by what each stands for. */
-const PROVIDERS = { github: "fake", google: "other" } as const;
-
-/** The secret a browser keeps while it signs in, and its fingerprint. */
-const verifier = "v".repeat(43);
-const challenge = createHash("sha256").update(verifier).digest("base64url");
-
-type External = NonNullable<Parameters<AppModule["startGateway"]>[0]["external"]>;
-
-/**
- * An identity provider that confirms `<subject>:<email>:<name>` codes, for the
- * tests. A code without an email address stands for an account the provider
- * has verified no address for. The name may be left out.
- */
-function fakeProvider(kind: IdentityProvider, issuer: string): External[string] {
-  return {
-    callbackUri: CALLBACK,
-    provider: {
-      kind,
-      label: "Fake",
-      authorizationEndpoint: `${issuer}/authorize`,
-      clientId: "access-desk-tests",
-      scopes: ["openid"],
-      provider: {
-        issuer,
-        exchangeAuthorizationCode({ code }) {
-          const [subject = "", email = "", name = ""] = code.split(":");
-          return Promise.resolve(
-            subject === "" || email === ""
-              ? undefined
-              : providers.describe(issuer, subject, email, name === "" ? undefined : name),
-          );
-        },
-      },
-    },
-  };
-}
-
-/** The running application behind its gateway. */
-interface Running {
-  readonly url: string;
-  readonly resources: BoundedContext;
-  readonly identity: BoundedContext;
-}
-
-/**
- * Starts the application with Acme, administered by `noah`, and Globex,
- * administered by `olivia`, behind a gateway with
- * two fake identity providers.
- */
-async function givenGateway(): Promise<Running> {
-  let address = "";
-  const contexts = await app.assembleAccessDesk({ server: () => address });
-  const hosted = await new Server({
-    contexts: [contexts.identity, contexts.resources],
-    port: 0,
-  }).start();
-  address = hosted.baseUrl;
-  await givenOrganization(contexts, "acme", "noah@acme.example");
-  await givenOrganization(contexts, "globex", "olivia@acme.example");
-  const gateway = await app.startGateway({
-    backend: hosted.baseUrl,
-    registry: app.typeRegistry,
-    origins: [ORIGIN],
-    port: 0,
-    external: {
-      fake: fakeProvider(IdentityProvider.GITHUB, "https://provider.test"),
-      other: fakeProvider(IdentityProvider.GOOGLE, "https://other.test"),
-    },
-  });
-  // The gateway and the application server are separate, so each is stopped.
-  stop = async () => {
-    await gateway.close();
-    await hosted.close();
-    await contexts.close();
-  };
-  return { url: gateway.url, resources: contexts.resources, identity: contexts.identity };
-}
-
-/** Gives a context a command in the application's own name, as nothing outside the tests does yet. */
-async function give<Schema extends GenMessage<Message>>(
-  context: BoundedContext,
-  schema: Schema,
-  command: MessageShape<Schema>,
-  organization?: string,
-): Promise<void> {
-  await context.commandBus().post(
-    SignalEnvelopes.command({
-      context: new SignalMetadata().commandContext({
-        actor: create(UserIdSchema, { value: "access-desk" }),
-        ...(organization === undefined ? {} : { tenantId: tenant(organization) }),
-      }),
-      schema,
-      message: command,
-    }),
-  );
-}
-
-/**
- * Creates an organization and invites its first administrator.
- *
- * The application has no way of creating an organization yet, so the tests
- * give the two commands themselves.
- */
-async function givenOrganization(
-  contexts: { readonly resources: BoundedContext; readonly identity: BoundedContext },
-  name: string,
-  administrator: string,
-): Promise<void> {
-  await give(
-    contexts.resources,
-    CreateOrganizationSchema,
-    create(CreateOrganizationSchema, { id: organizationId(name), name }),
-    name,
-  );
-  await give(
-    contexts.identity,
-    InviteMemberSchema,
-    create(InviteMemberSchema, {
-      id: invitationId(name, administrator),
-      role: OrganizationRole.ADMINISTRATOR,
-    }),
-  );
-}
-
-function organizationId(organization: string) {
-  return create(OrganizationIdSchema, { uuid: organization });
-}
-
-function tenant(organization: string) {
-  return create(TenantIdSchema, { kind: { case: "value", value: organization } });
-}
-
-/** A JSON answer of the gateway. */
-interface Answered {
-  readonly status: number;
-  readonly body: Record<string, unknown>;
-}
-
-/** Calls a sign-in or session address of the gateway from the application's page. */
-async function call(
-  running: Running,
-  path: string,
-  body: object = {},
-  token?: string,
-  origin: string = ORIGIN,
-): Promise<Answered> {
-  const response = await fetch(`${running.url}${path}`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      origin,
-      ...(token === undefined ? {} : { authorization: `Bearer ${token}` }),
-    },
-    body: JSON.stringify(body),
-  });
-  const text = await response.text();
-  return {
-    status: response.status,
-    body: text === "" ? {} : (JSON.parse(text) as Record<string, unknown>),
-  };
-}
-
-/** A person signed in through the gateway. */
-interface Signed {
-  readonly token: string;
-  readonly person: string;
-  /** The email address the person is registered under. */
-  readonly email: string;
-  /** The person's display name. */
-  readonly name: string;
-}
-
-/** Starts a sign-in and returns the state the provider sends back with its answer. */
-async function start(running: Running, provider = "fake"): Promise<string> {
-  const started = await call(running, "/auth/external/start", {
-    provider,
-    codeChallenge: challenge,
-  });
-  expect(started.status).toBe(200);
-  const url = new URL(started.body.authorizationUrl as string);
-  expect(url.pathname).toBe("/authorize");
-  expect(url.searchParams.get("redirect_uri")).toBe(CALLBACK);
-  return url.searchParams.get("state") ?? "";
-}
-
-/**
- * Signs one of the people of the tests in through an identity provider, as a
- * browser does. The account is named by the person's key.
- */
-async function signIn(
-  running: Running,
-  person: keyof typeof PEOPLE,
-  via: keyof typeof PROVIDERS = "github",
-): Promise<Signed> {
-  const provider = PROVIDERS[via];
-  const { email, name } = PEOPLE[person];
-  const { status, body } = await call(running, "/auth/external/complete", {
-    provider,
-    state: await start(running, provider),
-    code: `${person}:${email}:${name}`,
-    codeVerifier: verifier,
-  });
-  expect(status).toBe(200);
-  const signed = body.person as { id: string; email: string; name: string };
-  return { token: body.token as string, person: signed.id, email: signed.email, name: signed.name };
-}
-
-/** Enters an organization, exchanging the session for one bound to it. */
-async function enter(running: Running, signed: Signed, organization: string): Promise<Signed> {
-  const { status, body } = await call(
-    running,
-    "/auth/organization",
-    { organization },
-    signed.token,
-  );
-  expect(status).toBe(200);
-  return { ...signed, token: body.token as string };
-}
-
-/** Signs a seeded person in, accepts their invitation to the organization, and enters it. */
-async function givenMember(
-  running: Running,
-  person: keyof typeof PEOPLE,
-  organization: string,
-): Promise<Signed> {
-  const signed = await signIn(running, person);
-  expect(await acceptInvitation(running, signed, organization)).toBe("ok");
-  await eventually(
-    () => call(running, "/auth/session", {}, signed.token),
-    ({ body }) =>
-      (body.organizations as { id: string; standing: string }[]).some(
-        (entry) => entry.id === organization && entry.standing === "member",
-      ),
-  );
-  return enter(running, signed, organization);
-}
-
-/** The invitation an organization holds for an email address. */
-function invitationId(organization: string, email: string) {
-  return create(InvitationIdSchema, {
-    organization: { uuid: organization },
-    invitee: { value: email },
-  });
-}
-
-/** Has a signed-in person accept the invitation an organization holds for them. */
-function acceptInvitation(running: Running, signed: Signed, organization: string): Promise<string> {
-  return post(
-    running,
-    signed,
-    AcceptInvitationSchema,
-    create(AcceptInvitationSchema, {
-      id: invitationId(organization, signed.email),
-      person: { uuid: signed.person },
-      name: signed.name,
-    }),
-  );
-}
-
-/** Has a signed-in person decline the invitation an organization holds for them. */
-function declineInvitation(
-  running: Running,
-  signed: Signed,
-  organization: string,
-): Promise<string> {
-  return post(
-    running,
-    signed,
-    DeclineInvitationSchema,
-    create(DeclineInvitationSchema, {
-      id: invitationId(organization, signed.email),
-      person: { uuid: signed.person },
-    }),
-  );
-}
-
-/**
- * Has somebody who entered an organization invite an email address to it as a
- * member. An invitation belongs to no organization's tenant, so the command
- * names none.
- */
-function inviteMember(
-  running: Running,
-  as: Signed,
-  organization: string,
-  email: string,
-): Promise<string> {
-  return post(
-    running,
-    as,
-    InviteMemberSchema,
-    create(InviteMemberSchema, {
-      id: invitationId(organization, email),
-      role: OrganizationRole.MEMBER,
-    }),
-  );
-}
-
-/** Reads the invitations of an organization through the gateway as the browser client does. */
-async function readInvitations(
-  running: Running,
-  as: Signed,
-  of: string,
-): Promise<InvitationView[] | "refused"> {
-  const client = Client.forGrpcWeb(running.url, {
-    onRequestMetadata: () => ({ origin: ORIGIN, authorization: `Bearer ${as.token}` }),
-  });
-  try {
-    const response = await client.onBehalfOf(as.person).send(
-      InvitationViewQuery.create()
-        .organization()
-        .is(create(OrganizationIdSchema, { uuid: of }))
-        .build(),
-    );
-    return response.message.flatMap(({ state }) => {
-      const view =
-        state === undefined ? undefined : AnyMessages.unpack(state, InvitationViewSchema);
-      return view === undefined ? [] : [view];
-    });
-  } catch {
-    return "refused";
-  } finally {
-    await client.close();
-  }
-}
-
-/**
- * Gives a command through the gateway as the browser client does.
- *
- * @returns `"ok"` when the gateway let the command through, and why not otherwise.
- */
-async function post<Schema extends GenMessage<Message>>(
-  running: Running,
-  as: { readonly token?: string; readonly person: string; readonly organization?: string },
-  schema: Schema,
-  command: MessageShape<Schema>,
-): Promise<string> {
-  const client = Client.forGrpcWeb(running.url, {
-    ...(as.organization === undefined ? {} : { tenant: as.organization }),
-    onRequestMetadata: () => ({
-      origin: ORIGIN,
-      ...(as.token === undefined ? {} : { authorization: `Bearer ${as.token}` }),
-    }),
-  });
-  try {
-    return (await client.onBehalfOf(as.person).post(schema, command)).kind;
-  } catch (error) {
-    return error instanceof Error ? `refused: ${error.message}` : "refused";
-  } finally {
-    await client.close();
-  }
-}
-
-/** What the browser client takes as a request for read models. */
-type Asking = Parameters<ReturnType<ReturnType<typeof Client.forGrpcWeb>["onBehalfOf"]>["send"]>[0];
-
-/**
- * Everything there is of one kind of read model, as a request that names nobody.
- *
- * @param schema The kind of read model.
- * @param as Who asks, and in which organization.
- * @returns The request.
- */
-function everything(
-  schema: typeof AccessRequestViewSchema | typeof ResourceCatalogItemSchema,
-  as: { readonly person: string; readonly organization: string },
-): Query {
-  return create(QuerySchema, {
-    id: create(QueryIdSchema, { value: `all-${crypto.randomUUID()}` }),
-    target: create(TargetSchema, {
-      type: TypeUrls.derive(schema),
-      criterion: { case: "includeAll", value: true },
-    }),
-    context: new SignalMetadata().actorContext({
-      actor: create(UserIdSchema, { value: as.person }),
-      tenantId: tenant(as.organization),
-    }),
-  });
-}
-
-/**
- * Reads requests through the gateway as the browser client does.
- *
- * @param running The running application behind its gateway.
- * @param as Who reads: their session, their identifier, and the organization
- *   the request names.
- * @param asking What to ask for. The person's own requests when left out.
- * @returns The requests, or `"refused"` when the gateway or the application
- *   server did not answer the request.
- */
-async function readRequests(
-  running: Running,
-  as: { readonly token: string; readonly person: string; readonly organization: string },
-  asking: Asking = AccessRequestViewQuery.create()
-    .requester()
-    .is(create(PersonIdSchema, { uuid: as.person }))
-    .build(),
-): Promise<AccessRequestView[] | "refused"> {
-  const client = Client.forGrpcWeb(running.url, {
-    tenant: as.organization,
-    onRequestMetadata: () => ({ origin: ORIGIN, authorization: `Bearer ${as.token}` }),
-  });
-  try {
-    const response = await client.onBehalfOf(as.person).send(asking);
-    return response.message.flatMap(({ state }) => {
-      const view =
-        state === undefined ? undefined : AnyMessages.unpack(state, AccessRequestViewSchema);
-      return view === undefined ? [] : [view];
-    });
-  } catch {
-    return "refused";
-  } finally {
-    await client.close();
-  }
-}
-
-/** What a browser has been told while it watches the catalog of an organization. */
-interface Watched {
-  /** The resources it was told about, in the order it was told. */
-  readonly told: string[];
-  /** Whether it is told nothing more. */
-  ended(): boolean;
-  /** Stops watching. */
-  close(): Promise<void>;
-}
-
-/**
- * Watches the catalog of an organization through the gateway as the browser client does.
- *
- * @param running The running application behind its gateway.
- * @param as Who watches: their session, their identifier, and the organization
- *   whose catalog it is.
- * @returns What the browser has been told since, once its subscription is opened.
- */
-async function watchCatalog(
-  running: Running,
-  as: { readonly token: string; readonly person: string; readonly organization: string },
-): Promise<Watched> {
-  const client = Client.forGrpcWeb(running.url, {
-    tenant: as.organization,
-    onRequestMetadata: () => ({ origin: ORIGIN, authorization: `Bearer ${as.token}` }),
-  });
-  const subscription = await client.onBehalfOf(as.person).createSubscription(
-    create(TopicSchema, {
-      id: { value: `catalog-${crypto.randomUUID()}` },
-      target: {
-        type: TypeUrls.derive(ResourceCatalogItemSchema),
-        criterion: { case: "includeAll", value: true },
-      },
-    }),
-    { kind: "entity", authoritativeQuery: () => everything(ResourceCatalogItemSchema, as) },
-  );
-  const told: string[] = [];
-  let ended = false;
-  void (async () => {
-    try {
-      for await (const delivery of subscription.updates) {
-        if (delivery.kind !== "update" || delivery.update.update.case !== "entityUpdates") {
-          continue;
-        }
-        for (const { kind } of delivery.update.update.value.update) {
-          const item =
-            kind.case === "state"
-              ? AnyMessages.unpack(kind.value, ResourceCatalogItemSchema)
-              : undefined;
-          if (item?.id !== undefined) {
-            told.push(item.id.uuid);
-          }
-        }
-      }
-    } catch {
-      // A stream the gateway ended is one the browser is told nothing more on.
-    } finally {
-      ended = true;
-    }
-  })();
-  await subscription.activate();
-  return {
-    told,
-    ended: () => ended,
-    close: () => client.close().catch(() => undefined),
-  };
-}
-
-/**
- * Waits until a browser is really being told what it watches.
- *
- * A subscription tells only what happens after it has opened all the way to
- * the application server, which is a moment after the browser's call returns.
- * So an administrator registers resources until the browser hears of one.
- *
- * @param running The running application behind its gateway.
- * @param administrator An administrator of Acme who has entered it, to register the resources.
- * @param watched What the browser has been told, as `watchCatalog` returned it.
- */
-async function givenTold(running: Running, administrator: Signed, watched: Watched): Promise<void> {
-  for (let attempt = 0; attempt < 40; attempt += 1) {
-    const probe = `probe-${crypto.randomUUID()}`;
-    expect(await registerResource(running, administrator, probe)).toBe("ok");
-    const deadline = Date.now() + 500;
-    while (Date.now() < deadline) {
-      if (watched.told.includes(probe)) {
-        return;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    }
-  }
-  throw new Error("The browser was never told what it watches.");
-}
-
-/**
- * Has an administrator of Acme register a resource they manage themselves.
- *
- * @param running The running application behind its gateway.
- * @param administrator An administrator of Acme who has entered it.
- * @param resource The identifier of the resource, which is also its name.
- * @param organization The organization the command names. Acme when left
- *   out. The administrator acts in Acme either way, so any other organization
- *   here is one the gateway must refuse.
- * @returns `"ok"` when the gateway let the command through, and why not otherwise.
- */
-function registerResource(
-  running: Running,
-  administrator: Signed,
-  resource: string,
-  organization = "acme",
-): Promise<string> {
-  return post(
-    running,
-    { ...administrator, organization: "acme" },
-    RegisterResourceSchema,
-    create(RegisterResourceSchema, {
-      id: { uuid: resource },
-      organizationId: organizationId(organization),
-      name: resource,
-      description: `${resource} production`,
-      category: "application",
-      sensitivity: Sensitivity.RESTRICTED,
-      manager: [{ uuid: administrator.person }],
-      accessLevel: [{ name: "Read", rank: 1 }],
-      maximumDuration: { seconds: 3600n },
-    }),
-  );
-}
-
-/** Reads until the value is accepted, for outcomes that become visible later. */
-async function eventually<Value>(
-  read: () => Promise<Value>,
-  accept: (value: Value) => boolean,
-): Promise<Value> {
-  const deadline = Date.now() + 15_000;
-  for (;;) {
-    const value = await read();
-    if (accept(value) || Date.now() >= deadline) {
-      return value;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  }
-}
-
-/** Reads what an organization records about one of its members. */
-async function member(
-  running: Running,
-  organization: string,
-  person: string,
-): Promise<OrganizationMember | undefined> {
-  const view = await running.resources
-    .stand()
-    .read(OrganizationViewSchema, organizationId(organization), { tenantId: tenant(organization) });
-  return view?.member.find((candidate) => candidate.person?.uuid === person);
-}
-
-/** Reads an organization's invitation of an email address. */
-function invitation(running: Running, organization: string, email: string) {
-  return running.identity.stand().read(
-    InvitationViewSchema,
-    create(InvitationIdSchema, {
-      organization: { uuid: organization },
-      invitee: { value: email },
-    }),
-  );
-}
-
-/** Has `noah` administer Acme, register the payroll resource he manages, and open it. */
-async function givenOpenResource(running: Running): Promise<Signed> {
-  const noah = await givenMember(running, "noah", "acme");
-  const as = { ...noah, organization: "acme" };
-  expect(
-    await post(
-      running,
-      as,
-      RegisterResourceSchema,
-      create(RegisterResourceSchema, {
-        id: { uuid: "payroll" },
-        organizationId: organizationId("acme"),
-        name: "Payroll",
-        description: "Payroll production",
-        category: "application",
-        sensitivity: Sensitivity.RESTRICTED,
-        manager: [{ uuid: noah.person }],
-        accessLevel: [{ name: "Read", rank: 1 }],
-        maximumDuration: { seconds: 3600n },
-      }),
-    ),
-  ).toBe("ok");
-  const catalogued = () =>
-    running.resources
-      .stand()
-      .read(ResourceCatalogItemSchema, create(ResourceIdSchema, { uuid: "payroll" }), {
-        tenantId: tenant("acme"),
-      });
-  await eventually(catalogued, (item) => item !== undefined);
-  expect(
-    await post(
-      running,
-      as,
-      OpenResourceForRequestsSchema,
-      create(OpenResourceForRequestsSchema, { id: { uuid: "payroll" } }),
-    ),
-  ).toBe("ok");
-  await eventually(catalogued, (item) => item?.policy?.openForRequests === true);
-  return noah;
-}
-
-/** Has the administrator invite `maya` to Acme, and `maya` accept and enter. */
-async function givenMaya(running: Running, administrator: Signed): Promise<Signed> {
-  expect(await inviteMember(running, administrator, "acme", "maya@acme.example")).toBe("ok");
-  await eventually(
-    () => invitation(running, "acme", "maya@acme.example"),
-    (invited) => invited?.status === InvitationStatus.PENDING,
-  );
-  return givenMember(running, "maya", "acme");
-}
-
-/** A request by the person for an hour of read access to payroll. */
-function submission(id: string, requester: string) {
-  return create(SubmitAccessRequestSchema, {
-    id: { uuid: id },
-    requester: { uuid: requester },
-    resource: { uuid: "payroll" },
-    accessLevel: { name: "Read", rank: 1 },
-    justification: "Need payroll review",
-    period: { kind: { case: "immediateDuration", value: { seconds: 60n } } },
-  });
-}
+afterEach(stopGateways);
 
 describe("The gateway should", () => {
   describe("sign a person in, and", () => {
@@ -751,8 +64,7 @@ describe("The gateway should", () => {
 
       const noah = await signIn(running, "noah");
 
-      const session = await call(running, "/auth/session", {}, noah.token);
-      expect(session.body).toEqual({
+      expect((await session(running, noah.token)).body).toEqual({
         person: { id: noah.person, email: "noah@acme.example", name: "Noah Reyes" },
         accounts: [{ provider: "github", subject: "noah" }],
         organization: null,
@@ -778,8 +90,7 @@ describe("The gateway should", () => {
 
       expect(throughGoogle.person).toBe(throughGitHub.person);
       expect(throughGitHub.person).toMatch(/^[0-9a-f-]{36}$/);
-      const session = await call(running, "/auth/session", {}, throughGoogle.token);
-      expect(session.body.accounts).toEqual([
+      expect((await session(running, throughGoogle.token)).body.accounts).toEqual([
         { provider: "github", subject: "noah" },
         { provider: "google", subject: "noah" },
       ]);
@@ -797,17 +108,15 @@ describe("The gateway should", () => {
     it("refuse a caller without a session", async () => {
       const running = await givenGateway();
 
-      expect((await call(running, "/auth/session")).status).toBe(401);
-      expect((await call(running, "/auth/session", {}, "no-such-token")).status).toBe(401);
+      expect((await session(running)).status).toBe(401);
+      expect((await session(running, "no-such-token")).status).toBe(401);
     });
 
     it("refuse a call from a page it was not told about", async () => {
       const running = await givenGateway();
 
-      const answered = await fetch(`${running.url}/auth/options`, {
-        method: "POST",
-        headers: { "content-type": "application/json", origin: "https://elsewhere.example" },
-        body: "{}",
+      const answered = await request(running, "/auth/options", "{}", {
+        origin: "https://elsewhere.example",
       });
 
       expect(answered.status).toBe(403);
@@ -817,11 +126,7 @@ describe("The gateway should", () => {
       const running = await givenGateway();
 
       for (const body of ["not-json", "null", "7", '"word"', "[]"]) {
-        const response = await fetch(`${running.url}/auth/options`, {
-          method: "POST",
-          headers: { "content-type": "application/json", origin: ORIGIN },
-          body,
-        });
+        const response = await request(running, "/auth/options", body);
         expect(response.status).toBe(403);
         expect(await response.json()).toEqual({ error: "refused" });
       }
@@ -830,11 +135,7 @@ describe("The gateway should", () => {
     it("answer auth routes as noncacheable JSON", async () => {
       const running = await givenGateway();
 
-      const response = await fetch(`${running.url}/auth/options`, {
-        method: "POST",
-        headers: { "content-type": "application/json", origin: ORIGIN },
-        body: "{}",
-      });
+      const response = await request(running, "/auth/options", "{}");
 
       expect(response.status).toBe(200);
       expect(response.headers.get("content-type")).toContain("application/json");
@@ -859,18 +160,18 @@ describe("The gateway should", () => {
       const running = await givenGateway();
       const noah = await signIn(running, "noah");
 
-      expect((await call(running, "/auth/sign-out", {}, noah.token)).status).toBe(200);
+      expect((await signOut(running, noah.token)).status).toBe(200);
 
-      expect((await call(running, "/auth/session", {}, noah.token)).status).toBe(401);
+      expect((await session(running, noah.token)).status).toBe(401);
     });
 
     it("allow sign-out without a session and refuse malformed session credentials", async () => {
       const running = await givenGateway();
       const noah = await signIn(running, "noah");
 
-      expect(await call(running, "/auth/sign-out")).toEqual({ status: 200, body: {} });
-      expect((await call(running, "/auth/session", {}, `not-${noah.token}`)).status).toBe(401);
-      expect((await call(running, "/auth/session", {}, noah.token)).status).toBe(200);
+      expect(await signOut(running)).toEqual({ status: 200, body: {} });
+      expect((await session(running, `not-${noah.token}`)).status).toBe(401);
+      expect((await session(running, noah.token)).status).toBe(200);
     });
   });
 
@@ -879,16 +180,10 @@ describe("The gateway should", () => {
       const running = await givenGateway();
       const state = await start(running);
 
-      const completed = await call(running, "/auth/external/complete", {
-        provider: "fake",
-        state,
-        code: "1001:Noah@Acme.example",
-        codeVerifier: verifier,
-      });
+      const completed = await complete(running, { state, code: "1001:Noah@Acme.example" });
 
       expect(completed.status).toBe(200);
-      const session = await call(running, "/auth/session", {}, completed.body.token as string);
-      expect(session.body).toMatchObject({
+      expect((await session(running, completed.body.token as string)).body).toMatchObject({
         person: { email: "noah@acme.example", name: "Noah@Acme.example" },
         organizations: [{ id: "acme", standing: "invited" }],
       });
@@ -896,24 +191,13 @@ describe("The gateway should", () => {
 
     it("sign in the same person through a second provider under the same email address", async () => {
       const running = await givenGateway();
-      const signedIn = async (provider: string, code: string) => {
-        const state = await start(running, provider);
-        const completed = await call(running, "/auth/external/complete", {
-          provider,
-          state,
-          code,
-          codeVerifier: verifier,
-        });
-        expect(completed.status).toBe(200);
-        return (completed.body.person as { id: string }).id;
-      };
 
-      const first = await signedIn("fake", "1001:noah@acme.example");
-      const second = await signedIn("other", "g-7:noah@acme.example");
-      const somebodyElse = await signedIn("other", "g-8:maya@acme.example");
+      const first = await signInWith(running, "fake", "1001:noah@acme.example");
+      const second = await signInWith(running, "other", "g-7:noah@acme.example");
+      const somebodyElse = await signInWith(running, "other", "g-8:maya@acme.example");
 
-      expect(second).toBe(first);
-      expect(somebodyElse).not.toBe(first);
+      expect(second.person).toBe(first.person);
+      expect(somebodyElse.person).not.toBe(first.person);
     });
 
     it("refuse a provider it was not set up with", async () => {
@@ -951,27 +235,18 @@ describe("The gateway should", () => {
 
     it("refuse an answer for a sign-in it never started, or one already used", async () => {
       const running = await givenGateway();
-      const state = await start(running);
-      const answer = {
-        provider: "fake",
-        state,
-        code: "1001:noah@acme.example",
-        codeVerifier: verifier,
-      };
+      const answer = { state: await start(running), code: "1001:noah@acme.example" };
 
-      expect(
-        (await call(running, "/auth/external/complete", { ...answer, state: "not-issued" })).status,
-      ).toBe(403);
-      expect((await call(running, "/auth/external/complete", answer)).status).toBe(200);
-      expect((await call(running, "/auth/external/complete", answer)).status).toBe(403);
+      expect((await complete(running, { ...answer, state: "not-issued" })).status).toBe(403);
+      expect((await complete(running, answer)).status).toBe(200);
+      expect((await complete(running, answer)).status).toBe(403);
     });
 
     it("refuse an answer from a browser that does not hold the secret the sign-in started with", async () => {
       const running = await givenGateway();
       const state = await start(running);
 
-      const completed = await call(running, "/auth/external/complete", {
-        provider: "fake",
+      const completed = await complete(running, {
         state,
         code: "1001:noah@acme.example",
         codeVerifier: "w".repeat(43),
@@ -984,12 +259,7 @@ describe("The gateway should", () => {
       const running = await givenGateway();
       const state = await start(running);
 
-      const completed = await call(running, "/auth/external/complete", {
-        provider: "fake",
-        state,
-        code: "1001:",
-        codeVerifier: verifier,
-      });
+      const completed = await complete(running, { state, code: "1001:" });
 
       expect(completed.status).toBe(403);
     });
@@ -1002,11 +272,11 @@ describe("The gateway should", () => {
 
       expect(await acceptInvitation(running, noah, "acme")).toBe("ok");
 
-      const session = await eventually(
-        () => call(running, "/auth/session", {}, noah.token),
+      const told = await eventually(
+        () => session(running, noah.token),
         ({ body }) => (body.organizations as { standing: string }[])[0]?.standing === "member",
       );
-      expect(session.body.organizations).toEqual([
+      expect(told.body.organizations).toEqual([
         { id: "acme", name: "acme", standing: "member", role: "administrator" },
       ]);
       expect(await member(running, "acme", noah.person)).toMatchObject({
@@ -1022,39 +292,21 @@ describe("The gateway should", () => {
       expect(await declineInvitation(running, noah, "acme")).toBe("ok");
 
       await eventually(
-        () => call(running, "/auth/session", {}, noah.token),
+        () => session(running, noah.token),
         ({ body }) => (body.organizations as unknown[]).length === 0,
       );
       await acceptInvitation(running, noah, "acme");
-      expect(
-        (await call(running, "/auth/organization", { organization: "acme" }, noah.token)).status,
-      ).toBe(403);
+      expect((await entering(running, noah.token, "acme")).status).toBe(403);
       expect(await member(running, "acme", noah.person)).toBeUndefined();
     });
 
     it("refuse an answer to an invitation sent to somebody else", async () => {
       const running = await givenGateway();
       const maya = await signIn(running, "maya");
+      const sentToNoah = { invitee: "noah@acme.example" };
 
-      const accepted = await post(
-        running,
-        maya,
-        AcceptInvitationSchema,
-        create(AcceptInvitationSchema, {
-          id: invitationId("acme", "noah@acme.example"),
-          person: { uuid: maya.person },
-          name: maya.name,
-        }),
-      );
-      const declined = await post(
-        running,
-        maya,
-        DeclineInvitationSchema,
-        create(DeclineInvitationSchema, {
-          id: invitationId("acme", "noah@acme.example"),
-          person: { uuid: maya.person },
-        }),
-      );
+      const accepted = await acceptInvitation(running, maya, "acme", sentToNoah);
+      const declined = await declineInvitation(running, maya, "acme", sentToNoah);
 
       expect(accepted).not.toBe("ok");
       expect(declined).not.toBe("ok");
@@ -1068,16 +320,7 @@ describe("The gateway should", () => {
       const running = await givenGateway();
       const noah = await signIn(running, "noah");
 
-      const accepted = await post(
-        running,
-        noah,
-        AcceptInvitationSchema,
-        create(AcceptInvitationSchema, {
-          id: invitationId("acme", noah.email),
-          person: { uuid: "somebody-else" },
-          name: noah.name,
-        }),
-      );
+      const accepted = await acceptInvitation(running, noah, "acme", { person: "somebody-else" });
 
       expect(accepted).not.toBe("ok");
       expect(await member(running, "acme", "somebody-else")).toBeUndefined();
@@ -1089,9 +332,7 @@ describe("The gateway should", () => {
 
       await acceptInvitation(running, noah, "globex");
 
-      expect(
-        (await call(running, "/auth/organization", { organization: "globex" }, noah.token)).status,
-      ).toBe(403);
+      expect((await entering(running, noah.token, "globex")).status).toBe(403);
       expect(await member(running, "globex", noah.person)).toBeUndefined();
     });
 
@@ -1099,13 +340,9 @@ describe("The gateway should", () => {
       const running = await givenGateway();
       const noah = await signIn(running, "noah");
 
-      expect((await call(running, "/auth/organization", { organization: "acme" })).status).toBe(
-        401,
-      );
+      expect((await entering(running, undefined, "acme")).status).toBe(401);
       for (const organization of [undefined, null, 7, { uuid: "acme" }]) {
-        expect(
-          (await call(running, "/auth/organization", { organization }, noah.token)).status,
-        ).toBe(403);
+        expect((await entering(running, noah.token, organization)).status).toBe(403);
       }
     });
 
@@ -1113,10 +350,10 @@ describe("The gateway should", () => {
       const running = await givenGateway();
       const noah = await signIn(running, "noah");
 
-      const entered = await call(running, "/auth/organization", { organization: "" }, noah.token);
+      const entered = await entering(running, noah.token, "");
 
       expect(entered).toEqual({ status: 403, body: { error: "refused" } });
-      const current = await call(running, "/auth/session", {}, noah.token);
+      const current = await session(running, noah.token);
       expect(current.status).toBe(200);
       expect(current.body.organization).toBeNull();
     });
@@ -1133,10 +370,8 @@ describe("The gateway should", () => {
       const entered = await enter(running, noah, "acme");
 
       expect(entered.token).not.toBe(noah.token);
-      expect((await call(running, "/auth/session", {}, noah.token)).status).toBe(401);
-      expect((await call(running, "/auth/session", {}, entered.token)).body.organization).toBe(
-        "acme",
-      );
+      expect((await session(running, noah.token)).status).toBe(401);
+      expect((await session(running, entered.token)).body.organization).toBe("acme");
     });
   });
 
@@ -1145,14 +380,11 @@ describe("The gateway should", () => {
       const running = await givenGateway();
       const noah = await givenOpenResource(running);
       const maya = await givenMaya(running, noah);
-      const as = { ...maya, organization: "acme" };
 
-      expect(
-        await post(running, as, SubmitAccessRequestSchema, submission("req-1", maya.person)),
-      ).toBe("ok");
+      expect(await submitRequest(running, maya, "req-1")).toBe("ok");
 
       const requests = await eventually(
-        () => readRequests(running, as),
+        () => readRequests(running, maya),
         (views) => views !== "refused" && views.length === 1,
       );
       expect(requests).toMatchObject([
@@ -1164,61 +396,35 @@ describe("The gateway should", () => {
       const running = await givenGateway();
       const noah = await givenOpenResource(running);
       const maya = await givenMaya(running, noah);
-      const asMaya = { ...maya, organization: "acme" };
-      const asNoah = { ...noah, organization: "acme" };
-      expect(
-        await post(running, asMaya, SubmitAccessRequestSchema, submission("req-maya", maya.person)),
-      ).toBe("ok");
-      expect(
-        await post(running, asNoah, SubmitAccessRequestSchema, submission("req-noah", noah.person)),
-      ).toBe("ok");
+      expect(await submitRequest(running, maya, "req-maya")).toBe("ok");
+      expect(await submitRequest(running, noah, "req-noah")).toBe("ok");
 
       const own = await eventually(
-        () => readRequests(running, asMaya),
+        () => readRequests(running, maya),
         (views) => views !== "refused" && views.length === 1,
       );
 
       expect(own).toMatchObject([{ id: { uuid: "req-maya" } }]);
       // Everything of the organization, and what somebody else asked for, are not hers to see.
-      expect(await readRequests(running, asMaya, everything(AccessRequestViewSchema, asMaya))).toBe(
-        "refused",
-      );
-      expect(
-        await readRequests(
-          running,
-          asMaya,
-          AccessRequestViewQuery.create()
-            .requester()
-            .is(create(PersonIdSchema, { uuid: noah.person }))
-            .build(),
-        ),
-      ).toBe("refused");
+      expect(await readRequests(running, maya, "all")).toBe("refused");
+      expect(await readRequests(running, maya, { requester: noah.person })).toBe("refused");
     });
 
     it("show a manager the requests for a resource they manage, and no other member", async () => {
       const running = await givenGateway();
       const noah = await givenOpenResource(running);
       const maya = await givenMaya(running, noah);
-      const asMaya = { ...maya, organization: "acme" };
-      const asNoah = { ...noah, organization: "acme" };
-      expect(
-        await post(running, asMaya, SubmitAccessRequestSchema, submission("req-maya", maya.person)),
-      ).toBe("ok");
-      const forPayroll = () =>
-        AccessRequestViewQuery.create()
-          .resource()
-          .is(create(ResourceIdSchema, { uuid: "payroll" }))
-          .build();
+      expect(await submitRequest(running, maya, "req-maya")).toBe("ok");
 
       const managed = await eventually(
-        () => readRequests(running, asNoah, forPayroll()),
+        () => readRequests(running, noah, { resource: "payroll" }),
         (views) => views !== "refused" && views.length === 1,
       );
 
       expect(managed).toMatchObject([
         { id: { uuid: "req-maya" }, requester: { uuid: maya.person } },
       ]);
-      expect(await readRequests(running, asMaya, forPayroll())).toBe("refused");
+      expect(await readRequests(running, maya, { resource: "payroll" })).toBe("refused");
     });
 
     it("refuse an administrator a resource registered for another organization", async () => {
@@ -1228,77 +434,43 @@ describe("The gateway should", () => {
       const outcome = await registerResource(running, noah, "ledger", "globex");
 
       expect(outcome).not.toBe("ok");
-      expect(
-        await running.resources
-          .stand()
-          .read(ResourceCatalogItemSchema, create(ResourceIdSchema, { uuid: "ledger" }), {
-            tenantId: tenant("acme"),
-          }),
-      ).toBeUndefined();
+      expect(await catalogItem(running, "acme", "ledger")).toBeUndefined();
     });
 
     it("tell a browser nothing more of what it watched once its person signs out", async () => {
       const running = await givenGateway();
       const noah = await givenMember(running, "noah", "acme");
       const maya = await givenMaya(running, noah);
-      const hers = await watchCatalog(running, { ...maya, organization: "acme" });
-      const his = await watchCatalog(running, { ...noah, organization: "acme" });
-      try {
-        await givenTold(running, noah, hers);
-        await givenTold(running, noah, his);
-        expect(await registerResource(running, noah, "payroll")).toBe("ok");
-        await eventually(
-          () => Promise.resolve(hers.told),
-          (told) => told.includes("payroll"),
-        );
-        expect(hers.told).toContain("payroll");
+      const hers = await watchCatalog(running, maya);
+      const his = await watchCatalog(running, noah);
+      await givenTold(running, noah, hers);
+      await givenTold(running, noah, his);
+      expect(await registerResource(running, noah, "payroll")).toBe("ok");
+      expect(await hers.hears("payroll")).toBe(true);
 
-        expect((await call(running, "/auth/sign-out", {}, maya.token)).status).toBe(200);
-        expect(await registerResource(running, noah, "ledger")).toBe("ok");
+      expect((await signOut(running, maya.token)).status).toBe(200);
+      expect(await registerResource(running, noah, "ledger")).toBe("ok");
 
-        // Whoever is still signed in is told, so the news did go out.
-        await eventually(
-          () => Promise.resolve(his.told),
-          (told) => told.includes("ledger"),
-        );
-        expect(his.told).toContain("ledger");
-        expect(hers.told).not.toContain("ledger");
-        await eventually(
-          () => Promise.resolve(hers.ended()),
-          (ended) => ended,
-        );
-        expect(hers.ended()).toBe(true);
-      } finally {
-        await hers.close();
-        await his.close();
-      }
+      // Whoever is still signed in is told, so the news did go out.
+      expect(await his.hears("ledger")).toBe(true);
+      expect(hers.told).not.toContain("ledger");
+      expect(await hers.stops()).toBe(true);
     });
 
     it("stop what a person watched in an organization once they enter it anew", async () => {
       const running = await givenGateway();
       const noah = await givenMember(running, "noah", "acme");
-      const earlier = await watchCatalog(running, { ...noah, organization: "acme" });
-      try {
-        await givenTold(running, noah, earlier);
-        // Entering exchanges the session, and the earlier one ends.
-        const entered = await enter(running, noah, "acme");
-        const later = await watchCatalog(running, { ...entered, organization: "acme" });
-        try {
-          await givenTold(running, entered, later);
-          expect(await registerResource(running, entered, "payroll")).toBe("ok");
+      const earlier = await watchCatalog(running, noah);
+      await givenTold(running, noah, earlier);
 
-          await eventually(
-            () => Promise.resolve(later.told),
-            (told) => told.includes("payroll"),
-          );
-          expect(later.told).toContain("payroll");
-          expect(earlier.told).not.toContain("payroll");
-        } finally {
-          await later.close();
-        }
-      } finally {
-        await earlier.close();
-      }
+      // Entering exchanges the session, and the earlier one ends.
+      const entered = await enter(running, noah, "acme");
+
+      const later = await watchCatalog(running, entered);
+      await givenTold(running, entered, later);
+      expect(await registerResource(running, entered, "payroll")).toBe("ok");
+      expect(await later.hears("payroll")).toBe(true);
+      expect(earlier.told).not.toContain("payroll");
     });
 
     it("refuse a command given in another person's name", async () => {
@@ -1306,30 +478,16 @@ describe("The gateway should", () => {
       const noah = await givenOpenResource(running);
       const maya = await givenMaya(running, noah);
 
-      const outcome = await post(
-        running,
-        { ...maya, organization: "acme" },
-        SubmitAccessRequestSchema,
-        submission("req-spoofed", noah.person),
-      );
+      const outcome = await submitRequest(running, maya, "req-spoofed", {
+        requester: noah.person,
+      });
 
       expect(outcome).not.toBe("ok");
       // The session says who is acting, whatever the client claims.
       expect(
-        await post(
-          running,
-          { token: maya.token, person: noah.person, organization: "acme" },
-          SubmitAccessRequestSchema,
-          submission("req-spoofed", noah.person),
-        ),
+        await submitRequest(running, { token: maya.token, person: noah.person }, "req-spoofed"),
       ).not.toBe("ok");
-      expect(
-        await running.resources
-          .stand()
-          .read(AccessRequestViewSchema, create(AccessRequestIdSchema, { uuid: "req-spoofed" }), {
-            tenantId: tenant("acme"),
-          }),
-      ).toBeUndefined();
+      expect(await accessRequest(running, "acme", "req-spoofed")).toBeUndefined();
     });
 
     it("refuse a request aimed at an organization other than the one entered", async () => {
@@ -1337,29 +495,24 @@ describe("The gateway should", () => {
       const noah = await givenOpenResource(running);
       const maya = await givenMaya(running, noah);
 
-      const outcome = await post(
-        running,
-        { ...maya, organization: "globex" },
-        SubmitAccessRequestSchema,
-        submission("req-elsewhere", maya.person),
-      );
+      const outcome = await submitRequest(running, maya, "req-elsewhere", {
+        organization: "globex",
+      });
 
       expect(outcome).not.toBe("ok");
-      expect(await readRequests(running, { ...maya, organization: "globex" })).toBe("refused");
+      expect(await readRequests(running, maya, "own", "globex")).toBe("refused");
     });
 
     it("refuse a command only the application itself gives", async () => {
       const running = await givenGateway();
       const noah = await givenMember(running, "noah", "acme");
 
-      const outcome = await post(
+      const outcome = await inviteMember(
         running,
         { ...noah, organization: "acme" },
-        InviteMemberSchema,
-        create(InviteMemberSchema, {
-          id: { organization: { uuid: "globex" }, invitee: { value: "somebody@acme.example" } },
-          role: OrganizationRole.ADMINISTRATOR,
-        }),
+        "globex",
+        "somebody@acme.example",
+        OrganizationRole.ADMINISTRATOR,
       );
 
       expect(outcome).not.toBe("ok");
@@ -1383,15 +536,7 @@ describe("The gateway should", () => {
       const running = await givenGateway();
       const noah = await givenMember(running, "noah", "acme");
 
-      const invited = await post(
-        running,
-        noah,
-        InviteMemberSchema,
-        create(InviteMemberSchema, {
-          id: invitationId("globex", "maya@acme.example"),
-          role: OrganizationRole.MEMBER,
-        }),
-      );
+      const invited = await inviteMember(running, noah, "globex", "maya@acme.example");
       const listed = await readInvitations(running, noah, "globex");
 
       expect(invited).not.toBe("ok");
@@ -1402,18 +547,9 @@ describe("The gateway should", () => {
     it("let an administrator see the organization's invitations and take one back", async () => {
       const running = await givenGateway();
       const noah = await givenMember(running, "noah", "acme");
-      expect(await inviteMember(running, noah, "acme", "maya@acme.example")).toBe("ok");
-      await eventually(
-        () => invitation(running, "acme", "maya@acme.example"),
-        (invited) => invited?.status === InvitationStatus.PENDING,
-      );
+      await givenInvited(running, noah, "acme", "maya@acme.example");
 
-      const revoked = await post(
-        running,
-        noah,
-        RevokeInvitationSchema,
-        create(RevokeInvitationSchema, { id: invitationId("acme", "maya@acme.example") }),
-      );
+      const revoked = await revokeInvitation(running, noah, "acme", "maya@acme.example");
 
       expect(revoked).toBe("ok");
       await eventually(
@@ -1438,21 +574,9 @@ describe("The gateway should", () => {
       const maya = await givenMaya(running, noah);
       const signedInOnly = await signIn(running, "maya");
 
+      expect(await submitRequest(running, { person: maya.person }, "req-anonymous")).not.toBe("ok");
       expect(
-        await post(
-          running,
-          { person: maya.person, organization: "acme" },
-          SubmitAccessRequestSchema,
-          submission("req-anonymous", maya.person),
-        ),
-      ).not.toBe("ok");
-      expect(
-        await post(
-          running,
-          { ...signedInOnly, organization: "acme" },
-          SubmitAccessRequestSchema,
-          submission("req-not-entered", maya.person),
-        ),
+        await submitRequest(running, signedInOnly, "req-not-entered", { requester: maya.person }),
       ).not.toBe("ok");
     });
   });

@@ -24,24 +24,24 @@ import { InvitationViewSchema } from "@access-desk/identity-model/generated/acce
 import {
   IdentityProvider,
   InvitationStatus,
+  OrganizationRole,
 } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 import { PersonViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/person_pb.js";
 import { ExternalIdentityViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/external_identity_pb.js";
 import { ExternalIdentityLinkedSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/external_identity_events_pb.js";
-import { OrganizationMemberSchema } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
+import { OrganizationViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
 import { ResourceCatalogItemSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_pb.js";
 import { AccessRequestViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_pb.js";
 import {
   AccessRequestIdSchema,
   ResourceIdSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
-import { AccessDesk } from "../../src/gateway/access-desk.js";
-import type { ServerConnection } from "../../src/server/client.js";
+import { AccessDesk, alreadyMember, memberOf } from "../../src/gateway/access-desk.js";
+import type { ServerConnection, ServerRequest } from "../../src/server/client.js";
 
 const reads = vi.hoisted(() => ({
   readById: vi.fn(),
   find: vi.fn(),
-  memberOf: vi.fn(),
   postAndAwait: vi.fn(),
 }));
 vi.mock("../../src/server/client.js", () => reads);
@@ -226,10 +226,10 @@ describe("AccessDesk should", () => {
     const { desk, inOrganization } = givenDesk();
     const resource = create(ResourceIdSchema, { uuid: "payroll" });
     const accessRequest = create(AccessRequestIdSchema, { uuid: "request-1" });
-    reads.memberOf.mockResolvedValueOnce(
-      create(OrganizationMemberSchema, { person, name: "Maya" }),
-    );
     reads.readById
+      .mockResolvedValueOnce(
+        create(OrganizationViewSchema, { id: organization, member: [{ person, name: "Maya" }] }),
+      )
       .mockResolvedValueOnce(
         create(ResourceCatalogItemSchema, { id: resource, policy: { manager: [person] } }),
       )
@@ -241,9 +241,8 @@ describe("AccessDesk should", () => {
     expect(await desk.manages(organization, person, resource)).toBe(true);
     expect(await desk.requested(organization, person, accessRequest)).toBe(true);
     expect(inOrganization).toHaveBeenCalledWith(organization);
-    // The organization is asked as its own tenant, about that person.
-    expect(reads.memberOf).toHaveBeenCalledWith(expect.anything(), organization, person);
     expect(reads.readById.mock.calls.map((call): unknown => call[3])).toEqual([
+      organization,
       resource,
       accessRequest,
     ]);
@@ -264,5 +263,59 @@ describe("AccessDesk should", () => {
         create(AccessRequestIdSchema, { uuid: "missing" }),
       ),
     ).toBe(false);
+  });
+});
+
+describe("An organization asked about a person should", () => {
+  const asking = { name: "server request" } as unknown as ServerRequest;
+  const acme = create(OrganizationViewSchema, {
+    id: organization,
+    member: [{ person, name: "Maya", role: OrganizationRole.MEMBER }],
+  });
+
+  it("tell their membership, and none for anybody else or where there is no organization", async () => {
+    const somebodyElse = create(PersonIdSchema, { uuid: "person-2" });
+    reads.readById
+      .mockResolvedValueOnce(acme)
+      .mockResolvedValueOnce(acme)
+      .mockResolvedValueOnce(undefined);
+
+    expect(await memberOf(asking, organization, person)).toMatchObject({
+      name: "Maya",
+      role: OrganizationRole.MEMBER,
+    });
+    expect(await memberOf(asking, organization, somebodyElse)).toBeUndefined();
+    expect(await memberOf(asking, organization, person)).toBeUndefined();
+    // It is asked as whoever asks, under its own identifier.
+    expect(reads.readById).toHaveBeenCalledWith(
+      asking,
+      OrganizationViewSchema,
+      OrganizationIdSchema,
+      organization,
+    );
+  });
+
+  it("tell whether they are a member already, and say when their role differs", async () => {
+    const somebodyElse = create(PersonIdSchema, { uuid: "person-2" });
+    reads.readById.mockResolvedValue(acme);
+    const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      expect(await alreadyMember(asking, organization, person, OrganizationRole.MEMBER)).toBe(true);
+      expect(await alreadyMember(asking, organization, somebodyElse, OrganizationRole.MEMBER)).toBe(
+        false,
+      );
+      expect(warned).not.toHaveBeenCalled();
+
+      // A member in another role is a member all the same, and the console says so.
+      expect(
+        await alreadyMember(asking, organization, person, OrganizationRole.ADMINISTRATOR),
+      ).toBe(true);
+      expect(warned).toHaveBeenCalledWith(
+        "Organization acme already has person person-1 as a member, " +
+          "in another role than the one they were to be added with.",
+      );
+    } finally {
+      warned.mockRestore();
+    }
   });
 });
