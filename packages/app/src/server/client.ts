@@ -16,6 +16,7 @@ import { create, type Message, type MessageShape } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { Http2SessionManager, createGrpcTransport } from "@connectrpc/connect-node";
 import { Client } from "@spine-event-engine/client-node";
+import type { OrganizationId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { AnyMessages, TypeUrls } from "@spine-event-engine/core";
 import {
   QueryIdSchema,
@@ -44,8 +45,8 @@ export class ServerConnection {
   #open:
     | { sessions: Http2SessionManager; transport: ReturnType<typeof createGrpcTransport> }
     | undefined;
-  /** The client for what belongs to no organization, and the client of each organization. */
-  readonly #clients = new Map<string, ServerClient>();
+  /** UUID-keyed organization clients; `undefined` identifies the tenantless client. */
+  readonly #clients = new Map<string | undefined, ServerClient>();
 
   /**
    * @param address Tells the address of the application server.
@@ -60,14 +61,18 @@ export class ServerConnection {
    * The client for one organization, or for what belongs to none.
    *
    * @param organization The organization, or nothing for what belongs to none.
+   * @throws When an organization has an empty UUID, which cannot name a tenant.
    */
-  in(organization?: string): ServerClient {
-    const key = organization ?? "";
+  in(organization?: OrganizationId): ServerClient {
+    if (organization?.uuid === "") {
+      throw new Error("OrganizationId UUID must not be empty.");
+    }
+    const key = organization?.uuid;
     let client = this.#clients.get(key);
     if (client === undefined) {
       client = Client.usingTransport(
         this.#transport(),
-        organization === undefined ? {} : { tenant: organization },
+        organization === undefined ? {} : { tenant: organization.uuid },
       );
       this.#clients.set(key, client);
     }
