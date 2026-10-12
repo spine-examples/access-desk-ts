@@ -73,8 +73,6 @@ function organizationOf(context: ActorContext): string | undefined {
  * A subscription that was never opened tells nobody anything. It is dropped
  * when the time of the session it was made under runs out.
  *
- * Everything is kept in memory, so all watching ends when the gateway stops.
- *
  * Ending a session stops what it opened in two steps, because Spine gives a
  * gateway only one way to clear a subscription everywhere it is kept:
  *

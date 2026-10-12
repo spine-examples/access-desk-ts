@@ -27,9 +27,6 @@ import type { VerifiedPerson } from "./access-desk.js";
 /**
  * An outside identity provider, such as GitHub or Google, and how the gateway
  * reaches it.
- *
- * Whatever the provider issues along the way stays inside the provider. Only
- * the confirmed account comes out, with its verified email address and name.
  */
 export interface SignInProvider {
   /** Which provider this is. */

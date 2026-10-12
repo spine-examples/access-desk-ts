@@ -103,9 +103,6 @@ function invitesThem(
 
 /**
  * The commands a signed-in person may give before entering any organization.
- *
- * A person answers only the invitations sent to their own email address, and
- * only in their own name.
  */
 const SIGNED_IN_COMMANDS: readonly CommandRule<Signed>[] = [
   rule(
@@ -125,10 +122,6 @@ const SIGNED_IN_COMMANDS: readonly CommandRule<Signed>[] = [
 /**
  * The commands a member may give in the organization they have entered, and
  * on what condition.
- *
- * A command that is not listed is refused. That covers every command only the
- * application itself gives, such as creating an organization, adding a member,
- * or creating a grant, and every other command of the Identity context.
  *
  * Where a command names the person who acts, that person must be the one who
  * signed in. Where it names an organization, that must be the one entered.

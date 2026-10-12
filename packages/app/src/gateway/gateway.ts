@@ -79,14 +79,10 @@ export interface Gateway {
  * enter one organization. Only then may they give commands and read, and only
  * within that organization.
  *
- * The gateway, never the browser, decides who is acting and where. Both come
+ * The gateway decides who is acting and where. Both come
  * from the session it issued. A request that names another person or another
  * organization is refused, and so is every command only the application
  * itself may give.
- *
- * Sessions are kept in memory, so everybody is signed out when the gateway
- * stops. What a browser watches belongs to its session: when the session
- * ends, the watching stops with it.
  *
  * @param options How to set the gateway up.
  * @returns The running gateway.
