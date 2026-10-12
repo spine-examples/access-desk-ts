@@ -16,7 +16,14 @@ import { create, type Message, type MessageShape } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { Http2SessionManager, createGrpcTransport } from "@connectrpc/connect-node";
 import { Client } from "@spine-event-engine/client-node";
-import type { OrganizationId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
+import {
+  OrganizationIdSchema,
+  type OrganizationId,
+  type PersonId,
+} from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
+import type { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
+import { OrganizationViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
+import type { OrganizationMember } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import { AnyMessages, TypeUrls } from "@spine-event-engine/core";
 import {
   QueryIdSchema,
@@ -174,6 +181,7 @@ export async function postAndAwait<
     }
     return undefined;
   })();
+  answered.catch(() => undefined);
   let giveUp: ReturnType<typeof setTimeout> | undefined;
   const tooLate = new Promise<undefined>((resolve) => {
     giveUp = setTimeout(() => {
@@ -223,6 +231,52 @@ export async function readById<
   );
   const state = response.message[0]?.state;
   return state === undefined ? undefined : AnyMessages.unpack(state, schema);
+}
+
+/**
+ * Reads a person's membership in an organization.
+ *
+ * @param request The client that reads, acting in that organization.
+ * @param organization The organization.
+ * @param person The person.
+ * @returns The membership, or `undefined` when the person is not a member of
+ *   the organization or there is no such organization.
+ */
+export async function memberOf(
+  request: ServerRequest,
+  organization: OrganizationId,
+  person: PersonId,
+): Promise<OrganizationMember | undefined> {
+  const view = await readById(request, OrganizationViewSchema, OrganizationIdSchema, organization);
+  return view?.member.find((member) => member.person?.uuid === person.uuid);
+}
+
+/**
+ * Tells whether an organization has a person as a member already.
+ *
+ * A member keeps the role they hold. When it is another one than the role
+ * they were to be added with, the console says so.
+ *
+ * @param request The client that reads, acting in that organization.
+ * @param organization The organization.
+ * @param person The person.
+ * @param role The role the person was to be added with.
+ * @returns Whether the person is a member of the organization.
+ */
+export async function alreadyMember(
+  request: ServerRequest,
+  organization: OrganizationId,
+  person: PersonId,
+  role: OrganizationRole,
+): Promise<boolean> {
+  const held = await memberOf(request, organization, person);
+  if (held !== undefined && held.role !== role) {
+    console.warn(
+      `Organization ${organization.uuid} already has person ${person.uuid} ` +
+        "as a member, in another role than the one they were to be added with.",
+    );
+  }
+  return held !== undefined;
 }
 
 /**

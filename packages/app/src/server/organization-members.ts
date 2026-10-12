@@ -20,7 +20,7 @@ import {
   type OrganizationMemberAdded,
   OrganizationMemberAddedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
-import { PATIENCE_MS, postAndAwait, ServerConnection } from "./client.js";
+import { alreadyMember, PATIENCE_MS, postAndAwait, ServerConnection } from "./client.js";
 
 /** The name under which the application itself acts. */
 const SYSTEM = "access-desk";
@@ -38,9 +38,16 @@ export interface ReachedOrganizationMembers extends OrganizationMembers {
  * own tenant. An accepted invitation lives in Identity. To add the person,
  * Identity asks the organization as any client of the server would:
  *
- * 1. It starts watching the organization for a member being added.
- * 2. It asks the organization to add the person.
- * 3. It waits until the organization says that it has added them.
+ * 1. It asks the organization whether the person is a member already. An
+ *    earlier attempt may have added them and been cut short before Identity
+ *    learned of it, and the person is then added, whatever role they hold.
+ * 2. It starts watching the organization for a member being added.
+ * 3. It asks the organization to add the person.
+ * 4. It waits until the organization says that it has added them. When no
+ *    word comes in time, it asks once more whether the person is a member.
+ *
+ * So adding a person twice adds them once, and an acceptance that failed
+ * halfway can be given again.
  *
  * Whether the person may be added is the organization's to decide. This only
  * asks, and says so on the console when the organization does not add them.
@@ -61,6 +68,10 @@ export function organizationMembersThrough(
   return {
     async add(member: NewMember): Promise<void> {
       const { organization, person, name, role } = member;
+      const inOrganization = organizationOf(organization);
+      if (await alreadyMember(inOrganization, organization, person, role)) {
+        return;
+      }
       const awaited = {
         command: AddOrganizationMemberSchema,
         message: create(AddOrganizationMemberSchema, {
@@ -72,8 +83,11 @@ export function organizationMembersThrough(
         event: OrganizationMemberAddedSchema,
         answers: (event: OrganizationMemberAdded) => event.person?.uuid === person.uuid,
       };
-      const added = await postAndAwait(organizationOf(organization), awaited, patienceMs);
-      if (added === undefined) {
+      const added = await postAndAwait(inOrganization, awaited, patienceMs);
+      if (
+        added === undefined &&
+        !(await alreadyMember(inOrganization, organization, person, role))
+      ) {
         console.warn(
           `Organization ${organization.uuid} did not add person ${person.uuid} to its members.`,
         );

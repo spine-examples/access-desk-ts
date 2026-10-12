@@ -23,6 +23,7 @@ import {
   InviteMemberSchema,
 } from "@access-desk/identity-model/generated/accessdesk/identity/invitation/commands_pb.js";
 import { InvitationViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/invitation/invitation_pb.js";
+import { AddOrganizationMemberSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
 import {
   InvitationStatus,
   OrganizationRole,
@@ -98,5 +99,60 @@ describe("The assembled application should", () => {
       (view) => view?.status === InvitationStatus.ACCEPTED,
     );
     expect(invitation?.acceptedBy?.uuid).toBe("noah");
+  });
+
+  it("let a person accept again when the organization added them and the acceptance was lost", async () => {
+    const hosted = await givenServer();
+    server = hosted;
+    const { identity, resources } = hosted;
+    const acme = create(OrganizationIdSchema, { uuid: "acme" });
+    await givenOrganization(hosted, acme);
+    await give(
+      identity,
+      InviteMemberSchema,
+      create(InviteMemberSchema, {
+        id: invitationOf("acme", "noah@acme.example"),
+        role: OrganizationRole.MEMBER,
+      }),
+    );
+    // The first acceptance got as far as the organization, and no further.
+    await give(
+      resources,
+      AddOrganizationMemberSchema,
+      create(AddOrganizationMemberSchema, {
+        organizationId: acme,
+        person: { uuid: "noah" },
+        name: "Noah Reyes",
+        role: OrganizationRole.MEMBER,
+      }),
+      { organization: acme },
+    );
+    await eventually(
+      () => organizationView(hosted, acme),
+      (view) => view?.member.length === 1,
+    );
+    expect(
+      (await identity.stand().read(InvitationViewSchema, invitationOf("acme", "noah@acme.example")))
+        ?.status,
+    ).toBe(InvitationStatus.PENDING);
+
+    await give(
+      identity,
+      AcceptInvitationSchema,
+      create(AcceptInvitationSchema, {
+        id: invitationOf("acme", "noah@acme.example"),
+        person: { uuid: "noah" },
+        name: "Noah Reyes",
+      }),
+      { actor: "noah" },
+    );
+
+    const invitation = await eventually(
+      () => identity.stand().read(InvitationViewSchema, invitationOf("acme", "noah@acme.example")),
+      (view) => view?.status === InvitationStatus.ACCEPTED,
+    );
+    expect(invitation?.status).toBe(InvitationStatus.ACCEPTED);
+    expect(invitation?.acceptedBy?.uuid).toBe("noah");
+    expect((await organizationView(hosted, acme))?.member).toHaveLength(1);
   });
 });

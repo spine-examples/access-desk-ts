@@ -13,14 +13,28 @@
  */
 
 import { create } from "@bufbuild/protobuf";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { CreateOrganizationSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  AddOrganizationMemberSchema,
+  CreateOrganizationSchema,
+} from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
 import { OrganizationCreatedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
-import { OrganizationIdSchema } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
+import {
+  OrganizationIdSchema,
+  PersonIdSchema,
+} from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
+import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 import { OrganizationViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
 import { OrganizationViewQuery } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_query.js";
 
-import { givenOrganization, givenServer, organizationView, type Hosted } from "./given/hosted.js";
+import {
+  eventually,
+  give,
+  givenOrganization,
+  givenServer,
+  organizationView,
+  type Hosted,
+} from "./given/hosted.js";
 
 type ClientModule = typeof import("../../dist/src/server/client.js");
 let client: ClientModule;
@@ -222,6 +236,93 @@ describe("readById should", () => {
     );
 
     expect(view).toBeUndefined();
+  });
+});
+
+describe("memberOf should", () => {
+  it("read a person's membership in an organization, and none for anybody else", async () => {
+    const server = await hosted();
+    const acme = organizationId("acme");
+    await givenOrganization(server, acme);
+    await give(
+      server.resources,
+      AddOrganizationMemberSchema,
+      create(AddOrganizationMemberSchema, {
+        organizationId: acme,
+        person: { uuid: "noah" },
+        name: "Noah Reyes",
+        role: OrganizationRole.ADMINISTRATOR,
+      }),
+      { organization: acme },
+    );
+    await eventually(
+      () => organizationView(server, acme),
+      (view) => view?.member.length === 1,
+    );
+    const connection = connectionTo(() => server.url);
+    const inAcme = connection.in(acme).onBehalfOf("access-desk");
+    const noah = create(PersonIdSchema, { uuid: "noah" });
+
+    const held = await client.memberOf(inAcme, acme, noah);
+
+    expect(held).toMatchObject({
+      person: { uuid: "noah" },
+      name: "Noah Reyes",
+      role: OrganizationRole.ADMINISTRATOR,
+    });
+    expect(
+      await client.memberOf(inAcme, acme, create(PersonIdSchema, { uuid: "maya" })),
+    ).toBeUndefined();
+    // An organization that does not exist has no members.
+    const globex = organizationId("globex");
+    expect(
+      await client.memberOf(connection.in(globex).onBehalfOf("access-desk"), globex, noah),
+    ).toBeUndefined();
+  });
+});
+
+describe("alreadyMember should", () => {
+  it("tell whether an organization has a person as a member, and say when their role differs", async () => {
+    const server = await hosted();
+    const acme = organizationId("acme");
+    await givenOrganization(server, acme);
+    await give(
+      server.resources,
+      AddOrganizationMemberSchema,
+      create(AddOrganizationMemberSchema, {
+        organizationId: acme,
+        person: { uuid: "noah" },
+        name: "Noah Reyes",
+        role: OrganizationRole.MEMBER,
+      }),
+      { organization: acme },
+    );
+    await eventually(
+      () => organizationView(server, acme),
+      (view) => view?.member.length === 1,
+    );
+    const inAcme = connectionTo(() => server.url)
+      .in(acme)
+      .onBehalfOf("access-desk");
+    const noah = create(PersonIdSchema, { uuid: "noah" });
+    const maya = create(PersonIdSchema, { uuid: "maya" });
+    const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      expect(await client.alreadyMember(inAcme, acme, noah, OrganizationRole.MEMBER)).toBe(true);
+      expect(await client.alreadyMember(inAcme, acme, maya, OrganizationRole.MEMBER)).toBe(false);
+      expect(warned).not.toHaveBeenCalled();
+
+      // A member in another role is a member all the same, and the console says so.
+      expect(await client.alreadyMember(inAcme, acme, noah, OrganizationRole.ADMINISTRATOR)).toBe(
+        true,
+      );
+      expect(warned).toHaveBeenCalledWith(
+        "Organization acme already has person noah as a member, " +
+          "in another role than the one they were to be added with.",
+      );
+    } finally {
+      warned.mockRestore();
+    }
   });
 });
 

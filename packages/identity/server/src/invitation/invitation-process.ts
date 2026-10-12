@@ -56,7 +56,14 @@ import type { OrganizationMembers } from "./organization-members.js";
  *    another person. A person who declined may be invited again.
  * 4. When a person accepts, the organization adds them to its members with
  *    the role the invitation gives. The invitation is accepted once the
- *    organization has done so.
+ *    organization has done so. When that fails halfway, the invitation keeps
+ *    waiting and the person may accept again: the organization adds them
+ *    only once.
+ *
+ * An invitation knows the invited person by their email address, and the
+ * person who answers by their identifier. That the two are the same person
+ * is established before a command reaches the invitation, by whoever signs
+ * the person in.
  */
 export class InvitationProcessManager extends ProcessManager<
   InvitationId,

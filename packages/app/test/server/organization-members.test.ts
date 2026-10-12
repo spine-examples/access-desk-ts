@@ -105,21 +105,55 @@ describe("The organizations' members, reached through the application server, sh
     expect(await peopleOf(organizationId("globex"))).toEqual(["olivia"]);
   });
 
-  it("say so, and fail, when the organization does not add the person", async () => {
+  it("add a person once, however many times they are added", async () => {
     const server = await hosted();
     await givenOrganization(server, organizationId("acme"));
     const members = membersOf(server, 300);
     await members.add(joining("acme", "noah"));
+    await eventually(
+      () => organizationView(server, organizationId("acme")),
+      (organization) => organization?.member.length === 1,
+    );
+
+    // An acceptance that failed after the person was added is given again.
+    await expect(members.add(joining("acme", "noah"))).resolves.toBeUndefined();
+
+    expect((await organizationView(server, organizationId("acme")))?.member).toHaveLength(1);
+  });
+
+  it("keep the role a member already holds, and say that it differs", async () => {
+    const server = await hosted();
+    await givenOrganization(server, organizationId("acme"));
+    const members = membersOf(server, 300);
+    await members.add(joining("acme", "noah", OrganizationRole.MEMBER));
+    await eventually(
+      () => organizationView(server, organizationId("acme")),
+      (organization) => organization?.member.length === 1,
+    );
     const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
-    // A person is added to an organization once, so a second time adds nobody.
-    await expect(members.add(joining("acme", "noah"))).rejects.toThrow(
+    await members.add(joining("acme", "noah", OrganizationRole.ADMINISTRATOR));
+
+    expect(warned).toHaveBeenCalledWith(expect.stringContaining("in another role"));
+    expect((await organizationView(server, organizationId("acme")))?.member).toMatchObject([
+      { person: { uuid: "noah" }, role: OrganizationRole.MEMBER },
+    ]);
+  });
+
+  it("say so, and fail, when the organization does not add the person", async () => {
+    const server = await hosted();
+    await givenOrganization(server, organizationId("acme"));
+    const members = membersOf(server, 300);
+    const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    // An organization adds nobody without a name.
+    await expect(members.add({ ...joining("acme", "noah"), name: "" })).rejects.toThrow(
       "The organization did not add the person to its members.",
     );
 
     expect(warned).toHaveBeenCalledWith(
       "Organization acme did not add person noah to its members.",
     );
-    expect((await organizationView(server, organizationId("acme")))?.member).toHaveLength(1);
+    expect((await organizationView(server, organizationId("acme")))?.member).toHaveLength(0);
   });
 });
