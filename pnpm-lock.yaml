@@ -86,6 +86,9 @@ importers:
       '@bufbuild/protobuf':
         specifier: 2.12.1
         version: 2.12.1
+      '@connectrpc/connect-node':
+        specifier: 2.1.2
+        version: 2.1.2(@bufbuild/protobuf@2.12.1)(@connectrpc/connect@2.1.2(@bufbuild/protobuf@2.12.1))
       '@spine-event-engine/auth':
         specifier: 2.0.0-snapshot.22
         version: 2.0.0-snapshot.22
@@ -101,12 +104,6 @@ importers:
       '@spine-event-engine/server':
         specifier: 2.0.0-snapshot.22
         version: 2.0.0-snapshot.22(@spine-event-engine/auth@2.0.0-snapshot.22)
-      '@spine-event-engine/storage':
-        specifier: 2.0.0-snapshot.22
-        version: 2.0.0-snapshot.22
-      '@spine-event-engine/storage-datastore':
-        specifier: 2.0.0-snapshot.22
-        version: 2.0.0-snapshot.22
     devDependencies:
       '@spine-event-engine/client-web':
         specifier: 2.0.0-snapshot.22
@@ -114,9 +111,6 @@ importers:
       '@spine-event-engine/proto-tools':
         specifier: 2.0.0-snapshot.22
         version: 2.0.0-snapshot.22
-      '@spine-event-engine/testing':
-        specifier: 2.0.0-snapshot.22
-        version: 2.0.0-snapshot.22(@spine-event-engine/auth@2.0.0-snapshot.22)
       '@types/node':
         specifier: 24.13.2
         version: 24.13.2
