@@ -12,7 +12,7 @@ Runtime baseline: **Node ≥ 24, pnpm 11.9, strict TypeScript, ESM**.
 
 ## Bounded contexts
 
-Three contexts (`references/architecture.md`):
+Two contexts (`references/architecture.md`):
 
 | Context    | Owns                                                                                                                                        | Tenancy                  |
 | ---------- |---------------------------------------------------------------------------------------------------------------------------------------------| ------------------------ |
@@ -37,18 +37,14 @@ packages/
   identity/    { model, server }      # global / single-tenant
   resources/   { model, server }
   app/                                # composition root: complete registry, organization setup, gateway
-  web/                                # React + Vite browser client
+  web/                                # React + Vite browser client (later iterations)
 ```
-
-`deploy/` holds the Dockerfile and the compose file that run the application
-server, the gateway, and the web client as three containers.
 
 - **`<context>/model`** — `@access-desk/<context>-model`, `spine-proto.json` `mode: "model"`.
   Canonical `.proto` under `proto/accessdesk/<context>/` plus the generated
   `ProtoModule`; pure wire contracts, no behavior. Resources subdivides its protos
-  into per-area folders (`organization/`, `resource/`,
-  `access/request/`, `access/grant/`), each its
-  own sub-package under `accessdesk.resources.*`, with shared `identifiers.proto`
+  into per-area folders (`organization/`, `resource/`, `access/request/`, `access/grant/`),
+  each its own sub-package under `accessdesk.resources.*`, with shared `identifiers.proto`
   and `values.proto` at the top level (filename conventions in the `protobuf-style` skill).
 - **`<context>/server`** — `@access-desk/<context>-server`, `spine-proto.json`
   `mode: "application"`. Its `src/` and `test/` directories mirror the model's
@@ -64,17 +60,10 @@ server, the gateway, and the web client as three containers.
   (sign-in, sessions, authorization), which reaches the server over the
   network. The gateway's own addresses live in `src/gateway/routes/`, and
   are only for signing in and the session; everything else passes through
-  as Spine requests judged by `src/gateway/policy.ts`. What a browser
-  watches is kept per session in `src/gateway/watching.ts`, and stops when
-  the session ends.
+  as Spine requests judged by `src/gateway/policy.ts`.
   `pnpm --dir packages/app run server` and `run gateway` start each.
-  Every program is configured in one `.env` in the repository root (see
-  `.env.example`); `src/settings.ts` reads it, requires every setting, and
-  assumes nothing.
-- **`web`** — `@access-desk/web`, the web client. Only its foundation is
-  committed: the package has no screens and no `dev` script yet, so nothing
-  serves the page people sign in from. The React/Vite client is to reach the
-  gateway through the Vite proxy, so the browser sees one address.
+  Every program is configured in one `.env` in the repository root.
+- **`web`** — `@access-desk/web`, the React/Vite client.
 
 **Dependency rule:** a `server` may depend on another context's `model` (wire
 contracts) but **never** on another context's `server` (behavior) — the pnpm graph
@@ -122,9 +111,6 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
   `test/**`, and externalizes `dist` (`server.deps.external`) so the handler registry's
   classes keep the same identity as the classes the context registers (otherwise the
   registry lookup fails with "missing metadata").
-- The gateway is tested in `packages/app/test/gateway/` over HTTP, against an
-  application server it reaches by address, with the browser client for
-  commands and queries and fake identity providers.
 - Multitenant BlackBox: pass `{ tenant }` to `BlackBox.from`; assert the immediate
   command ack directly and use `box.eventually(...)` only for async read-side visibility.
 - **Time comes from Spine's `Time`.** Every Resources decision that depends on

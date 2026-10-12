@@ -13,48 +13,25 @@ rejections from the Event Storming board. Architecture details belong in
 
 ## Identity
 
-| Owner                  | Trigger (actor/event)                | Command                | Event(s)                          | Rejections                      |
-| ---------------------- | ------------------------------------ | ---------------------- | --------------------------------- | ------------------------------- |
-| External Identity (PM) | Gateway                              | Link External Identity | External Identity Linking Started | External Identity Already Known |
-| External Identity (PM) | on External Identity Linking Started | Register Person Email  | —                                 | —                               |
-| Person Email           | External Identity (PM)               | Register Person Email  | Person Email Registered           | Person Email Already Registered |
-| External Identity (PM) | on Person Email Registered           | Register Person        | —                                 | —                               |
-| Person                 | External Identity (PM)               | Register Person        | Person Registered                 | —                               |
-| External Identity (PM) | on Person Email Already Registered   | Add Sign-In Account    | —                                 | —                               |
-| Person                 | External Identity (PM)               | Add Sign-In Account    | Sign-In Account Added             | —                               |
-| External Identity (PM) | on Person Registered                 | —                      | External Identity Linked          | —                               |
-| External Identity (PM) | on Sign-In Account Added             | —                      | External Identity Linked          | —                               |
+| Owner                  | Trigger (actor/event)                | Command                | Event(s)                          | Rejections                                 |
+|------------------------|--------------------------------------|------------------------|-----------------------------------|--------------------------------------------|
+| External Identity (PM) | Gateway                              | Link External Identity | External Identity Linking Started | External Identity Already Known            |
+| External Identity (PM) | on External Identity Linking Started | Register Person Email  | —                                 | —                                          |
+| Person Email           | External Identity (PM)               | Register Person Email  | Person Email Registered           | Person Email Already Registered            |
+| External Identity (PM) | on Person Email Registered           | Register Person        | —                                 | —                                          |
+| Person                 | External Identity (PM)               | Register Person        | Person Registered                 | —                                          |
+| External Identity (PM) | on Person Email Already Registered   | Add Sign-In Account    | —                                 | —                                          |
+| Person                 | External Identity (PM)               | Add Sign-In Account    | Sign-In Account Added             | —                                          |
+| External Identity (PM) | on Person Registered                 | —                      | External Identity Linked          | —                                          |
+| External Identity (PM) | on Sign-In Account Added             | —                      | External Identity Linked          | —                                          |
+| Invitation (PM)        | Organization Administrator           | Invite Member          | Member Invited                    | Member Already Invited                     |
+| Invitation (PM)        | Organization Administrator           | Revoke Invitation      | Invitation Revoked                | Invitation Not Pending                     |
+| Invitation (PM)        | Invited person, signed in            | Accept Invitation      | Invitation Accepted               | Invitation Not Pending, Not Invited Person |
+| Invitation (PM)        | Invited person, signed in            | Decline Invitation     | Invitation Declined               | Invitation Not Pending, Not Invited Person |
 
 Projections: **External Identity View** receives External Identity Linked and
 tells which person an account belongs to. **Person View** receives Person
-Registered and Sign-In Account Added.
-
-### Invitations
-
-An invitation concerns a person and an organization, so it is kept outside
-every organization. The board draws the invitation stickies under Resources;
-the model moved them to Identity on 2026-10-08. The organization keeps its own
-members.
-
-| Owner           | Trigger (actor/event)      | Command            | Event(s)            | Rejections                                 |
-| --------------- | -------------------------- | ------------------ | ------------------- | ------------------------------------------ |
-| Invitation (PM) | Organization Administrator | Invite Member      | Member Invited      | Member Already Invited                     |
-| Invitation (PM) | Organization Administrator | Revoke Invitation  | Invitation Revoked  | Invitation Not Pending                     |
-| Invitation (PM) | Invited person, signed in  | Accept Invitation  | Invitation Accepted | Invitation Not Pending, Not Invited Person |
-| Invitation (PM) | Invited person, signed in  | Decline Invitation | Invitation Declined | Invitation Not Pending, Not Invited Person |
-
-An invitation is identified by the organization and the invited email address.
-
-Accepting crosses into Resources:
-
-1. The person accepts the invitation.
-2. The invitation asks the organization, through a client of the application
-   server, to add the person: Add Organization Member.
-3. It waits for Organization Member Added.
-4. Then it emits Invitation Accepted. When the organization does not add the
-   person, the invitation keeps waiting.
-
-Projections: **Invitation View** receives all four events. It keeps the invited
+Registered and Sign-In Account Added. **Invitation View** receives all four events. It keeps the invited
 email address as a column, so the invitations of one address are found by it.
 **Person View** also receives Invitation Accepted and holds the organizations
 the person is a member of.
@@ -64,10 +41,10 @@ the person is a member of.
 ### Resources
 
 | Owner                      | Trigger (actor/event)              | Command                     | Event(s)                     | Rejections                           |
-| -------------------------- | ---------------------------------- | --------------------------- | ---------------------------- | ------------------------------------ |
+|----------------------------|------------------------------------|-----------------------------|------------------------------|--------------------------------------|
 | Organization               | Developer, at assembly             | Create Organization         | Organization Created         | Organization Already Exists          |
 | Organization               | Invitation (PM), in Identity       | Add Organization Member     | Organization Member Added    | —                                    |
-| Organization               | Resource Registration (PM)         | Organization Administrator  | Register Resource            | Resource Registration Requested      | —   |
+| Organization               | Resource Registration (PM)         | Organization Administrator  | Register Resource            | Resource Registration Requested      |
 | Resource Registration (PM) | on Resource Registration Requested | Create Resource             | —                            | —                                    |
 | Resource                   | Resource Registration (PM)         | Create Resource             | Resource Created             | Resource Already Exists              |
 | Resource Registration (PM) | on Resource Already Exists         | —                           | Resource Registration Failed | —                                    |
@@ -95,7 +72,7 @@ for policy; there is no separate request-policy mirror projection.
 #### Request & approval
 
 | Owner               | Trigger (actor/event)                                                                                          | Command                                      | Event(s)                                    | Rejections                                                                        |
-| ------------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------- |
+|---------------------|----------------------------------------------------------------------------------------------------------------|----------------------------------------------|---------------------------------------------|-----------------------------------------------------------------------------------|
 | Access Request (PM) | Requester                                                                                                      | Submit Access Request                        | Access Request Submission Started           | Resource Not Open For Requests; Access Level Not Offered; Request Already Pending |
 | Access Request (PM) | Requester                                                                                                      | Submit Access Extension Request              | Access Extension Request Submission Started | Resource Not Open For Requests; Request Already Pending                           |
 | Access Request (PM) | on Access Request Submission Started                                                                           | Check Requested Access                       | —                                           | —                                                                                 |
@@ -119,10 +96,8 @@ Projection inputs and outputs drawn on the board:
 - **Access Request View** receives Access Request Submitted, Access Extension
   Request Submitted, Access Request Approval Started, Access Request Approved,
   Access Request Approval Failed, Access Request Denied, and Access Request
-  Canceled — the read model of each request and its status, for its requester
-  and the managers of the requested resource. It keeps the requester and the
-  resource beside the request, so each can ask for their own. It takes who
-  approved a request, and when, from Access Request Approval Started.
+  Canceled — the requester's read model of each request and its status. It
+  takes who approved a request, and when, from Access Request Approval Started.
 - **Access Decision Assignment** receives Access Request Submitted, Access
   Extension Request Submitted, Access Request Approved, Access Request Approval
   Failed, Access Request Denied, and Access Request Canceled; it also receives
@@ -131,7 +106,7 @@ Projection inputs and outputs drawn on the board:
 #### Access grant — Resource Access aggregate
 
 | Owner           | Trigger (actor/event)              | Command                   | Event(s)                    | Rejections                                                                |
-| --------------- | ---------------------------------- | ------------------------- | --------------------------- | ------------------------------------------------------------------------- |
+|-----------------|------------------------------------|---------------------------|-----------------------------|---------------------------------------------------------------------------|
 | Resource Access | Access Request (PM), at submission | Check Requested Access    | Requested Access Checked    | Requested Duration Too Long; Access Already Held                          |
 | Resource Access | Access Request (PM), at submission | Check Requested Extension | Requested Extension Checked | Access Grant Not Active; Requested Duration Too Long; Access Already Held |
 | Resource Access | Access Request (PM), at approval   | Create Access Grant       | Access Grant Created        | —                                                                         |

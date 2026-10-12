@@ -44,18 +44,6 @@ package, generated module, `BoundedContext` instance, repositories, storage
 layout, handlers, and ownership. Direct cross-context entity, repository, or
 application-service calls are forbidden.
 
-```mermaid
-flowchart LR
-  Browser --> Gateway[Application gateway]
-  Provider[Identity provider] --> Gateway
-  subgraph Server[Application server]
-    Identity
-    Resources
-  end
-  Gateway -->|verified identity| Identity
-  Gateway -->|signed-in person + organization| Resources
-```
-
 Cross-context state propagation and lifecycle choreography use versioned
 external events. Commands are domestic to their receiving context. Shared
 packages may contain wire contracts and value types, but never another
@@ -105,30 +93,18 @@ Organization is the tenant.
   person's email address, and the signed-in person accepts or declines.
   The invited person answers for themselves; nobody accepts or declines on
   behalf of another.
-- Nothing creates an organization yet. No organization is set up when the
-  application starts, and no person may give the command that creates one.
-  The intent is that a signed-in person creates an organization, is invited
-  to it as an administrator, and has that invitation accepted for them at
-  once. `PLAN.md` describes it under "Creating an organization".
 - Roles and permissions are organization-scoped. A role in one organization
   gives no authority in another.
 - Storage namespaces and context-prefixed kinds provide defense in depth; they
   never replace handler, query, subscription, and gateway authorization.
-- The connection between the gateway and the application server is not
-  secured. The Spine version in use offers the server neither encryption nor
-  a check of who is calling, so the server trusts whoever can reach it. It is
-  protected only by listening where nobody but the gateway can reach it.
-  Running the two on different machines needs mutual TLS put around the
-  server, by a proxy or a service mesh. `packages/app/README.md` tells the
-  whole of it.
 
 Authentication sits behind a provider abstraction in the gateway. GitHub and
 Google can be switched on as outside providers through
 `@spine-event-engine/auth`, each with one registration for the whole
 installation; organizations supply nothing. There is no other way to sign
-in. Provider tokens are used
-for the one exchange and discarded. They are never stored in browser
-application storage or passed into bounded contexts.
+in. Provider tokens are used for the one exchange and discarded.
+They are never stored in browser application storage or passed
+into bounded contexts.
 
 The gateway issues an opaque session. Entering an organization exchanges it for
 one bound to that organization, and the earlier one stops working. For every

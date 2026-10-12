@@ -271,20 +271,6 @@ handler requires one, so a raw Identity event cannot reach a Resources handler.
 Access Desk needs no such delivery: Identity and Resources exchange no facts,
 and the gateway carries the signed-in person to Resources as the actor.
 
-The other direction is refused too. An event of a multitenant context carries
-its tenant, and a single-tenant context will not take it (`Produced signal
-handling failed`). To let a single-tenant context follow a multitenant one,
-add a raw `EventDispatcher` to the multitenant context with
-`builder.addEventDispatcher(...)`. It receives the events of every tenant. Have
-it post each event into the consumer's own event bus,
-`consumer.eventBus().post(event)`, as a new `Event` that carries the same
-message under an `importContext` origin with no tenant. The consumer handles
-the type as an ordinary event, without `External<T>`. Do not subscribe to the
-type as `External<T>`: the multitenant context then also publishes its own
-tenant-carrying event to the consumer, which refuses it, and the refusals fail
-the context's shutdown. Access Desk used this while invitations lived in
-Resources. It needs none of it now that they live in Identity.
-
 ## Protobuf Any and type registries
 
 Use the Spine core `Any`/TypeRegistry helpers verified against this exact
@@ -333,79 +319,58 @@ authoritative query for reconnect/gap recovery. Command validation remains
 server-side.
 
 The gateway, not a bounded context, performs the provider, session, and origin
-controls defined in the architecture. What `2.0.0-snapshot.22` requires of it,
-as found while building `packages/app/src/gateway/`:
+controls defined in the architecture.
 
 - `BrowserServer.open(undefined, { backend: { baseUrl }, … })` starts a
-  standalone gateway that forwards to an application server running as its own
-  program, as the Message Board example does. `BrowserServer.open(runningServer,
-options)` instead puts the gateway in front of a server in the same process.
-  `authorize` and `contexts` run for every request; pass `registry` so
-  `authorize` receives each command decoded.
-- A standalone gateway with sessions needs `bindings`. Locally that is
-  `new InMemorySubscriptionBindings({ nextId, dispose })` from
-  `@spine-event-engine/auth`; production requires `DurableSubscriptionBindings`.
-  The application server likewise needs a `storageFactory` under
-  `NODE_ENV=production`, so neither program starts as a production one while
-  everything is kept in memory.
-- Ending a session does not end its streams. Spine stops a stream only when
-  the session's own time runs out. `packages/app/src/gateway/watching.ts`
-  stops them sooner. It is the store given as `bindings`, and tells a
-  subscription's session from the principal `authorize` receives when the
-  subscription is opened.
-- Only Spine's own cancel effect clears a subscription everywhere it is kept:
-  in the store, in the gateway's record of what it forwards, and at the
-  application server. Spine hands that effect to the store only when a
-  browser cancels through the gateway, and attaches it itself only for
-  `DurableSubscriptionBindings`. So when a session ends, the gateway cancels
-  the session's subscriptions through its own address with the session's
-  token, before the token stops working. What is left is stopped in the
-  store with `cancel({ id, context, nowMs, onDefinition })`, which ends the
-  stream but leaves the gateway's forwarding record until the gateway stops.
-- `dispose` of an application-supplied in-memory store runs when a
-  subscription outlives its session's time and when the gateway stops. It
-  cannot reach Spine's cancel effect, so it cannot clear the forwarding
-  record. The application server drops its side when the stream to it ends
-  and expires what was never opened.
+  standalone gateway in front of an application server in another program.
+  Pass `registry` so `authorize` receives each command decoded.
+- A standalone gateway with sessions needs `bindings`:
+  `InMemorySubscriptionBindings` locally, `DurableSubscriptionBindings` in
+  production. The application server needs a `storageFactory` there too, so
+  neither program starts under `NODE_ENV=production` while everything is kept
+  in memory.
+- Ending a session does not end its streams; Spine stops them only when the
+  session's time runs out.
+- Only Spine's own cancel effect clears a subscription everywhere it is kept,
+  and the store receives it only when a browser cancels. So the gateway
+  cancels an ending session's subscriptions through its own address with the
+  session's token. What is left is stopped in the store, which ends the stream
+  but leaves the gateway's forwarding record until the gateway stops. `dispose`
+  of an in-memory store cannot clear that record either.
 - A subscription tells only what happens after it has opened all the way to
-  the application server, which is a moment after the client's `activate`
-  returns. A test that needs an update must first make sure the subscription
-  is being told, for example by causing changes until one arrives.
-- A query takes an id filter or `EQUAL` filters on declared top-level
-  `(column)` fields. A subscription to read models takes id filters and
-  `EQUAL` field filters, also on nested paths; a subscription to events takes
-  only `include_all`.
-- A standalone gateway cannot call the contexts. It asks the application server
-  through `Client.connectTo(baseUrl, { tenant })` from
-  `@spine-event-engine/client-node`, posting commands and reading read models
-  by an id filter. Only read models are readable this way, not process state.
-- A request whose own actor or tenant differs from what `contexts` resolves is
+  the application server, a moment after the client's `activate` returns. A
+  test must first make sure updates arrive.
+- A query takes an id filter or `EQUAL` filters on top-level `(column)`
+  fields. A subscription to read models takes id filters and `EQUAL` field
+  filters, also on nested paths. A subscription to events takes only
+  `include_all`.
+- A standalone gateway cannot call the contexts. It asks the application
+  server through `@spine-event-engine/client-node`, and can read only read
+  models, not process state.
+- A request whose actor or tenant differs from what `contexts` resolves is
   refused, so the client sends the person and organization it learned from the
   gateway.
-- `authRoutes` match the request's whole address, query string included, so
-  they suit `POST` with a body, not a provider callback carrying `?code=`. The
-  provider sends the person back to a page of the application, which posts the
-  answer on. Their preflight answers allow no headers, so they are for pages
-  served from the same origin as the gateway, as through a development proxy.
-- Without the `cookies` option the gateway takes its session as a bearer
-  token. `OpaqueSessions.resolve` accepts only `kind: "cookie"`, so the session
-  resolver passes the bearer value on as one.
+- `authRoutes` match the whole address, query string included, so they suit
+  `POST` with a body, not a provider callback carrying `?code=`. Their
+  preflight answers allow no headers, so they serve only pages of the
+  gateway's own origin, as through a development proxy.
+- Without `cookies` the session is a bearer token. `OpaqueSessions.resolve`
+  accepts only `kind: "cookie"`, so the resolver passes the bearer value as
+  one.
 - `OidcFlow` accepts only HTTPS addresses and requires the `openid` scope.
-  `createGitHubProvider` returns the issuer and the account number, and with
-  `includeVerifiedPrimaryEmail` the verified primary email address as the
-  `email` claim; the display name is noted through its `fetch` option from the
-  same profile answer. `createGoogleProvider` looks Google's addresses up when it
-  is created and returns the `email` and `email_verified` claims as text.
-- `createGoogleProvider` sends no client secret unless told how. Pass
+- `createGitHubProvider` gives the verified primary email address only with
+  `includeVerifiedPrimaryEmail`. `createGoogleProvider` returns
+  `email_verified` as text, and needs
   `clientAuthentication: "client_secret_post"`, or Google refuses the code
-  exchange with `client_secret is missing`.
+  exchange.
 - The sign-in flow reports every provider failure the same way and prints
   nothing. Pass the provider a `fetch` that logs a refused answer, and log the
   `reason` of a rejected `OidcFlow.callback`.
-- In the application server, post a command in-process with `context.commandBus().post(SignalEnvelopes
-.command({ context, schema, message }))`, and read any tenant's state with
-  `context.stand().read(Schema, id, { tenantId })`; a message-valued id must be
-  made with `create(IdSchema, …)`.
+- In the application server, post a command in-process with
+  `context.commandBus().post(SignalEnvelopes.command({ context, schema, message }))`,
+  and read any tenant's state with
+  `context.stand().read(Schema, id, { tenantId })`. Make a message-valued id
+  with `create(IdSchema, …)`.
 
 ## Testing boundaries
 
