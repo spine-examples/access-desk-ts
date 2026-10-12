@@ -60,7 +60,9 @@ export interface GatewaySettings {
  * with them, so one message can tell it all.
  */
 class Reading {
+  /** The environment the settings are read from, by the name of each. */
   readonly #environment: NodeJS.ProcessEnv;
+  /** What is wrong with the settings read so far, one sentence for each problem. */
   readonly #problems: string[] = [];
 
   constructor(environment: NodeJS.ProcessEnv) {

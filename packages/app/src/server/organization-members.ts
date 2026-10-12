@@ -15,9 +15,10 @@
 import { create } from "@bufbuild/protobuf";
 import type { NewMember, OrganizationMembers } from "@access-desk/identity-server";
 import { AddOrganizationMemberSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
+import type { OrganizationId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import {
   type OrganizationMemberAdded,
-  OrganizationMemberAddedSchema
+  OrganizationMemberAddedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
 import { PATIENCE_MS, postAndAwait, ServerConnection } from "./client.js";
 
@@ -54,7 +55,8 @@ export function organizationMembersThrough(
   patienceMs: number = PATIENCE_MS,
 ): ReachedOrganizationMembers {
   const connection = new ServerConnection(server);
-  const organizationOf = (uuid: string) => connection.in(uuid).onBehalfOf(SYSTEM);
+  const organizationOf = (organization: OrganizationId) =>
+    connection.in(organization).onBehalfOf(SYSTEM);
 
   return {
     async add(member: NewMember): Promise<void> {
@@ -68,9 +70,9 @@ export function organizationMembersThrough(
           role,
         }),
         event: OrganizationMemberAddedSchema,
-        answers: (event: OrganizationMemberAdded) => event.person?.uuid === person.uuid
+        answers: (event: OrganizationMemberAdded) => event.person?.uuid === person.uuid,
       };
-      const added = await postAndAwait(organizationOf(organization.uuid), awaited, patienceMs);
+      const added = await postAndAwait(organizationOf(organization), awaited, patienceMs);
       if (added === undefined) {
         console.warn(
           `Organization ${organization.uuid} did not add person ${person.uuid} to its members.`,
