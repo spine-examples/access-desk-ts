@@ -14,7 +14,10 @@
 
 import { create } from "@bufbuild/protobuf";
 import { afterEach, describe, expect, it } from "vitest";
-import { InvitationIdSchema } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
+import {
+  InvitationIdSchema,
+  OrganizationIdSchema,
+} from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import {
   AcceptInvitationSchema,
   InviteMemberSchema,
@@ -61,7 +64,8 @@ describe("The assembled application should", () => {
     const hosted = await givenServer();
     server = hosted;
     const { identity } = hosted;
-    await givenOrganization(hosted, "acme");
+    const acme = create(OrganizationIdSchema, { uuid: "acme" });
+    await givenOrganization(hosted, acme);
     await give(
       identity,
       InviteMemberSchema,
@@ -83,7 +87,7 @@ describe("The assembled application should", () => {
     );
 
     const organization = await eventually(
-      () => organizationView(hosted, "acme"),
+      () => organizationView(hosted, acme),
       (view) => view?.member.length === 1,
     );
     expect(organization?.member).toMatchObject([

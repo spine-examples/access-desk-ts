@@ -28,6 +28,7 @@ import {
   acceptInvitation,
   awaitInvitation,
   inviteMember,
+  organizationId,
   revokeInvitation,
   declineInvitation,
 } from "./given/invitation.js";
@@ -46,6 +47,7 @@ describe("InvitationViewProjection should", () => {
       const view = await awaitInvitation(box, scope, "noah");
       expect(view.role).toBe(OrganizationRole.ADMINISTRATOR);
       expect(view.invitee?.value).toBe("noah");
+      expect(view.organization?.uuid).toBe(organizationId);
       expect(view.acceptedBy).toBeUndefined();
     });
   });

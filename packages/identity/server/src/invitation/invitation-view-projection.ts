@@ -34,6 +34,7 @@ export class InvitationViewProjection extends Projection<
   @Subscribe
   onMemberInvited(event: MemberInvited): void {
     this.update((draft) => {
+      draft.organization = event.id?.organization;
       draft.invitee = event.id?.invitee;
       draft.role = event.role;
       draft.status = InvitationStatus.PENDING;

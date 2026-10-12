@@ -15,6 +15,7 @@
 import { create } from "@bufbuild/protobuf";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {
+  type OrganizationId,
   OrganizationIdSchema,
   PersonIdSchema,
 } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
@@ -64,15 +65,19 @@ function joining(organization: string, person: string, role = OrganizationRole.M
   };
 }
 
+function organizationId(uuid: string) {
+  return create(OrganizationIdSchema, { uuid });
+}
+
 describe("The organizations' members, reached through the application server, should", () => {
   it("add a person to the members of an organization, with their name and role", async () => {
     const server = await hosted();
-    await givenOrganization(server, "acme");
+    await givenOrganization(server, organizationId("acme"));
 
     await membersOf(server).add(joining("acme", "noah", OrganizationRole.ADMINISTRATOR));
 
     const view = await eventually(
-      () => organizationView(server, "acme"),
+      () => organizationView(server, organizationId("acme")),
       (organization) => organization?.member.length === 1,
     );
     expect(view?.member).toMatchObject([
@@ -82,27 +87,27 @@ describe("The organizations' members, reached through the application server, sh
 
   it("add each person to the organization they join, and to no other", async () => {
     const server = await hosted();
-    await givenOrganization(server, "acme");
-    await givenOrganization(server, "globex");
+    await givenOrganization(server, organizationId("acme"));
+    await givenOrganization(server, organizationId("globex"));
     const members = membersOf(server);
 
     await members.add(joining("acme", "noah"));
     await members.add(joining("globex", "olivia"));
 
-    const peopleOf = async (organization: string) =>
+    const peopleOf = async (organization: OrganizationId) =>
       (
         await eventually(
           () => organizationView(server, organization),
           (view) => view?.member.length === 1,
         )
       )?.member.map((member) => member.person?.uuid);
-    expect(await peopleOf("acme")).toEqual(["noah"]);
-    expect(await peopleOf("globex")).toEqual(["olivia"]);
+    expect(await peopleOf(organizationId("acme"))).toEqual(["noah"]);
+    expect(await peopleOf(organizationId("globex"))).toEqual(["olivia"]);
   });
 
   it("say so, and fail, when the organization does not add the person", async () => {
     const server = await hosted();
-    await givenOrganization(server, "acme");
+    await givenOrganization(server, organizationId("acme"));
     const members = membersOf(server, 300);
     await members.add(joining("acme", "noah"));
     const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
@@ -115,6 +120,6 @@ describe("The organizations' members, reached through the application server, sh
     expect(warned).toHaveBeenCalledWith(
       "Organization acme did not add person noah to its members.",
     );
-    expect((await organizationView(server, "acme"))?.member).toHaveLength(1);
+    expect((await organizationView(server, organizationId("acme")))?.member).toHaveLength(1);
   });
 });

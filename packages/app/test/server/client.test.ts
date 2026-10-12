@@ -58,6 +58,10 @@ function creation(organization: string) {
   };
 }
 
+function organizationId(uuid: string) {
+  return create(OrganizationIdSchema, { uuid });
+}
+
 describe("ServerConnection should", () => {
   it("give the same client for an organization each time, and another for another", () => {
     const connection = connectionTo(() => "http://127.0.0.1:1");
@@ -104,8 +108,8 @@ describe("ServerConnection should", () => {
       expect(created?.name).toBe(organization);
     }
 
-    expect((await organizationView(server, "acme"))?.name).toBe("acme");
-    expect((await organizationView(server, "globex"))?.name).toBe("globex");
+    expect((await organizationView(server, organizationId("acme")))?.name).toBe("acme");
+    expect((await organizationView(server, organizationId("globex")))?.name).toBe("globex");
   });
 
   it("connect again after it was closed", async () => {
@@ -140,7 +144,7 @@ describe("postAndAwait should", () => {
 
   it("return nothing when no event answers the command in time", async () => {
     const server = await hosted();
-    await givenOrganization(server, "acme");
+    await givenOrganization(server, organizationId("acme"));
     const connection = connectionTo(() => server.url);
 
     // An organization is created once, so creating it again leads to no event.
@@ -164,14 +168,14 @@ describe("postAndAwait should", () => {
     );
 
     expect(created).toBeUndefined();
-    expect((await organizationView(server, "acme"))?.name).toBe("acme");
+    expect((await organizationView(server, organizationId("acme")))?.name).toBe("acme");
   });
 });
 
 describe("readById should", () => {
   it("read a read model of an organization by its identifier", async () => {
     const server = await hosted();
-    await givenOrganization(server, "acme");
+    await givenOrganization(server, organizationId("acme"));
     const acme = connectionTo(() => server.url)
       .in(create(OrganizationIdSchema, { uuid: "acme" }))
       .onBehalfOf("access-desk");
@@ -188,7 +192,7 @@ describe("readById should", () => {
 
   it("read nothing under an identifier nothing is kept under", async () => {
     const server = await hosted();
-    await givenOrganization(server, "acme");
+    await givenOrganization(server, organizationId("acme"));
     const acme = connectionTo(() => server.url)
       .in(create(OrganizationIdSchema, { uuid: "acme" }))
       .onBehalfOf("access-desk");
@@ -205,7 +209,7 @@ describe("readById should", () => {
 
   it("read only inside the organization the client is for", async () => {
     const server = await hosted();
-    await givenOrganization(server, "acme");
+    await givenOrganization(server, organizationId("acme"));
     const globex = connectionTo(() => server.url)
       .in(create(OrganizationIdSchema, { uuid: "globex" }))
       .onBehalfOf("access-desk");
@@ -224,7 +228,7 @@ describe("readById should", () => {
 describe("find should", () => {
   it("find the read models a query describes, and none when nothing matches", async () => {
     const server = await hosted();
-    await givenOrganization(server, "acme");
+    await givenOrganization(server, organizationId("acme"));
     const acme = connectionTo(() => server.url)
       .in(create(OrganizationIdSchema, { uuid: "acme" }))
       .onBehalfOf("access-desk");

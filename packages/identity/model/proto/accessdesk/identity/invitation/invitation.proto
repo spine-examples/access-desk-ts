@@ -48,15 +48,18 @@ message InvitationView {
     // address.
     accessdesk.identity.InvitationId id = 1;
 
+    // The organization that invites the person.
+    accessdesk.identity.OrganizationId organization = 2 [(required) = true, (column) = true];
+
     // The email address of the invited person.
-    spine.net.EmailAddress invitee = 2 [(required) = true, (column) = true];
+    spine.net.EmailAddress invitee = 3 [(required) = true, (column) = true];
 
     // The role the invitation gives the invited person.
-    accessdesk.identity.OrganizationRole role = 3 [(required) = true];
+    accessdesk.identity.OrganizationRole role = 4 [(required) = true];
 
     // The current status of the invitation.
-    accessdesk.identity.InvitationStatus status = 4 [(required) = true];
+    accessdesk.identity.InvitationStatus status = 5 [(required) = true];
 
     // The person who accepted the invitation.
-    accessdesk.identity.PersonId accepted_by = 5;
+    accessdesk.identity.PersonId accepted_by = 6;
 }
