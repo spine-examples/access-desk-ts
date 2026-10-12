@@ -20,7 +20,8 @@ import {
   type OrganizationMemberAdded,
   OrganizationMemberAddedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
-import { alreadyMember, PATIENCE_MS, postAndAwait, ServerConnection } from "./client.js";
+import { alreadyMember } from "../gateway/access-desk.js";
+import { PATIENCE_MS, postAndAwait, ServerConnection } from "./client.js";
 
 /** The name under which the application itself acts. */
 const SYSTEM = "access-desk";
@@ -34,23 +35,18 @@ export interface ReachedOrganizationMembers extends OrganizationMembers {
 /**
  * Reaches the organizations' members through the application server.
  *
- * An organization keeps its members itself, in the Resources context, as its
- * own tenant. An accepted invitation lives in Identity. To add the person,
- * Identity asks the organization as any client of the server would:
+ * An organization keeps its members itself, as its own tenant in Resources.
+ * Identity adds a person who accepted an invitation by asking the
+ * organization, as any client of the server would:
  *
- * 1. It asks the organization whether the person is a member already. An
- *    earlier attempt may have added them and been cut short before Identity
- *    learned of it, and the person is then added, whatever role they hold.
- * 2. It starts watching the organization for a member being added.
- * 3. It asks the organization to add the person.
- * 4. It waits until the organization says that it has added them. When no
- *    word comes in time, it asks once more whether the person is a member.
+ * 1. It asks whether the person is a member already. If so, nothing more is
+ *    done, and they keep the role they hold.
+ * 2. It asks the organization to add the person, and waits for it to say
+ *    that it has.
+ * 3. When no word comes in time, it asks once more whether the person is a
+ *    member. When they are not, it says so on the console and fails.
  *
- * So adding a person twice adds them once, and an acceptance that failed
- * halfway can be given again.
- *
- * Whether the person may be added is the organization's to decide. This only
- * asks, and says so on the console when the organization does not add them.
+ * So an acceptance that failed halfway can be given again.
  *
  * @param server Tells the address of the application server, once it listens.
  * @param patienceMs How long an organization has to say that it added a

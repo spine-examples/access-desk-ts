@@ -14,7 +14,7 @@
 
 /** Where a program listens. */
 export interface Listening {
-  /** The address to listen on, such as `127.0.0.1`. */
+  /** The address to listen on. */
   readonly host: string;
   /** The port to listen on. */
   readonly port: number;
@@ -163,24 +163,4 @@ export function gatewaySettingsOf(environment: NodeJS.ProcessEnv): GatewaySettin
     github: reading.provider("GITHUB"),
     google: reading.provider("GOOGLE"),
   });
-}
-
-/**
- * Refuses to start a program as a production one.
- *
- * Access Desk keeps everything in memory: people, organizations, sessions, and
- * what each browser watches. Spine starts neither program that way when
- * `NODE_ENV` is `production`, because it then requires storage that outlasts
- * the program. Access Desk has none yet, so it says so itself.
- *
- * @param environment The environment the program runs in.
- * @throws When `NODE_ENV` is `production`.
- */
-export function refuseProduction(environment: NodeJS.ProcessEnv): void {
-  if (environment.NODE_ENV?.trim() === "production") {
-    throw new Error(
-      "Access Desk keeps everything in memory, which Spine refuses when NODE_ENV is " +
-        "`production`. Start it without that setting until Access Desk has storage that lasts.",
-    );
-  }
 }

@@ -35,8 +35,6 @@ export function sessionRoutes(
 ): BrowserAuthRoute[] {
   return [
     /**
-     * `POST /auth/session`
-     *
      * Tells who is signed in and which organizations are theirs. The page
      * asks when it opens, to learn whether the session it kept is still good,
      * and again after the person signs in, answers an invitation, or enters
@@ -99,8 +97,6 @@ export function sessionRoutes(
     }),
 
     /**
-     * `POST /auth/organization`
-     *
      * Enters an organization. The page calls it when the person chooses one
      * of the organizations they are a member of. Everything the person does
      * afterwards happens in that organization.
@@ -144,8 +140,6 @@ export function sessionRoutes(
     }),
 
     /**
-     * `POST /auth/sign-out`
-     *
      * Ends the session, so its token stops working. The page calls it when
      * the person signs out.
      *

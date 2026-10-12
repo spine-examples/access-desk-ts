@@ -108,8 +108,6 @@ export function signInRoutes(
 
   const routes = [
     /**
-     * `POST /auth/options`
-     *
      * Tells a sign-in page which identity providers it may offer. The page
      * asks before anybody has signed in, to draw its sign-in buttons.
      *
@@ -135,8 +133,6 @@ export function signInRoutes(
   if (flows.size > 0) {
     routes.push(
       /**
-       * `POST /auth/external/start`
-       *
        * Starts a sign-in through one identity provider. The page calls it
        * when the person presses a sign-in button, and then sends the browser
        * to the address it is given.
@@ -169,8 +165,6 @@ export function signInRoutes(
         );
       }),
       /**
-       * `POST /auth/external/complete`
-       *
        * Finishes a sign-in and gives the person a session. The page calls it
        * when the provider has sent the person back to it, with `code` and
        * `state` in the address.

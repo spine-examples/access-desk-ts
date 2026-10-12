@@ -41,10 +41,6 @@ export interface AccessDesk {
 /**
  * Assembles Access Desk from its contexts.
  *
- * Identity says who a person is and holds the invitations. Resources holds
- * the organizations, their members, and what they own. When a person accepts
- * an invitation, Identity has the organization add them to its members.
- *
  * @param options How to assemble the application.
  * @returns The contexts, ready to be hosted by a server.
  */

@@ -14,27 +14,17 @@
 
 import { Server } from "@spine-event-engine/server";
 import { assembleAccessDesk } from "./access-desk.js";
-import { refuseProduction, serverSettingsOf } from "../settings.js";
+import { serverSettingsOf } from "../settings.js";
 
 /**
  * The application server.
  *
  * It hosts the Identity and Resources contexts. It knows nothing of browsers,
- * sessions, or identity providers. Those are the gateway's, which is a program of its own and
- * reaches this server over the network.
- *
- * The connection to the server is not secured. Spine's server speaks plain
- * HTTP/2 and offers neither encryption nor a way to check who is calling, so
- * the server trusts whoever can reach it to say who is acting. What protects
- * it is where it listens: only where the gateway can reach it, and nobody
- * else. `README.md` tells the whole of it.
+ * sessions, or identity providers.
  */
 
-refuseProduction(process.env);
 const { host, port } = serverSettingsOf(process.env).listening;
 
-// The contexts are assembled before the server listens, and reach it only
-// once somebody accepts an invitation.
 const listening: { address?: string } = {};
 const contexts = await assembleAccessDesk({
   server: () => {

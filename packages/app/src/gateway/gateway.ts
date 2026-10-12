@@ -38,13 +38,13 @@ const CANCEL_MS = 5_000; // 5 seconds.
 /** How the gateway is set up. */
 export interface GatewayOptions {
   /**
-   * The address of the application server, such as `http://127.0.0.1:8090`.
+   * The address of the application server.
    * The gateway reaches the application only through it.
    */
   readonly backend: string;
   /** Every type the application's messages use, so commands can be read and judged. */
   readonly registry: TypeRegistryLookup;
-  /** The addresses of the pages that may call the gateway, such as `https://127.0.0.1:5173`. */
+  /** The addresses of the pages that may call the gateway. */
   readonly origins: readonly string[];
   /** The address to listen on. The loopback address when left out. */
   readonly host?: string;
