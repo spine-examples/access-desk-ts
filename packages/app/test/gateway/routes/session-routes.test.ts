@@ -21,10 +21,10 @@ import {
 } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 import { OrganizationViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
-import type { AccessDesk } from "../../src/gateway/access_desk.js";
-import { routing } from "../../src/gateway/routes/route.js";
-import { sessionRoutes } from "../../src/gateway/routes/session-routes.js";
-import type { Issued, Session, Sessions } from "../../src/gateway/sessions.js";
+import type { AccessDesk } from "../../../src/gateway/access_desk.js";
+import { routing } from "../../../src/gateway/routes/route.js";
+import { sessionRoutes } from "../../../src/gateway/routes/session-routes.js";
+import type { Issued, Session, Sessions } from "../../../src/gateway/sessions.js";
 
 const person = {
   id: create(PersonIdSchema, { uuid: "person-1" }),

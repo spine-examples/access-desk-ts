@@ -13,10 +13,10 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { AccessDesk } from "../../src/gateway/access_desk.js";
-import { routing } from "../../src/gateway/routes/route.js";
-import { signInRoutes } from "../../src/gateway/routes/sign-in-routes.js";
-import { Sessions } from "../../src/gateway/sessions.js";
+import type { AccessDesk } from "../../../src/gateway/access_desk.js";
+import { routing } from "../../../src/gateway/routes/route.js";
+import { signInRoutes } from "../../../src/gateway/routes/sign-in-routes.js";
+import { Sessions } from "../../../src/gateway/sessions.js";
 
 describe("Gateway sign-in routes should", () => {
   it("offer only the options route when no outside provider is configured", async () => {

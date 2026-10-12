@@ -13,8 +13,8 @@
  */
 
 import { afterEach, describe, expect, it } from "vitest";
-import { routing } from "../../src/gateway/routes/route.js";
-import { Sessions } from "../../src/gateway/sessions.js";
+import { routing } from "../../../src/gateway/routes/route.js";
+import { Sessions } from "../../../src/gateway/sessions.js";
 
 let sessions = new Sessions();
 afterEach(async () => {
