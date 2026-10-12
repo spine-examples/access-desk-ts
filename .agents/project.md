@@ -64,14 +64,17 @@ server, the gateway, and the web client as three containers.
   (sign-in, sessions, authorization), which reaches the server over the
   network. The gateway's own addresses live in `src/gateway/routes/`, and
   are only for signing in and the session; everything else passes through
-  as Spine requests judged by `src/gateway/policy.ts`.
+  as Spine requests judged by `src/gateway/policy.ts`. What a browser
+  watches is kept per session in `src/gateway/watching.ts`, and stops when
+  the session ends.
   `pnpm --dir packages/app run server` and `run gateway` start each.
   Every program is configured in one `.env` in the repository root (see
   `.env.example`); `src/settings.ts` reads it, requires every setting, and
   assumes nothing.
-- **`web`** — `@access-desk/web`, the React/Vite client. It reaches the gateway
-  through the Vite proxy, so the browser sees one address. Run it with
-  `pnpm --dir packages/web run dev` beside the gateway.
+- **`web`** — `@access-desk/web`, the web client. Only its foundation is
+  committed: the package has no screens and no `dev` script yet, so nothing
+  serves the page people sign in from. The React/Vite client is to reach the
+  gateway through the Vite proxy, so the browser sees one address.
 
 **Dependency rule:** a `server` may depend on another context's `model` (wire
 contracts) but **never** on another context's `server` (behavior) — the pnpm graph

@@ -17,6 +17,21 @@ flowchart LR
   Gateway --> Provider[Identity provider]
 ```
 
+## What is not here yet
+
+- **The web client.** `packages/web` holds only its foundation. Nothing in
+  this repository serves the page people sign in from, so the gateway can be
+  run and tested, but nobody can sign in through a browser yet. Wherever this
+  guide speaks of the web client, it speaks of what is to come.
+- **Creating an organization.** Nothing creates an organization or its first
+  administrator. The tests give those commands to the application server
+  themselves.
+- **Storage that lasts.** Both programs keep everything in memory: people,
+  organizations, sessions, and what each browser watches. Stopping the
+  application server loses the first two, and stopping the gateway signs
+  everybody out. Spine refuses to start either program this way when
+  `NODE_ENV` is `production`, so both refuse it themselves and say why.
+
 ## Set it up
 
 All of Access Desk is configured in one file, `.env`, in the root of the
@@ -74,7 +89,8 @@ email address. An account without a verified email address cannot sign in.
 ## Sign in through GitHub and Google
 
 Both providers send people back only to an HTTPS address, so the web client
-must run on `https://127.0.0.1:5173` (see its README).
+must run on `https://127.0.0.1:5173`. The web client is not in this repository
+yet, so these steps cannot be finished from it alone.
 
 1. Copy `.env.example` to `.env` in the root of the repository. It is
    ignored by Git.
@@ -140,6 +156,9 @@ Every address of its own works the same way:
 | `401`  | `{ "error": "not signed in" }` | The address needs a session, and there is none or it has ended. |
 | `403`  | `{ "error": "refused" }`       | The person may not do this, or the request is malformed.        |
 | `503`  | `{ "error": "try again" }`     | The gateway could not do it just now.                           |
+
+A failure nobody foresaw, such as an application server that cannot be
+reached, is answered `503` too. The gateway's console says what failed.
 
 ### Signing in
 
@@ -271,16 +290,19 @@ Answers `200` with a new session, bound to the organization:
 }
 ```
 
-The earlier session stops working, so use the new `token` from then on. To
-enter another organization, call this again with the new session.
+The earlier session stops working, so use the new `token` from then on.
+Every subscription opened under the earlier session stops with it. To enter
+another organization, call this again with the new session.
 
 Answers `401` without a session, `403` when the person is not a member of that
-organization, and `503` when the session could not be issued just now.
+organization, and `503` when the session could not be issued just now. Only an
+organization that `/auth/session` lists for the person as `member` is entered.
 
 #### `POST /auth/sign-out`
 
-Ends the session, so its token stops working. Send `{}` with the session to
-end. Answers `200` with `{}`, also when there was no session to end.
+Ends the session, so its token stops working, and stops every subscription
+opened under it. Send `{}` with the session to end. Answers `200` with `{}`,
+also when there was no session to end.
 
 ### What passes through
 
@@ -293,14 +315,42 @@ A request names the organization it acts in, which must be the one the session
 has entered. A request about an invitation names no organization, because
 invitations belong to none.
 
-| Request                                                                                | Who may send it                                                            |
-| -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `AcceptInvitation`, `DeclineInvitation`                                                | A signed-in person, for an invitation sent to their own email address.     |
-| `InviteMember`, `RevokeInvitation`                                                     | An administrator, for the organization they have entered.                  |
-| Query on `InvitationView`, filtered by `organization` alone                            | An administrator, for the organization they have entered.                  |
-| `SubmitAccessRequest`, `SubmitAccessExtensionRequest`                                  | A member, as the requester.                                                |
-| `CancelAccessRequest`                                                                  | The member who made the request.                                           |
-| `ApproveAccessRequest`, `DenyAccessRequest`, `RevokeAccessGrant`                       | A member, as the manager. The domain checks that they manage the resource. |
-| `OpenResourceForRequests`, `CloseResourceForRequests`                                  | A manager of the resource, or an administrator.                            |
-| `RegisterResource`                                                                     | An administrator.                                                          |
-| Query or subscription on the organization, catalog, request, decision, and grant views | Any member of the organization.                                            |
+| Request                                                          | Who may send it                                                            |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `AcceptInvitation`, `DeclineInvitation`                          | A signed-in person, for an invitation sent to their own email address.     |
+| `InviteMember`, `RevokeInvitation`                               | An administrator, for the organization they have entered.                  |
+| Query on `InvitationView`, filtered by `organization` alone      | An administrator, for the organization they have entered.                  |
+| `SubmitAccessRequest`, `SubmitAccessExtensionRequest`            | A member, as the requester.                                                |
+| `CancelAccessRequest`                                            | The member who made the request.                                           |
+| `ApproveAccessRequest`, `DenyAccessRequest`, `RevokeAccessGrant` | A member, as the manager. The domain checks that they manage the resource. |
+| `OpenResourceForRequests`, `CloseResourceForRequests`            | A manager of the resource, or an administrator.                            |
+| `RegisterResource`                                               | An administrator, for the organization they have entered.                  |
+| Query or subscription on a read model                            | A member, as [What a member may read](#what-a-member-may-read) tells.      |
+
+### What a member may read
+
+A member reads and watches the organization and its catalog freely. Everything
+else they see only where it concerns them, so a query or a subscription must
+say whose it wants. It says so by one condition alone: that one column equals
+one value. A request with no condition, with several, or with another one is
+refused.
+
+| Read model                 | The request must ask for                         | Who may ask                          |
+| -------------------------- | ------------------------------------------------ | ------------------------------------ |
+| `OrganizationView`         | anything                                         | Any member.                          |
+| `ResourceCatalogItem`      | anything                                         | Any member.                          |
+| `AccessRequestView`        | `requester` equal to the person's own identifier | The member themselves.               |
+| `AccessRequestView`        | `resource` equal to one resource's identifier    | A manager of that resource.          |
+| `AccessGrantView`          | `grantee` equal to the person's own identifier   | The member themselves.               |
+| `AccessGrantView`          | `resource` equal to one resource's identifier    | A manager of that resource.          |
+| `AccessDecisionAssignment` | the one kept under the person's own identifier   | The member themselves, as a manager. |
+
+The generated query builders say it this way:
+
+```ts
+AccessRequestViewQuery.create().requester().is(me).build();
+AccessGrantViewQuery.create().resource().is(payroll).build();
+```
+
+A subscription takes the same condition as a filter on its topic. The decision
+queue is asked for by its identifier, which is the manager's own.

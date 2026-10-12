@@ -142,6 +142,16 @@ query, or a subscription it judges as it passes, including the commands and
 the query about invitations. A request about an invitation names no
 organization, and the gateway refuses one that does.
 
+A member reads and watches the organization and its catalog freely. Everything
+else they see only where it concerns them: the requests they made and the
+grants they hold, those of a resource they manage, and their own queue of
+requests to decide. A query or a subscription must therefore say whose it
+wants, by one condition on one column, and the gateway refuses any other.
+
+What a browser watches belongs to the session it was opened under. When the
+session ends, because the person signs out or enters another organization,
+the gateway stops everything opened under it.
+
 ### Roles, relations, and fine-grained authorization
 
 Authority takes two forms, both organization-scoped.

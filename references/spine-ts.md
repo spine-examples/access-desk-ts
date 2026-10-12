@@ -345,6 +345,36 @@ options)` instead puts the gateway in front of a server in the same process.
 - A standalone gateway with sessions needs `bindings`. Locally that is
   `new InMemorySubscriptionBindings({ nextId, dispose })` from
   `@spine-event-engine/auth`; production requires `DurableSubscriptionBindings`.
+  The application server likewise needs a `storageFactory` under
+  `NODE_ENV=production`, so neither program starts as a production one while
+  everything is kept in memory.
+- Ending a session does not end its streams. Spine stops a stream only when
+  the session's own time runs out. `packages/app/src/gateway/watching.ts`
+  stops them sooner. It is the store given as `bindings`, and tells a
+  subscription's session from the principal `authorize` receives when the
+  subscription is opened.
+- Only Spine's own cancel effect clears a subscription everywhere it is kept:
+  in the store, in the gateway's record of what it forwards, and at the
+  application server. Spine hands that effect to the store only when a
+  browser cancels through the gateway, and attaches it itself only for
+  `DurableSubscriptionBindings`. So when a session ends, the gateway cancels
+  the session's subscriptions through its own address with the session's
+  token, before the token stops working. What is left is stopped in the
+  store with `cancel({ id, context, nowMs, onDefinition })`, which ends the
+  stream but leaves the gateway's forwarding record until the gateway stops.
+- `dispose` of an application-supplied in-memory store runs when a
+  subscription outlives its session's time and when the gateway stops. It
+  cannot reach Spine's cancel effect, so it cannot clear the forwarding
+  record. The application server drops its side when the stream to it ends
+  and expires what was never opened.
+- A subscription tells only what happens after it has opened all the way to
+  the application server, which is a moment after the client's `activate`
+  returns. A test that needs an update must first make sure the subscription
+  is being told, for example by causing changes until one arrives.
+- A query takes an id filter or `EQUAL` filters on declared top-level
+  `(column)` fields. A subscription to read models takes id filters and
+  `EQUAL` field filters, also on nested paths; a subscription to events takes
+  only `include_all`.
 - A standalone gateway cannot call the contexts. It asks the application server
   through `Client.connectTo(baseUrl, { tenant })` from
   `@spine-event-engine/client-node`, posting commands and reading read models
