@@ -22,6 +22,7 @@ import type { TimeProvider } from "@spine-event-engine/core/time";
  * instead of waiting for it.
  */
 export class ManualClock implements TimeProvider {
+  /** The time the clock shows, in milliseconds since the start of 1970. */
   #time: number;
 
   /**
