@@ -42,6 +42,12 @@ const server = await new Server({
 listening.address = server.baseUrl;
 
 console.log(`Access Desk application server: ${server.baseUrl}`);
+if (!Settings.onlyThisMachine(host)) {
+  console.warn(
+    `The application server listens on ${host}, so other machines can reach it. ` +
+      "Make sure only the gateway can reach it.",
+  );
+}
 
 let stopping = false;
 for (const signal of ["SIGINT", "SIGTERM"] as const) {

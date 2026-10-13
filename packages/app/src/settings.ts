@@ -12,6 +12,13 @@
  * and limitations under the License.
  */
 
+import { BlockList, isIP } from "node:net";
+
+/** The addresses that are reached only from the same machine. */
+const LOOPBACK = new BlockList();
+LOOPBACK.addSubnet("127.0.0.0", 8, "ipv4");
+LOOPBACK.addAddress("::1", "ipv6");
+
 /** Where a program listens. */
 export interface Listening {
   /** The address to listen on. */
@@ -168,5 +175,21 @@ export const Settings = {
       webUrl: `https://${web.host}:${web.port.toString()}/`,
       ...reading.providers(),
     });
+  },
+
+  /**
+   * Whether an address is reached only from the same machine.
+   *
+   * @param host The address a program listens on.
+   * @returns `true` for `localhost` and for a loopback address, such as
+   *   `127.0.0.1` or `::1`.
+   */
+  onlyThisMachine(host: string): boolean {
+    const address = host.trim().toLowerCase();
+    const version = isIP(address);
+    return (
+      address === "localhost" ||
+      (version !== 0 && LOOPBACK.check(address, version === 6 ? "ipv6" : "ipv4"))
+    );
   },
 };

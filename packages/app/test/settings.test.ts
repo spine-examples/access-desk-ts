@@ -53,6 +53,33 @@ describe("The settings should", () => {
     );
   });
 
+  it("tell an address reached only from the same machine from any other", () => {
+    for (const host of [
+      "127.0.0.1",
+      "127.1.2.3",
+      "localhost",
+      "LOCALHOST",
+      "::1",
+      "0:0:0:0:0:0:0:1",
+      "::ffff:127.0.0.1",
+    ]) {
+      expect(Settings.onlyThisMachine(host)).toBe(true);
+    }
+    for (const host of [
+      "0.0.0.0",
+      "::",
+      "192.168.1.10",
+      "10.0.0.5",
+      "server",
+      "127.example.com",
+      "127.999.999.999",
+      "[::1]",
+      "::ffff:10.0.0.5",
+    ]) {
+      expect(Settings.onlyThisMachine(host)).toBe(false);
+    }
+  });
+
   it("refuse a port that is not one", () => {
     expect(() => Settings.ofServer({ ...server, ACCESS_DESK_SERVER_PORT: "eighty" })).toThrow(
       /ACCESS_DESK_SERVER_PORT must be a port/,
