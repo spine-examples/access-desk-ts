@@ -22,6 +22,7 @@ import {
 import { call, eventually, givenGateway, request, stopGateways } from "./given/gateway.js";
 import {
   acceptInvitation,
+  addMember,
   declineInvitation,
   givenInvited,
   givenMaya,
@@ -504,6 +505,21 @@ describe("The gateway should", () => {
     });
 
     it("refuse a command only the application itself gives", async () => {
+      const running = await givenGateway();
+      const noah = await givenMember(running, "noah", "acme");
+
+      const outcome = await addMember(
+        running,
+        { ...noah, organization: "acme" },
+        "acme",
+        "somebody",
+      );
+
+      expect(outcome).not.toBe("ok");
+      expect(await member(running, "acme", "somebody")).toBeUndefined();
+    });
+
+    it("refuse an invitation to another organization than the one entered", async () => {
       const running = await givenGateway();
       const noah = await givenMember(running, "noah", "acme");
 

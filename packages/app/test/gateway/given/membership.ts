@@ -30,6 +30,7 @@ import {
   InvitationStatus,
   OrganizationRole,
 } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
+import { AddOrganizationMemberSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
 import { OrganizationViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
 import type { OrganizationMember } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 
@@ -138,6 +139,37 @@ export function inviteMember(
     as,
     InviteMemberSchema,
     create(InviteMemberSchema, { id: invitationId(organization, email), role }),
+  );
+}
+
+/**
+ * Tries to add a person to an organization through the gateway.
+ *
+ * People are not allowed to do that. The application adds a member itself,
+ * when an invitation is accepted.
+ *
+ * @param running The running application.
+ * @param as Who adds the person.
+ * @param organization The organization's name.
+ * @param person The identifier of the person to add.
+ * @returns `"ok"` when the gateway let the command through, and why not otherwise.
+ */
+export function addMember(
+  running: Running,
+  as: Acting,
+  organization: string,
+  person: string,
+): Promise<string> {
+  return post(
+    running,
+    as,
+    AddOrganizationMemberSchema,
+    create(AddOrganizationMemberSchema, {
+      organizationId: organizationId(organization),
+      person: { uuid: person },
+      name: "Somebody",
+      role: OrganizationRole.ADMINISTRATOR,
+    }),
   );
 }
 
