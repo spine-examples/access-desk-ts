@@ -111,32 +111,33 @@ import { compare, longerThan } from "../../time/interval.js";
 const NO_TIME = create(DurationSchema, {});
 
 /**
- * One access request for a protected resource, driven from submission to a
- * terminal decision.
+ * One request for access to a resource, from its submission to a final
+ * decision.
  *
- * 1. Validate a submission against the resource's request policy, and capture
- *    the managers who may decide it.
- * 2. Have the requester's access to the resource check what the request asks
- *    for: access not already held, or a grant that may be extended. That
- *    changes nothing there. When the check rejects, the submission fails.
- * 3. Assign the accepted request to those managers for a decision.
- * 4. A manager approves or denies it, or the requester cancels it — once.
- * 5. An approval asks for the grant to take effect: a first-time request
+ * 1. A submission is checked against the resource's request policy, and the
+ *    managers who may decide it are noted.
+ * 2. The requester's access to the resource checks what the request asks
+ *    for. New access must not be held already, and an extension needs a
+ *    grant that can be extended. Nothing changes there yet. When the check
+ *    rejects, the submission fails.
+ * 3. The accepted request is assigned to those managers for a decision.
+ * 4. A manager approves or denies it, or the requester cancels it. This
+ *    happens once.
+ * 5. An approval asks for the grant to take effect. A first-time request
  *    creates a grant, and an extension request extends the grant it names.
  *    Only then does the requester's access change.
  * 6. Once the grant is created or extended, the request is approved.
  *
- * A first-time request asks for new access; an extension request asks to keep
- * active access longer by a duration, which fixes the end it proposes.
+ * A first-time request asks for new access. An extension request asks to
+ * keep active access longer by a duration, which fixes the end it proposes.
  */
 export class AccessRequestProcessManager extends ProcessManager<
   AccessRequestId,
   typeof AccessRequestSchema
 > {
   /**
-   * Validates a first-time access request against the resource's policy and,
-   * when it passes, has the access it asks for checked against the access the
-   * requester already holds.
+   * Checks a first-time request against the resource's policy. When it passes,
+   * the access it asks for is checked against what the requester already holds.
    */
   @Assign
   @Throws(ResourceNotOpenForRequests, AccessLevelNotOffered, RequestAlreadyPending)
@@ -173,8 +174,8 @@ export class AccessRequestProcessManager extends ProcessManager<
   }
 
   /**
-   * Validates a request to keep active access longer against the resource's
-   * policy and, when it passes, has the extension checked against its grant.
+   * Checks an extension request against the resource's policy. When it passes,
+   * the extension is checked against its grant.
    */
   @Assign
   @Throws(ResourceNotOpenForRequests, RequestAlreadyPending)
@@ -215,7 +216,7 @@ export class AccessRequestProcessManager extends ProcessManager<
   /**
    * Sends the requested access to be checked once the submission starts.
    *
-   * The check tells whether the requester already holds this access, and
+   * The check shows whether the requester already holds this access, and
    * whether it would last longer than the resource permits.
    */
   @Command
@@ -242,7 +243,7 @@ export class AccessRequestProcessManager extends ProcessManager<
   /**
    * Sends the requested extension to be checked once the submission starts.
    *
-   * The check tells whether the grant gives access now, whether the extended
+   * The check shows whether the grant gives access now, whether the extended
    * access would last longer than the resource permits, and whether the
    * requester already holds access for the added time.
    */
@@ -340,7 +341,7 @@ export class AccessRequestProcessManager extends ProcessManager<
   }
 
   /**
-   * Asks the grant to give an approval its effect.
+   * Puts an approval into effect.
    *
    * A first-time request creates its grant, which shares the request's
    * identifier. An extension request extends the grant it names.
@@ -485,10 +486,7 @@ export class AccessRequestProcessManager extends ProcessManager<
     });
   }
 
-  /**
-   * The request's end without effect, at the step its access was rejected at:
-   * its submission, or its approval.
-   */
+  /** The failure of a request whose access was rejected, at its submission or at its approval. */
   private rejected(): SubmissionFailed | AccessRequestApprovalFailed {
     if (this.state.status === AccessRequestStatus.SUBMISSION_STARTED) {
       return this.submissionFailed();
@@ -504,10 +502,7 @@ export class AccessRequestProcessManager extends ProcessManager<
     });
   }
 
-  /**
-   * The failure of a submission whose access may not be granted, told for the
-   * kind of request it is.
-   */
+  /** The submission failure for the kind of request this is. */
   private submissionFailed(): SubmissionFailed {
     const snapshot = this.requireSubmissionStarted();
     this.update((draft) => {
@@ -519,7 +514,7 @@ export class AccessRequestProcessManager extends ProcessManager<
       : create(AccessRequestSubmissionFailedSchema, failure);
   }
 
-  /** The request details while it is asked whether its access may be granted. */
+  /** The request details, while the submission is being checked. */
   private requireSubmissionStarted(): AccessRequestSnapshot {
     if (this.state.status !== AccessRequestStatus.SUBMISSION_STARTED) {
       throw new Error("Only a request being submitted is settled by its access.");
@@ -527,7 +522,7 @@ export class AccessRequestProcessManager extends ProcessManager<
     return this.requireSnapshot();
   }
 
-  /** The request details while its grant is asked to give the approval its effect. */
+  /** The request details, while the approval is being put into effect. */
   private requireApprovalStarted(): AccessRequestSnapshot {
     if (this.state.status !== AccessRequestStatus.APPROVAL_STARTED) {
       throw new Error("Only a request a manager approved is settled by its grant.");
@@ -535,10 +530,7 @@ export class AccessRequestProcessManager extends ProcessManager<
     return this.requireSnapshot();
   }
 
-  /**
-   * Stores the request details and its manager pool while it is asked whether
-   * the access may be granted.
-   */
+  /** Stores the request details and its managers, while the submission is checked. */
   private store(snapshot: AccessRequestSnapshot, manager: readonly PersonId[]): void {
     this.update((draft) => {
       draft.snapshot = snapshot;
@@ -560,7 +552,7 @@ export class AccessRequestProcessManager extends ProcessManager<
     return policy;
   }
 
-  /** The longest total access the resource permits, as its catalog entry tells now. */
+  /** The longest total access the resource permits now, from its catalog entry. */
   private async maximumDuration(resource: ResourceId | undefined): Promise<Duration | undefined> {
     return resource === undefined
       ? undefined
@@ -568,7 +560,7 @@ export class AccessRequestProcessManager extends ProcessManager<
           ?.maximumDuration;
   }
 
-  /** The authoritative policy level matching the request, or `AccessLevelNotOffered`. */
+  /** The resource's access level that matches the request, or `AccessLevelNotOffered`. */
   private matchLevel(
     id: AccessRequestId,
     policy: ResourcePolicy,
@@ -598,7 +590,7 @@ export class AccessRequestProcessManager extends ProcessManager<
     }
   }
 
-  /** Rejects a request identifier that already names a request lifecycle. */
+  /** Rejects an identifier another request already uses. */
   private assertUnclaimed(): void {
     if (
       this.state.status !== AccessRequestStatus.ARS_UNSPECIFIED ||
@@ -608,7 +600,7 @@ export class AccessRequestProcessManager extends ProcessManager<
     }
   }
 
-  /** The resource managers who may decide the request, deduplicated in policy order. */
+  /** The managers who may decide the request, each once, in the policy's order. */
   private managers(policy: ResourcePolicy): PersonId[] {
     const managers: PersonId[] = [];
     const seen = new Set<string>();

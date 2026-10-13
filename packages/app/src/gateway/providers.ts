@@ -33,23 +33,17 @@ export interface SignInProvider {
   readonly kind: IdentityProvider;
   /** What to call the provider on a sign-in page. */
   readonly label: string;
-  /** The address the person is sent to in order to be confirmed. */
+  /** The provider's page where the person confirms the sign-in. */
   readonly authorizationEndpoint: string;
-  /** The name the provider knows Access Desk by. */
+  /** The client identifier the provider gave Access Desk. */
   readonly clientId: string;
-  /** What Access Desk asks the provider to let it see. */
+  /** The permissions Access Desk asks the provider for. */
   readonly scopes: readonly string[];
   /** Exchanges the provider's answer for the confirmed account. */
   readonly provider: OidcVerifiedIdentityProvider;
 }
 
-/**
- * Asks an identity provider something and tells the console when the provider
- * refuses, with the provider's own reason.
- *
- * The sign-in flow reports every failure the same way, so this is the only
- * place that says what the provider objected to. Nothing secret is printed.
- */
+/** Calls an identity provider, and logs the provider's reason when it refuses. */
 function watched(label: string) {
   return async (address: string, init?: RequestInit): Promise<Response> => {
     const response = await fetch(address, init);
@@ -84,13 +78,9 @@ export interface OAuthApplication {
 /**
  * GitHub as an identity provider.
  *
- * It asks to read the person's public profile and their email addresses.
- * GitHub's token is used for those reads and then forgotten.
- *
- * The account is the number GitHub gives it, which never changes. Its email
- * address is the primary one GitHub has verified. An account without one
- * cannot sign in, because the email address is what ties a person's accounts
- * together.
+ * Access Desk reads the person's profile and their primary email address, and
+ * keeps no GitHub token. An account without a verified primary address cannot
+ * sign in.
  *
  * @param application How Access Desk is registered with GitHub.
  * @returns The provider.
@@ -113,8 +103,8 @@ export function gitHubSignIn(application: OAuthApplication): SignInProvider {
           login: undefined,
           name: undefined,
         };
-        // The profile GitHub returns is read once, for the account. The name
-        // is noted from that same answer, or the login when there is no name.
+        // The name comes from the profile GitHub already returns, or the login
+        // when there is no name.
         const exchange = createGitHubProvider({
           ...settings,
           fetch: async (address, init) => {
@@ -147,10 +137,10 @@ export function gitHubSignIn(application: OAuthApplication): SignInProvider {
 /**
  * Google as an identity provider.
  *
- * It asks for the person's name and email address. An account whose email
+ * Access Desk reads the person's name and email address. An account whose
  * address Google has not verified cannot sign in.
  *
- * Setting it up asks Google where its sign-in addresses are, once.
+ * Setting it up fetches Google's sign-in addresses once.
  *
  * @param application How Access Desk is registered with Google.
  * @returns The provider, or `undefined` when Google could not be reached.
@@ -200,12 +190,12 @@ export async function googleSignIn(
 }
 
 /**
- * A confirmed account that carries its verified email address and name.
+ * A confirmed account with its verified email address and name.
  *
  * @param issuer The identity provider that vouches for the account.
- * @param subject The name the provider gives the account for good.
+ * @param subject The account's permanent identifier with the provider.
  * @param email The email address the provider has verified for the account.
- * @param name The display name, when the provider tells one.
+ * @param name The display name, when the provider gives one.
  * @returns The account, as the sign-in flow carries it.
  */
 export function describe(
@@ -218,11 +208,11 @@ export function describe(
 }
 
 /**
- * The account a confirmed identity describes.
+ * The verified person behind a confirmed identity.
  *
  * @param provider The provider that confirmed it.
  * @param identity The identity the provider confirmed.
- * @returns The account, or `undefined` when the identity carries no verified email address.
+ * @returns The person, or `undefined` when the identity has no verified email address.
  */
 export function personIn(
   provider: IdentityProvider,

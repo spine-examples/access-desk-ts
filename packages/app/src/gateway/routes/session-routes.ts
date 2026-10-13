@@ -21,11 +21,11 @@ import type { Sessions } from "../sessions.js";
 import { REFUSED, UNAUTHENTICATED, UNAVAILABLE, type Route } from "./route.js";
 
 /**
- * The endpoints through which a signed-in person sees who they are, enters an
- * organization, and signs out.
+ * The endpoints for the session, which tell who is signed in, enter an
+ * organization, and sign out.
  *
- * @param route How an endpoint is made.
- * @param desk What the gateway asks of the application.
+ * @param route Makes an endpoint.
+ * @param desk Looks up people and organizations.
  * @param sessions The sessions of the people who have signed in.
  */
 export function sessionRoutes(
@@ -35,31 +35,30 @@ export function sessionRoutes(
 ): BrowserAuthRoute[] {
   return [
     /**
-     * Tells who is signed in and which organizations are theirs. The page
-     * asks when it opens, to learn whether the session it kept is still good,
-     * and again after the person signs in, answers an invitation, or enters
-     * an organization.
+     * Tells who is signed in and which organizations are theirs.
+     *
+     * The page calls it when it opens, and again after the person signs in,
+     * answers an invitation, or enters an organization.
      *
      * Needs a session. Send `{}`.
      *
      * Answers `200` with:
      *
      * - `person: { id, email, name }`, the signed-in person;
-     * - `accounts: [{ provider, subject }]`, the accounts they sign in with,
-     *   such as `github` account `1001`;
+     * - `accounts: [{ provider, subject }]`, the accounts they sign in with;
      * - `organization`, the organization the session has entered, or `null`;
-     * - `organizations: [{ id, name, standing, role }]`, every organization
-     *   the person belongs to or is invited to. `standing` is `member` or
-     *   `invited`. `role` is `member` or `administrator` for a member, and
-     *   `null` for somebody only invited.
+     * - `organizations: [{ id, name, standing, role }]`, the organizations the
+     *   person belongs to or is invited to. `standing` is `member` or
+     *   `invited`. `role` is `member` or `administrator`, or `null` for
+     *   somebody only invited.
      *
-     * Answers `401` when there is no session or it is no longer good.
+     * Answers `401` without a valid session.
      */
     route("/auth/session", async (_body, session) => {
       if (session === undefined) {
         return UNAUTHENTICATED;
       }
-      // Which organizations are a person's to see is the application server's to say.
+      // The application server decides which organizations a person sees.
       const { accounts, standings } = await desk.profile(session.person);
       const views = await Promise.all(
         standings.map(({ organization }) => desk.organization(organization)),
@@ -97,21 +96,19 @@ export function sessionRoutes(
     }),
 
     /**
-     * Enters an organization. The page calls it when the person chooses one
-     * of the organizations they are a member of. Everything the person does
-     * afterwards happens in that organization.
+     * Enters an organization the person is a member of. Everything they do
+     * afterwards happens there.
      *
      * Needs a session. Send `{ organization }`, the `id` of an organization
      * from `/auth/session` whose `standing` is `member`.
      *
      * Answers `200` with `{ token, person: { id, email, name }, organization }`.
-     * `token` is a new session, bound to the organization. The earlier
-     * session stops working, so whatever was open under it closes. To enter
-     * another organization, call this again with the new session.
+     * `token` is a new session for that organization, and the earlier one
+     * stops working. To enter another organization, call this again with the
+     * new session.
      *
      * Answers `401` without a session, `403` when the person is not a member
-     * of that organization, and `503` when the session could not be issued
-     * just now.
+     * of that organization, and `503` when the session could not be issued.
      */
     route("/auth/organization", async (body, session) => {
       const organization = body.organization;
@@ -122,8 +119,8 @@ export function sessionRoutes(
         typeof organization === "string" && organization !== ""
           ? create(OrganizationIdSchema, { uuid: organization })
           : undefined;
-      // Only an organization Identity lists for the person is asked about
-      // them. A made-up identifier never reaches an organization.
+      // Resources is asked only about an organization Identity lists for the
+      // person, so a made-up identifier never reaches it.
       if (
         organizationId === undefined ||
         !(await desk.joined(session.person.id, organizationId)) ||
@@ -140,8 +137,7 @@ export function sessionRoutes(
     }),
 
     /**
-     * Ends the session, so its token stops working. The page calls it when
-     * the person signs out.
+     * Ends the session, so its token stops working.
      *
      * Send `{}` with the session to end.
      *

@@ -112,7 +112,7 @@ export class ResourceAccessAggregate extends Aggregate<
 
   /**
    * Checks the extension a request asks for, without extending the grant, and
-   * tells the end the grant would then have.
+   * works out the end the grant would then have.
    *
    * 1. The grant must give access now.
    * 2. The whole access, extension included, must fit the longest total access

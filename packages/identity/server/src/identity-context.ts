@@ -68,8 +68,9 @@ export async function createIdentityContext(
     .route(RevokeInvitationSchema, (command) => invitationOf(command.id))
     .route(AcceptInvitationSchema, (command) => invitationOf(command.id))
     .route(DeclineInvitationSchema, (command) => invitationOf(command.id));
-  const personRouting = EventRouting.create<PersonId>()
-    .route(InvitationAcceptedSchema, (event) => event.person === undefined ? [] : [event.person]);
+  const personRouting = EventRouting.create<PersonId>().route(InvitationAcceptedSchema, (event) =>
+    event.person === undefined ? [] : [event.person],
+  );
   return BoundedContext.singleTenant("Identity")
     .withGeneratedRegistryRoot(new URL("..", import.meta.url))
     .add(ExternalIdentityProcessManager, { eventRouting: accountRouting })
@@ -85,9 +86,7 @@ export async function createIdentityContext(
     .buildAsync();
 }
 
-/**
- * The account a fact about signing in is for.
- */
+/** The account an event about signing in belongs to. */
 function accountOf(identity: ExternalIdentityId | undefined): ExternalIdentityId[] {
   return identity === undefined ? [] : [identity];
 }
@@ -95,9 +94,8 @@ function accountOf(identity: ExternalIdentityId | undefined): ExternalIdentityId
 /**
  * The invitation a command is about.
  *
- * A signed-in person's email address is kept in lower case. So an invitation
- * is found by the organization and the invited address in lower case, however
- * the address was written.
+ * Email addresses are kept in lower case. So the invited address is put in
+ * lower case before the invitation is looked up, however it was written.
  */
 function invitationOf(id: InvitationId | undefined): InvitationId {
   return create(InvitationIdSchema, {

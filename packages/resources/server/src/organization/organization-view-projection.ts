@@ -38,9 +38,7 @@ export class OrganizationViewProjection extends Projection<
   OrganizationId,
   typeof OrganizationViewSchema
 > {
-  /**
-   * Records one organization in the catalog view.
-   */
+  /** Creates the view of a newly created organization. */
   @Subscribe
   onOrganizationCreated(event: OrganizationCreated): void {
     this.update((draft) => {
@@ -48,9 +46,7 @@ export class OrganizationViewProjection extends Projection<
     });
   }
 
-  /**
-   * Adds one member to the organization view.
-   */
+  /** Adds a member to the organization. */
   @Subscribe
   onOrganizationMemberAdded(event: OrganizationMemberAdded): void {
     const person = event.person;
@@ -67,9 +63,7 @@ export class OrganizationViewProjection extends Projection<
     });
   }
 
-  /**
-   * Reflects a reserved resource in its organization's view.
-   */
+  /** Adds a resource to the organization. */
   @Subscribe
   onResourceAdded(event: ResourceAdded): void {
     const resourceId = event.resourceId;

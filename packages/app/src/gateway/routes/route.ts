@@ -37,21 +37,18 @@ export type Route = (
 ) => BrowserAuthRoute;
 
 /**
- * Tells how the gateway's own endpoints are made.
+ * Makes the gateway's own endpoints, which all work the same way.
  *
- * Every endpoint works the same way:
- *
- * - It takes `POST` with a JSON object as the body, `{}` when there is
- *   nothing to send, of at most 16 KiB.
+ * - An endpoint takes `POST` with a JSON object of at most 16 KiB. Send `{}`
+ *   when there is nothing to send. Anything else is refused.
  * - It answers only the pages allowed to call the gateway, by their `Origin`.
- * - Where it needs a session, the session comes as `Authorization: Bearer
- *   <token>`.
- * - It answers JSON, which is never to be cached. A refusal is `403` with
- *   `{ error: "refused" }`, a missing session `401` with `{ error: "not
- *   signed in" }`, and a passing failure `503` with `{ error: "try again" }`.
- *   A body that is not a JSON object is refused.
- * - A failure nobody foresaw, such as an application server that cannot be
- *   reached, is a passing one. The console says what failed.
+ * - A session comes as `Authorization: Bearer <token>`.
+ * - It answers JSON that must not be cached. A refusal is `403` with
+ *   `{ error: "refused" }`, a missing session `401` with
+ *   `{ error: "not signed in" }`, and a failure that may pass `503` with
+ *   `{ error: "try again" }`.
+ * - An unexpected failure, such as an application server that cannot be
+ *   reached, is answered with `503` and logged.
  *
  * @param origins The addresses of the pages that may call the gateway.
  * @param sessions The sessions of the people who have signed in.

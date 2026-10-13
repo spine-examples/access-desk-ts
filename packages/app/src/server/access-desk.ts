@@ -20,21 +20,21 @@ import { organizationMembersThrough } from "./organization-members.js";
 /** How the application is assembled. */
 export interface AccessDeskOptions {
   /**
-   * Tells the address of the server that hosts the contexts, once it listens.
+   * Returns the address of the application server, once it listens.
    *
-   * An accepted invitation adds the person to the organization's members
-   * through this address.
+   * Identity uses it to add a person to an organization's members when they
+   * accept an invitation.
    */
   readonly server: () => string;
 }
 
 /** The assembled application. */
 export interface AccessDesk {
-  /** The Identity context, which says who a person is and who invited them where. */
+  /** The Identity context, which holds people, their accounts, and invitations. */
   readonly identity: BoundedContext;
   /** The Resources context, which holds each organization, its members, and what it owns. */
   readonly resources: BoundedContext;
-  /** Closes the connections through which Identity reaches the organizations. */
+  /** Closes Identity's connection to the organizations. */
   close(): Promise<void>;
 }
 

@@ -21,9 +21,8 @@ import type { ExternalSignIn } from "./routes/sign-in-routes.js";
 /**
  * The gateway, the only program a browser talks to.
  *
- * It signs people in, keeps their sessions, and decides what each may send
- * on. It holds no part of the application. Everything else it asks of the
- * application server, a separate program, where that server listens.
+ * It signs people in, keeps their sessions, and decides which of their
+ * requests reach the application server.
  */
 
 const settings = gatewaySettingsOf(process.env);
@@ -61,9 +60,8 @@ for (const [key, label] of [
 if (Object.keys(external).length === 0) {
   console.warn("No identity provider is set up, so nobody can sign in.");
 }
-// A browser that leaves or reloads a page abandons the requests it was waiting
-// for. The request then ends as cancelled, which must not bring the gateway
-// down for everybody else. Any other failure nobody handled still does.
+// A browser that leaves or reloads a page cancels its pending requests.
+// That must not stop the gateway. Any other unhandled failure still does.
 const CANCELLED = 1;
 process.on("unhandledRejection", (reason) => {
   if ((reason as { code?: unknown } | null)?.code === CANCELLED) {

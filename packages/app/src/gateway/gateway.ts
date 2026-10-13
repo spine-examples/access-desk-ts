@@ -37,10 +37,7 @@ const CANCEL_MS = 5_000; // 5 seconds.
 
 /** How the gateway is set up. */
 export interface GatewayOptions {
-  /**
-   * The address of the application server.
-   * The gateway reaches the application only through it.
-   */
+  /** The address of the application server. */
   readonly backend: string;
   /** Every type the application's messages use, so commands can be read and judged. */
   readonly registry: TypeRegistryLookup;
@@ -50,10 +47,7 @@ export interface GatewayOptions {
   readonly host?: string;
   /** The port to listen on. Zero picks a free one. */
   readonly port: number;
-  /**
-   * The outside identity providers to sign people in through, such as GitHub
-   * and Google, by the key each is chosen with.
-   */
+  /** The identity providers people sign in through, such as GitHub and Google, by key. */
   readonly external: Readonly<Record<string, ExternalSignIn>>;
 }
 
@@ -68,21 +62,13 @@ export interface Gateway {
 /**
  * Starts the gateway, the only way from a browser to the application.
  *
- * The gateway is a program of its own. It holds no part of the application and
- * reaches the application server over the network, at the address it is given.
+ * A person signs in first, which concerns no organization. They then enter
+ * one of their organizations. Only then may they give commands and read, and
+ * only within that organization.
  *
- * Signing in and working in an organization are separate. A person signs in,
- * which says who they are and concerns no organization. Whichever of their
- * accounts they sign in with, they are the same person, because the accounts
- * share a verified email address. They then see the
- * organizations they belong to and the invitations waiting for them, and
- * enter one organization. Only then may they give commands and read, and only
- * within that organization.
- *
- * The gateway decides who is acting and where. Both come
- * from the session it issued. A request that names another person or another
- * organization is refused, and so is every command only the application
- * itself may give.
+ * The gateway decides who is acting and where, from the session it issued. It
+ * refuses a request that names another person or another organization, and
+ * every command only the application itself may give.
  *
  * @param options How to set the gateway up.
  * @returns The running gateway.
@@ -100,7 +86,6 @@ export async function startGateway(options: GatewayOptions): Promise<Gateway> {
 
   const running = await BrowserServer.open(undefined, {
     backend: { baseUrl: options.backend },
-    // The gateway remembers which browser watches what only while it runs.
     bindings: watching,
     host: options.host ?? "127.0.0.1",
     port: options.port,
@@ -138,15 +123,14 @@ export async function startGateway(options: GatewayOptions): Promise<Gateway> {
 }
 
 /**
- * Tells how the gateway cancels a subscription as the browser that holds a
- * session would.
+ * Cancels a subscription the way its browser would.
  *
- * Spine clears a subscription everywhere it is kept only when it is cancelled
- * through the gateway's own address. So the gateway calls itself there, from
- * a page it answers, with the session's token.
+ * Spine fully clears a subscription only when it is canceled through the
+ * gateway's own address. So the gateway calls itself there, with the
+ * session's token.
  *
- * @param address Tells the address the gateway listens at, once it listens.
- * @param origin The address of a page that may call the gateway, when there is one.
+ * @param address Returns the address the gateway listens at, once it listens.
+ * @param origin The address of a page that may call the gateway.
  */
 function cancellingThrough(
   address: () => string | undefined,
@@ -176,14 +160,16 @@ function cancellingThrough(
 }
 
 /**
- * Who is acting and in which organization, as the session says. This replaces
- * whatever the request itself claims.
+ * Builds the context of a request from its session.
  *
- * @param principal Whoever the session stands for.
+ * The context names the signed-in person as the actor, and the organization
+ * they have entered as the tenant.
+ *
+ * @param principal The person the session belongs to.
  * @param timestamp When the request was received.
- * @param inOrganization Whether the request acts in the organization the
- *   person has entered. A request for Identity does not, because Identity
- *   belongs to no organization.
+ * @param inOrganization Whether to include the organization. A request for
+ *   Identity is sent without one.
+ * @returns The actor, the tenant when there is one, and the timestamp.
  */
 function trusted(
   principal: AuthenticatedPrincipal,

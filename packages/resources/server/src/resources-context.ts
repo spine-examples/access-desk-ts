@@ -63,10 +63,10 @@ import { ResourceAccessAggregate } from "./access/grant/resource-access-aggregat
 import { AccessGrantViewProjection } from "./access/grant/access-grant-view-projection.js";
 
 /**
- * Builds the multitenant Resources bounded context.
+ * Builds the Resources bounded context.
  *
- * The organization is the tenant: `CreateOrganization` is issued in the tenant
- * scope of the organization it creates (`OrganizationId = TenantId`).
+ * It is multitenant, and each organization is its own tenant. So
+ * `CreateOrganization` is given in the tenant of the organization it creates.
  *
  * @returns The assembled Resources bounded context.
  */
@@ -118,16 +118,16 @@ export async function createResourcesContext(): Promise<BoundedContext> {
 }
 
 /**
- * The request a person's access to a resource answers.
+ * The request an event from a person's access answers.
  *
- * The access answers the request that asked for a check when it was submitted,
- * or for a grant to be created or extended when it was approved.
+ * That is the request that asked for a check when it was submitted, or for a
+ * grant when it was approved.
  */
 function requestOf(answer: { readonly request?: AccessRequestId | undefined }): AccessRequestId[] {
   return answer.request === undefined ? [] : [answer.request];
 }
 
-/** The commands through which a request asks something of a person's access to a resource. */
+/** The commands a request gives to a person's access to a resource. */
 const askedByRequest = [
   CheckRequestedAccessSchema,
   CheckRequestedExtensionSchema,
@@ -136,10 +136,9 @@ const askedByRequest = [
 ] as const;
 
 /**
- * The request whose command a person's access to a resource rejected.
+ * The request whose command a person's access rejected.
  *
- * A rejection of anything a request did not ask for, such as a revocation or a
- * submission the request itself rejected, answers no request.
+ * A rejection of anything else, such as a revocation, belongs to no request.
  */
 function requestRejected(context: EventContext): AccessRequestId[] {
   const rejected = context.rejection?.command?.message;
@@ -150,7 +149,7 @@ function requestRejected(context: EventContext): AccessRequestId[] {
     : requestOf(anyUnpack(rejected, asked) ?? {});
 }
 
-/** The grant an event tells about. */
+/** The grant an event is about. */
 function grantOf(event: { readonly id?: AccessGrantId | undefined }): AccessGrantId[] {
   return event.id === undefined ? [] : [event.id];
 }

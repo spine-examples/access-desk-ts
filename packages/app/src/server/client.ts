@@ -26,32 +26,32 @@ import {
   TopicSchema,
 } from "@spine-event-engine/proto/client";
 
-/**
- * A client of the application server that sends commands, queries, and
- * subscriptions to one organization, or to what belongs to no organization.
- */
+/** A client of the application server for one organization, or for what belongs to none. */
 export type ServerClient = ReturnType<typeof Client.usingTransport>;
 
 /**
  * The one connection a program keeps to the application server.
  *
- * Every command, query, and subscription names the organization it concerns, or
- * none. All of them share this one connection, however many organizations there are.
+ * Each organization has a client of its own, and all clients share this
+ * connection.
  */
 export class ServerConnection {
-  /** Tells the address of the application server. */
+  /** Returns the address of the application server. */
   readonly #address: () => string;
   /** The connection, once the first client was made. */
   #open:
     | { sessions: Http2SessionManager; transport: ReturnType<typeof createGrpcTransport> }
     | undefined;
-  /** UUID-keyed organization clients; `undefined` identifies the tenantless client. */
+  /**
+   * The client of each organization, by the organization's identifier.
+   * The client for what belongs to no organization is kept under `undefined`.
+   */
   readonly #clients = new Map<string | undefined, ServerClient>();
 
   /**
-   * @param address Tells the address of the application server.
-   *   It is read when the connection is first
-   *   needed, so the server need not listen before then.
+   * @param address Returns the address of the application server. It is called
+   *   when the connection is first needed, so the server need not listen
+   *   before then.
    */
   constructor(address: () => string) {
     this.#address = address;
@@ -101,43 +101,32 @@ export class ServerConnection {
   }
 }
 
-/**
- * A client of the application server acting as one person or program, which
- * sends their commands, queries, and subscriptions.
- */
+/** A client that acts as one person or program. */
 export type ServerRequest = ReturnType<ServerClient["onBehalfOf"]>;
 
-/** How long the application server has to say that a command took effect, unless told otherwise. */
+/** How long to wait for the event by default. */
 export const PATIENCE_MS = 10_000; // 10 seconds.
 
-/** A command and the event that tells it took effect. */
+/** A command and the event it is expected to cause. */
 export interface Awaited<Command extends GenMessage<Message>, Event extends GenMessage<Message>> {
-  /** The kind of command to give. */
+  /** The type of the command. */
   readonly command: Command;
-  /** The command. */
+  /** The command to post. */
   readonly message: MessageShape<Command>;
-  /** The kind of event that tells the command took effect. */
+  /** The type of the event to wait for. */
   readonly event: Event;
-  /** Whether an event of that kind is the one this command caused. */
+  /** Whether an event is the one this command caused. */
   readonly answers: (event: MessageShape<Event>) => boolean;
 }
 
 /**
- * Gives a command and waits for the event that tells it took effect.
+ * Posts a command and waits for the event it causes.
  *
- * A command is only accepted when it is given. What it led to shows in an
- * event a moment later.
- *
- * 1. It starts watching for the event.
- * 2. It gives the command.
- * 3. It waits for an event that answers the command.
- *
- * @param request The client that gives the command, as one actor in one
- *   organization.
- * @param awaited The command, and the event that tells it took effect.
- * @param patienceMs How long to wait for the event. Ten seconds when left out.
- * @returns The event, or `undefined` when the command was not accepted or no
- *   such event came in time.
+ * @param request The client that posts the command.
+ * @param awaited The command and the event to wait for.
+ * @param patienceMs How long to wait for the event. Ten seconds by default.
+ * @returns The event, or `undefined` if the command was not accepted or the
+ *   event did not come in time.
  */
 export async function postAndAwait<
   Command extends GenMessage<Message>,
@@ -194,7 +183,7 @@ export async function postAndAwait<
 /**
  * Reads one read model by its identifier.
  *
- * @param request The client that reads, as one actor in one organization.
+ * @param request The client that reads.
  * @param schema The kind of read model.
  * @param idSchema The kind of its identifier.
  * @param id The identifier.
@@ -229,7 +218,7 @@ export async function readById<
 /**
  * Finds the read models of one kind that a query describes.
  *
- * @param request The client that reads, as one actor in one organization.
+ * @param request The client that reads.
  * @param schema The kind of read model.
  * @param query What to look for, built from the read model's generated query.
  * @returns Those that match.

@@ -22,10 +22,7 @@ import {
 } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import type { SignedIn } from "./access-desk.js";
 
-/**
- * The name under which a session's principal carries what the gateway knows
- * the session by, apart from its token.
- */
+/** The principal attribute that holds a session's identifier. */
 export const SESSION = "session";
 
 /** How long a session lasts. */
@@ -33,12 +30,9 @@ const SESSION_MILLISECONDS = 8 * 60 * 60 * 1_000; // 8 hours.
 
 /** A session a request carries. */
 export interface Session {
-  /**
-   * What the gateway knows the session by, apart from its token. It never
-   * leaves the gateway.
-   */
+  /** The session's identifier inside the gateway. It is never sent to the browser. */
   readonly id: string;
-  /** The token the browser presents the session with. */
+  /** The token the browser sends. */
   readonly credential: { readonly kind: "cookie"; readonly value: string };
   /** The signed-in person. */
   readonly person: SignedIn;
@@ -46,30 +40,29 @@ export interface Session {
   readonly organization: OrganizationId | undefined;
 }
 
-/** Whatever is opened under sessions and must not outlast them. */
+/** What is opened under a session and must end with it, such as subscriptions. */
 export interface OpenedUnderSessions {
   /**
-   * Closes what is opened under a session that is about to end, in the
-   * session's own name.
+   * Closes what a session opened, while the session's token still works.
    *
-   * @param session The session, while its token still works.
+   * @param session The session that is about to end.
    */
   closeFor(session: Session): Promise<void>;
   /**
-   * Stops what is still open under a session that has ended.
+   * Stops what is still open after a session has ended.
    *
-   * @param session What the gateway knows the session by.
+   * @param session The identifier of the session.
    */
   stop(session: string): Promise<void>;
 }
 
 /** The signed-in person as the gateway sends them over HTTP. */
 export interface BrowserPerson {
-  /** The PersonId UUID serialized as a scalar HTTP JSON field. */
+  /** The person's identifier. */
   readonly id: string;
-  /** The EmailAddress value serialized as a scalar HTTP JSON field. */
+  /** The person's email address. */
   readonly email: string;
-  /** The display name serialized as a scalar HTTP JSON field. */
+  /** The person's display name. */
   readonly name: string;
 }
 
@@ -79,18 +72,16 @@ export interface Issued {
   readonly token: string;
   /** The signed-in person the session stands for. */
   readonly person: BrowserPerson;
-  /** The OrganizationId UUID serialized as scalar HTTP JSON, or null. */
+  /** The identifier of the organization the session has entered, or `null`. */
   readonly organization: string | null;
 }
 
 /**
  * The sessions of the people who have signed in.
  *
- * A session says who a person is and, once they have entered one, which
- * organization they work in. The browser holds it as a bearer token. Sessions
- * are kept in memory, so everybody is signed out when the gateway stops.
- *
- * When a session is ended, whatever was opened under it is stopped too.
+ * A session says who a person is and which organization they have entered.
+ * The browser holds it as a bearer token. Ending a session also stops
+ * everything opened under it.
  */
 export class Sessions {
   /**
@@ -98,12 +89,12 @@ export class Sessions {
    * ends after eight hours, or when it is ended.
    */
   readonly #sessions = new OpaqueSessions({ ttlMilliseconds: SESSION_MILLISECONDS });
-  /** Whatever is opened under the sessions, when anything is. */
+  /** What is opened under the sessions, when anything is. */
   readonly #opened: OpenedUnderSessions | undefined;
 
   /**
-   * @param opened Whatever is opened under the sessions and must not outlast
-   *   them. Nothing when left out.
+   * @param opened What is opened under the sessions and must end with them.
+   *   Nothing when left out.
    */
   constructor(opened?: OpenedUnderSessions) {
     this.#opened = opened;
@@ -134,7 +125,7 @@ export class Sessions {
       : undefined;
   }
 
-  /** Starts a session for whoever a sign-in through an outside provider confirmed. */
+  /** Starts a session for a person an identity provider confirmed. */
   create(principal: AuthenticatedPrincipal): ReturnType<OpaqueSessions["create"]> {
     return this.#sessions.create({
       ...principal,
@@ -142,12 +133,12 @@ export class Sessions {
     });
   }
 
-  /** Whoever a bearer token stands for, when its session is still good. */
+  /** The person a token stands for, while its session is valid. */
   resolve(token: string): ReturnType<OpaqueSessions["resolve"]> {
     return this.#sessions.resolve({ kind: "cookie", value: token });
   }
 
-  /** The session a request carries, when it is still good. */
+  /** The session a request carries, when it is still valid. */
   async of(request: Request): Promise<Session | undefined> {
     const token = /^Bearer (\S+)$/.exec(request.headers.get("authorization") ?? "")?.[1];
     if (token === undefined) {
@@ -173,14 +164,11 @@ export class Sessions {
   }
 
   /**
-   * Ends a session, so its token stops working and whatever was opened under
-   * it stops.
+   * Ends a session and stops everything opened under it.
    *
-   * 1. What is opened under the session is closed in the session's own name,
-   *    while its token still works.
+   * 1. What the session opened is closed, while its token still works.
    * 2. The token stops working.
-   * 3. What is still open under the session, or was opened meanwhile, is
-   *    stopped.
+   * 3. Anything still open, or opened in the meantime, is stopped.
    */
   async end(session: Session): Promise<void> {
     await this.#opened?.closeFor(session);

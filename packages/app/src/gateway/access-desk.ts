@@ -70,26 +70,20 @@ export interface VerifiedPerson {
 export interface SignedIn {
   /** The person's identifier, by which Access Desk knows them everywhere. */
   readonly id: PersonId;
-  /** The email address the person was registered under, which invitations name. */
+  /** The email address the person is registered under. */
   readonly email: EmailAddress;
   /** The person's display name. */
   readonly name: string;
 }
 
-/**
- * How a signed-in person stands with an organization. A member may enter it.
- * An invited person holds a pending invitation and may enter once they accept.
- */
+/** Whether a person is a member of an organization, or only invited to it. */
 export type Standing = "member" | "invited";
 
-/** What Identity tells about a signed-in person. */
+/** What Identity knows about a signed-in person. */
 export interface Profile {
-  /**
-   * The accounts the person signs in with, each as its provider and the name
-   * the provider gives it.
-   */
+  /** The accounts the person signs in with. */
   readonly accounts: readonly { readonly provider: string; readonly subject: string }[];
-  /** Each organization the person may see, paired with their standing in it. */
+  /** The person's organizations, each with their standing in it. */
   readonly standings: readonly {
     readonly organization: OrganizationId;
     readonly standing: Standing;
@@ -97,12 +91,10 @@ export interface Profile {
 }
 
 /**
- * What the gateway asks of Identity and Resources.
+ * The application, as the gateway uses it.
  *
- * Signing in is asked of Identity and concerns no organization. Everything
- * about an organization is asked of Resources, and only for a person who has
- * already signed in. Nothing here takes the person or the organization from
- * the browser.
+ * It signs people in through Identity, and looks up what the gateway needs to
+ * know about an organization in Resources.
  */
 export class AccessDesk {
   /** The gateway's connection to the application server. */
@@ -126,14 +118,13 @@ export class AccessDesk {
   }
 
   /**
-   * Signs in whoever holds an account an identity provider has just confirmed.
+   * Signs in the person a confirmed account belongs to.
    *
-   * 1. An account Access Desk already knows signs in the person it belongs to.
-   * 2. An account it has not seen is linked first. It joins the person who
-   *    its email address is registered for, or a new person is registered for it.
+   * An account that is new to Access Desk is linked to its person first.
    *
    * @param verified The account the identity provider confirmed.
-   * @returns The signed-in person, or `undefined` when Identity did not settle whose account it is.
+   * @returns The signed-in person, or `undefined` when the account could not be
+   *   linked.
    */
   async signIn(verified: VerifiedPerson): Promise<SignedIn | undefined> {
     const { id, email, name } = verified;
@@ -176,12 +167,10 @@ export class AccessDesk {
   }
 
   /**
-   * The accounts a signed-in person signs in with, and each organization they
-   * may see, paired with their standing in it.
+   * A signed-in person's accounts and organizations.
    *
-   * A person is a member of the organizations whose invitations they
-   * accepted, and is invited to those whose invitations of their email
-   * address still wait.
+   * The person is a member where they accepted an invitation, and invited where
+   * an invitation still waits for their answer.
    */
   async profile(person: SignedIn): Promise<Profile> {
     const [invitations, view] = await Promise.all([
@@ -211,16 +200,13 @@ export class AccessDesk {
     };
   }
 
-  /**
-   * Whether Identity lists an organization among those a person is a member
-   * of, which it does once they have accepted its invitation.
-   */
+  /** Whether a person is a member of an organization, as Identity knows it. */
   async joined(person: PersonId, organization: OrganizationId): Promise<boolean> {
     const view = await readById(this.#identity, PersonViewSchema, PersonIdSchema, person);
     return view?.organization.some((joined) => joined.uuid === organization.uuid) ?? false;
   }
 
-  /** What an organization records about itself, when it exists. */
+  /** An organization with its members and resources, when it exists. */
   organization(organization: OrganizationId): Promise<OrganizationView | undefined> {
     return readById(
       this.#in(organization),
@@ -239,7 +225,7 @@ export class AccessDesk {
     return view?.member.find((candidate) => candidate.person?.uuid === person.uuid);
   }
 
-  /** Whether the person is one of the managers of a resource of the organization. */
+  /** Whether a person manages a resource of an organization. */
   async manages(
     organization: OrganizationId,
     person: PersonId,
@@ -254,7 +240,7 @@ export class AccessDesk {
     return item?.policy?.manager.some((manager) => manager.uuid === person.uuid) ?? false;
   }
 
-  /** Whether the person is the one who made an access request of the organization. */
+  /** Whether a person made an access request in an organization. */
   async requested(
     organization: OrganizationId,
     person: PersonId,

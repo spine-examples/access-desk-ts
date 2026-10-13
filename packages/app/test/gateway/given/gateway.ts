@@ -286,7 +286,7 @@ export function browserClient(running: Running, as: Acting) {
 }
 
 /**
- * Gives a command through the gateway as the browser client does.
+ * Sends a command through the gateway.
  *
  * @param running The running application.
  * @param as Who the browser acts as.

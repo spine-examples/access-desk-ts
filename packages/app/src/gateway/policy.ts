@@ -70,7 +70,7 @@ interface Signed {
   readonly name: string;
 }
 
-/** Who is asking, and where, once the gateway has established both. */
+/** A signed-in person, in the organization they have entered. */
 interface Asking extends Signed {
   /** The organization the person has entered. */
   readonly organization: OrganizationId;
@@ -80,7 +80,7 @@ interface Asking extends Signed {
   readonly administrator: boolean;
 }
 
-/** Says whether somebody may give one kind of command. */
+/** Whether somebody may give one kind of command. */
 interface CommandRule<Who> {
   readonly schema: GenMessage<Message>;
   readonly allows: (command: Message, who: Who, desk: AccessDesk) => boolean | Promise<boolean>;
@@ -93,7 +93,7 @@ function rule<Who, Schema extends GenMessage<Message>>(
   return { schema, allows: (command, who, desk) => allows(command as never, who, desk) };
 }
 
-/** Whether an invitation is the one an organization holds for the signed-in person. */
+/** Whether an invitation was sent to the signed-in person's email address. */
 function invitesThem(
   id: { readonly invitee?: EmailAddress | undefined } | undefined,
   signed: Signed,
@@ -101,9 +101,7 @@ function invitesThem(
   return id?.invitee?.value.trim().toLowerCase() === signed.email.value;
 }
 
-/**
- * The commands a signed-in person may give before entering any organization.
- */
+/** The commands a signed-in person may give before entering an organization. */
 const SIGNED_IN_COMMANDS: readonly CommandRule<Signed>[] = [
   rule(
     AcceptInvitationSchema,
@@ -120,13 +118,12 @@ const SIGNED_IN_COMMANDS: readonly CommandRule<Signed>[] = [
 ];
 
 /**
- * The commands a member may give in the organization they have entered, and
- * on what condition.
+ * The commands a member may give in their organization, each with its
+ * condition.
  *
- * Where a command names the person who acts, that person must be the one who
- * signed in. Where it names an organization, that must be the one entered.
- * The finer rules, such as which manager may decide which request, remain
- * with the domain.
+ * A command must name the signed-in person as the one acting, and the
+ * organization they have entered. Finer rules, such as which manager decides
+ * which request, stay in the domain.
  */
 const MEMBER_COMMANDS: readonly CommandRule<Asking>[] = [
   rule(
@@ -185,11 +182,9 @@ function managesOrAdministers(
 }
 
 /**
- * The one condition a request puts on the read models it asks for, when it
- * puts exactly one: that a column of theirs equals a value.
+ * The filter of a query that has exactly one, of the form `column = value`.
  *
- * A request that names read models by their identifiers, or puts several
- * conditions or none, has no such condition.
+ * A query by identifiers, or with several filters or none, has no such filter.
  */
 function onlyCondition(
   target: Target,
@@ -218,8 +213,8 @@ function onlyCondition(
 }
 
 /**
- * Whether a request asks only for the read models that name the person in one
- * of their columns, such as the requests they made or the grants they hold.
+ * Whether a query is filtered to the person's own records, such as the
+ * requests they made or the grants they hold.
  */
 function asksForOwn(target: Target, column: string, person: PersonId): boolean {
   const condition = onlyCondition(target);
@@ -229,10 +224,7 @@ function asksForOwn(target: Target, column: string, person: PersonId): boolean {
   );
 }
 
-/**
- * Whether a request asks only for what concerns one resource, and the person
- * is one of that resource's managers.
- */
+/** Whether a query is filtered to one resource, and the person manages that resource. */
 function asksForManaged(
   target: Target,
   asking: Asking,
@@ -250,10 +242,7 @@ function asksForManaged(
   );
 }
 
-/**
- * Whether a request asks for the one read model kept under the person's own
- * identifier, and nothing else.
- */
+/** Whether a query asks only for the record kept under the person's own identifier. */
 function asksForOwnById(target: Target, person: PersonId): boolean {
   if (target.criterion.case !== "filters") {
     return false;
@@ -268,23 +257,21 @@ function asksForOwnById(target: Target, person: PersonId): boolean {
   );
 }
 
-/** Says whether a member may read or watch one kind of read model, by what the request asks for. */
+/** Whether a member may read or watch what a query asks for. */
 type ReadRule = (target: Target, asking: Asking, desk: AccessDesk) => boolean | Promise<boolean>;
 
 /**
- * What a member may read and watch in the organization they have entered, and
- * on what condition.
+ * What a member may read and watch in their organization.
  *
- * The organization and its catalog of resources are every member's to see.
- * Everything else a person sees only where it concerns them:
+ * Every member sees the organization and its catalog of resources. The rest a
+ * person sees only where it concerns them:
  *
  * - the requests they made, and those for a resource they manage;
  * - the grants they hold, and those to a resource they manage;
- * - their own queue of requests awaiting their decision.
+ * - their own queue of requests to decide.
  *
- * So a request for requests or grants must say whose it wants, or which
- * resource's, by that one column alone. A read model that is not listed is
- * nobody's to see.
+ * So a query for requests or grants must filter by the person or by the
+ * resource. Anything not listed here cannot be read.
  */
 const MEMBER_READS: ReadonlyMap<string, ReadRule> = new Map<string, ReadRule>([
   [TypeUrls.derive(OrganizationViewSchema), () => true],
@@ -312,7 +299,7 @@ function mayRead(target: Target, asking: Asking, desk: AccessDesk): boolean | Pr
 
 const INVITATIONS = TypeUrls.derive(InvitationViewSchema);
 
-/** The kinds of message that concern no single organization, because Identity handles them. */
+/** The messages Identity handles, which belong to no organization. */
 const OUTSIDE_ORGANIZATIONS: ReadonlySet<string> = new Set([
   INVITATIONS,
   ...[
@@ -324,10 +311,10 @@ const OUTSIDE_ORGANIZATIONS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Whether a request is for Identity, which belongs to no organization.
+ * Whether a request is for Identity.
  *
- * Such a request must reach the application server without naming an
- * organization, even when the person has entered one.
+ * Such a request is sent without an organization, even when the person has
+ * entered one.
  *
  * @param request A request that reached the gateway.
  */
@@ -345,11 +332,10 @@ export function concernsNoOrganization(request: IncomingRequest): boolean {
 }
 
 /**
- * Whether a query asks for the invitations of one organization and nothing
- * else.
+ * Whether a query asks only for the invitations of one organization.
  *
- * Invitations of every organization are kept together, so a query for them
- * must say which organization's it wants, by that column alone.
+ * Invitations of all organizations are kept together, so the query must
+ * filter by organization.
  */
 function asksForInvitationsOf(target: Target, organization: OrganizationId): boolean {
   const condition = target.type === INVITATIONS ? onlyCondition(target) : undefined;
@@ -360,21 +346,18 @@ function asksForInvitationsOf(target: Target, organization: OrganizationId): boo
 }
 
 /**
- * Decides, for each request that reaches the gateway, whether the signed-in
- * person may make it.
+ * Decides whether a signed-in person may make a request.
  *
- * 1. A signed-in person may answer an invitation sent to their own email
- *    address, whether or not they have entered an organization.
- * 2. For anything else the person must have entered an organization, and be
- *    a member of it, as the organization says now.
- * 3. A command must be one a member may give, on its condition.
- * 4. A query or a subscription must be for something the member may see:
- *    the organization and its catalog, or what concerns the member
- *    themselves. An administrator may also read the organization's
- *    invitations.
+ * 1. Anybody signed in may answer an invitation sent to their own email
+ *    address.
+ * 2. Anything else requires having entered an organization, and being a
+ *    member of it now.
+ * 3. A command must be one a member may give.
+ * 4. A query or a subscription must be for something the member may see. An
+ *    administrator may also read the organization's invitations.
  *
- * @param desk What the gateway asks of the contexts.
- * @returns The decision the gateway asks for each request.
+ * @param desk Looks up what a rule needs to know.
+ * @returns The check the gateway runs on each request.
  */
 export function authorization(
   desk: AccessDesk,

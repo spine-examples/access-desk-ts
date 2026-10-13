@@ -29,32 +29,33 @@ import { PATIENCE_MS, postAndAwait, readById, ServerConnection } from "./client.
 /** The name under which the application itself acts. */
 const SYSTEM = "access-desk";
 
-/** The organizations' members, with the connections that reach them. */
+/** The service that adds members to organizations, with the connection it holds. */
 export interface ReachedOrganizationMembers extends OrganizationMembers {
   /** Closes the connection to the organizations. */
   close(): Promise<void>;
 }
 
 /**
- * Reaches the organizations' members through the application server.
+ * Adds people to the members of organizations, through the application
+ * server.
  *
  * An organization keeps its members itself, as its own tenant in Resources.
- * Identity adds a person who accepted an invitation by asking the
- * organization, as any client of the server would:
+ * So Identity adds a person who accepted an invitation the way any client of
+ * the server would:
  *
- * 1. It asks whether the person is a member already. If so, nothing more is
- *    done, and they keep the role they hold.
- * 2. It asks the organization to add the person, and waits for it to say
- *    that it has.
- * 3. When no word comes in time, it asks once more whether the person is a
- *    member. When they are not, it says so on the console and fails.
+ * 1. It checks whether the person is a member already. If so, nothing more
+ *    is done, and they keep the role they hold.
+ * 2. It asks the organization to add the person, and waits for
+ *    the organization to confirm.
+ * 3. If no confirmation comes in time, it checks once more whether the
+ *    person is a member. If they are not, it logs that and fails.
  *
  * So an acceptance that failed halfway can be given again.
  *
- * @param server Tells the address of the application server, once it listens.
- * @param patienceMs How long an organization has to say that it added a
- *   person. Ten seconds when left out.
- * @returns The organizations' members, as Identity reaches them.
+ * @param server Returns the address of the application server, once it listens.
+ * @param patienceMs How long to wait for the organization to confirm. Ten
+ *   seconds when left out.
+ * @returns The service, as Identity uses it.
  */
 export function organizationMembersThrough(
   server: () => string,

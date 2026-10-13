@@ -37,19 +37,19 @@ export class AccessRequestViewProjection extends Projection<
   AccessRequestId,
   typeof AccessRequestViewSchema
 > {
-  /** Seeds a newly submitted first-time request as pending a decision. */
+  /** Creates the view of a newly submitted first-time request, as pending. */
   @Subscribe
   onAccessRequestSubmitted(event: AccessRequestSubmitted): void {
     this.seedPending(event.snapshot);
   }
 
-  /** Seeds a newly submitted extension request as pending a decision. */
+  /** Creates the view of a newly submitted extension request, as pending. */
   @Subscribe
   onAccessExtensionRequestSubmitted(event: AccessExtensionRequestSubmitted): void {
     this.seedPending(event.snapshot);
   }
 
-  /** Records who approved the request and when, while its access is being granted. */
+  /** Sets who approved the request and when, while its access is being granted. */
   @Subscribe
   onAccessRequestApprovalStarted(event: AccessRequestApprovalStarted): void {
     this.update((draft) => {
@@ -58,25 +58,25 @@ export class AccessRequestViewProjection extends Projection<
     });
   }
 
-  /** Records an approved request as its terminal outcome. */
+  /** Marks the request as approved. */
   @Subscribe
   onAccessRequestApproved(event: AccessRequestApproved): void {
     this.settle(AccessRequestStatus.APPROVED, event.snapshot);
   }
 
-  /** Records a failed approval as the request's terminal outcome. */
+  /** Marks the request as failed at approval. */
   @Subscribe
   onAccessRequestApprovalFailed(event: AccessRequestApprovalFailed): void {
     this.settle(AccessRequestStatus.APPROVAL_FAILED, event.snapshot);
   }
 
-  /** Records a denied request as its terminal outcome, with who denied it and when. */
+  /** Marks the request as denied, and sets who denied it and when. */
   @Subscribe
   onAccessRequestDenied(event: AccessRequestDenied): void {
     this.settle(AccessRequestStatus.DENIED, event.snapshot, event);
   }
 
-  /** Records a canceled request as its terminal outcome. */
+  /** Marks the request as canceled. */
   @Subscribe
   onAccessRequestCanceled(event: AccessRequestCanceled): void {
     this.settle(AccessRequestStatus.CANCELED, event.snapshot);

@@ -51,22 +51,18 @@ import type { OrganizationMembers } from "./organization-members.js";
  *    role they will hold.
  * 2. The invitation waits. An administrator may take it back, and may later
  *    invite the same person again.
- * 3. The person, having signed in, accepts the invitation or declines it.
- *    They answer for themselves: nobody accepts or declines on behalf of
- *    another person. A person who declined may be invited again.
- * 4. When a person accepts, the organization adds them to its members with
- *    the role the invitation gives. The invitation is accepted once the
- *    organization has done so. When that fails halfway, the invitation keeps
- *    waiting and the person may accept again: the organization adds them
- *    only once.
+ * 3. The signed-in person accepts or declines. Nobody answers for another
+ *    person. A person who declined may be invited again.
+ * 4. When the person accepts, the organization adds them to its members with
+ *    the role the invitation gives. Only then is the invitation accepted. If
+ *    adding fails, the invitation keeps waiting, and the person may accept
+ *    again.
  */
 export class InvitationProcessManager extends ProcessManager<
   InvitationId,
   typeof InvitationSchema
 > {
-  /**
-   * The service that adds a person to the members of an organization.
-   */
+  /** The service that adds a person to the members of an organization. */
   readonly #members: OrganizationMembers;
 
   /**
@@ -109,11 +105,10 @@ export class InvitationProcessManager extends ProcessManager<
   }
 
   /**
-   * Accepts the invitation for the invited person while it is waiting.
+   * Accepts a waiting invitation.
    *
-   * The person who accepts is the one acting, never somebody they name. The
-   * organization adds them to its members first. Only when it has done so is
-   * the invitation accepted. Otherwise, it keeps waiting.
+   * The person who accepts must be the one acting. The organization adds them
+   * to its members first, and the invitation is accepted only once it has.
    */
   @Assign
   @Throws(NotInvitedPerson, InvitationNotPending)
@@ -137,9 +132,9 @@ export class InvitationProcessManager extends ProcessManager<
   }
 
   /**
-   * Declines the invitation for the invited person while it is waiting.
+   * Declines a waiting invitation.
    *
-   * The person who declines is the one acting, never somebody they name.
+   * The person who declines must be the one acting.
    */
   @Assign
   @Throws(NotInvitedPerson, InvitationNotPending)

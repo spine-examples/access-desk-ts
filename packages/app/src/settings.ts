@@ -38,15 +38,11 @@ export interface ServerSettings {
 export interface GatewaySettings {
   /** Where the gateway listens. */
   readonly listening: Listening;
-  /**
-   * The address at which the gateway reaches the application server, which is
-   * where that server listens.
-   */
+  /** The address of the application server. */
   readonly serverUrl: string;
   /**
-   * The HTTPS address people open the application at, which is where the web
-   * client listens. An identity provider sends a person back there, and only
-   * that page may call the gateway.
+   * The HTTPS address people open the application at. Identity providers
+   * send people back there, and only that page may call the gateway.
    */
   readonly webUrl: string;
   /** GitHub as an identity provider, when it is set up. */
@@ -56,25 +52,25 @@ export interface GatewaySettings {
 }
 
 /**
- * Reads settings from the environment and remembers everything that is wrong
- * with them, so one message can tell it all.
+ * Reads settings from the environment and collects every problem, so one
+ * error can report them all.
  */
 class Reading {
-  /** The environment the settings are read from, by the name of each. */
+  /** The environment the settings are read from. */
   readonly #environment: NodeJS.ProcessEnv;
-  /** What is wrong with the settings read so far, one sentence for each problem. */
+  /** The problems found so far, one sentence each. */
   readonly #problems: string[] = [];
 
   constructor(environment: NodeJS.ProcessEnv) {
     this.#environment = environment;
   }
 
-  /** A setting as it is written, or nothing when it is not there. */
+  /** A setting's value, or an empty string when it is not set. */
   #value(name: string): string {
     return this.#environment[name]?.trim() ?? "";
   }
 
-  /** A setting that must be there. */
+  /** A setting that must be set. */
   text(name: string): string {
     const value = this.#value(name);
     if (value === "") {
@@ -83,7 +79,7 @@ class Reading {
     return value;
   }
 
-  /** A port that must be there. */
+  /** A port that must be set. */
   port(name: string): number {
     const text = this.text(name);
     const port = /^\d+$/.test(text) ? Number(text) : Number.NaN;
@@ -93,15 +89,12 @@ class Reading {
     return port;
   }
 
-  /** Where a program listens, by the settings that name its host and port. */
+  /** Where a program listens, from its `_HOST` and `_PORT` settings. */
   listening(prefix: string): Listening {
     return { host: this.text(`${prefix}_HOST`), port: this.port(`${prefix}_PORT`) };
   }
 
-  /**
-   * An identity provider, which is set up by both of its settings or by
-   * neither.
-   */
+  /** An identity provider. Both of its settings must be set, or neither. */
   provider(prefix: string): ProviderSettings | undefined {
     const clientId = this.#value(`${prefix}_CLIENT_ID`);
     const clientSecret = this.#value(`${prefix}_CLIENT_SECRET`);
@@ -117,10 +110,7 @@ class Reading {
     return { clientId, clientSecret };
   }
 
-  /**
-   * Gives back the settings that were read, or says everything that is wrong
-   * with them.
-   */
+  /** Returns the settings, or throws one error that lists every problem. */
   done<Settings>(settings: Settings): Settings {
     if (this.#problems.length > 0) {
       throw new Error(
@@ -135,7 +125,7 @@ class Reading {
 }
 
 /**
- * How the application server is set up, as the environment says.
+ * The application server's settings, read from the environment.
  *
  * @param environment The environment the program runs in.
  * @returns The settings of the application server.
@@ -146,7 +136,7 @@ export function serverSettingsOf(environment: NodeJS.ProcessEnv): ServerSettings
 }
 
 /**
- * How the gateway is set up, as the environment says.
+ * The gateway's settings, read from the environment.
  *
  * @param environment The environment the program runs in.
  * @returns The settings of the gateway.
