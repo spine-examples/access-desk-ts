@@ -293,9 +293,35 @@ describe("What people watch through the gateway should", () => {
     expect(unopened).not.toBe(hers);
   });
 
-  it("leave a session's subscriptions to be stopped when they cannot be cancelled", async () => {
+  it("be cancelled on a later try, when the first one fails", async () => {
+    let tries = 0;
     await watching.close();
-    watching = new Watching(() => Promise.reject(new Error("The gateway cannot be called.")));
+    watching = new Watching(() => {
+      tries += 1;
+      return tries < 3 ? Promise.reject(new Error("Not this time.")) : Promise.resolve();
+    });
+    const maya = watcher("maya", "acme");
+    const id = await subscribed(maya);
+    watching.claim(principal("maya", "acme", "session-1"), opening(id));
+    const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    await watching.closeFor({
+      id: "session-1",
+      credential: { kind: "cookie", value: "token-1" },
+    } as Session);
+
+    expect(tries).toBe(3);
+    expect(warned).not.toHaveBeenCalled();
+    warned.mockRestore();
+  });
+
+  it("leave a session's subscriptions to be stopped when they cannot be cancelled", async () => {
+    let tries = 0;
+    await watching.close();
+    watching = new Watching(() => {
+      tries += 1;
+      return Promise.reject(new Error("The gateway cannot be called."));
+    });
     const maya = watcher("maya", "acme");
     const id = await subscribed(maya);
     watching.claim(principal("maya", "acme", "session-1"), opening(id));
@@ -309,6 +335,8 @@ describe("What people watch through the gateway should", () => {
     expect(stream.stopped).toBe(false);
     await watching.stop("session-1");
 
+    // The cancel was tried three times before it was given up.
+    expect(tries).toBe(3);
     expect(warned).toHaveBeenCalled();
     expect(stream.stopped).toBe(true);
     warned.mockRestore();

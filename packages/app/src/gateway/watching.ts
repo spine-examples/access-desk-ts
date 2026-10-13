@@ -37,6 +37,12 @@ export type CancelAsBrowser = (
   token: string,
 ) => Promise<void>;
 
+/** How many times the gateway tries to cancel a subscription of a session about to end. */
+const CANCEL_ATTEMPTS = 3;
+
+/** How long the gateway waits before it tries to cancel a subscription again. */
+const CANCEL_PAUSE_MS = 100;
+
 /** One subscription a browser holds. */
 interface Watched {
   /** The subscription, as the gateway handed it to the browser. */
@@ -69,7 +75,8 @@ interface Watched {
  *
  * 1. While the session is still valid, the gateway cancels each subscription
  *    the way its browser would. That clears it in the gateway and on the
- *    application server.
+ *    application server. A cancel that fails is tried again, three times in
+ *    all.
  * 2. Once the session has ended, anything still open is stopped in the
  *    gateway. The browser is told nothing more, though Spine remembers the
  *    subscription until the gateway stops.
@@ -194,7 +201,8 @@ export class Watching implements SubscriptionBindings, OpenedUnderSessions {
   /**
    * Cancels everything a session opened, while its token still works.
    *
-   * What cannot be cancelled this way is left for {@link stop}.
+   * A cancel that fails is tried again, three times in all.
+   * What still cannot be canceled is left for {@link stop}.
    *
    * @param session The session that is about to end.
    */
@@ -205,12 +213,22 @@ export class Watching implements SubscriptionBindings, OpenedUnderSessions {
     }
     const opened = [...this.#watched.values()].filter((watched) => watched.session === session.id);
     const cancelled = await Promise.allSettled(
-      opened.map(({ subscription }) =>
-        cancelAsBrowser(
-          { kind: "public-subscription", bytes: subscription.slice() },
-          session.credential.value,
-        ),
-      ),
+      opened.map(async ({ subscription }) => {
+        for (let attempt = 1; ; attempt++) {
+          try {
+            await cancelAsBrowser(
+              { kind: "public-subscription", bytes: subscription.slice() },
+              session.credential.value,
+            );
+            return;
+          } catch (error) {
+            if (attempt === CANCEL_ATTEMPTS) {
+              throw error;
+            }
+            await new Promise((resolve) => setTimeout(resolve, CANCEL_PAUSE_MS));
+          }
+        }
+      }),
     );
     for (const outcome of cancelled) {
       if (outcome.status === "rejected") {
