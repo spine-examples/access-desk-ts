@@ -43,9 +43,9 @@ interface Watched {
   readonly subscription: Uint8Array;
   /** The person and the organization the subscription was created for. */
   readonly context: ActorContext;
-  /** The session that last opened the subscription, once one has. */
+  /** The session that opened the subscription, once one has. */
   session: string | undefined;
-  /** Ends the open stream of changes, once there is one. */
+  /** Ends the open stream of changes, while there is one. */
   stream: AbortController | undefined;
 }
 
@@ -132,6 +132,9 @@ export class Watching implements SubscriptionBindings, OpenedUnderSessions {
    * subscription matters, and only by the person and in the organization the
    * subscription was created for.
    *
+   * A subscription that is open already stays with the session that opened
+   * it. Spine refuses to open it a second time, so the attempt changes nothing.
+   *
    * @param principal The person the session stands for.
    * @param request The request the gateway allowed.
    */
@@ -141,6 +144,7 @@ export class Watching implements SubscriptionBindings, OpenedUnderSessions {
     }
     const watched = this.#watched.get(request.subscription.id?.value ?? "");
     if (
+      watched?.stream === undefined &&
       watched?.context.actor?.value === principal.id &&
       this.#organizationOf(watched.context) === principal.attributes?.organization
     ) {
@@ -155,18 +159,25 @@ export class Watching implements SubscriptionBindings, OpenedUnderSessions {
     const watched = this.#watched.get(input.id);
     if (
       watched === undefined ||
+      watched.stream !== undefined ||
       watched.context.actor?.value !== input.context.actor?.value ||
       this.#organizationOf(watched.context) !== this.#organizationOf(input.context)
     ) {
-      // Spine's store refuses anybody the subscription was not created for.
+      // Spine's store refuses anybody the subscription was not created for,
+      // and a subscription that is open already.
       return this.#kept.activate(input);
     }
     const stream = new AbortController();
     watched.stream = stream;
-    return this.#kept.activate({
-      ...input,
-      signal: AbortSignal.any([input.signal, stream.signal]),
-    });
+    return this.#kept
+      .activate({ ...input, signal: AbortSignal.any([input.signal, stream.signal]) })
+      .finally(() => {
+        // The stream is over, so there is nothing left to stop. If it failed,
+        // Spine lets the subscription be opened again.
+        if (watched.stream === stream) {
+          watched.stream = undefined;
+        }
+      });
   }
 
   /** Stops a subscription its browser no longer wants. */

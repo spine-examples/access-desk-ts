@@ -273,7 +273,8 @@ type ReadRule = (target: Target, asking: Asking, desk: AccessDesk) => boolean | 
  * - their own queue of requests to decide.
  *
  * So a query for requests or grants must filter by the person or by the
- * resource. Anything not listed here cannot be read.
+ * resource. The decision queue is asked for by its identifier, which is the
+ * manager's own. Anything not listed here cannot be read.
  */
 const MEMBER_READS: ReadonlyMap<string, ReadRule> = new Map<string, ReadRule>([
   [TypeUrls.derive(OrganizationViewSchema), () => true],

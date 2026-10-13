@@ -227,6 +227,31 @@ describe("What people watch through the gateway should", () => {
     expect(stream.stopped).toBe(true);
   });
 
+  it("stay with the session that opened it, when another session tries to open it again", async () => {
+    const maya = watcher("maya", "acme");
+    const id = await subscribed(maya);
+    watching.claim(principal("maya", "acme", "session-1"), opening(id));
+    const stream = await opened(id, maya);
+
+    // The same person, in a second session, tries to open what is open already.
+    // Spine keeps the attempt waiting while the stream runs, then refuses it.
+    watching.claim(principal("maya", "acme", "session-2"), opening(id));
+    const again = watching.activate({
+      id,
+      context: maya,
+      nowMs: Date.now(),
+      signal: new AbortController().signal,
+      onDefinition: () => Promise.resolve(),
+    });
+
+    await watching.stop("session-2");
+    expect(stream.stopped).toBe(false);
+
+    await watching.stop("session-1");
+    expect(stream.stopped).toBe(true);
+    expect(await again).toEqual({ kind: "denied" });
+  });
+
   it("not be taken over by somebody it was not made for", async () => {
     const maya = watcher("maya", "acme");
     const id = await subscribed(maya);
