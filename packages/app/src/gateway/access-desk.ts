@@ -45,13 +45,7 @@ import {
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
 import { ResourceCatalogItemSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_pb.js";
 import type { OrganizationMember } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
-import {
-  find,
-  postAndAwait,
-  readById,
-  type ServerConnection,
-  type ServerRequest,
-} from "../server/client.js";
+import { ServerRequests, type ServerConnection, type ServerRequest } from "../server/client.js";
 
 /** The name under which the gateway itself acts. */
 const GATEWAY = "access-desk-gateway";
@@ -128,7 +122,7 @@ export class AccessDesk {
    */
   async signIn(verified: VerifiedPerson): Promise<SignedIn | undefined> {
     const { id, email, name } = verified;
-    const known = await readById(
+    const known = await ServerRequests.readById(
       this.#identity,
       ExternalIdentityViewSchema,
       ExternalIdentityIdSchema,
@@ -139,8 +133,8 @@ export class AccessDesk {
       return undefined;
     }
     // The account is linked a moment before the person shows with it.
-    const view = await eventually(() =>
-      readById(this.#identity, PersonViewSchema, PersonIdSchema, holder),
+    const view = await AccessDesk.#eventually(() =>
+      ServerRequests.readById(this.#identity, PersonViewSchema, PersonIdSchema, holder),
     );
     return view?.emailAddress === undefined
       ? undefined
@@ -157,7 +151,7 @@ export class AccessDesk {
     email: EmailAddress,
     name: string,
   ): Promise<PersonId | undefined> {
-    const linked = await postAndAwait(this.#identity, {
+    const linked = await ServerRequests.postAndAwait(this.#identity, {
       command: LinkExternalIdentitySchema,
       message: create(LinkExternalIdentitySchema, { id, emailAddress: email, name }),
       event: ExternalIdentityLinkedSchema,
@@ -174,12 +168,12 @@ export class AccessDesk {
    */
   async profile(person: SignedIn): Promise<Profile> {
     const [invitations, view] = await Promise.all([
-      find(
+      ServerRequests.find(
         this.#identity,
         InvitationViewSchema,
         InvitationViewQuery.create().invitee().is(person.email).build(),
       ),
-      readById(this.#identity, PersonViewSchema, PersonIdSchema, person.id),
+      ServerRequests.readById(this.#identity, PersonViewSchema, PersonIdSchema, person.id),
     ]);
     const standings = new Map<string, Profile["standings"][number]>();
     for (const invitation of invitations) {
@@ -202,13 +196,18 @@ export class AccessDesk {
 
   /** Whether a person is a member of an organization, as Identity knows it. */
   async joined(person: PersonId, organization: OrganizationId): Promise<boolean> {
-    const view = await readById(this.#identity, PersonViewSchema, PersonIdSchema, person);
+    const view = await ServerRequests.readById(
+      this.#identity,
+      PersonViewSchema,
+      PersonIdSchema,
+      person,
+    );
     return view?.organization.some((joined) => joined.uuid === organization.uuid) ?? false;
   }
 
   /** An organization with its members and resources, when it exists. */
   organization(organization: OrganizationId): Promise<OrganizationView | undefined> {
-    return readById(
+    return ServerRequests.readById(
       this.#in(organization),
       OrganizationViewSchema,
       OrganizationIdSchema,
@@ -231,7 +230,7 @@ export class AccessDesk {
     person: PersonId,
     resource: ResourceId,
   ): Promise<boolean> {
-    const item = await readById(
+    const item = await ServerRequests.readById(
       this.#in(organization),
       ResourceCatalogItemSchema,
       ResourceIdSchema,
@@ -246,7 +245,7 @@ export class AccessDesk {
     person: PersonId,
     request: AccessRequestId,
   ): Promise<boolean> {
-    const view = await readById(
+    const view = await ServerRequests.readById(
       this.#in(organization),
       AccessRequestViewSchema,
       AccessRequestIdSchema,
@@ -254,18 +253,18 @@ export class AccessDesk {
     );
     return view?.snapshot?.requester?.uuid === person.uuid;
   }
-}
 
-/** Reads until something is there, for up to ten seconds. */
-async function eventually<Value>(
-  read: () => Promise<Value | undefined>,
-): Promise<Value | undefined> {
-  const deadline = Date.now() + 10_000;
-  for (;;) {
-    const value = await read();
-    if (value !== undefined || Date.now() >= deadline) {
-      return value;
+  /** Reads until something is there, for up to ten seconds. */
+  static async #eventually<Value>(
+    read: () => Promise<Value | undefined>,
+  ): Promise<Value | undefined> {
+    const deadline = Date.now() + 10_000;
+    for (;;) {
+      const value = await read();
+      if (value !== undefined || Date.now() >= deadline) {
+        return value;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25));
     }
-    await new Promise((resolve) => setTimeout(resolve, 25));
   }
 }

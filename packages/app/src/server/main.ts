@@ -13,8 +13,8 @@
  */
 
 import { Server } from "@spine-event-engine/server";
-import { assembleAccessDesk } from "./access-desk.js";
-import { serverSettingsOf } from "../settings.js";
+import { AccessDesk } from "./access-desk.js";
+import { Settings } from "../settings.js";
 
 /**
  * The application server.
@@ -23,10 +23,10 @@ import { serverSettingsOf } from "../settings.js";
  * sessions, or identity providers.
  */
 
-const { host, port } = serverSettingsOf(process.env).listening;
+const { host, port } = Settings.ofServer(process.env).listening;
 
 const listening: { address?: string } = {};
-const contexts = await assembleAccessDesk({
+const contexts = await AccessDesk.assemble({
   server: () => {
     if (listening.address === undefined) {
       throw new Error("The application server does not listen yet.");
@@ -44,12 +44,11 @@ listening.address = server.baseUrl;
 console.log(`Access Desk application server: ${server.baseUrl}`);
 
 let stopping = false;
-async function stop(): Promise<void> {
-  if (!stopping) {
-    stopping = true;
-    await server.close();
-    await contexts.close();
-  }
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+  process.once(signal, () => {
+    if (!stopping) {
+      stopping = true;
+      void server.close().then(() => contexts.close());
+    }
+  });
 }
-process.once("SIGINT", () => void stop());
-process.once("SIGTERM", () => void stop());

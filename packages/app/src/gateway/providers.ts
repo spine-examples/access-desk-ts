@@ -75,155 +75,156 @@ export interface OAuthApplication {
   readonly clientSecret: string;
 }
 
-/**
- * GitHub as an identity provider.
- *
- * Access Desk reads the person's profile and their primary email address, and
- * keeps no GitHub token. An account without a verified primary address cannot
- * sign in.
- *
- * @param application How Access Desk is registered with GitHub.
- * @returns The provider.
- */
-export function gitHubSignIn(application: OAuthApplication): SignInProvider {
-  const settings = { ...application, includeVerifiedPrimaryEmail: true };
-  const { authorizationEndpoint, recommendedScopes, provider } = createGitHubProvider(settings);
-  return {
-    kind: IdentityProvider.GITHUB,
-    label: "GitHub",
-    authorizationEndpoint,
-    clientId: application.clientId,
-    // The sign-in flow requires `openid`. GitHub knows no such scope and
-    // leaves it out of what it grants.
-    scopes: [...new Set(["openid", ...recommendedScopes, "user:email"])],
-    provider: {
-      issuer: provider.issuer,
-      async exchangeAuthorizationCode(input) {
-        const profile: { login: string | undefined; name: string | undefined } = {
-          login: undefined,
-          name: undefined,
-        };
-        // The name comes from the profile GitHub already returns, or the login
-        // when there is no name.
-        const exchange = createGitHubProvider({
-          ...settings,
-          fetch: async (address, init) => {
-            const response = await watched("GitHub")(address, init);
-            if (new URL(address).pathname === "/user" && response.ok) {
-              const user: unknown = await response.clone().json();
-              if (typeof user === "object" && user !== null) {
-                const { login, name } = user as Record<string, unknown>;
-                profile.login = typeof login === "string" ? login : undefined;
-                profile.name = typeof name === "string" && name.trim() !== "" ? name : undefined;
+/** The identity providers people sign in through. */
+export const SignInProvider = {
+  /**
+   * GitHub as an identity provider.
+   *
+   * Access Desk reads the person's profile and their primary email address, and
+   * keeps no GitHub token. An account without a verified primary address cannot
+   * sign in.
+   *
+   * @param application How Access Desk is registered with GitHub.
+   * @returns The provider.
+   */
+  gitHub(application: OAuthApplication): SignInProvider {
+    const settings = { ...application, includeVerifiedPrimaryEmail: true };
+    const { authorizationEndpoint, recommendedScopes, provider } = createGitHubProvider(settings);
+    return {
+      kind: IdentityProvider.GITHUB,
+      label: "GitHub",
+      authorizationEndpoint,
+      clientId: application.clientId,
+      // The sign-in flow requires `openid`. GitHub knows no such scope and
+      // leaves it out of what it grants.
+      scopes: [...new Set(["openid", ...recommendedScopes, "user:email"])],
+      provider: {
+        issuer: provider.issuer,
+        async exchangeAuthorizationCode(input) {
+          const profile: { login: string | undefined; name: string | undefined } = {
+            login: undefined,
+            name: undefined,
+          };
+          // The name comes from the profile GitHub already returns, or the login
+          // when there is no name.
+          const exchange = createGitHubProvider({
+            ...settings,
+            fetch: async (address, init) => {
+              const response = await watched("GitHub")(address, init);
+              if (new URL(address).pathname === "/user" && response.ok) {
+                const user: unknown = await response.clone().json();
+                if (typeof user === "object" && user !== null) {
+                  const { login, name } = user as Record<string, unknown>;
+                  profile.login = typeof login === "string" ? login : undefined;
+                  profile.name = typeof name === "string" && name.trim() !== "" ? name : undefined;
+                }
               }
-            }
-            return response;
-          },
-        });
-        const identity = await exchange.provider.exchangeAuthorizationCode(input);
-        const email = identity?.claims?.email;
-        if (identity === undefined || email === undefined) {
-          console.warn(
-            "GitHub did not confirm an account with one verified primary email address.",
+              return response;
+            },
+          });
+          const identity = await exchange.provider.exchangeAuthorizationCode(input);
+          const email = identity?.claims?.email;
+          if (identity === undefined || email === undefined) {
+            console.warn(
+              "GitHub did not confirm an account with one verified primary email address.",
+            );
+            return undefined;
+          }
+          return ConfirmedIdentity.of(
+            identity.issuer,
+            identity.subject,
+            email,
+            profile.name ?? profile.login,
           );
-          return undefined;
-        }
-        return describe(identity.issuer, identity.subject, email, profile.name ?? profile.login);
+        },
       },
-    },
-  };
-}
+    };
+  },
 
-/**
- * Google as an identity provider.
- *
- * Access Desk reads the person's name and email address. An account whose
- * address Google has not verified cannot sign in.
- *
- * Setting it up fetches Google's sign-in addresses once.
- *
- * @param application How Access Desk is registered with Google.
- * @returns The provider, or `undefined` when Google could not be reached.
- */
-export async function googleSignIn(
-  application: OAuthApplication,
-): Promise<SignInProvider | undefined> {
-  // The provider sends no client secret unless told how. Google expects it
-  // with the code exchange.
-  const google = await createGoogleProvider({
-    ...application,
-    clientAuthentication: "client_secret_post",
-    fetch: watched("Google"),
-  });
-  if (google === undefined) {
-    return undefined;
-  }
-  return {
-    kind: IdentityProvider.GOOGLE,
-    label: "Google",
-    authorizationEndpoint: google.authorizationEndpoint,
-    clientId: application.clientId,
-    scopes: google.recommendedScopes,
-    provider: {
-      issuer: google.provider.issuer,
-      async exchangeAuthorizationCode(input) {
-        const identity = await google.provider.exchangeAuthorizationCode(input);
-        if (identity === undefined) {
-          console.warn(
-            "Google did not confirm the account. Its answer to the sign-in code was refused or failed the checks.",
-          );
-          return undefined;
-        }
-        const { email, email_verified: verified, name } = identity.claims ?? {};
-        if (email === undefined || verified !== "true") {
-          console.warn(
-            email === undefined
-              ? "Google confirmed the account but gave no email address for it."
-              : "Google confirmed the account, but its email address is not verified.",
-          );
-          return undefined;
-        }
-        return describe(identity.issuer, identity.subject, email, name);
+  /**
+   * Google as an identity provider.
+   *
+   * Access Desk reads the person's name and email address. An account whose
+   * address Google has not verified cannot sign in.
+   *
+   * Setting it up fetches Google's sign-in addresses once.
+   *
+   * @param application How Access Desk is registered with Google.
+   * @returns The provider, or `undefined` when Google could not be reached.
+   */
+  async google(application: OAuthApplication): Promise<SignInProvider | undefined> {
+    // The provider sends no client secret unless told how. Google expects it
+    // with the code exchange.
+    const google = await createGoogleProvider({
+      ...application,
+      clientAuthentication: "client_secret_post",
+      fetch: watched("Google"),
+    });
+    if (google === undefined) {
+      return undefined;
+    }
+    return {
+      kind: IdentityProvider.GOOGLE,
+      label: "Google",
+      authorizationEndpoint: google.authorizationEndpoint,
+      clientId: application.clientId,
+      scopes: google.recommendedScopes,
+      provider: {
+        issuer: google.provider.issuer,
+        async exchangeAuthorizationCode(input) {
+          const identity = await google.provider.exchangeAuthorizationCode(input);
+          if (identity === undefined) {
+            console.warn(
+              "Google did not confirm the account. Its answer to the sign-in code was refused or failed the checks.",
+            );
+            return undefined;
+          }
+          const { email, email_verified: verified, name } = identity.claims ?? {};
+          if (email === undefined || verified !== "true") {
+            console.warn(
+              email === undefined
+                ? "Google confirmed the account but gave no email address for it."
+                : "Google confirmed the account, but its email address is not verified.",
+            );
+            return undefined;
+          }
+          return ConfirmedIdentity.of(identity.issuer, identity.subject, email, name);
+        },
       },
-    },
-  };
-}
+    };
+  },
+};
 
-/**
- * A confirmed account with its verified email address and name.
- *
- * @param issuer The identity provider that vouches for the account.
- * @param subject The account's permanent identifier with the provider.
- * @param email The email address the provider has verified for the account.
- * @param name The display name, when the provider gives one.
- * @returns The account, as the sign-in flow carries it.
- */
-export function describe(
-  issuer: string,
-  subject: string,
-  email: string,
-  name: string | undefined,
-): ExternalIdentity {
-  return { issuer, subject, claims: { email, name: name ?? email } };
-}
+/** An account an identity provider has confirmed. */
+export const ConfirmedIdentity = {
+  /**
+   * A confirmed account with its verified email address and name.
+   *
+   * @param issuer The identity provider that vouches for the account.
+   * @param subject The account's permanent identifier with the provider.
+   * @param email The email address the provider has verified for the account.
+   * @param name The display name, when the provider gives one.
+   * @returns The account, as the sign-in flow carries it.
+   */
+  of(issuer: string, subject: string, email: string, name: string | undefined): ExternalIdentity {
+    return { issuer, subject, claims: { email, name: name ?? email } };
+  },
 
-/**
- * The verified person behind a confirmed identity.
- *
- * @param provider The provider that confirmed it.
- * @param identity The identity the provider confirmed.
- * @returns The person, or `undefined` when the identity has no verified email address.
- */
-export function personIn(
-  provider: IdentityProvider,
-  identity: ExternalIdentity,
-): VerifiedPerson | undefined {
-  const { email, name } = identity.claims ?? {};
-  return email === undefined
-    ? undefined
-    : {
-        id: create(ExternalIdentityIdSchema, { provider, subject: identity.subject }),
-        email: create(EmailAddressSchema, { value: email }),
-        name: name ?? email,
-      };
-}
+  /**
+   * The verified person behind a confirmed identity.
+   *
+   * @param provider The provider that confirmed it.
+   * @param identity The identity the provider confirmed.
+   * @returns The person, or `undefined` when the identity has no verified email address.
+   */
+  personIn(provider: IdentityProvider, identity: ExternalIdentity): VerifiedPerson | undefined {
+    const { email, name } = identity.claims ?? {};
+    return email === undefined
+      ? undefined
+      : {
+          id: create(ExternalIdentityIdSchema, { provider, subject: identity.subject }),
+          email: create(EmailAddressSchema, { value: email }),
+          name: name ?? email,
+        };
+  },
+};

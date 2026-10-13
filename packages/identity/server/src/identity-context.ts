@@ -49,57 +49,58 @@ export interface IdentityContextOptions {
 }
 
 /**
- * Builds the Identity bounded context, which says who a person is, which
+ * The Identity bounded context, which says who a person is, which
  * organizations invited them, and which they are a member of.
- *
- * @param options How to assemble the context.
- * @returns The assembled Identity bounded context.
  */
-export async function createIdentityContext(
-  options: IdentityContextOptions,
-): Promise<BoundedContext> {
-  const accountRouting = EventRouting.create<ExternalIdentityId>()
-    .route(PersonEmailRegisteredSchema, (event) => accountOf(event.invoker))
-    .route(PersonEmailAlreadyRegisteredSchema, (rejection) => accountOf(rejection.invoker))
-    .route(PersonRegisteredSchema, (event) => accountOf(event.account))
-    .route(SignInAccountAddedSchema, (event) => accountOf(event.account));
-  const invitationCommands = CommandRouting.create<InvitationId>()
-    .route(InviteMemberSchema, (command) => invitationOf(command.id))
-    .route(RevokeInvitationSchema, (command) => invitationOf(command.id))
-    .route(AcceptInvitationSchema, (command) => invitationOf(command.id))
-    .route(DeclineInvitationSchema, (command) => invitationOf(command.id));
-  const personRouting = EventRouting.create<PersonId>().route(InvitationAcceptedSchema, (event) =>
-    event.person === undefined ? [] : [event.person],
-  );
-  return BoundedContext.singleTenant("Identity")
-    .withGeneratedRegistryRoot(new URL("..", import.meta.url))
-    .add(ExternalIdentityProcessManager, { eventRouting: accountRouting })
-    .add(ExternalIdentityViewProjection)
-    .add(PersonEmailAggregate)
-    .add(PersonAggregate)
-    .add(PersonViewProjection, { eventRouting: personRouting })
-    .add(InvitationProcessManager, {
-      commandRouting: invitationCommands,
-      onCreate: (entity) => new InvitationProcessManager(entity, options.members),
-    })
-    .add(InvitationViewProjection)
-    .buildAsync();
-}
+export const IdentityContext = {
+  /**
+   * Builds the context.
+   *
+   * @param options How to assemble the context.
+   * @returns The assembled Identity bounded context.
+   */
+  async create(options: IdentityContextOptions): Promise<BoundedContext> {
+    /** The account an event about signing in belongs to. */
+    const accountOf = (identity: ExternalIdentityId | undefined): ExternalIdentityId[] =>
+      identity === undefined ? [] : [identity];
+    /**
+     * The invitation a command is about.
+     *
+     * Email addresses are kept in lower case. So the invited address is put in
+     * lower case before the invitation is looked up, however it was written.
+     */
+    const invitationOf = (id: InvitationId | undefined): InvitationId =>
+      create(InvitationIdSchema, {
+        ...(id?.organization === undefined ? {} : { organization: id.organization }),
+        invitee: { value: (id?.invitee?.value ?? "").trim().toLowerCase() },
+      });
 
-/** The account an event about signing in belongs to. */
-function accountOf(identity: ExternalIdentityId | undefined): ExternalIdentityId[] {
-  return identity === undefined ? [] : [identity];
-}
-
-/**
- * The invitation a command is about.
- *
- * Email addresses are kept in lower case. So the invited address is put in
- * lower case before the invitation is looked up, however it was written.
- */
-function invitationOf(id: InvitationId | undefined): InvitationId {
-  return create(InvitationIdSchema, {
-    ...(id?.organization === undefined ? {} : { organization: id.organization }),
-    invitee: { value: (id?.invitee?.value ?? "").trim().toLowerCase() },
-  });
-}
+    const accountRouting = EventRouting.create<ExternalIdentityId>()
+      .route(PersonEmailRegisteredSchema, (event) => accountOf(event.invoker))
+      .route(PersonEmailAlreadyRegisteredSchema, (rejection) => accountOf(rejection.invoker))
+      .route(PersonRegisteredSchema, (event) => accountOf(event.account))
+      .route(SignInAccountAddedSchema, (event) => accountOf(event.account));
+    const invitationCommands = CommandRouting.create<InvitationId>()
+      .route(InviteMemberSchema, (command) => invitationOf(command.id))
+      .route(RevokeInvitationSchema, (command) => invitationOf(command.id))
+      .route(AcceptInvitationSchema, (command) => invitationOf(command.id))
+      .route(DeclineInvitationSchema, (command) => invitationOf(command.id));
+    const personRouting = EventRouting.create<PersonId>().route(
+      InvitationAcceptedSchema,
+      (event) => (event.person === undefined ? [] : [event.person]),
+    );
+    return BoundedContext.singleTenant("Identity")
+      .withGeneratedRegistryRoot(new URL("..", import.meta.url))
+      .add(ExternalIdentityProcessManager, { eventRouting: accountRouting })
+      .add(ExternalIdentityViewProjection)
+      .add(PersonEmailAggregate)
+      .add(PersonAggregate)
+      .add(PersonViewProjection, { eventRouting: personRouting })
+      .add(InvitationProcessManager, {
+        commandRouting: invitationCommands,
+        onCreate: (entity) => new InvitationProcessManager(entity, options.members),
+      })
+      .add(InvitationViewProjection)
+      .buildAsync();
+  },
+};

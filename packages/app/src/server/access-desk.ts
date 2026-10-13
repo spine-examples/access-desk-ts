@@ -13,9 +13,9 @@
  */
 
 import type { BoundedContext } from "@spine-event-engine/server";
-import { createIdentityContext } from "@access-desk/identity-server";
-import { createResourcesContext } from "@access-desk/resources-server";
-import { organizationMembersThrough } from "./organization-members.js";
+import { IdentityContext } from "@access-desk/identity-server";
+import { ResourcesContext } from "@access-desk/resources-server";
+import { ReachedOrganizationMembers } from "./organization-members.js";
 
 /** How the application is assembled. */
 export interface AccessDeskOptions {
@@ -38,15 +38,18 @@ export interface AccessDesk {
   close(): Promise<void>;
 }
 
-/**
- * Assembles Access Desk from its contexts.
- *
- * @param options How to assemble the application.
- * @returns The contexts, ready to be hosted by a server.
- */
-export async function assembleAccessDesk(options: AccessDeskOptions): Promise<AccessDesk> {
-  const members = organizationMembersThrough(options.server);
-  const identity = await createIdentityContext({ members });
-  const resources = await createResourcesContext();
-  return { identity, resources, close: () => members.close() };
-}
+/** Assembles the application. */
+export const AccessDesk = {
+  /**
+   * Assembles Access Desk from its contexts.
+   *
+   * @param options How to assemble the application.
+   * @returns The contexts, ready to be hosted by a server.
+   */
+  async assemble(options: AccessDeskOptions): Promise<AccessDesk> {
+    const members = ReachedOrganizationMembers.through(options.server);
+    const identity = await IdentityContext.create({ members });
+    const resources = await ResourcesContext.create();
+    return { identity, resources, close: () => members.close() };
+  },
+};

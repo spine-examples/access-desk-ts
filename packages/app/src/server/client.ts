@@ -119,118 +119,115 @@ export interface Awaited<Command extends GenMessage<Message>, Event extends GenM
   readonly answers: (event: MessageShape<Event>) => boolean;
 }
 
-/**
- * Posts a command and waits for the event it causes.
- *
- * @param request The client that posts the command.
- * @param awaited The command and the event to wait for.
- * @param patienceMs How long to wait for the event. Ten seconds by default.
- * @returns The event, or `undefined` if the command was not accepted or the
- *   event did not come in time.
- */
-export async function postAndAwait<
-  Command extends GenMessage<Message>,
-  Event extends GenMessage<Message>,
->(
-  request: ServerRequest,
-  awaited: Awaited<Command, Event>,
-  patienceMs: number = PATIENCE_MS,
-): Promise<MessageShape<Event> | undefined> {
-  const watching = await request.createSubscription(
-    create(TopicSchema, {
-      id: create(TopicIdSchema, { value: `awaited-${crypto.randomUUID()}` }),
-      target: create(TargetSchema, {
-        type: TypeUrls.derive(awaited.event),
-        criterion: { case: "includeAll", value: true },
+/** The requests a program makes to the application server. */
+export const ServerRequests = {
+  /**
+   * Posts a command and waits for the event it causes.
+   *
+   * @param request The client that posts the command.
+   * @param awaited The command and the event to wait for.
+   * @param patienceMs How long to wait for the event. Ten seconds by default.
+   * @returns The event, or `undefined` if the command was not accepted or the
+   *   event did not come in time.
+   */
+  async postAndAwait<Command extends GenMessage<Message>, Event extends GenMessage<Message>>(
+    request: ServerRequest,
+    awaited: Awaited<Command, Event>,
+    patienceMs: number = PATIENCE_MS,
+  ): Promise<MessageShape<Event> | undefined> {
+    const watching = await request.createSubscription(
+      create(TopicSchema, {
+        id: create(TopicIdSchema, { value: `awaited-${crypto.randomUUID()}` }),
+        target: create(TargetSchema, {
+          type: TypeUrls.derive(awaited.event),
+          criterion: { case: "includeAll", value: true },
+        }),
       }),
-    }),
-    { kind: "event" },
-  );
-  const answered = (async (): Promise<MessageShape<Event> | undefined> => {
-    for await (const delivery of watching.updates) {
-      if (delivery.kind !== "update" || delivery.update.update.case !== "eventUpdates") {
-        continue;
-      }
-      for (const event of delivery.update.update.value.event) {
-        const fact =
-          event.message === undefined
-            ? undefined
-            : AnyMessages.unpack(event.message, awaited.event);
-        if (fact !== undefined && awaited.answers(fact)) {
-          return fact;
+      { kind: "event" },
+    );
+    const answered = (async (): Promise<MessageShape<Event> | undefined> => {
+      for await (const delivery of watching.updates) {
+        if (delivery.kind !== "update" || delivery.update.update.case !== "eventUpdates") {
+          continue;
+        }
+        for (const event of delivery.update.update.value.event) {
+          const fact =
+            event.message === undefined
+              ? undefined
+              : AnyMessages.unpack(event.message, awaited.event);
+          if (fact !== undefined && awaited.answers(fact)) {
+            return fact;
+          }
         }
       }
+      return undefined;
+    })();
+    answered.catch(() => undefined);
+    let giveUp: ReturnType<typeof setTimeout> | undefined;
+    const tooLate = new Promise<undefined>((resolve) => {
+      giveUp = setTimeout(() => {
+        resolve(undefined);
+      }, patienceMs);
+    });
+    try {
+      await watching.activate();
+      const given = await request.post(awaited.command, awaited.message);
+      return given.kind === "ok" ? await Promise.race([answered, tooLate]) : undefined;
+    } finally {
+      clearTimeout(giveUp);
+      await watching.cancel();
     }
-    return undefined;
-  })();
-  answered.catch(() => undefined);
-  let giveUp: ReturnType<typeof setTimeout> | undefined;
-  const tooLate = new Promise<undefined>((resolve) => {
-    giveUp = setTimeout(() => {
-      resolve(undefined);
-    }, patienceMs);
-  });
-  try {
-    await watching.activate();
-    const given = await request.post(awaited.command, awaited.message);
-    return given.kind === "ok" ? await Promise.race([answered, tooLate]) : undefined;
-  } finally {
-    clearTimeout(giveUp);
-    await watching.cancel();
-  }
-}
+  },
 
-/**
- * Reads one read model by its identifier.
- *
- * @param request The client that reads.
- * @param schema The kind of read model.
- * @param idSchema The kind of its identifier.
- * @param id The identifier.
- * @returns The read model, or `undefined` when there is none under that identifier.
- */
-export async function readById<
-  Schema extends GenMessage<Message>,
-  IdSchema extends GenMessage<Message>,
->(
-  request: ServerRequest,
-  schema: Schema,
-  idSchema: IdSchema,
-  id: MessageShape<IdSchema>,
-): Promise<MessageShape<Schema> | undefined> {
-  const type = TypeUrls.derive(schema);
-  const response = await request.send(
-    create(QuerySchema, {
-      id: create(QueryIdSchema, { value: `read-${type}-${crypto.randomUUID()}` }),
-      target: create(TargetSchema, {
-        type,
-        criterion: {
-          case: "filters",
-          value: { idFilter: { id: [AnyMessages.pack(idSchema, id)] } },
-        },
+  /**
+   * Reads one read model by its identifier.
+   *
+   * @param request The client that reads.
+   * @param schema The kind of read model.
+   * @param idSchema The kind of its identifier.
+   * @param id The identifier.
+   * @returns The read model, or `undefined` when there is none under that identifier.
+   */
+  async readById<Schema extends GenMessage<Message>, IdSchema extends GenMessage<Message>>(
+    request: ServerRequest,
+    schema: Schema,
+    idSchema: IdSchema,
+    id: MessageShape<IdSchema>,
+  ): Promise<MessageShape<Schema> | undefined> {
+    const type = TypeUrls.derive(schema);
+    const response = await request.send(
+      create(QuerySchema, {
+        id: create(QueryIdSchema, { value: `read-${type}-${crypto.randomUUID()}` }),
+        target: create(TargetSchema, {
+          type,
+          criterion: {
+            case: "filters",
+            value: { idFilter: { id: [AnyMessages.pack(idSchema, id)] } },
+          },
+        }),
       }),
-    }),
-  );
-  const state = response.message[0]?.state;
-  return state === undefined ? undefined : AnyMessages.unpack(state, schema);
-}
+    );
+    const state = response.message[0]?.state;
+    return state === undefined ? undefined : AnyMessages.unpack(state, schema);
+  },
 
-/**
- * Finds the read models of one kind that a query describes.
- *
- * @param request The client that reads.
- * @param schema The kind of read model.
- * @param query What to look for, built from the read model's generated query.
- * @returns Those that match.
- */
-export async function find<Schema extends GenMessage<Message>>(
-  request: ServerRequest,
-  schema: Schema,
-  query: Parameters<ServerRequest["send"]>[0],
-): Promise<MessageShape<Schema>[]> {
-  const response = await request.send(query);
-  return response.message.flatMap(({ state }) => {
-    const item = state === undefined ? undefined : AnyMessages.unpack(state, schema);
-    return item === undefined ? [] : [item];
-  });
-}
+  /**
+   * Finds the read models of one kind that a query describes.
+   *
+   * @param request The client that reads.
+   * @param schema The kind of read model.
+   * @param query What to look for, built from the read model's generated query.
+   * @returns Those that match.
+   */
+  async find<Schema extends GenMessage<Message>>(
+    request: ServerRequest,
+    schema: Schema,
+    query: Parameters<ServerRequest["send"]>[0],
+  ): Promise<MessageShape<Schema>[]> {
+    const response = await request.send(query);
+    return response.message.flatMap(({ state }) => {
+      const item = state === undefined ? undefined : AnyMessages.unpack(state, schema);
+      return item === undefined ? [] : [item];
+    });
+  },
+};

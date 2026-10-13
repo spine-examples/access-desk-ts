@@ -124,33 +124,36 @@ class Reading {
   }
 }
 
-/**
- * The application server's settings, read from the environment.
- *
- * @param environment The environment the program runs in.
- * @returns The settings of the application server.
- */
-export function serverSettingsOf(environment: NodeJS.ProcessEnv): ServerSettings {
-  const reading = new Reading(environment);
-  return reading.done({ listening: reading.listening("ACCESS_DESK_SERVER") });
-}
+/** The settings of the application server and of the gateway. */
+export const Settings = {
+  /**
+   * The application server's settings, read from the environment.
+   *
+   * @param environment The environment the program runs in.
+   * @returns The settings of the application server.
+   */
+  ofServer(environment: NodeJS.ProcessEnv): ServerSettings {
+    const reading = new Reading(environment);
+    return reading.done({ listening: reading.listening("ACCESS_DESK_SERVER") });
+  },
 
-/**
- * The gateway's settings, read from the environment.
- *
- * @param environment The environment the program runs in.
- * @returns The settings of the gateway.
- */
-export function gatewaySettingsOf(environment: NodeJS.ProcessEnv): GatewaySettings {
-  const reading = new Reading(environment);
-  const listening = reading.listening("ACCESS_DESK_GATEWAY");
-  const server = reading.listening("ACCESS_DESK_SERVER");
-  const web = reading.listening("ACCESS_DESK_WEB");
-  return reading.done({
-    listening,
-    serverUrl: `http://${server.host}:${server.port.toString()}`,
-    webUrl: `https://${web.host}:${web.port.toString()}/`,
-    github: reading.provider("GITHUB"),
-    google: reading.provider("GOOGLE"),
-  });
-}
+  /**
+   * The gateway's settings, read from the environment.
+   *
+   * @param environment The environment the program runs in.
+   * @returns The settings of the gateway.
+   */
+  ofGateway(environment: NodeJS.ProcessEnv): GatewaySettings {
+    const reading = new Reading(environment);
+    const listening = reading.listening("ACCESS_DESK_GATEWAY");
+    const server = reading.listening("ACCESS_DESK_SERVER");
+    const web = reading.listening("ACCESS_DESK_WEB");
+    return reading.done({
+      listening,
+      serverUrl: `http://${server.host}:${server.port.toString()}`,
+      webUrl: `https://${web.host}:${web.port.toString()}/`,
+      github: reading.provider("GITHUB"),
+      google: reading.provider("GOOGLE"),
+    });
+  },
+};

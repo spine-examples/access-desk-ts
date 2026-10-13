@@ -37,7 +37,7 @@ import { CancelAccessRequestSchema } from "@access-desk/resources-model/generate
 import { OpenResourceForRequestsSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/commands_pb.js";
 import { OrganizationMemberSchema } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import type { AccessDesk } from "../../src/gateway/access-desk.js";
-import { authorization, concernsNoOrganization } from "../../src/gateway/policy.js";
+import { Policy } from "../../src/gateway/policy.js";
 
 const principal: AuthenticatedPrincipal = {
   id: "person-1",
@@ -113,36 +113,36 @@ describe("Gateway request classification should", () => {
     const organization = target(OrganizationViewSchema);
 
     expect(
-      concernsNoOrganization(
+      Policy.concernsNoOrganization(
         command(create(AcceptInvitationSchema), TypeUrls.derive(AcceptInvitationSchema)),
       ),
     ).toBe(true);
     expect(
-      concernsNoOrganization(
+      Policy.concernsNoOrganization(
         command(
           create(OpenResourceForRequestsSchema),
           TypeUrls.derive(OpenResourceForRequestsSchema),
         ),
       ),
     ).toBe(false);
-    expect(concernsNoOrganization({ kind: "query", target: invitation } as IncomingRequest)).toBe(
-      true,
-    );
     expect(
-      concernsNoOrganization({ kind: "subscribe", target: invitation } as IncomingRequest),
+      Policy.concernsNoOrganization({ kind: "query", target: invitation } as IncomingRequest),
     ).toBe(true);
-    expect(concernsNoOrganization({ kind: "query", target: organization } as IncomingRequest)).toBe(
-      false,
-    );
-    expect(concernsNoOrganization({ kind: "activate" } as IncomingRequest)).toBe(false);
-    expect(concernsNoOrganization({ kind: "cancel" } as IncomingRequest)).toBe(false);
+    expect(
+      Policy.concernsNoOrganization({ kind: "subscribe", target: invitation } as IncomingRequest),
+    ).toBe(true);
+    expect(
+      Policy.concernsNoOrganization({ kind: "query", target: organization } as IncomingRequest),
+    ).toBe(false);
+    expect(Policy.concernsNoOrganization({ kind: "activate" } as IncomingRequest)).toBe(false);
+    expect(Policy.concernsNoOrganization({ kind: "cancel" } as IncomingRequest)).toBe(false);
   });
 });
 
 describe("Gateway policy should", () => {
   it("let a signed-in person answer only their own invitation without entering an organization", async () => {
     const application = desk();
-    const authorize = authorization(application as unknown as AccessDesk);
+    const authorize = Policy.authorization(application as unknown as AccessDesk);
     const signedIn = { id: "person-1", attributes: { email: "maya@example.com", name: "Maya" } };
     const invitation = create(AcceptInvitationSchema, {
       id: { organization: { uuid: "acme" }, invitee: { value: " MAYA@example.com " } },
@@ -168,7 +168,7 @@ describe("Gateway policy should", () => {
 
   it("refuse missing email and missing organization before checking membership", async () => {
     const application = desk();
-    const authorize = authorization(application as unknown as AccessDesk);
+    const authorize = Policy.authorization(application as unknown as AccessDesk);
     const reading = { kind: "query", target: target(OrganizationViewSchema) } as IncomingRequest;
 
     expect(await authorize({ id: "person-1", attributes: {} }, reading)).toBe(false);
@@ -181,7 +181,7 @@ describe("Gateway policy should", () => {
   it("convert principal scalars to value objects for membership and refuse nonmembers", async () => {
     const application = desk();
     application.member.mockResolvedValueOnce(undefined);
-    const authorize = authorization(application as unknown as AccessDesk);
+    const authorize = Policy.authorization(application as unknown as AccessDesk);
     const reading = { kind: "query", target: target(OrganizationViewSchema) } as IncomingRequest;
 
     expect(await authorize(principal, reading)).toBe(false);
@@ -193,7 +193,7 @@ describe("Gateway policy should", () => {
 
   it("allow member reads and subscriptions, but refuse an unlisted command", async () => {
     const application = desk();
-    const authorize = authorization(application as unknown as AccessDesk);
+    const authorize = Policy.authorization(application as unknown as AccessDesk);
     const view = target(OrganizationViewSchema);
 
     expect(await authorize(principal, { kind: "query", target: view } as IncomingRequest)).toBe(
@@ -236,16 +236,19 @@ describe("Gateway policy should", () => {
       ({ kind: "query", target: targetFor(id) }) as IncomingRequest;
 
     expect(
-      await authorization(administrator as unknown as AccessDesk)(principal, queryFor(acme)),
+      await Policy.authorization(administrator as unknown as AccessDesk)(principal, queryFor(acme)),
     ).toBe(true);
     expect(
-      await authorization(administrator as unknown as AccessDesk)(principal, queryFor(globex)),
+      await Policy.authorization(administrator as unknown as AccessDesk)(
+        principal,
+        queryFor(globex),
+      ),
     ).toBe(false);
-    expect(await authorization(member as unknown as AccessDesk)(principal, queryFor(acme))).toBe(
-      false,
-    );
     expect(
-      await authorization(administrator as unknown as AccessDesk)(principal, {
+      await Policy.authorization(member as unknown as AccessDesk)(principal, queryFor(acme)),
+    ).toBe(false);
+    expect(
+      await Policy.authorization(administrator as unknown as AccessDesk)(principal, {
         kind: "subscribe",
         target: targetFor(acme),
       } as IncomingRequest),
@@ -253,7 +256,7 @@ describe("Gateway policy should", () => {
   });
 
   it("let every member read and watch the organization and its catalog", async () => {
-    const authorize = authorization(desk() as unknown as AccessDesk);
+    const authorize = Policy.authorization(desk() as unknown as AccessDesk);
 
     for (const schema of [OrganizationViewSchema, ResourceCatalogItemSchema]) {
       const everything = create(TargetSchema, {
@@ -271,7 +274,7 @@ describe("Gateway policy should", () => {
   it("let a member read and watch only their own requests and grants", async () => {
     const application = desk();
     application.manages.mockResolvedValue(false);
-    const authorize = authorization(application as unknown as AccessDesk);
+    const authorize = Policy.authorization(application as unknown as AccessDesk);
     const own = [
       where(AccessRequestViewSchema, "requester", me),
       where(AccessGrantViewSchema, "grantee", me),
@@ -310,7 +313,7 @@ describe("Gateway policy should", () => {
   });
 
   it("refuse a request that puts a second condition beside the person's own", async () => {
-    const authorize = authorization(desk() as unknown as AccessDesk);
+    const authorize = Policy.authorization(desk() as unknown as AccessDesk);
     const own = {
       fieldPath: { fieldName: ["requester"] },
       value: me,
@@ -368,7 +371,7 @@ describe("Gateway policy should", () => {
 
   it("let a manager read and watch the requests and grants of a resource they manage", async () => {
     const application = desk();
-    const authorize = authorization(application as unknown as AccessDesk);
+    const authorize = Policy.authorization(application as unknown as AccessDesk);
 
     for (const schema of [AccessRequestViewSchema, AccessGrantViewSchema]) {
       for (const kind of ["query", "subscribe"] as const) {
@@ -388,7 +391,7 @@ describe("Gateway policy should", () => {
   });
 
   it("let a manager read and watch their own queue of requests, and nobody else's", async () => {
-    const authorize = authorization(desk() as unknown as AccessDesk);
+    const authorize = Policy.authorization(desk() as unknown as AccessDesk);
     const asking = (kind: "query" | "subscribe", target: ReturnType<typeof byId>) =>
       authorize(principal, { kind, target } as IncomingRequest);
 
@@ -419,10 +422,10 @@ describe("Gateway policy should", () => {
           ...(organization === undefined ? {} : { organizationId: { uuid: organization } }),
         }),
       );
-    const administrator = authorization(
+    const administrator = Policy.authorization(
       desk(OrganizationRole.ADMINISTRATOR) as unknown as AccessDesk,
     );
-    const member = authorization(desk() as unknown as AccessDesk);
+    const member = Policy.authorization(desk() as unknown as AccessDesk);
 
     expect(await administrator(principal, registering("acme"))).toBe(true);
     expect(await administrator(principal, registering("globex"))).toBe(false);
@@ -432,7 +435,7 @@ describe("Gateway policy should", () => {
 
   it("use the typed request id for cancellation and refuse a missing id", async () => {
     const application = desk();
-    const authorize = authorization(application as unknown as AccessDesk);
+    const authorize = Policy.authorization(application as unknown as AccessDesk);
 
     expect(await authorize(principal, command(create(CancelAccessRequestSchema)))).toBe(false);
     expect(application.requested).not.toHaveBeenCalled();
@@ -452,7 +455,7 @@ describe("Gateway policy should", () => {
   it("require a resource id before either a manager or administrator opens it", async () => {
     for (const role of [OrganizationRole.MEMBER, OrganizationRole.ADMINISTRATOR]) {
       const application = desk(role);
-      const authorize = authorization(application as unknown as AccessDesk);
+      const authorize = Policy.authorization(application as unknown as AccessDesk);
 
       expect(await authorize(principal, command(create(OpenResourceForRequestsSchema)))).toBe(
         false,

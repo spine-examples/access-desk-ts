@@ -14,11 +14,11 @@
 
 import { describe, expect, it } from "vitest";
 import { IdentityProvider } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
-import { describe as describeIdentity, personIn } from "../../src/gateway/providers.js";
+import { ConfirmedIdentity } from "../../src/gateway/providers.js";
 
 describe("Gateway provider mapping should", () => {
   it("carry a confirmed account's issuer, subject, email, and display name", () => {
-    const identity = describeIdentity(
+    const identity = ConfirmedIdentity.of(
       "https://provider.test",
       "subject-1",
       "maya@example.com",
@@ -30,7 +30,7 @@ describe("Gateway provider mapping should", () => {
       subject: "subject-1",
       claims: { email: "maya@example.com", name: "Maya Chen" },
     });
-    expect(personIn(IdentityProvider.GITHUB, identity)).toMatchObject({
+    expect(ConfirmedIdentity.personIn(IdentityProvider.GITHUB, identity)).toMatchObject({
       id: { provider: IdentityProvider.GITHUB, subject: "subject-1" },
       email: { value: "maya@example.com" },
       name: "Maya Chen",
@@ -38,15 +38,17 @@ describe("Gateway provider mapping should", () => {
   });
 
   it("use the verified email as a display-name fallback", () => {
-    const identity = describeIdentity("issuer", "subject-2", "no-name@example.com", undefined);
+    const identity = ConfirmedIdentity.of("issuer", "subject-2", "no-name@example.com", undefined);
 
     expect(identity.claims?.name).toBe("no-name@example.com");
-    expect(personIn(IdentityProvider.GOOGLE, identity)?.name).toBe("no-name@example.com");
+    expect(ConfirmedIdentity.personIn(IdentityProvider.GOOGLE, identity)?.name).toBe(
+      "no-name@example.com",
+    );
   });
 
   it("refuse an identity with no verified email claim", () => {
     expect(
-      personIn(IdentityProvider.GITHUB, {
+      ConfirmedIdentity.personIn(IdentityProvider.GITHUB, {
         issuer: "issuer",
         subject: "subject-3",
         claims: { name: "No email" },

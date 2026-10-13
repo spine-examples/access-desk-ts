@@ -38,7 +38,7 @@ import { give, givenServer, tenant as tenantOf, type Hosted } from "../../server
 // execute the handler classes' standard decorators from raw TypeScript source.
 type AppModule = typeof import("../../../dist/src/index.js");
 type ProvidersModule = typeof import("../../../dist/src/gateway/providers.js");
-type External = NonNullable<Parameters<AppModule["startGateway"]>[0]["external"]>;
+type External = NonNullable<Parameters<AppModule["Gateway"]["start"]>[0]["external"]>;
 
 /** The address of the page that calls the gateway. */
 export const ORIGIN = "http://app.test";
@@ -95,12 +95,12 @@ export async function stopGateways(): Promise<void> {
  *
  * @param kind Which provider it stands for.
  * @param issuer The address it vouches under.
- * @param describe Describes a confirmed account, as the gateway's own providers do.
+ * @param identities Describes a confirmed account, as the gateway's own providers do.
  */
 function fakeProvider(
   kind: IdentityProvider,
   issuer: string,
-  describe: ProvidersModule["describe"],
+  identities: ProvidersModule["ConfirmedIdentity"],
 ): External[string] {
   return {
     callbackUri: CALLBACK,
@@ -117,7 +117,7 @@ function fakeProvider(
           return Promise.resolve(
             subject === "" || email === ""
               ? undefined
-              : describe(issuer, subject, email, name === "" ? undefined : name),
+              : identities.of(issuer, subject, email, name === "" ? undefined : name),
           );
         },
       },
@@ -175,14 +175,22 @@ export async function givenGateway(): Promise<Running> {
   afterwards(() => hosted.stop());
   await givenOrganization(hosted, "acme", "noah@acme.example");
   await givenOrganization(hosted, "globex", "olivia@acme.example");
-  const gateway = await app.startGateway({
+  const gateway = await app.Gateway.start({
     backend: hosted.url,
     registry: app.typeRegistry,
     origins: [ORIGIN],
     port: 0,
     external: {
-      fake: fakeProvider(IdentityProvider.GITHUB, "https://provider.test", providers.describe),
-      other: fakeProvider(IdentityProvider.GOOGLE, "https://other.test", providers.describe),
+      fake: fakeProvider(
+        IdentityProvider.GITHUB,
+        "https://provider.test",
+        providers.ConfirmedIdentity,
+      ),
+      other: fakeProvider(
+        IdentityProvider.GOOGLE,
+        "https://other.test",
+        providers.ConfirmedIdentity,
+      ),
     },
   });
   // The gateway and the application server are separate, so each is stopped.

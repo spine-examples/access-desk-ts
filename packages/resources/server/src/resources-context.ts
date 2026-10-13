@@ -63,93 +63,95 @@ import { ResourceAccessAggregate } from "./access/grant/resource-access-aggregat
 import { AccessGrantViewProjection } from "./access/grant/access-grant-view-projection.js";
 
 /**
- * Builds the Resources bounded context.
+ * The Resources bounded context.
  *
  * It is multitenant, and each organization is its own tenant. So
  * `CreateOrganization` is given in the tenant of the organization it creates.
- *
- * @returns The assembled Resources bounded context.
  */
-export async function createResourcesContext(): Promise<BoundedContext> {
-  const resourceRegistrationProcmanRouting = EventRouting.create<ResourceId>()
-    .route(ResourceAddedSchema, (event) =>
-      event.resourceId === undefined ? [] : [event.resourceId],
-    )
-    .route(ResourceAlreadyExistsSchema, (rejection) =>
-      rejection.id === undefined ? [] : [rejection.id],
-    )
-    .route(OrganizationResourceNameAlreadyUsedSchema, (rejection) =>
-      rejection.resourceId === undefined ? [] : [rejection.resourceId],
-    )
-    .route(ResourceDeletedSchema, (event) => (event.id === undefined ? [] : [event.id]));
-  const decisionRouting = EventRouting.create<PersonId>()
-    .route(AccessRequestSubmittedSchema, (event) => event.manager)
-    .route(AccessExtensionRequestSubmittedSchema, (event) => event.manager)
-    .route(AccessRequestApprovedSchema, (event) => event.manager)
-    .route(AccessRequestApprovalFailedSchema, (event) => event.manager)
-    .route(AccessRequestDeniedSchema, (event) => event.manager)
-    .route(AccessRequestCanceledSchema, (event) => event.manager)
-    .route(AccessGrantRevokedSchema, (event) => event.manager);
-  const requestRouting = EventRouting.create<AccessRequestId>()
-    .route(RequestedAccessCheckedSchema, (event) => requestOf(event))
-    .route(RequestedExtensionCheckedSchema, (event) => requestOf(event))
-    .route(AccessGrantCreatedSchema, (event) => requestOf(event))
-    .route(AccessGrantExtendedSchema, (event) => requestOf(event))
-    .route(AccessAlreadyHeldSchema, (_rejection, context) => requestRejected(context))
-    .route(AccessGrantNotActiveSchema, (_rejection, context) => requestRejected(context))
-    .route(RequestedDurationTooLongSchema, (_rejection, context) => requestRejected(context));
-  const grantViewRouting = EventRouting.create<AccessGrantId>()
-    .route(AccessGrantCreatedSchema, (event) => grantOf(event))
-    .route(AccessGrantExtendedSchema, (event) => grantOf(event))
-    .route(AccessGrantRevokedSchema, (event) => grantOf(event));
-  const builder = BoundedContext.multitenant("Resources")
-    .withGeneratedRegistryRoot(new URL("..", import.meta.url))
-    .add(OrganizationAggregate)
-    .add(OrganizationViewProjection)
-    .add(ResourceRegistrationProcessManager, { eventRouting: resourceRegistrationProcmanRouting })
-    .add(ResourceAggregate)
-    .add(ResourceCatalogProjection)
-    .add(AccessRequestProcessManager, { eventRouting: requestRouting })
-    .add(AccessRequestViewProjection)
-    .add(AccessDecisionAssignmentProjection, { eventRouting: decisionRouting })
-    .add(ResourceAccessAggregate)
-    .add(AccessGrantViewProjection, { eventRouting: grantViewRouting });
-  return builder.buildAsync();
-}
-
-/**
- * The request an event from a person's access answers.
- *
- * That is the request that asked for a check when it was submitted, or for a
- * grant when it was approved.
- */
-function requestOf(answer: { readonly request?: AccessRequestId | undefined }): AccessRequestId[] {
-  return answer.request === undefined ? [] : [answer.request];
-}
-
-/** The commands a request gives to a person's access to a resource. */
-const askedByRequest = [
-  CheckRequestedAccessSchema,
-  CheckRequestedExtensionSchema,
-  CreateAccessGrantSchema,
-  ExtendAccessGrantSchema,
-] as const;
-
-/**
- * The request whose command a person's access rejected.
- *
- * A rejection of anything else, such as a revocation, belongs to no request.
- */
-function requestRejected(context: EventContext): AccessRequestId[] {
-  const rejected = context.rejection?.command?.message;
-  const asked =
-    rejected === undefined ? undefined : askedByRequest.find((schema) => anyIs(rejected, schema));
-  return rejected === undefined || asked === undefined
-    ? []
-    : requestOf(anyUnpack(rejected, asked) ?? {});
-}
-
-/** The grant an event is about. */
-function grantOf(event: { readonly id?: AccessGrantId | undefined }): AccessGrantId[] {
-  return event.id === undefined ? [] : [event.id];
-}
+export const ResourcesContext = {
+  /**
+   * Builds the context.
+   *
+   * @returns The assembled Resources bounded context.
+   */
+  async create(): Promise<BoundedContext> {
+    /**
+     * The request an event from a person's access answers.
+     *
+     * That is the request that asked for a check when it was submitted, or for a
+     * grant when it was approved.
+     */
+    const requestOf = (answer: {
+      readonly request?: AccessRequestId | undefined;
+    }): AccessRequestId[] => (answer.request === undefined ? [] : [answer.request]);
+    /** The commands a request gives to a person's access to a resource. */
+    const askedByRequest = [
+      CheckRequestedAccessSchema,
+      CheckRequestedExtensionSchema,
+      CreateAccessGrantSchema,
+      ExtendAccessGrantSchema,
+    ] as const;
+    /**
+     * The request whose command a person's access rejected.
+     *
+     * A rejection of anything else, such as a revocation, belongs to no request.
+     */
+    const requestRejected = (context: EventContext): AccessRequestId[] => {
+      const rejected = context.rejection?.command?.message;
+      const asked =
+        rejected === undefined
+          ? undefined
+          : askedByRequest.find((schema) => anyIs(rejected, schema));
+      return rejected === undefined || asked === undefined
+        ? []
+        : requestOf(anyUnpack(rejected, asked) ?? {});
+    };
+    /** The grant an event is about. */
+    const grantOf = (event: { readonly id?: AccessGrantId | undefined }): AccessGrantId[] =>
+      event.id === undefined ? [] : [event.id];
+    const resourceRegistrationProcmanRouting = EventRouting.create<ResourceId>()
+      .route(ResourceAddedSchema, (event) =>
+        event.resourceId === undefined ? [] : [event.resourceId],
+      )
+      .route(ResourceAlreadyExistsSchema, (rejection) =>
+        rejection.id === undefined ? [] : [rejection.id],
+      )
+      .route(OrganizationResourceNameAlreadyUsedSchema, (rejection) =>
+        rejection.resourceId === undefined ? [] : [rejection.resourceId],
+      )
+      .route(ResourceDeletedSchema, (event) => (event.id === undefined ? [] : [event.id]));
+    const decisionRouting = EventRouting.create<PersonId>()
+      .route(AccessRequestSubmittedSchema, (event) => event.manager)
+      .route(AccessExtensionRequestSubmittedSchema, (event) => event.manager)
+      .route(AccessRequestApprovedSchema, (event) => event.manager)
+      .route(AccessRequestApprovalFailedSchema, (event) => event.manager)
+      .route(AccessRequestDeniedSchema, (event) => event.manager)
+      .route(AccessRequestCanceledSchema, (event) => event.manager)
+      .route(AccessGrantRevokedSchema, (event) => event.manager);
+    const requestRouting = EventRouting.create<AccessRequestId>()
+      .route(RequestedAccessCheckedSchema, (event) => requestOf(event))
+      .route(RequestedExtensionCheckedSchema, (event) => requestOf(event))
+      .route(AccessGrantCreatedSchema, (event) => requestOf(event))
+      .route(AccessGrantExtendedSchema, (event) => requestOf(event))
+      .route(AccessAlreadyHeldSchema, (_rejection, context) => requestRejected(context))
+      .route(AccessGrantNotActiveSchema, (_rejection, context) => requestRejected(context))
+      .route(RequestedDurationTooLongSchema, (_rejection, context) => requestRejected(context));
+    const grantViewRouting = EventRouting.create<AccessGrantId>()
+      .route(AccessGrantCreatedSchema, (event) => grantOf(event))
+      .route(AccessGrantExtendedSchema, (event) => grantOf(event))
+      .route(AccessGrantRevokedSchema, (event) => grantOf(event));
+    const builder = BoundedContext.multitenant("Resources")
+      .withGeneratedRegistryRoot(new URL("..", import.meta.url))
+      .add(OrganizationAggregate)
+      .add(OrganizationViewProjection)
+      .add(ResourceRegistrationProcessManager, { eventRouting: resourceRegistrationProcmanRouting })
+      .add(ResourceAggregate)
+      .add(ResourceCatalogProjection)
+      .add(AccessRequestProcessManager, { eventRouting: requestRouting })
+      .add(AccessRequestViewProjection)
+      .add(AccessDecisionAssignmentProjection, { eventRouting: decisionRouting })
+      .add(ResourceAccessAggregate)
+      .add(AccessGrantViewProjection, { eventRouting: grantViewRouting });
+    return builder.buildAsync();
+  },
+};

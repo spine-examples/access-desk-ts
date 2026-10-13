@@ -43,7 +43,7 @@ const reads = vi.hoisted(() => ({
   find: vi.fn(),
   postAndAwait: vi.fn(),
 }));
-vi.mock("../../src/server/client.js", () => reads);
+vi.mock("../../src/server/client.js", () => ({ ServerRequests: reads }));
 
 beforeEach(() => {
   vi.clearAllMocks();

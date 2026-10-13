@@ -16,4 +16,4 @@
  * The Resources bounded context, with its domain handlers and multitenant
  * context assembly.
  */
-export { createResourcesContext } from "./resources-context.js";
+export { ResourcesContext } from "./resources-context.js";

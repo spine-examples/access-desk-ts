@@ -51,7 +51,7 @@ async function hosted(): Promise<Hosted> {
 }
 
 function membersOf(server: Hosted, patienceMs?: number) {
-  const members = module.organizationMembersThrough(() => server.url, patienceMs);
+  const members = module.ReachedOrganizationMembers.through(() => server.url, patienceMs);
   closing.push(() => members.close());
   return members;
 }

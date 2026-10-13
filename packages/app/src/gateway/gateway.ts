@@ -17,6 +17,7 @@ import { createGrpcWebTransport } from "@connectrpc/connect-node";
 import {
   NativeSubscriptionCreator,
   type AuthenticatedPrincipal,
+  type AuthorizedRequestContext,
   type RequestCredential,
 } from "@spine-event-engine/auth";
 import type { TypeRegistryLookup } from "@spine-event-engine/core";
@@ -25,7 +26,7 @@ import { TenantIdSchema, UserIdSchema } from "@spine-event-engine/proto";
 import { BrowserServer } from "@spine-event-engine/server/browser";
 import { ServerConnection } from "../server/client.js";
 import { AccessDesk } from "./access-desk.js";
-import { authorization, concernsNoOrganization } from "./policy.js";
+import { Policy } from "./policy.js";
 import { routing } from "./routes/route.js";
 import { sessionRoutes } from "./routes/session-routes.js";
 import { signInRoutes, type ExternalSignIn } from "./routes/sign-in-routes.js";
@@ -59,68 +60,72 @@ export interface Gateway {
   close(): Promise<void>;
 }
 
-/**
- * Starts the gateway, the only way from a browser to the application.
- *
- * A person signs in first, which concerns no organization. They then enter
- * one of their organizations. Only then may they give commands and read, and
- * only within that organization.
- *
- * The gateway decides who is acting and where, from the session it issued. It
- * refuses a request that names another person or another organization, and
- * every command only the application itself may give.
- *
- * @param options How to set the gateway up.
- * @returns The running gateway.
- */
-export async function startGateway(options: GatewayOptions): Promise<Gateway> {
-  const server = new ServerConnection(() => options.backend);
-  const desk = new AccessDesk(server);
-  const origins = [...options.origins];
-  const listening: { address?: string } = {};
-  const watching = new Watching(cancellingThrough(() => listening.address, origins[0]));
-  const sessions = new Sessions(watching);
-  const route = routing(origins, sessions);
-  const signIn = signInRoutes(route, desk, sessions, options.external);
-  const allows = authorization(desk);
+/** Starts the gateway. */
+export const Gateway = {
+  /**
+   * Starts the gateway, the only way from a browser to the application.
+   *
+   * A person signs in first, which concerns no organization. They then enter
+   * one of their organizations. Only then may they give commands and read, and
+   * only within that organization.
+   *
+   * The gateway decides who is acting and where, from the session it issued. It
+   * refuses a request that names another person or another organization, and
+   * every command only the application itself may give.
+   *
+   * @param options How to set the gateway up.
+   * @returns The running gateway.
+   */
+  async start(options: GatewayOptions): Promise<Gateway> {
+    const server = new ServerConnection(() => options.backend);
+    const desk = new AccessDesk(server);
+    const origins = [...options.origins];
+    const listening: { address?: string } = {};
+    const watching = new Watching(cancellingThrough(() => listening.address, origins[0]));
+    const sessions = new Sessions(watching);
+    const route = routing(origins, sessions);
+    const signIn = signInRoutes(route, desk, sessions, options.external);
+    const allows = Policy.authorization(desk);
 
-  const running = await BrowserServer.open(undefined, {
-    backend: { baseUrl: options.backend },
-    bindings: watching,
-    host: options.host ?? "127.0.0.1",
-    port: options.port,
-    origins,
-    registry: options.registry,
-    authRoutes: [...signIn.routes, ...sessionRoutes(route, desk, sessions)],
-    clock: { now: () => Time.currentTime() },
-    sessions: {
-      // The gateway hands its session out as a bearer token.
-      resolve: (credential: RequestCredential) => sessions.resolve(credential.value),
-    },
-    authorize: async (principal, request) => {
-      const allowed = await allows(principal, request);
-      if (allowed) {
-        watching.claim(principal, request);
-      }
-      return allowed;
-    },
-    contexts: {
-      resolve: (principal, request, clock) =>
-        Promise.resolve(trusted(principal, clock.now(), !concernsNoOrganization(request))),
-      resolveContext: (principal, clock) => Promise.resolve(trusted(principal, clock.now(), true)),
-    },
-  });
-  listening.address = running.baseUrl;
-  return {
-    url: running.baseUrl,
-    close: async () => {
-      signIn.close();
-      await running.close();
-      await server.close();
-      await sessions.close();
-    },
-  };
-}
+    const running = await BrowserServer.open(undefined, {
+      backend: { baseUrl: options.backend },
+      bindings: watching,
+      host: options.host ?? "127.0.0.1",
+      port: options.port,
+      origins,
+      registry: options.registry,
+      authRoutes: [...signIn.routes, ...sessionRoutes(route, desk, sessions)],
+      clock: { now: () => Time.currentTime() },
+      sessions: {
+        // The gateway hands its session out as a bearer token.
+        resolve: (credential: RequestCredential) => sessions.resolve(credential.value),
+      },
+      authorize: async (principal, request) => {
+        const allowed = await allows(principal, request);
+        if (allowed) {
+          watching.claim(principal, request);
+        }
+        return allowed;
+      },
+      contexts: {
+        resolve: (principal, request, clock) =>
+          Promise.resolve(trusted(principal, clock.now(), !Policy.concernsNoOrganization(request))),
+        resolveContext: (principal, clock) =>
+          Promise.resolve(trusted(principal, clock.now(), true)),
+      },
+    });
+    listening.address = running.baseUrl;
+    return {
+      url: running.baseUrl,
+      close: async () => {
+        signIn.close();
+        await running.close();
+        await server.close();
+        await sessions.close();
+      },
+    };
+  },
+};
 
 /**
  * Cancels a subscription the way its browser would.
@@ -175,7 +180,7 @@ function trusted(
   principal: AuthenticatedPrincipal,
   timestamp: ReturnType<typeof Time.currentTime>,
   inOrganization: boolean,
-) {
+): AuthorizedRequestContext {
   const organization = inOrganization ? principal.attributes?.organization : undefined;
   return {
     actor: create(UserIdSchema, { value: principal.id }),

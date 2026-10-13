@@ -13,9 +13,9 @@
  */
 
 import { typeRegistry } from "../../generated/model-registry.js";
-import { gatewaySettingsOf } from "../settings.js";
-import { startGateway } from "./gateway.js";
-import { gitHubSignIn, googleSignIn } from "./providers.js";
+import { Settings } from "../settings.js";
+import { Gateway } from "./gateway.js";
+import { SignInProvider } from "./providers.js";
 import type { ExternalSignIn } from "./routes/sign-in-routes.js";
 
 /**
@@ -25,20 +25,24 @@ import type { ExternalSignIn } from "./routes/sign-in-routes.js";
  * requests reach the application server.
  */
 
-const settings = gatewaySettingsOf(process.env);
+const settings = Settings.ofGateway(process.env);
 
 const external: Record<string, ExternalSignIn> = {};
 if (settings.github !== undefined) {
-  external.github = { provider: gitHubSignIn(settings.github), callbackUri: settings.webUrl };
+  external.github = {
+    provider: SignInProvider.gitHub(settings.github),
+    callbackUri: settings.webUrl,
+  };
 }
-const google = settings.google === undefined ? undefined : await googleSignIn(settings.google);
+const google =
+  settings.google === undefined ? undefined : await SignInProvider.google(settings.google);
 if (settings.google !== undefined && google !== undefined) {
   external.google = { provider: google, callbackUri: settings.webUrl };
 } else if (settings.google !== undefined) {
   console.warn("Google could not be reached, so sign-in through Google is off.");
 }
 
-const gateway = await startGateway({
+const gateway = await Gateway.start({
   backend: settings.serverUrl,
   registry: typeRegistry,
   // Only the page people open the application at may call the gateway.
@@ -76,11 +80,11 @@ process.on("unhandledRejection", (reason) => {
 });
 
 let stopping = false;
-async function stop(): Promise<void> {
-  if (!stopping) {
-    stopping = true;
-    await gateway.close();
-  }
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+  process.once(signal, () => {
+    if (!stopping) {
+      stopping = true;
+      void gateway.close();
+    }
+  });
 }
-process.once("SIGINT", () => void stop());
-process.once("SIGTERM", () => void stop());

@@ -82,7 +82,7 @@ const ownedBlackBoxes = new Set<BlackBox>();
  * {@link closeIdentityBlackBoxes}.
  */
 export async function identityBlackBox(): Promise<BlackBox> {
-  const context = await identityModule().createIdentityContext({
+  const context = await identityModule().IdentityContext.create({
     members: {
       add: (member) => {
         if (organizations.refusing) {

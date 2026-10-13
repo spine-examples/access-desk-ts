@@ -15,7 +15,7 @@
 import { OidcFlow } from "@spine-event-engine/auth";
 import type { BrowserAuthRoute } from "@spine-event-engine/server/browser";
 import type { AccessDesk } from "../access-desk.js";
-import { personIn, type SignInProvider } from "../providers.js";
+import { ConfirmedIdentity, type SignInProvider } from "../providers.js";
 import type { Issued, Sessions } from "../sessions.js";
 import { REFUSED, type Route } from "./route.js";
 
@@ -72,7 +72,7 @@ export function signInRoutes(
         identityMapping: {
           // Identity knows which person the confirmed account belongs to.
           async resolve(identity) {
-            const verified = personIn(provider.kind, identity);
+            const verified = ConfirmedIdentity.personIn(provider.kind, identity);
             const person = verified === undefined ? undefined : await desk.signIn(verified);
             if (verified !== undefined && person === undefined) {
               console.warn(`Identity did not settle whose account ${provider.label} confirmed.`);

@@ -79,7 +79,7 @@ export async function resourcesBlackBox(clock?: TimeProvider): Promise<BlackBox>
   }
   // Grant flows cross several entities before a read model settles, so waits
   // get generous headroom; they still return as soon as the outcome is visible.
-  const box = await BlackBox.from(await loaded().createResourcesContext(), {
+  const box = await BlackBox.from(await loaded().ResourcesContext.create(), {
     tenant: organizationId,
     timeoutMs: 20_000,
     intervalMs: 20,

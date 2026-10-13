@@ -106,9 +106,9 @@ export class OrganizationAggregate extends Aggregate<OrganizationId, typeof Orga
       equals(ResourceIdSchema, reserved.id, resourceId),
     );
     if (existing === undefined) {
-      const requestedName = normalizeName(command.name);
+      const requestedName = this.#normalizeName(command.name);
       const nameTaken = this.state.resource.some(
-        (reserved) => normalizeName(reserved.name) === requestedName,
+        (reserved) => this.#normalizeName(reserved.name) === requestedName,
       );
       if (nameTaken) {
         throw OrganizationResourceNameAlreadyUsed.create({ resourceId, name: command.name });
@@ -126,9 +126,9 @@ export class OrganizationAggregate extends Aggregate<OrganizationId, typeof Orga
       name: command.name,
     });
   }
-}
 
-/** Normalizes a resource name for case-insensitive within-organization comparison. */
-function normalizeName(name: string): string {
-  return name.trim().toLowerCase();
+  /** Normalizes a resource name for case-insensitive within-organization comparison. */
+  #normalizeName(name: string): string {
+    return name.trim().toLowerCase();
+  }
 }

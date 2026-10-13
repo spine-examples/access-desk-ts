@@ -49,12 +49,6 @@ interface Watched {
   stream: AbortController | undefined;
 }
 
-/** The organization a subscription was created in, when it was created in one. */
-function organizationOf(context: ActorContext): string | undefined {
-  const tenant = context.tenantId?.kind;
-  return tenant?.case === "value" ? tenant.value : undefined;
-}
-
 /**
  * The subscriptions signed-in people hold through the gateway.
  *
@@ -148,7 +142,7 @@ export class Watching implements SubscriptionBindings, OpenedUnderSessions {
     const watched = this.#watched.get(request.subscription.id?.value ?? "");
     if (
       watched?.context.actor?.value === principal.id &&
-      organizationOf(watched.context) === principal.attributes?.organization
+      this.#organizationOf(watched.context) === principal.attributes?.organization
     ) {
       watched.session = principal.attributes?.[SESSION];
     }
@@ -162,7 +156,7 @@ export class Watching implements SubscriptionBindings, OpenedUnderSessions {
     if (
       watched === undefined ||
       watched.context.actor?.value !== input.context.actor?.value ||
-      organizationOf(watched.context) !== organizationOf(input.context)
+      this.#organizationOf(watched.context) !== this.#organizationOf(input.context)
     ) {
       // Spine's store refuses anybody the subscription was not created for.
       return this.#kept.activate(input);
@@ -258,5 +252,11 @@ export class Watching implements SubscriptionBindings, OpenedUnderSessions {
   async close(): Promise<void> {
     await this.#kept.close();
     this.#watched.clear();
+  }
+
+  /** The organization a subscription was created in, when it was created in one. */
+  #organizationOf(context: ActorContext): string | undefined {
+    const tenant = context.tenantId?.kind;
+    return tenant?.case === "value" ? tenant.value : undefined;
   }
 }

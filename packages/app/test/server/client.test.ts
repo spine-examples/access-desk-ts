@@ -99,7 +99,7 @@ describe("ServerConnection should", () => {
     const connection = connectionTo(() => server.url);
 
     for (const organization of ["acme", "globex"]) {
-      const created = await client.postAndAwait(
+      const created = await client.ServerRequests.postAndAwait(
         connection
           .in(create(OrganizationIdSchema, { uuid: organization }))
           .onBehalfOf("access-desk"),
@@ -116,12 +116,12 @@ describe("ServerConnection should", () => {
     const server = await hosted();
     const connection = connectionTo(() => server.url);
     const acme = connection.in(create(OrganizationIdSchema, { uuid: "acme" }));
-    await client.postAndAwait(acme.onBehalfOf("access-desk"), creation("acme"));
+    await client.ServerRequests.postAndAwait(acme.onBehalfOf("access-desk"), creation("acme"));
 
     await connection.close();
 
     expect(connection.in(create(OrganizationIdSchema, { uuid: "acme" }))).not.toBe(acme);
-    const created = await client.postAndAwait(
+    const created = await client.ServerRequests.postAndAwait(
       connection.in(create(OrganizationIdSchema, { uuid: "globex" })).onBehalfOf("access-desk"),
       creation("globex"),
     );
@@ -134,7 +134,7 @@ describe("postAndAwait should", () => {
     const server = await hosted();
     const connection = connectionTo(() => server.url);
 
-    const created = await client.postAndAwait(
+    const created = await client.ServerRequests.postAndAwait(
       connection.in(create(OrganizationIdSchema, { uuid: "acme" })).onBehalfOf("access-desk"),
       creation("acme"),
     );
@@ -148,7 +148,7 @@ describe("postAndAwait should", () => {
     const connection = connectionTo(() => server.url);
 
     // An organization is created once, so creating it again leads to no event.
-    const created = await client.postAndAwait(
+    const created = await client.ServerRequests.postAndAwait(
       connection.in(create(OrganizationIdSchema, { uuid: "acme" })).onBehalfOf("access-desk"),
       creation("acme"),
       300,
@@ -161,7 +161,7 @@ describe("postAndAwait should", () => {
     const server = await hosted();
     const connection = connectionTo(() => server.url);
 
-    const created = await client.postAndAwait(
+    const created = await client.ServerRequests.postAndAwait(
       connection.in(create(OrganizationIdSchema, { uuid: "acme" })).onBehalfOf("access-desk"),
       { ...creation("acme"), answers: () => false },
       300,
@@ -180,7 +180,7 @@ describe("readById should", () => {
       .in(create(OrganizationIdSchema, { uuid: "acme" }))
       .onBehalfOf("access-desk");
 
-    const view = await client.readById(
+    const view = await client.ServerRequests.readById(
       acme,
       OrganizationViewSchema,
       OrganizationIdSchema,
@@ -197,7 +197,7 @@ describe("readById should", () => {
       .in(create(OrganizationIdSchema, { uuid: "acme" }))
       .onBehalfOf("access-desk");
 
-    const view = await client.readById(
+    const view = await client.ServerRequests.readById(
       acme,
       OrganizationViewSchema,
       OrganizationIdSchema,
@@ -214,7 +214,7 @@ describe("readById should", () => {
       .in(create(OrganizationIdSchema, { uuid: "globex" }))
       .onBehalfOf("access-desk");
 
-    const view = await client.readById(
+    const view = await client.ServerRequests.readById(
       globex,
       OrganizationViewSchema,
       OrganizationIdSchema,
@@ -234,8 +234,8 @@ describe("find should", () => {
       .onBehalfOf("access-desk");
     const named = (name: string) => OrganizationViewQuery.create().name().is(name).build();
 
-    const found = await client.find(acme, OrganizationViewSchema, named("acme"));
-    const none = await client.find(acme, OrganizationViewSchema, named("globex"));
+    const found = await client.ServerRequests.find(acme, OrganizationViewSchema, named("acme"));
+    const none = await client.ServerRequests.find(acme, OrganizationViewSchema, named("globex"));
 
     expect(found.map((view) => view.id?.uuid)).toEqual(["acme"]);
     expect(none).toEqual([]);

@@ -82,7 +82,9 @@ interface Asking extends Signed {
 
 /** Whether somebody may give one kind of command. */
 interface CommandRule<Who> {
+  /** The kind of command. */
   readonly schema: GenMessage<Message>;
+  /** Decides whether somebody may give the command. */
   readonly allows: (command: Message, who: Who, desk: AccessDesk) => boolean | Promise<boolean>;
 }
 
@@ -311,27 +313,6 @@ const OUTSIDE_ORGANIZATIONS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Whether a request is for Identity.
- *
- * Such a request is sent without an organization, even when the person has
- * entered one.
- *
- * @param request A request that reached the gateway.
- */
-export function concernsNoOrganization(request: IncomingRequest): boolean {
-  switch (request.kind) {
-    case "command":
-      return OUTSIDE_ORGANIZATIONS.has(request.messageType);
-    case "query":
-    case "subscribe":
-      return OUTSIDE_ORGANIZATIONS.has(request.target.type);
-    case "activate":
-    case "cancel":
-      return false;
-  }
-}
-
-/**
  * Whether a query asks only for the invitations of one organization.
  *
  * Invitations of all organizations are kept together, so the query must
@@ -345,75 +326,99 @@ function asksForInvitationsOf(target: Target, organization: OrganizationId): boo
   );
 }
 
-/**
- * Decides whether a signed-in person may make a request.
- *
- * 1. Anybody signed in may answer an invitation sent to their own email
- *    address.
- * 2. Anything else requires having entered an organization, and being a
- *    member of it now.
- * 3. A command must be one a member may give.
- * 4. A query or a subscription must be for something the member may see. An
- *    administrator may also read the organization's invitations.
- *
- * @param desk Looks up what a rule needs to know.
- * @returns The check the gateway runs on each request.
- */
-export function authorization(
-  desk: AccessDesk,
-): (principal: AuthenticatedPrincipal, request: IncomingRequest) => Promise<boolean> {
-  return async (principal, request) => {
-    const { email, name, organization } = principal.attributes ?? {};
-    if (email === undefined) {
-      return false;
-    }
-    const signed: Signed = {
-      person: create(PersonIdSchema, { uuid: principal.id }),
-      email: create(EmailAddressSchema, { value: email }),
-      name: name ?? email,
-    };
-    const command = request.kind === "command" ? request.message : undefined;
-    const answering =
-      command === undefined
-        ? undefined
-        : SIGNED_IN_COMMANDS.find(({ schema }) => isMessage(command, schema));
-    if (command !== undefined && answering !== undefined) {
-      return answering.allows(command, signed, desk);
-    }
-    if (organization === undefined) {
-      return false;
-    }
-    const organizationId = create(OrganizationIdSchema, { uuid: organization });
-    const member = await desk.member(organizationId, signed.person);
-    if (member === undefined) {
-      return false;
-    }
-    const asking: Asking = {
-      ...signed,
-      organization: organizationId,
-      member,
-      administrator: member.role === OrganizationRole.ADMINISTRATOR,
-    };
+/** What a signed-in person may do through the gateway. */
+export const Policy = {
+  /**
+   * Whether a request is for Identity.
+   *
+   * Such a request is sent without an organization, even when the person has
+   * entered one.
+   *
+   * @param request A request that reached the gateway.
+   */
+  concernsNoOrganization(request: IncomingRequest): boolean {
     switch (request.kind) {
-      case "command": {
-        const applies =
-          command === undefined
-            ? undefined
-            : MEMBER_COMMANDS.find(({ schema }) => isMessage(command, schema));
-        return command !== undefined && applies !== undefined
-          ? applies.allows(command, asking, desk)
-          : false;
-      }
+      case "command":
+        return OUTSIDE_ORGANIZATIONS.has(request.messageType);
       case "query":
-        return (
-          (await mayRead(request.target, asking, desk)) ||
-          (asking.administrator && asksForInvitationsOf(request.target, organizationId))
-        );
       case "subscribe":
-        return mayRead(request.target, asking, desk);
+        return OUTSIDE_ORGANIZATIONS.has(request.target.type);
       case "activate":
       case "cancel":
-        return true;
+        return false;
     }
-  };
-}
+  },
+
+  /**
+   * Decides whether a signed-in person may make a request.
+   *
+   * 1. Anybody signed in may answer an invitation sent to their own email
+   *    address.
+   * 2. Anything else requires having entered an organization, and being a
+   *    member of it now.
+   * 3. A command must be one a member may give.
+   * 4. A query or a subscription must be for something the member may see. An
+   *    administrator may also read the organization's invitations.
+   *
+   * @param desk Looks up what a rule needs to know.
+   * @returns The check the gateway runs on each request.
+   */
+  authorization(
+    desk: AccessDesk,
+  ): (principal: AuthenticatedPrincipal, request: IncomingRequest) => Promise<boolean> {
+    return async (principal, request) => {
+      const { email, name, organization } = principal.attributes ?? {};
+      if (email === undefined) {
+        return false;
+      }
+      const signed: Signed = {
+        person: create(PersonIdSchema, { uuid: principal.id }),
+        email: create(EmailAddressSchema, { value: email }),
+        name: name ?? email,
+      };
+      const command = request.kind === "command" ? request.message : undefined;
+      const answering =
+        command === undefined
+          ? undefined
+          : SIGNED_IN_COMMANDS.find(({ schema }) => isMessage(command, schema));
+      if (command !== undefined && answering !== undefined) {
+        return answering.allows(command, signed, desk);
+      }
+      if (organization === undefined) {
+        return false;
+      }
+      const organizationId = create(OrganizationIdSchema, { uuid: organization });
+      const member = await desk.member(organizationId, signed.person);
+      if (member === undefined) {
+        return false;
+      }
+      const asking: Asking = {
+        ...signed,
+        organization: organizationId,
+        member,
+        administrator: member.role === OrganizationRole.ADMINISTRATOR,
+      };
+      switch (request.kind) {
+        case "command": {
+          const applies =
+            command === undefined
+              ? undefined
+              : MEMBER_COMMANDS.find(({ schema }) => isMessage(command, schema));
+          return command !== undefined && applies !== undefined
+            ? applies.allows(command, asking, desk)
+            : false;
+        }
+        case "query":
+          return (
+            (await mayRead(request.target, asking, desk)) ||
+            (asking.administrator && asksForInvitationsOf(request.target, organizationId))
+          );
+        case "subscribe":
+          return mayRead(request.target, asking, desk);
+        case "activate":
+        case "cancel":
+          return true;
+      }
+    };
+  },
+};

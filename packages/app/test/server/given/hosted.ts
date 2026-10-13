@@ -53,7 +53,7 @@ export function tenant(organization: OrganizationId) {
 export async function givenServer(): Promise<Hosted> {
   const assembly: AccessDeskModule = await import("../../../dist/src/server/access-desk.js");
   let url = "";
-  const contexts = await assembly.assembleAccessDesk({ server: () => url });
+  const contexts = await assembly.AccessDesk.assemble({ server: () => url });
   const server = await new Server({
     contexts: [contexts.identity, contexts.resources],
     port: 0,
