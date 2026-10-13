@@ -23,26 +23,26 @@ All of Access Desk is configured in one file, `.env`, in the root of the
 repository. Copy [`.env.example`](../../.env.example) there and fill it in.
 The file is ignored by Git.
 
-Every setting is required unless the table says otherwise. Nothing is
-assumed: a program that misses a setting refuses to start and names it.
+The addresses and ports are all required. Of the two identity providers, at
+least one is required. Nothing is assumed: a program that misses a setting it
+needs refuses to start and names it.
 
-| Variable                   | Read by             | Meaning                                                          |
-| -------------------------- | ------------------- | ---------------------------------------------------------------- |
-| `ACCESS_DESK_SERVER_HOST`  | server, gateway     | The address the application server listens on.                   |
-| `ACCESS_DESK_SERVER_PORT`  | server, gateway     | The port the application server listens on.                      |
-| `ACCESS_DESK_GATEWAY_HOST` | gateway, web client | The address the gateway listens on.                              |
-| `ACCESS_DESK_GATEWAY_PORT` | gateway, web client | The port the gateway listens on.                                 |
-| `ACCESS_DESK_WEB_HOST`     | gateway, web client | The address the web client listens on.                           |
-| `ACCESS_DESK_WEB_PORT`     | gateway, web client | The port the web client listens on.                              |
-| `GITHUB_CLIENT_ID`         | gateway             | Optional. The client identifier of the GitHub OAuth application. |
-| `GITHUB_CLIENT_SECRET`     | gateway             | Optional. The client secret of the GitHub OAuth application.     |
-| `GOOGLE_CLIENT_ID`         | gateway             | Optional. The client identifier of the Google OAuth application. |
-| `GOOGLE_CLIENT_SECRET`     | gateway             | Optional. The client secret of the Google OAuth application.     |
+| Variable                   | Read by             | Meaning                                                                                |
+| -------------------------- | ------------------- | -------------------------------------------------------------------------------------- |
+| `ACCESS_DESK_SERVER_HOST`  | server, gateway     | The address the application server listens on.                                         |
+| `ACCESS_DESK_SERVER_PORT`  | server, gateway     | The port the application server listens on.                                            |
+| `ACCESS_DESK_GATEWAY_HOST` | gateway, web client | The address the gateway listens on.                                                    |
+| `ACCESS_DESK_GATEWAY_PORT` | gateway, web client | The port the gateway listens on.                                                       |
+| `ACCESS_DESK_WEB_HOST`     | gateway, web client | The address the web client listens on.                                                 |
+| `ACCESS_DESK_WEB_PORT`     | gateway, web client | The port the web client listens on.                                                    |
+| `GITHUB_CLIENT_ID`         | gateway             | The client identifier of the GitHub OAuth application. Optional when Google is set up. |
+| `GITHUB_CLIENT_SECRET`     | gateway             | The client secret of the GitHub OAuth application. Optional when Google is set up.     |
+| `GOOGLE_CLIENT_ID`         | gateway             | The client identifier of the Google OAuth application. Optional when GitHub is set up. |
+| `GOOGLE_CLIENT_SECRET`     | gateway             | The client secret of the Google OAuth application. Optional when GitHub is set up.     |
 
-Sign-in through GitHub is on when both GitHub variables are set, and through
-Google when both Google variables are. Setting only one of a provider's
-variables is refused. Nobody can sign in without at least one
-provider.
+People sign in through GitHub, Google, or both. At least one of them must be
+set up, or the gateway does not start. A provider is set up when both of its
+variables are set. Setting only one of the two is refused.
 
 ## Run it
 

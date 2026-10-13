@@ -110,6 +110,20 @@ class Reading {
     return { clientId, clientSecret };
   }
 
+  /** The identity providers people sign in through. At least one must be set up. */
+  providers(): Pick<GatewaySettings, "github" | "google"> {
+    const before = this.#problems.length;
+    const github = this.provider("GITHUB");
+    const google = this.provider("GOOGLE");
+    if (github === undefined && google === undefined && this.#problems.length === before) {
+      this.#problems.push(
+        "No identity provider is set up. Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET, " +
+          "or GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, or both pairs.",
+      );
+    }
+    return { github, google };
+  }
+
   /** Returns the settings, or throws one error that lists every problem. */
   done<Settings>(settings: Settings): Settings {
     if (this.#problems.length > 0) {
@@ -152,8 +166,7 @@ export const Settings = {
       listening,
       serverUrl: `http://${server.host}:${server.port.toString()}`,
       webUrl: `https://${web.host}:${web.port.toString()}/`,
-      github: reading.provider("GITHUB"),
-      google: reading.provider("GOOGLE"),
+      ...reading.providers(),
     });
   },
 };

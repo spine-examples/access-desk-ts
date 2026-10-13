@@ -61,9 +61,6 @@ for (const [key, label] of [
 ] as const) {
   console.log(`Sign-in through ${label} is ${Object.hasOwn(external, key) ? "on" : "off"}.`);
 }
-if (Object.keys(external).length === 0) {
-  console.warn("No identity provider is set up, so nobody can sign in.");
-}
 // A browser that leaves or reloads a page cancels its pending requests.
 // That must not stop the gateway. Any other unhandled failure still does.
 const CANCELLED = 1;

@@ -23,6 +23,10 @@ const gateway = {
   ACCESS_DESK_GATEWAY_PORT: "8080",
   ACCESS_DESK_WEB_HOST: "localhost",
   ACCESS_DESK_WEB_PORT: "5173",
+  GITHUB_CLIENT_ID: "github-id",
+  GITHUB_CLIENT_SECRET: "github-secret",
+  GOOGLE_CLIENT_ID: "google-id",
+  GOOGLE_CLIENT_SECRET: "google-secret",
 };
 
 describe("The settings should", () => {
@@ -35,20 +39,9 @@ describe("The settings should", () => {
       listening: { host: "127.0.0.1", port: 8080 },
       serverUrl: "http://127.0.0.1:8090",
       webUrl: "https://localhost:5173/",
-      github: undefined,
-      google: undefined,
+      github: { clientId: "github-id", clientSecret: "github-secret" },
+      google: { clientId: "google-id", clientSecret: "google-secret" },
     });
-  });
-
-  it("take an identity provider that both of its settings are given for", () => {
-    const settings = Settings.ofGateway({
-      ...gateway,
-      GITHUB_CLIENT_ID: "id",
-      GITHUB_CLIENT_SECRET: "secret",
-    });
-
-    expect(settings.github).toEqual({ clientId: "id", clientSecret: "secret" });
-    expect(settings.google).toBeUndefined();
   });
 
   it("refuse to assume anything, and name every setting that is missing", () => {
@@ -56,7 +49,7 @@ describe("The settings should", () => {
       /ACCESS_DESK_SERVER_HOST is not set[\s\S]*ACCESS_DESK_SERVER_PORT is not set/,
     );
     expect(() => Settings.ofGateway({})).toThrow(
-      /ACCESS_DESK_GATEWAY_HOST[\s\S]*ACCESS_DESK_GATEWAY_PORT[\s\S]*ACCESS_DESK_SERVER_HOST[\s\S]*ACCESS_DESK_SERVER_PORT[\s\S]*ACCESS_DESK_WEB_HOST[\s\S]*ACCESS_DESK_WEB_PORT/,
+      /ACCESS_DESK_GATEWAY_HOST[\s\S]*ACCESS_DESK_GATEWAY_PORT[\s\S]*ACCESS_DESK_SERVER_HOST[\s\S]*ACCESS_DESK_SERVER_PORT[\s\S]*ACCESS_DESK_WEB_HOST[\s\S]*ACCESS_DESK_WEB_PORT[\s\S]*No identity provider is set up/,
     );
   });
 
@@ -77,8 +70,38 @@ describe("The settings should", () => {
     }
   });
 
+  it("take a gateway with only one identity provider", () => {
+    const onlyGitHub = Settings.ofGateway({
+      ...gateway,
+      GOOGLE_CLIENT_ID: "",
+      GOOGLE_CLIENT_SECRET: "",
+    });
+    expect(onlyGitHub.github).toEqual({ clientId: "github-id", clientSecret: "github-secret" });
+    expect(onlyGitHub.google).toBeUndefined();
+
+    const onlyGoogle = Settings.ofGateway({
+      ...gateway,
+      GITHUB_CLIENT_ID: "",
+      GITHUB_CLIENT_SECRET: "",
+    });
+    expect(onlyGoogle.github).toBeUndefined();
+    expect(onlyGoogle.google).toEqual({ clientId: "google-id", clientSecret: "google-secret" });
+  });
+
+  it("refuse a gateway with no identity provider", () => {
+    expect(() =>
+      Settings.ofGateway({
+        ...gateway,
+        GITHUB_CLIENT_ID: "",
+        GITHUB_CLIENT_SECRET: "",
+        GOOGLE_CLIENT_ID: "",
+        GOOGLE_CLIENT_SECRET: "",
+      }),
+    ).toThrow(/No identity provider is set up/);
+  });
+
   it("refuse an identity provider that is only partly set up", () => {
-    expect(() => Settings.ofGateway({ ...gateway, GOOGLE_CLIENT_ID: "id" })).toThrow(
+    expect(() => Settings.ofGateway({ ...gateway, GOOGLE_CLIENT_SECRET: "" })).toThrow(
       /GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set together/,
     );
   });
