@@ -14,7 +14,7 @@ rejections from the Event Storming board. Architecture details belong in
 ## Identity
 
 | Owner                  | Trigger (actor/event)                | Command                | Event(s)                          | Rejections                                 |
-|------------------------|--------------------------------------|------------------------|-----------------------------------|--------------------------------------------|
+| ---------------------- | ------------------------------------ | ---------------------- | --------------------------------- | ------------------------------------------ |
 | External Identity (PM) | Gateway                              | Link External Identity | External Identity Linking Started | External Identity Already Known            |
 | External Identity (PM) | on External Identity Linking Started | Register Person Email  | —                                 | —                                          |
 | Person Email           | External Identity (PM)               | Register Person Email  | Person Email Registered           | Person Email Already Registered            |
@@ -40,22 +40,22 @@ the person is a member of.
 
 ### Resources
 
-| Owner                      | Trigger (actor/event)              | Command                     | Event(s)                     | Rejections                           |
-|----------------------------|------------------------------------|-----------------------------|------------------------------|--------------------------------------|
-| Organization               | Developer, at assembly             | Create Organization         | Organization Created         | Organization Already Exists          |
-| Organization               | Invitation (PM), in Identity       | Add Organization Member     | Organization Member Added    | —                                    |
-| Organization               | Resource Registration (PM)         | Organization Administrator  | Register Resource            | Resource Registration Requested      |
-| Resource Registration (PM) | on Resource Registration Requested | Create Resource             | —                            | —                                    |
-| Resource                   | Resource Registration (PM)         | Create Resource             | Resource Created             | Resource Already Exists              |
-| Resource Registration (PM) | on Resource Already Exists         | —                           | Resource Registration Failed | —                                    |
-| Resource Registration (PM) | on Resource Created                | Add Resource                | —                            | —                                    |
-| Organization               | Resource Registration (PM)         | Add Resource                | Resource Added               | Resource Name Already Used           |
-| Resource Registration (PM) | on Resource Name Already Used      | Delete Resource             | —                            | —                                    |
-| Resource                   | Resource Registration (PM)         | Delete Resource             | Resource Deleted             | —                                    |
-| Resource Registration (PM) | on Resource Added                  | —                           | Resource Registered          | —                                    |
-| Resource Registration (PM) | on Resource Deleted                | —                           | Resource Registration Failed | —                                    |
-| Resource                   | Resource Manager                   | Open Resource For Requests  | Resource Opened For Requests | Resource Already Open For Requests   |
-| Resource                   | Resource Manager                   | Close Resource For Requests | Resource Closed For Requests | Resource Already Closed For Requests |
+| Owner                      | Trigger (actor/event)              | Command                     | Event(s)                        | Rejections                           |
+| -------------------------- | ---------------------------------- | --------------------------- | ------------------------------- | ------------------------------------ |
+| Organization               | Developer, at assembly             | Create Organization         | Organization Created            | Organization Already Exists          |
+| Organization               | Invitation (PM), in Identity       | Add Organization Member     | Organization Member Added       | —                                    |
+| Resource Registration (PM) | Organization Administrator         | Register Resource           | Resource Registration Requested | —                                    |
+| Resource Registration (PM) | on Resource Registration Requested | Create Resource             | —                               | —                                    |
+| Resource                   | Resource Registration (PM)         | Create Resource             | Resource Created                | Resource Already Exists              |
+| Resource Registration (PM) | on Resource Already Exists         | —                           | Resource Registration Failed    | —                                    |
+| Resource Registration (PM) | on Resource Created                | Add Resource                | —                               | —                                    |
+| Organization               | Resource Registration (PM)         | Add Resource                | Resource Added                  | Resource Name Already Used           |
+| Resource Registration (PM) | on Resource Name Already Used      | Delete Resource             | —                               | —                                    |
+| Resource                   | Resource Registration (PM)         | Delete Resource             | Resource Deleted                | —                                    |
+| Resource Registration (PM) | on Resource Added                  | —                           | Resource Registered             | —                                    |
+| Resource Registration (PM) | on Resource Deleted                | —                           | Resource Registration Failed    | —                                    |
+| Resource                   | Resource Manager                   | Open Resource For Requests  | Resource Opened For Requests    | Resource Already Open For Requests   |
+| Resource                   | Resource Manager                   | Close Resource For Requests | Resource Closed For Requests    | Resource Already Closed For Requests |
 
 Process: **Resource Registration** runs `Register Resource → Resource
 Registration Requested → Create Resource → Resource Created → Add Resource →
@@ -72,7 +72,7 @@ for policy; there is no separate request-policy mirror projection.
 #### Request & approval
 
 | Owner               | Trigger (actor/event)                                                                                          | Command                                      | Event(s)                                    | Rejections                                                                        |
-|---------------------|----------------------------------------------------------------------------------------------------------------|----------------------------------------------|---------------------------------------------|-----------------------------------------------------------------------------------|
+| ------------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------- |
 | Access Request (PM) | Requester                                                                                                      | Submit Access Request                        | Access Request Submission Started           | Resource Not Open For Requests; Access Level Not Offered; Request Already Pending |
 | Access Request (PM) | Requester                                                                                                      | Submit Access Extension Request              | Access Extension Request Submission Started | Resource Not Open For Requests; Request Already Pending                           |
 | Access Request (PM) | on Access Request Submission Started                                                                           | Check Requested Access                       | —                                           | —                                                                                 |
@@ -106,7 +106,7 @@ Projection inputs and outputs drawn on the board:
 #### Access grant — Resource Access aggregate
 
 | Owner           | Trigger (actor/event)              | Command                   | Event(s)                    | Rejections                                                                |
-|-----------------|------------------------------------|---------------------------|-----------------------------|---------------------------------------------------------------------------|
+| --------------- | ---------------------------------- | ------------------------- | --------------------------- | ------------------------------------------------------------------------- |
 | Resource Access | Access Request (PM), at submission | Check Requested Access    | Requested Access Checked    | Requested Duration Too Long; Access Already Held                          |
 | Resource Access | Access Request (PM), at submission | Check Requested Extension | Requested Extension Checked | Access Grant Not Active; Requested Duration Too Long; Access Already Held |
 | Resource Access | Access Request (PM), at approval   | Create Access Grant       | Access Grant Created        | —                                                                         |
