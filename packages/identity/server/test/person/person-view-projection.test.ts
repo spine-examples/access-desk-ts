@@ -20,14 +20,7 @@ import {
   identityBlackBox,
   loadIdentityContext,
 } from "../given/identity-context.js";
-import {
-  account,
-  addSignInAccount,
-  awaitPerson,
-  github,
-  google,
-  registerPerson,
-} from "./given/person.js";
+import { account, addSignInAccount, awaitPerson, google, registerPerson } from "./given/person.js";
 import { acceptInvitation, inviteMember } from "../invitation/given/invitation.js";
 import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 
@@ -40,12 +33,12 @@ describe("PersonViewProjection should", () => {
       const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
 
-      await registerPerson(scope, "noah", "noah@acme.example", account(github, "1001"));
+      await registerPerson(scope, "noah", "noah@acme.example", account(google, "1001"));
 
       expect(await awaitPerson(box, scope, "noah")).toMatchObject({
         emailAddress: { value: "noah@acme.example" },
         name: "noah (name)",
-        account: [{ provider: github, subject: "1001" }],
+        account: [{ provider: google, subject: "1001" }],
       });
     });
   });
@@ -54,13 +47,13 @@ describe("PersonViewProjection should", () => {
     it("show every account the person signs in with", async () => {
       const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
-      await registerPerson(scope, "noah", "noah@acme.example", account(github, "1001"));
+      await registerPerson(scope, "noah", "noah@acme.example", account(google, "1001"));
       await awaitPerson(box, scope, "noah");
 
       await addSignInAccount(scope, "noah", account(google, "g-7"));
 
       const person = await awaitPerson(box, scope, "noah", (view) => view.account.length === 2);
-      expect(person.account.map((held) => held.provider)).toEqual([github, google]);
+      expect(person.account.map((held) => held.subject)).toEqual(["1001", "g-7"]);
     });
   });
 
@@ -68,7 +61,7 @@ describe("PersonViewProjection should", () => {
     it("show every organization whose invitation the person accepted", async () => {
       const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
-      await registerPerson(scope, "noah", "noah@acme.example", account(github, "1001"));
+      await registerPerson(scope, "noah", "noah@acme.example", account(google, "1001"));
       await awaitPerson(box, scope, "noah");
       await inviteMember(scope, "noah@acme.example", OrganizationRole.MEMBER, "acme");
       await inviteMember(scope, "noah@acme.example", OrganizationRole.MEMBER, "globex");

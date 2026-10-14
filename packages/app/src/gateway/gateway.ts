@@ -48,7 +48,7 @@ export interface GatewayOptions {
   readonly host?: string;
   /** The port to listen on. Zero picks a free one. */
   readonly port: number;
-  /** The identity providers people sign in through, such as GitHub and Google, by key. */
+  /** The identity providers people sign in through, such as Google, by key. */
   readonly external: Readonly<Record<string, ExternalSignIn>>;
 }
 

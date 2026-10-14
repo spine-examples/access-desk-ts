@@ -67,7 +67,7 @@ describe("The gateway should", () => {
 
       expect((await session(running, noah.token)).body).toEqual({
         person: { id: noah.person, email: "noah@acme.example", name: "Noah Reyes" },
-        accounts: [{ provider: "github", subject: "noah" }],
+        accounts: [{ provider: "google", subject: "noah" }],
         organization: null,
         organizations: [{ id: "acme", name: "acme", standing: "invited", role: null }],
       });
@@ -83,17 +83,17 @@ describe("The gateway should", () => {
       expect(again.token).not.toBe(first.token);
     });
 
-    it("know them as the same person through another provider, by their email address", async () => {
+    it("know them as the same person through another account, by their email address", async () => {
       const running = await givenGateway();
 
-      const throughGitHub = await signIn(running, "noah", "github");
-      const throughGoogle = await signIn(running, "noah", "google");
+      const first = await signIn(running, "noah");
+      const second = await signInWith(running, "fake", "noah-2:noah@acme.example:Noah Reyes");
 
-      expect(throughGoogle.person).toBe(throughGitHub.person);
-      expect(throughGitHub.person).toMatch(/^[0-9a-f-]{36}$/);
-      expect((await session(running, throughGoogle.token)).body.accounts).toEqual([
-        { provider: "github", subject: "noah" },
+      expect(second.person).toBe(first.person);
+      expect(first.person).toMatch(/^[0-9a-f-]{36}$/);
+      expect((await session(running, second.token)).body.accounts).toEqual([
         { provider: "google", subject: "noah" },
+        { provider: "google", subject: "noah-2" },
       ]);
     });
 
@@ -150,10 +150,7 @@ describe("The gateway should", () => {
 
       expect(status).toBe(200);
       expect(body).toEqual({
-        external: [
-          { key: "fake", label: "Fake" },
-          { key: "other", label: "Fake" },
-        ],
+        external: [{ key: "fake", label: "Fake" }],
       });
     });
 
@@ -188,17 +185,6 @@ describe("The gateway should", () => {
         person: { email: "noah@acme.example", name: "Noah@Acme.example" },
         organizations: [{ id: "acme", standing: "invited" }],
       });
-    });
-
-    it("sign in the same person through a second provider under the same email address", async () => {
-      const running = await givenGateway();
-
-      const first = await signInWith(running, "fake", "1001:noah@acme.example");
-      const second = await signInWith(running, "other", "g-7:noah@acme.example");
-      const somebodyElse = await signInWith(running, "other", "g-8:maya@acme.example");
-
-      expect(second.person).toBe(first.person);
-      expect(somebodyElse.person).not.toBe(first.person);
     });
 
     it("refuse a provider it was not set up with", async () => {

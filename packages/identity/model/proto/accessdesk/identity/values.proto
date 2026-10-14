@@ -21,22 +21,13 @@ enum IdentityProvider {
 
     IP_UNSPECIFIED = 0;
 
-    // GitHub.
-    //
-    // An account is named by the number GitHub gives the user, the
-    // `id` of https://docs.github.com/en/rest/users/users#get-the-authenticated-user.
-    // The email address is the primary one GitHub has verified, from
-    // https://docs.github.com/en/rest/users/emails#list-email-addresses-for-the-authenticated-user.
-    //
-    GITHUB = 1;
-
     // Google.
     //
     // An account is named by the `sub` claim of the ID token, and the
     // email address is its `email` claim when `email_verified` is true. See
     // https://developers.google.com/identity/openid-connect/openid-connect#an-id-tokens-payload.
     //
-    GOOGLE = 2;
+    GOOGLE = 1;
 }
 
 // The status of an invitation to join an organization.

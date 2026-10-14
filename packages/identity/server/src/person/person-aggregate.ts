@@ -31,9 +31,9 @@ import { PersonSchema } from "@access-desk/identity-model/generated/accessdesk/i
  * One person who signs in to Access Desk.
  *
  * A person is registered the first time they sign in, under the email address
- * their identity provider confirmed. They may sign in with several accounts,
- * such as GitHub and Google. All of them are the same person, whom Access Desk
- * always knows by the same identifier.
+ * their identity provider confirmed. They may sign in with several accounts
+ * under that address. All of them are the same person, whom Access Desk always
+ * knows by the same identifier.
  */
 export class PersonAggregate extends Aggregate<PersonId, typeof PersonSchema> {
   /** Registers the person with the account they first signed in with. */

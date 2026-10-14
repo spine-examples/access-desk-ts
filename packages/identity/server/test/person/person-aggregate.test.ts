@@ -26,14 +26,7 @@ import {
   loadIdentityContext,
   recordEvents,
 } from "../given/identity-context.js";
-import {
-  account,
-  addSignInAccount,
-  awaitPerson,
-  github,
-  google,
-  registerPerson,
-} from "./given/person.js";
+import { account, addSignInAccount, awaitPerson, google, registerPerson } from "./given/person.js";
 
 beforeAll(loadIdentityContext, 30_000);
 afterEach(closeIdentityBlackBoxes);
@@ -49,7 +42,7 @@ describe("PersonAggregate should", () => {
         scope,
         "noah",
         "noah@acme.example",
-        account(github, "1001"),
+        account(google, "1001"),
       );
 
       expect(sent.kind).toBe("ok");
@@ -58,7 +51,7 @@ describe("PersonAggregate should", () => {
           id: { uuid: "noah" },
           emailAddress: { value: "noah@acme.example" },
           name: "noah (name)",
-          account: account(github, "1001"),
+          account: account(google, "1001"),
         }),
       );
       await registered.cancel();
@@ -69,7 +62,7 @@ describe("PersonAggregate should", () => {
     it("emit 'SignInAccountAdded' for a registered person", async () => {
       const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
-      await registerPerson(scope, "noah", "noah@acme.example", account(github, "1001"));
+      await registerPerson(scope, "noah", "noah@acme.example", account(google, "1001"));
       await awaitPerson(box, scope, "noah");
       const added = await recordEvents(scope, SignInAccountAddedSchema);
 

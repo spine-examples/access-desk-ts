@@ -24,7 +24,7 @@ import {
   loadIdentityContext,
   recordEvents,
 } from "../given/identity-context.js";
-import { account, github, google, registerPersonEmail } from "./given/person.js";
+import { account, google, registerPersonEmail } from "./given/person.js";
 
 beforeAll(loadIdentityContext, 30_000);
 afterEach(closeIdentityBlackBoxes);
@@ -36,13 +36,13 @@ describe("PersonEmailAggregate should", () => {
       const scope = box.onBehalfOf(actor);
       const registered = await recordEvents(scope, PersonEmailRegisteredSchema);
 
-      const sent = await registerPersonEmail(scope, "noah@acme.example", account(github, "1001"));
+      const sent = await registerPersonEmail(scope, "noah@acme.example", account(google, "1001"));
 
       expect(sent.kind).toBe("ok");
       const event = await registered.waitFor(box);
       expect(event).toMatchObject({
         emailAddress: { value: "noah@acme.example" },
-        invoker: { provider: github, subject: "1001" },
+        invoker: { provider: google, subject: "1001" },
       });
       expect(event.person?.uuid).toMatch(/^[0-9a-f-]{36}$/);
       await registered.cancel();
@@ -52,7 +52,7 @@ describe("PersonEmailAggregate should", () => {
       const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
       const registered = await recordEvents(scope, PersonEmailRegisteredSchema);
-      await registerPersonEmail(scope, "noah@acme.example", account(github, "1001"));
+      await registerPersonEmail(scope, "noah@acme.example", account(google, "1001"));
       const first = (await registered.waitFor(box)).person;
 
       const rejection = await expectRejection(box, scope, PersonEmailAlreadyRegisteredSchema, () =>

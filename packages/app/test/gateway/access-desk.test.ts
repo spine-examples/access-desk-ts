@@ -53,8 +53,8 @@ const person = create(PersonIdSchema, { uuid: "person-1" });
 const email = create(EmailAddressSchema, { value: "maya@example.com" });
 const organization = create(OrganizationIdSchema, { uuid: "acme" });
 const account = create(ExternalIdentityIdSchema, {
-  provider: IdentityProvider.GITHUB,
-  subject: "github-1",
+  provider: IdentityProvider.GOOGLE,
+  subject: "google-1",
 });
 
 function givenDesk() {
@@ -121,12 +121,12 @@ describe("AccessDesk should", () => {
       }) => boolean;
     };
     expect(awaited.message).toMatchObject({
-      id: { subject: "github-1" },
+      id: { subject: "google-1" },
       emailAddress: { value: "maya@example.com" },
     });
     expect(awaited.answers({ id: account })).toBe(true);
     expect(
-      awaited.answers({ id: { provider: IdentityProvider.GOOGLE, subject: "github-1" } }),
+      awaited.answers({ id: { provider: IdentityProvider.IP_UNSPECIFIED, subject: "google-1" } }),
     ).toBe(false);
     expect(reads.readById).toHaveBeenCalledTimes(3);
   });
@@ -157,7 +157,7 @@ describe("AccessDesk should", () => {
     const profile = await desk.profile({ id: person, email, name: "Maya" });
 
     expect(profile.accounts).toEqual([
-      { provider: "github", subject: "github-1" },
+      { provider: "google", subject: "google-1" },
       { provider: "google", subject: "google-2" },
     ]);
     expect(reads.readById).toHaveBeenCalledTimes(1);

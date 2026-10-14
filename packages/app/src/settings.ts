@@ -52,10 +52,8 @@ export interface GatewaySettings {
    * send people back there, and only that page may call the gateway.
    */
   readonly webUrl: string;
-  /** GitHub as an identity provider, when it is set up. */
-  readonly github: ProviderSettings | undefined;
-  /** Google as an identity provider, when it is set up. */
-  readonly google: ProviderSettings | undefined;
+  /** How Access Desk is registered with Google, which people sign in through. */
+  readonly google: ProviderSettings;
 }
 
 /**
@@ -101,34 +99,12 @@ class Reading {
     return { host: this.text(`${prefix}_HOST`), port: this.port(`${prefix}_PORT`) };
   }
 
-  /** An identity provider. Both of its settings must be set, or neither. */
-  provider(prefix: string): ProviderSettings | undefined {
-    const clientId = this.#value(`${prefix}_CLIENT_ID`);
-    const clientSecret = this.#value(`${prefix}_CLIENT_SECRET`);
-    if (clientId === "" && clientSecret === "") {
-      return undefined;
-    }
-    if (clientId === "" || clientSecret === "") {
-      this.#problems.push(
-        `${prefix}_CLIENT_ID and ${prefix}_CLIENT_SECRET must be set together, or neither.`,
-      );
-      return undefined;
-    }
-    return { clientId, clientSecret };
-  }
-
-  /** The identity providers people sign in through. At least one must be set up. */
-  providers(): Pick<GatewaySettings, "github" | "google"> {
-    const before = this.#problems.length;
-    const github = this.provider("GITHUB");
-    const google = this.provider("GOOGLE");
-    if (github === undefined && google === undefined && this.#problems.length === before) {
-      this.#problems.push(
-        "No identity provider is set up. Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET, " +
-          "or GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, or both pairs.",
-      );
-    }
-    return { github, google };
+  /** An identity provider, from its `_CLIENT_ID` and `_CLIENT_SECRET` settings. */
+  provider(prefix: string): ProviderSettings {
+    return {
+      clientId: this.text(`${prefix}_CLIENT_ID`),
+      clientSecret: this.text(`${prefix}_CLIENT_SECRET`),
+    };
   }
 
   /** Returns the settings, or throws one error that lists every problem. */
@@ -173,7 +149,7 @@ export const Settings = {
       listening,
       serverUrl: `http://${server.host}:${server.port.toString()}`,
       webUrl: `https://${web.host}:${web.port.toString()}/`,
-      ...reading.providers(),
+      google: reading.provider("GOOGLE"),
     });
   },
 

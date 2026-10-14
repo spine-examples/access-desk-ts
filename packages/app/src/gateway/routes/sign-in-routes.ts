@@ -39,8 +39,7 @@ export interface SignInRoutes {
 }
 
 /**
- * The endpoints for signing in through an identity provider, such as GitHub
- * or Google.
+ * The endpoints for signing in through an identity provider, such as Google.
  *
  * 1. The sign-in page asks which providers it may offer.
  * 2. The browser starts a sign-in with one of them.
@@ -108,7 +107,7 @@ export function signInRoutes(
      *
      * Answers `200` with `{ external: [{ key, label }] }`. `key` is what
      * `/auth/external/start` takes as `provider`, and `label` is the name to
-     * show, such as "GitHub". An empty list means nobody can sign in.
+     * show, such as "Google". An empty list means nobody can sign in.
      */
     route("/auth/options", () =>
       Promise.resolve([

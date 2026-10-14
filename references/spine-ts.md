@@ -358,9 +358,7 @@ controls defined in the architecture.
   accepts only `kind: "cookie"`, so the resolver passes the bearer value as
   one.
 - `OidcFlow` accepts only HTTPS addresses and requires the `openid` scope.
-- `createGitHubProvider` gives the verified primary email address only with
-  `includeVerifiedPrimaryEmail`. `createGoogleProvider` returns
-  `email_verified` as text, and needs
+- `createGoogleProvider` returns `email_verified` as text, and needs
   `clientAuthentication: "client_secret_post"`, or Google refuses the code
   exchange.
 - The sign-in flow reports every provider failure the same way and prints

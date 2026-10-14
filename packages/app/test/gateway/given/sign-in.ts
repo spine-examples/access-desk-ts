@@ -24,9 +24,6 @@ export const PEOPLE = {
   olivia: { email: "olivia@acme.example", name: "Olivia Park" },
 };
 
-/** The identity providers of the tests, by what each stands for. */
-const PROVIDERS = { github: "fake", google: "other" } as const;
-
 /** The secret a browser keeps while it signs in. */
 export const verifier = "v".repeat(43);
 /** The fingerprint of that secret, which the browser starts a sign-in with. */
@@ -48,7 +45,7 @@ export interface Signed {
  * Starts a sign-in through an identity provider.
  *
  * @param running The running application.
- * @param provider The key of the provider. The one standing for GitHub when left out.
+ * @param provider The key of the provider. The fake one when left out.
  * @returns The state the provider sends back with its answer.
  */
 export async function start(running: Running, provider = "fake"): Promise<string> {
@@ -69,7 +66,7 @@ export async function start(running: Running, provider = "fake"): Promise<string
  *
  * @param running The running application.
  * @param answer The state the sign-in was started with and the code the
- *   provider answered with. The provider standing for GitHub and the secret
+ *   provider answered with. The fake provider and the secret
  *   the sign-in was started with, when those are left out.
  * @returns The gateway's answer, which carries the session when it accepted the sign-in.
  */
@@ -118,16 +115,11 @@ export async function signInWith(
  *
  * @param running The running application.
  * @param person The person's key.
- * @param via Which provider they sign in through. GitHub when left out.
  * @returns The signed-in person, with their session.
  */
-export function signIn(
-  running: Running,
-  person: keyof typeof PEOPLE,
-  via: keyof typeof PROVIDERS = "github",
-): Promise<Signed> {
+export function signIn(running: Running, person: keyof typeof PEOPLE): Promise<Signed> {
   const { email, name } = PEOPLE[person];
-  return signInWith(running, PROVIDERS[via], `${person}:${email}:${name}`);
+  return signInWith(running, "fake", `${person}:${email}:${name}`);
 }
 
 /**

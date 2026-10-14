@@ -23,26 +23,22 @@ All of Access Desk is configured in one file, `.env`, in the root of the
 repository. Copy [`.env.example`](../../.env.example) there and fill it in.
 The file is ignored by Git.
 
-The addresses and ports are all required. Of the two identity providers, at
-least one is required. Nothing is assumed: a program that misses a setting it
-needs refuses to start and names it.
+Every setting is required. Nothing is assumed: a program that misses a
+setting refuses to start and names it.
 
-| Variable                   | Read by             | Meaning                                                                                |
-| -------------------------- | ------------------- | -------------------------------------------------------------------------------------- |
-| `ACCESS_DESK_SERVER_HOST`  | server, gateway     | The address the application server listens on.                                         |
-| `ACCESS_DESK_SERVER_PORT`  | server, gateway     | The port the application server listens on.                                            |
-| `ACCESS_DESK_GATEWAY_HOST` | gateway, web client | The address the gateway listens on.                                                    |
-| `ACCESS_DESK_GATEWAY_PORT` | gateway, web client | The port the gateway listens on.                                                       |
-| `ACCESS_DESK_WEB_HOST`     | gateway, web client | The address the web client listens on.                                                 |
-| `ACCESS_DESK_WEB_PORT`     | gateway, web client | The port the web client listens on.                                                    |
-| `GITHUB_CLIENT_ID`         | gateway             | The client identifier of the GitHub OAuth application. Optional when Google is set up. |
-| `GITHUB_CLIENT_SECRET`     | gateway             | The client secret of the GitHub OAuth application. Optional when Google is set up.     |
-| `GOOGLE_CLIENT_ID`         | gateway             | The client identifier of the Google OAuth application. Optional when GitHub is set up. |
-| `GOOGLE_CLIENT_SECRET`     | gateway             | The client secret of the Google OAuth application. Optional when GitHub is set up.     |
+| Variable                   | Read by             | Meaning                                                |
+| -------------------------- | ------------------- | ------------------------------------------------------ |
+| `ACCESS_DESK_SERVER_HOST`  | server, gateway     | The address the application server listens on.         |
+| `ACCESS_DESK_SERVER_PORT`  | server, gateway     | The port the application server listens on.            |
+| `ACCESS_DESK_GATEWAY_HOST` | gateway, web client | The address the gateway listens on.                    |
+| `ACCESS_DESK_GATEWAY_PORT` | gateway, web client | The port the gateway listens on.                       |
+| `ACCESS_DESK_WEB_HOST`     | gateway, web client | The address the web client listens on.                 |
+| `ACCESS_DESK_WEB_PORT`     | gateway, web client | The port the web client listens on.                    |
+| `GOOGLE_CLIENT_ID`         | gateway             | The client identifier of the Google OAuth application. |
+| `GOOGLE_CLIENT_SECRET`     | gateway             | The client secret of the Google OAuth application.     |
 
-People sign in through GitHub, Google, or both. At least one of them must be
-set up, or the gateway does not start. A provider is set up when both of its
-variables are set. Setting only one of the two is refused.
+People sign in through Google. If the gateway cannot reach Google when it
+starts, it does not start.
 
 ## Run it
 
@@ -98,7 +94,7 @@ Send `{}`.
 Answers `200`:
 
 ```json
-{ "external": [{ "key": "github", "label": "GitHub" }] }
+{ "external": [{ "key": "google", "label": "Google" }] }
 ```
 
 `key` is what `/auth/external/start` takes as `provider`. `label` is the name
@@ -119,7 +115,7 @@ provider sends the person back.
 Answers `200` with the provider's address to send the person to:
 
 ```json
-{ "authorizationUrl": "https://github.com/login/oauth/authorize?..." }
+{ "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth?..." }
 ```
 
 Answers `403` for a provider that is not set up or a missing `codeChallenge`.
@@ -167,7 +163,7 @@ Answers `200`:
 ```json
 {
   "person": { "id": "…", "email": "noah@acme.example", "name": "Noah Reyes" },
-  "accounts": [{ "provider": "github", "subject": "1001" }],
+  "accounts": [{ "provider": "google", "subject": "1001" }],
   "organization": null,
   "organizations": [
     { "id": "acme", "name": "acme", "standing": "member", "role": "administrator" },

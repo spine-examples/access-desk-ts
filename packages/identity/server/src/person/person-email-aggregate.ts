@@ -30,8 +30,8 @@ import { PersonEmailSchema } from "@access-desk/identity-model/generated/accessd
  *
  * An address belongs to one person only, the one registered when somebody
  * first signed in under it. Whoever signs in under it afterwards, with
- * whatever account, is that same person. This is what makes a GitHub account
- * and a Google account one person.
+ * whatever account, is that same person. This is what makes two accounts
+ * with the same address one person.
  */
 export class PersonEmailAggregate extends Aggregate<EmailAddress, typeof PersonEmailSchema> {
   /**

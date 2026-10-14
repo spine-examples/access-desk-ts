@@ -30,8 +30,8 @@ describe("Gateway provider mapping should", () => {
       subject: "subject-1",
       claims: { email: "maya@example.com", name: "Maya Chen" },
     });
-    expect(ConfirmedIdentity.personIn(IdentityProvider.GITHUB, identity)).toMatchObject({
-      id: { provider: IdentityProvider.GITHUB, subject: "subject-1" },
+    expect(ConfirmedIdentity.personIn(IdentityProvider.GOOGLE, identity)).toMatchObject({
+      id: { provider: IdentityProvider.GOOGLE, subject: "subject-1" },
       email: { value: "maya@example.com" },
       name: "Maya Chen",
     });
@@ -48,7 +48,7 @@ describe("Gateway provider mapping should", () => {
 
   it("refuse an identity with no verified email claim", () => {
     expect(
-      ConfirmedIdentity.personIn(IdentityProvider.GITHUB, {
+      ConfirmedIdentity.personIn(IdentityProvider.GOOGLE, {
         issuer: "issuer",
         subject: "subject-3",
         claims: { name: "No email" },

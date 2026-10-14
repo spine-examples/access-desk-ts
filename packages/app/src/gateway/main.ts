@@ -27,20 +27,13 @@ import type { ExternalSignIn } from "./routes/sign-in-routes.js";
 
 const settings = Settings.ofGateway(process.env);
 
-const external: Record<string, ExternalSignIn> = {};
-if (settings.github !== undefined) {
-  external.github = {
-    provider: SignInProvider.gitHub(settings.github),
-    callbackUri: settings.webUrl,
-  };
+const google = await SignInProvider.google(settings.google);
+if (google === undefined) {
+  throw new Error("Google could not be reached, so nobody could sign in.");
 }
-const google =
-  settings.google === undefined ? undefined : await SignInProvider.google(settings.google);
-if (settings.google !== undefined && google !== undefined) {
-  external.google = { provider: google, callbackUri: settings.webUrl };
-} else if (settings.google !== undefined) {
-  console.warn("Google could not be reached, so sign-in through Google is off.");
-}
+const external: Record<string, ExternalSignIn> = {
+  google: { provider: google, callbackUri: settings.webUrl },
+};
 
 const gateway = await Gateway.start({
   backend: settings.serverUrl,
@@ -55,12 +48,6 @@ const gateway = await Gateway.start({
 console.log(`Access Desk gateway: ${gateway.url}`);
 console.log(`Application server it reaches: ${settings.serverUrl}`);
 console.log(`People open the application at: ${settings.webUrl}`);
-for (const [key, label] of [
-  ["github", "GitHub"],
-  ["google", "Google"],
-] as const) {
-  console.log(`Sign-in through ${label} is ${Object.hasOwn(external, key) ? "on" : "off"}.`);
-}
 // A browser that leaves or reloads a page cancels its pending requests.
 // That must not stop the gateway. Any other unhandled failure still does.
 const CANCELLED = 1;

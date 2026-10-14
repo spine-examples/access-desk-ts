@@ -36,12 +36,10 @@ import {
 
 import { readAll } from "../../given/identity-context.js";
 
-/** GitHub, as the provider of a test account. */
-export const github = IdentityProvider.GITHUB;
 /** Google, as the provider of a test account. */
 export const google = IdentityProvider.GOOGLE;
 
-/** The account the provider gives the subject, such as GitHub account `1001`. */
+/** The account the provider gives the subject, such as Google account `1001`. */
 export function account(provider: IdentityProvider, subject: string): ExternalIdentityId {
   return create(ExternalIdentityIdSchema, { provider, subject });
 }

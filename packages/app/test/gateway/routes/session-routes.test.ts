@@ -47,7 +47,7 @@ function fixture() {
   };
   const desk = {
     profile: vi.fn().mockResolvedValue({
-      accounts: [{ provider: "github", subject: "1" }],
+      accounts: [{ provider: "google", subject: "1" }],
       standings: [{ organization, standing: "member" }],
     }),
     joined: vi.fn().mockResolvedValue(true),
@@ -87,7 +87,7 @@ describe("Gateway session routes should", () => {
     const { call, desk } = fixture();
     const missing = create(OrganizationIdSchema, { uuid: "missing" });
     desk.profile.mockResolvedValueOnce({
-      accounts: [{ provider: "github", subject: "1" }],
+      accounts: [{ provider: "google", subject: "1" }],
       standings: [
         { organization, standing: "member" },
         { organization: missing, standing: "invited" },
@@ -108,7 +108,7 @@ describe("Gateway session routes should", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
       person: { id: "person-1", email: "maya@example.com", name: "Maya" },
-      accounts: [{ provider: "github", subject: "1" }],
+      accounts: [{ provider: "google", subject: "1" }],
       organization: null,
       organizations: [{ id: "acme", name: "Acme", standing: "member", role: "administrator" }],
     });

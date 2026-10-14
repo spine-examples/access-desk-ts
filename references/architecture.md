@@ -57,10 +57,10 @@ external-event receptors internally.
 Organization is the tenant.
 
 - `PersonId` is global and is not an email address.
-- A person may sign in with several accounts, such as GitHub and Google. An
-  account is named by its provider and the permanent name the provider gives
-  it. Accounts are one person when their providers confirm the same email
-  address. Only an address the provider has verified counts.
+- A person may sign in with several accounts. An account is named by its
+  provider and the permanent name the provider gives it. Accounts are one
+  person when their providers confirm the same email address.
+  Only an address the provider has verified counts.
 - An account is linked to its person once.
 - Signing in and working in an organization are separate. Signing in says who
   a person is and concerns no organization. A signed-in person then enters one
@@ -98,12 +98,11 @@ Organization is the tenant.
 - Storage namespaces and context-prefixed kinds provide defense in depth; they
   never replace handler, query, subscription, and gateway authorization.
 
-Authentication sits behind a provider abstraction in the gateway. GitHub and
-Google can be switched on as outside providers through
-`@spine-event-engine/auth`, each with one registration for the whole
-installation; organizations supply nothing. There is no other way to sign
-in. Provider tokens are used for the one exchange and discarded.
-They are never stored in browser application storage or passed
+Authentication sits behind a provider abstraction in the gateway. Google is
+the outside provider, through `@spine-event-engine/auth`, with one
+registration for the whole installation; organizations supply nothing.
+There is no other way to sign in. Provider tokens are used for the one exchange
+and discarded. They are never stored in browser application storage or passed
 into bounded contexts.
 
 The gateway issues an opaque session. Entering an organization exchanges it for

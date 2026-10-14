@@ -161,8 +161,8 @@ async function givenOrganization(
  *
  * - The application server holds Acme, which invited `noah@acme.example` as
  *   its administrator, and Globex, which invited `olivia@acme.example`.
- * - The gateway signs people in through two fake identity providers, `fake`
- *   standing for GitHub and `other` for Google, and answers only {@link ORIGIN}.
+ * - The gateway signs people in through a fake identity provider, `fake`,
+ *   standing for Google, and answers only {@link ORIGIN}.
  *
  * Both are stopped by {@link stopGateways}.
  *
@@ -182,13 +182,8 @@ export async function givenGateway(): Promise<Running> {
     port: 0,
     external: {
       fake: fakeProvider(
-        IdentityProvider.GITHUB,
-        "https://provider.test",
-        providers.ConfirmedIdentity,
-      ),
-      other: fakeProvider(
         IdentityProvider.GOOGLE,
-        "https://other.test",
+        "https://provider.test",
         providers.ConfirmedIdentity,
       ),
     },

@@ -16,7 +16,6 @@ import { create } from "@bufbuild/protobuf";
 import { EmailAddressSchema } from "@spine-event-engine/proto";
 import { ExternalIdentityIdSchema } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import {
-  createGitHubProvider,
   createGoogleProvider,
   type ExternalIdentity,
   type OidcVerifiedIdentityProvider,
@@ -25,8 +24,7 @@ import { IdentityProvider } from "@access-desk/identity-model/generated/accessde
 import type { VerifiedPerson } from "./access-desk.js";
 
 /**
- * An outside identity provider, such as GitHub or Google, and how the gateway
- * reaches it.
+ * An outside identity provider, such as Google, and how the gateway reaches it.
  */
 export interface SignInProvider {
   /** Which provider this is. */
@@ -77,70 +75,6 @@ export interface OAuthApplication {
 
 /** The identity providers people sign in through. */
 export const SignInProvider = {
-  /**
-   * GitHub as an identity provider.
-   *
-   * Access Desk reads the person's profile and their primary email address, and
-   * keeps no GitHub token. An account without a verified primary address cannot
-   * sign in.
-   *
-   * @param application How Access Desk is registered with GitHub.
-   * @returns The provider.
-   */
-  gitHub(application: OAuthApplication): SignInProvider {
-    const settings = { ...application, includeVerifiedPrimaryEmail: true };
-    const { authorizationEndpoint, recommendedScopes, provider } = createGitHubProvider(settings);
-    return {
-      kind: IdentityProvider.GITHUB,
-      label: "GitHub",
-      authorizationEndpoint,
-      clientId: application.clientId,
-      // The sign-in flow requires `openid`. GitHub knows no such scope and
-      // leaves it out of what it grants.
-      scopes: [...new Set(["openid", ...recommendedScopes, "user:email"])],
-      provider: {
-        issuer: provider.issuer,
-        async exchangeAuthorizationCode(input) {
-          const profile: { login: string | undefined; name: string | undefined } = {
-            login: undefined,
-            name: undefined,
-          };
-          // The name comes from the profile GitHub already returns, or the login
-          // when there is no name.
-          const exchange = createGitHubProvider({
-            ...settings,
-            fetch: async (address, init) => {
-              const response = await watched("GitHub")(address, init);
-              if (new URL(address).pathname === "/user" && response.ok) {
-                const user: unknown = await response.clone().json();
-                if (typeof user === "object" && user !== null) {
-                  const { login, name } = user as Record<string, unknown>;
-                  profile.login = typeof login === "string" ? login : undefined;
-                  profile.name = typeof name === "string" && name.trim() !== "" ? name : undefined;
-                }
-              }
-              return response;
-            },
-          });
-          const identity = await exchange.provider.exchangeAuthorizationCode(input);
-          const email = identity?.claims?.email;
-          if (identity === undefined || email === undefined) {
-            console.warn(
-              "GitHub did not confirm an account with one verified primary email address.",
-            );
-            return undefined;
-          }
-          return ConfirmedIdentity.of(
-            identity.issuer,
-            identity.subject,
-            email,
-            profile.name ?? profile.login,
-          );
-        },
-      },
-    };
-  },
-
   /**
    * Google as an identity provider.
    *
