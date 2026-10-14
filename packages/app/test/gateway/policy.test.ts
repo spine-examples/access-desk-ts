@@ -18,8 +18,8 @@ import { AnyMessages, TypeUrls } from "@spine-event-engine/core";
 import { Filter_Operator, TargetSchema } from "@spine-event-engine/proto/client";
 import { describe, expect, it, vi } from "vitest";
 import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
-import { AcceptInvitationSchema } from "@access-desk/identity-model/generated/accessdesk/identity/invitation/commands_pb.js";
-import { InvitationViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/invitation/invitation_pb.js";
+import { AddMemberSchema } from "@access-desk/identity-model/generated/accessdesk/identity/membership/commands_pb.js";
+import { MembershipViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/membership/membership_pb.js";
 import {
   OrganizationIdSchema,
   PersonIdSchema,
@@ -31,6 +31,7 @@ import {
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_pb.js";
 import { ResourceIdSchema } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
 import { ResourceCatalogItemSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_pb.js";
+import { AddOrganizationMemberSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
 import { RegisterResourceSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_registration_commands_pb.js";
 import { OrganizationViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
 import { CancelAccessRequestSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/commands_pb.js";
@@ -48,7 +49,7 @@ function command(message: Message, messageType = ""): IncomingRequest {
   return { kind: "command", message, messageType } as IncomingRequest;
 }
 
-function target(schema: typeof InvitationViewSchema | typeof OrganizationViewSchema) {
+function target(schema: typeof MembershipViewSchema | typeof OrganizationViewSchema) {
   return create(TargetSchema, {
     type: TypeUrls.derive(schema),
     criterion: { case: "includeAll", value: true },
@@ -108,13 +109,13 @@ function desk(role: OrganizationRole = OrganizationRole.MEMBER) {
 }
 
 describe("Gateway request classification should", () => {
-  it("route invitation commands, queries, and subscriptions outside organizations", () => {
-    const invitation = target(InvitationViewSchema);
+  it("route membership commands, queries, and subscriptions outside organizations", () => {
+    const memberships = target(MembershipViewSchema);
     const organization = target(OrganizationViewSchema);
 
     expect(
       Policy.concernsNoOrganization(
-        command(create(AcceptInvitationSchema), TypeUrls.derive(AcceptInvitationSchema)),
+        command(create(AddMemberSchema), TypeUrls.derive(AddMemberSchema)),
       ),
     ).toBe(true);
     expect(
@@ -126,10 +127,10 @@ describe("Gateway request classification should", () => {
       ),
     ).toBe(false);
     expect(
-      Policy.concernsNoOrganization({ kind: "query", target: invitation } as IncomingRequest),
+      Policy.concernsNoOrganization({ kind: "query", target: memberships } as IncomingRequest),
     ).toBe(true);
     expect(
-      Policy.concernsNoOrganization({ kind: "subscribe", target: invitation } as IncomingRequest),
+      Policy.concernsNoOrganization({ kind: "subscribe", target: memberships } as IncomingRequest),
     ).toBe(true);
     expect(
       Policy.concernsNoOrganization({ kind: "query", target: organization } as IncomingRequest),
@@ -140,30 +141,35 @@ describe("Gateway request classification should", () => {
 });
 
 describe("Gateway policy should", () => {
-  it("let a signed-in person answer only their own invitation without entering an organization", async () => {
-    const application = desk();
+  it("refuse everything to a person who belongs to no organization", async () => {
+    const application = desk(OrganizationRole.ADMINISTRATOR);
     const authorize = Policy.authorization(application as unknown as AccessDesk);
-    const signedIn = { id: "person-1", attributes: { email: "maya@example.com", name: "Maya" } };
-    const invitation = create(AcceptInvitationSchema, {
-      id: { organization: { uuid: "acme" }, invitee: { value: " MAYA@example.com " } },
-      person: { uuid: "person-1" },
-      name: "Maya",
+    const nowhere = { id: "person-1", attributes: { email: "maya@example.com", name: "Maya" } };
+    const adding = create(AddMemberSchema, {
+      id: { emailAddress: { value: "noah@example.com" } },
+      organization: { uuid: "acme" },
     });
 
-    expect(await authorize(signedIn, command(invitation))).toBe(true);
-    expect(
-      await authorize(
-        signedIn,
-        command(
-          create(AcceptInvitationSchema, {
-            id: invitation.id,
-            person: { uuid: "somebody-else" },
-            name: "Maya",
-          }),
-        ),
-      ),
-    ).toBe(false);
+    expect(await authorize(nowhere, command(adding))).toBe(false);
     expect(application.member).not.toHaveBeenCalled();
+  });
+
+  it("let an administrator add people only to their own organization", async () => {
+    const administrator = Policy.authorization(
+      desk(OrganizationRole.ADMINISTRATOR) as unknown as AccessDesk,
+    );
+    const member = Policy.authorization(desk() as unknown as AccessDesk);
+    const addingTo = (organization: string) =>
+      command(
+        create(AddMemberSchema, {
+          id: { emailAddress: { value: "noah@example.com" } },
+          organization: { uuid: organization },
+        }),
+      );
+
+    expect(await administrator(principal, addingTo("acme"))).toBe(true);
+    expect(await administrator(principal, addingTo("globex"))).toBe(false);
+    expect(await member(principal, addingTo("acme"))).toBe(false);
   });
 
   it("refuse missing email and missing organization before checking membership", async () => {
@@ -202,19 +208,19 @@ describe("Gateway policy should", () => {
     expect(await authorize(principal, { kind: "subscribe", target: view } as IncomingRequest)).toBe(
       true,
     );
-    expect(await authorize(principal, command(create(AcceptInvitationSchema)))).toBe(false);
+    expect(await authorize(principal, command(create(AddOrganizationMemberSchema)))).toBe(false);
     expect(await authorize(principal, { kind: "activate" } as IncomingRequest)).toBe(true);
     expect(await authorize(principal, { kind: "cancel" } as IncomingRequest)).toBe(true);
   });
 
-  it("allow an administrator only the exact invitation query for their organization", async () => {
+  it("allow an administrator only the exact memberships query for their organization", async () => {
     const administrator = desk(OrganizationRole.ADMINISTRATOR);
     const member = desk();
     const acme = create(OrganizationIdSchema, { uuid: "acme" });
     const globex = create(OrganizationIdSchema, { uuid: "globex" });
     const targetFor = (id: typeof acme) =>
       create(TargetSchema, {
-        type: TypeUrls.derive(InvitationViewSchema),
+        type: TypeUrls.derive(MembershipViewSchema),
         criterion: {
           case: "filters",
           value: {

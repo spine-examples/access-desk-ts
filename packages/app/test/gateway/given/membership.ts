@@ -14,22 +14,14 @@
 
 import { create } from "@bufbuild/protobuf";
 import { expect } from "vitest";
-import { InvitationIdSchema } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
+import { MembershipIdSchema } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
+import { AddMemberSchema } from "@access-desk/identity-model/generated/accessdesk/identity/membership/commands_pb.js";
 import {
-  AcceptInvitationSchema,
-  DeclineInvitationSchema,
-  InviteMemberSchema,
-  RevokeInvitationSchema,
-} from "@access-desk/identity-model/generated/accessdesk/identity/invitation/commands_pb.js";
-import {
-  InvitationViewSchema,
-  type InvitationView,
-} from "@access-desk/identity-model/generated/accessdesk/identity/invitation/invitation_pb.js";
-import { InvitationViewQuery } from "@access-desk/identity-model/generated/accessdesk/identity/invitation/invitation_query.js";
-import {
-  InvitationStatus,
-  OrganizationRole,
-} from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
+  MembershipViewSchema,
+  type MembershipView,
+} from "@access-desk/identity-model/generated/accessdesk/identity/membership/membership_pb.js";
+import { MembershipViewQuery } from "@access-desk/identity-model/generated/accessdesk/identity/membership/membership_query.js";
+import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 import { AddOrganizationMemberSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
 import { OrganizationViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
 import type { OrganizationMember } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
@@ -43,91 +35,19 @@ import {
   type Acting,
   type Running,
 } from "./gateway.js";
-import { enter, session, signIn, type PEOPLE, type Signed } from "./sign-in.js";
+import { session, signIn, type PEOPLE, type Signed } from "./sign-in.js";
 
 /**
- * The invitation an organization holds for an email address.
- *
- * @param organization The organization's name.
- * @param email The invited email address.
- */
-export function invitationId(organization: string, email: string) {
-  return create(InvitationIdSchema, {
-    organization: { uuid: organization },
-    invitee: { value: email },
-  });
-}
-
-/**
- * Has a signed-in person accept an invitation of an organization.
+ * Has somebody add a person to an organization by their email address.
  *
  * @param running The running application.
- * @param signed The signed-in person.
+ * @param as Who adds the person.
  * @param organization The organization's name.
- * @param claimed What the command claims instead of the truth: the email
- *   address the invitation was sent to, or the person who accepts. The
- *   signed-in person's own when left out.
+ * @param email The email address of the person to add.
+ * @param role The role the person is to hold. A member's when left out.
  * @returns `"ok"` when the gateway let the command through, and why not otherwise.
  */
-export function acceptInvitation(
-  running: Running,
-  signed: Signed,
-  organization: string,
-  claimed: { readonly invitee?: string; readonly person?: string } = {},
-): Promise<string> {
-  return post(
-    running,
-    signed,
-    AcceptInvitationSchema,
-    create(AcceptInvitationSchema, {
-      id: invitationId(organization, claimed.invitee ?? signed.email),
-      person: { uuid: claimed.person ?? signed.person },
-      name: signed.name,
-    }),
-  );
-}
-
-/**
- * Has a signed-in person decline an invitation of an organization.
- *
- * @param running The running application.
- * @param signed The signed-in person.
- * @param organization The organization's name.
- * @param claimed The email address the command claims the invitation was sent
- *   to, instead of the signed-in person's own.
- * @returns `"ok"` when the gateway let the command through, and why not otherwise.
- */
-export function declineInvitation(
-  running: Running,
-  signed: Signed,
-  organization: string,
-  claimed: { readonly invitee?: string } = {},
-): Promise<string> {
-  return post(
-    running,
-    signed,
-    DeclineInvitationSchema,
-    create(DeclineInvitationSchema, {
-      id: invitationId(organization, claimed.invitee ?? signed.email),
-      person: { uuid: signed.person },
-    }),
-  );
-}
-
-/**
- * Has somebody invite an email address to an organization.
- *
- * An invitation belongs to no organization's tenant, so whoever invites acts
- * in no organization, unless the test has them name one.
- *
- * @param running The running application.
- * @param as Who invites.
- * @param organization The name of the organization that invites.
- * @param email The email address to invite.
- * @param role The role the invited person is to hold. A member's when left out.
- * @returns `"ok"` when the gateway let the command through, and why not otherwise.
- */
-export function inviteMember(
+export function addMember(
   running: Running,
   as: Acting,
   organization: string,
@@ -137,16 +57,21 @@ export function inviteMember(
   return post(
     running,
     as,
-    InviteMemberSchema,
-    create(InviteMemberSchema, { id: invitationId(organization, email), role }),
+    AddMemberSchema,
+    create(AddMemberSchema, {
+      id: { emailAddress: { value: email } },
+      organization: organizationId(organization),
+      role,
+    }),
   );
 }
 
 /**
- * Tries to add a person to an organization through the gateway.
+ * Tries to add a person to an organization's members in Resources, through
+ * the gateway.
  *
- * People are not allowed to do that. The application adds a member itself,
- * when an invitation is accepted.
+ * People are not allowed to do that. Identity adds a member itself, once the
+ * person joins.
  *
  * @param running The running application.
  * @param as Who adds the person.
@@ -154,7 +79,7 @@ export function inviteMember(
  * @param person The identifier of the person to add.
  * @returns `"ok"` when the gateway let the command through, and why not otherwise.
  */
-export function addMember(
+export function addOrganizationMember(
   running: Running,
   as: Acting,
   organization: string,
@@ -167,66 +92,45 @@ export function addMember(
     create(AddOrganizationMemberSchema, {
       organizationId: organizationId(organization),
       person: { uuid: person },
-      name: "Somebody",
+      emailAddress: { value: "somebody@acme.example" },
       role: OrganizationRole.ADMINISTRATOR,
     }),
   );
 }
 
 /**
- * Has somebody take back an invitation of an organization.
- *
- * @param running The running application.
- * @param as Who takes it back.
- * @param organization The organization's name.
- * @param email The invited email address.
- * @returns `"ok"` when the gateway let the command through, and why not otherwise.
- */
-export function revokeInvitation(
-  running: Running,
-  as: Acting,
-  organization: string,
-  email: string,
-): Promise<string> {
-  return post(
-    running,
-    as,
-    RevokeInvitationSchema,
-    create(RevokeInvitationSchema, { id: invitationId(organization, email) }),
-  );
-}
-
-/**
- * Reads the invitations of an organization through the gateway as the browser client does.
+ * Reads who was added to an organization through the gateway, as the browser
+ * client does.
  *
  * @param running The running application.
  * @param as The signed-in person who reads.
- * @param of The name of the organization whose invitations are asked for.
- * @returns The invitations, or `"refused"` when the request was not answered.
+ * @param of The name of the organization whose memberships are asked for.
+ * @returns The memberships, or `"refused"` when the request was not answered.
  */
-export function readInvitations(
+export function readMemberships(
   running: Running,
   as: Signed,
   of: string,
-): Promise<InvitationView[] | "refused"> {
+): Promise<MembershipView[] | "refused"> {
   return read(
     running,
     as,
-    InvitationViewSchema,
-    InvitationViewQuery.create().organization().is(organizationId(of)).build(),
+    MembershipViewSchema,
+    MembershipViewQuery.create().organization().is(organizationId(of)).build(),
   );
 }
 
 /**
- * Reads an organization's invitation of an email address, as the application server holds it.
+ * Reads the membership of an email address, as the application server holds it.
  *
  * @param running The running application.
- * @param organization The organization's name.
- * @param email The invited email address.
- * @returns The invitation, or `undefined` when there is none.
+ * @param email The email address, in lower case.
+ * @returns The membership, or `undefined` when the address was added to no organization.
  */
-export function invitation(running: Running, organization: string, email: string) {
-  return running.identity.stand().read(InvitationViewSchema, invitationId(organization, email));
+export function membership(running: Running, email: string) {
+  return running.identity
+    .stand()
+    .read(MembershipViewSchema, create(MembershipIdSchema, { emailAddress: { value: email } }));
 }
 
 /**
@@ -249,35 +153,35 @@ export async function member(
 }
 
 /**
- * Has an administrator invite an email address to an organization as a
- * member, and waits until the invitation waits for an answer.
+ * Has an administrator add an email address to their organization as a
+ * member, and waits until the address is listed.
  *
  * @param running The running application.
  * @param administrator An administrator of the organization.
  * @param organization The organization's name.
- * @param email The email address to invite.
+ * @param email The email address to add.
  */
-export async function givenInvited(
+export async function givenAdded(
   running: Running,
   administrator: Signed,
   organization: string,
   email: string,
 ): Promise<void> {
-  expect(await inviteMember(running, administrator, organization, email)).toBe("ok");
+  expect(await addMember(running, administrator, organization, email)).toBe("ok");
   await eventually(
-    () => invitation(running, organization, email),
-    (invited) => invited?.status === InvitationStatus.PENDING,
+    () => membership(running, email),
+    (added) => added?.organization?.uuid === organization,
   );
 }
 
 /**
- * Signs an invited person in, has them accept the invitation of the
- * organization, and has them enter it.
+ * Signs in a person who was added to an organization, and checks that the
+ * session works in it.
  *
  * @param running The running application.
- * @param person The key of one of the people of the tests, whom the organization invited.
+ * @param person The key of one of the people of the tests, who was added to the organization.
  * @param organization The organization's name.
- * @returns The person, with a session that has entered the organization.
+ * @returns The person, with a session in the organization.
  */
 export async function givenMember(
   running: Running,
@@ -285,25 +189,19 @@ export async function givenMember(
   organization: string,
 ): Promise<Signed> {
   const signed = await signIn(running, person);
-  expect(await acceptInvitation(running, signed, organization)).toBe("ok");
-  await eventually(
-    () => session(running, signed.token),
-    ({ body }) =>
-      (body.organizations as { id: string; standing: string }[]).some(
-        (entry) => entry.id === organization && entry.standing === "member",
-      ),
-  );
-  return enter(running, signed, organization);
+  const { body } = await session(running, signed.token);
+  expect((body.organization as { id: string } | null)?.id).toBe(organization);
+  return signed;
 }
 
 /**
- * Has the administrator invite `maya` to Acme, and `maya` accept and enter.
+ * Has the administrator add `maya` to Acme, and `maya` sign in.
  *
  * @param running The running application.
  * @param administrator An administrator of Acme.
- * @returns `maya`, with a session that has entered Acme.
+ * @returns `maya`, with a session in Acme.
  */
 export async function givenMaya(running: Running, administrator: Signed): Promise<Signed> {
-  await givenInvited(running, administrator, "acme", "maya@acme.example");
+  await givenAdded(running, administrator, "acme", "maya@acme.example");
   return givenMember(running, "maya", "acme");
 }

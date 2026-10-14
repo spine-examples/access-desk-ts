@@ -82,7 +82,13 @@ export function signInRoutes(
                   externalIdentity: identity,
                   principal: {
                     id: person.id.uuid,
-                    attributes: { email: person.email.value, name: person.name },
+                    attributes: {
+                      email: person.email.value,
+                      name: person.name,
+                      ...(person.organization === undefined
+                        ? {}
+                        : { organization: person.organization.uuid }),
+                    },
                   },
                 };
           },
@@ -206,7 +212,7 @@ export function signInRoutes(
         const session: Issued = {
           token: issued.credential.value,
           person: { id, email: attributes?.email ?? "", name: attributes?.name ?? "" },
-          organization: null,
+          organization: attributes?.organization ?? null,
         };
         return [200, session];
       }),

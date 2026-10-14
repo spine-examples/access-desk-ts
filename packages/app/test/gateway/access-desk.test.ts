@@ -20,11 +20,7 @@ import {
   OrganizationIdSchema,
   PersonIdSchema,
 } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
-import { InvitationViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/invitation/invitation_pb.js";
-import {
-  IdentityProvider,
-  InvitationStatus,
-} from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
+import { IdentityProvider } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 import { PersonViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/person_pb.js";
 import { ExternalIdentityViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/external_identity_pb.js";
 import { ExternalIdentityLinkedSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/external_identity_events_pb.js";
@@ -70,7 +66,9 @@ describe("AccessDesk should", () => {
     const { desk, inOrganization, onBehalfOf } = givenDesk();
     reads.readById
       .mockResolvedValueOnce(create(ExternalIdentityViewSchema, { person }))
-      .mockResolvedValueOnce(create(PersonViewSchema, { emailAddress: email, name: "Maya" }));
+      .mockResolvedValueOnce(
+        create(PersonViewSchema, { emailAddress: email, name: "Maya", account: [account] }),
+      );
 
     const signed = await desk.signIn({ id: account, email, name: "Maya" });
 
@@ -79,6 +77,8 @@ describe("AccessDesk should", () => {
       email: { value: "maya@example.com" },
       name: "Maya",
     });
+    // Nobody added her to an organization.
+    expect(signed?.organization).toBeUndefined();
     expect(reads.postAndAwait).not.toHaveBeenCalled();
     expect(inOrganization).toHaveBeenCalledWith();
     expect(onBehalfOf).toHaveBeenCalledWith("access-desk-gateway");
@@ -103,7 +103,9 @@ describe("AccessDesk should", () => {
     reads.readById
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
-      .mockResolvedValueOnce(create(PersonViewSchema, { emailAddress: email, name: "Maya" }));
+      .mockResolvedValueOnce(
+        create(PersonViewSchema, { emailAddress: email, name: "Maya", account: [account] }),
+      );
     reads.postAndAwait.mockResolvedValue(
       create(ExternalIdentityLinkedSchema, { id: account, person }),
     );
@@ -139,11 +141,51 @@ describe("AccessDesk should", () => {
     expect(await desk.signIn({ id: account, email, name: "Maya" })).toBeUndefined();
   });
 
+  it("sign a member in with the organization they belong to", async () => {
+    const { desk } = givenDesk();
+    reads.readById
+      .mockResolvedValueOnce(create(ExternalIdentityViewSchema, { person }))
+      .mockResolvedValueOnce(
+        create(PersonViewSchema, {
+          emailAddress: email,
+          name: "Maya",
+          account: [account],
+          organization,
+        }),
+      );
+
+    const signed = await desk.signIn({ id: account, email, name: "Maya" });
+
+    expect(signed?.organization?.uuid).toBe("acme");
+    expect(reads.readById).toHaveBeenCalledTimes(2);
+  });
+
+  it("wait until the person shows with the account they sign in with", async () => {
+    const { desk } = givenDesk();
+    reads.readById
+      .mockResolvedValueOnce(create(ExternalIdentityViewSchema, { person }))
+      // An administrator added her, and she has not signed in yet.
+      .mockResolvedValueOnce(create(PersonViewSchema, { emailAddress: email, organization }))
+      .mockResolvedValueOnce(
+        create(PersonViewSchema, {
+          emailAddress: email,
+          name: "Maya",
+          account: [account],
+          organization,
+        }),
+      );
+
+    const signed = await desk.signIn({ id: account, email, name: "Maya" });
+
+    expect(signed).toMatchObject({ name: "Maya", organization: { uuid: "acme" } });
+    expect(reads.readById).toHaveBeenCalledTimes(3);
+  });
+
   it("list provider accounts as browser scalars", async () => {
     const { desk } = givenDesk();
-    reads.find.mockResolvedValueOnce([]);
     reads.readById.mockResolvedValueOnce(
       create(PersonViewSchema, {
+        organization,
         account: [
           account,
           create(ExternalIdentityIdSchema, {
@@ -160,65 +202,8 @@ describe("AccessDesk should", () => {
       { provider: "google", subject: "google-1" },
       { provider: "google", subject: "google-2" },
     ]);
+    expect(profile.organization?.uuid).toBe("acme");
     expect(reads.readById).toHaveBeenCalledTimes(1);
-  });
-
-  it("let a membership override a pending invitation with an equal organization UUID", async () => {
-    const { desk } = givenDesk();
-    const anotherInstance = create(OrganizationIdSchema, { uuid: "acme" });
-    reads.find.mockResolvedValueOnce([
-      create(InvitationViewSchema, {
-        id: { organization, invitee: email },
-        status: InvitationStatus.PENDING,
-      }),
-    ]);
-    reads.readById.mockResolvedValueOnce(
-      create(PersonViewSchema, { organization: [anotherInstance] }),
-    );
-
-    const { standings } = await desk.profile({ id: person, email, name: "Maya" });
-
-    expect(standings).toEqual([{ organization: anotherInstance, standing: "member" }]);
-    expect(reads.find).toHaveBeenCalledWith(
-      expect.anything(),
-      InvitationViewSchema,
-      expect.anything(),
-    );
-  });
-
-  it("keep pending invitations for other organizations and omit nonpending ones", async () => {
-    const { desk } = givenDesk();
-    const globex = create(OrganizationIdSchema, { uuid: "globex" });
-    reads.find.mockResolvedValueOnce([
-      create(InvitationViewSchema, {
-        id: { organization, invitee: email },
-        status: InvitationStatus.PENDING,
-      }),
-      create(InvitationViewSchema, {
-        id: { organization: globex, invitee: email },
-        status: InvitationStatus.DECLINED,
-      }),
-    ]);
-    reads.readById.mockResolvedValueOnce(undefined);
-
-    expect((await desk.profile({ id: person, email, name: "Maya" })).standings).toEqual([
-      { organization, standing: "invited" },
-    ]);
-  });
-
-  it("tell whether Identity lists an organization among a person's own", async () => {
-    const { desk, inOrganization } = givenDesk();
-    reads.readById
-      .mockResolvedValueOnce(create(PersonViewSchema, { organization: [organization] }))
-      .mockResolvedValueOnce(create(PersonViewSchema, { organization: [organization] }))
-      .mockResolvedValueOnce(undefined);
-
-    expect(await desk.joined(person, create(OrganizationIdSchema, { uuid: "acme" }))).toBe(true);
-    expect(await desk.joined(person, create(OrganizationIdSchema, { uuid: "globex" }))).toBe(false);
-    expect(await desk.joined(person, organization)).toBe(false);
-    // Identity is asked, which belongs to no organization.
-    expect(inOrganization).toHaveBeenCalledWith();
-    expect(inOrganization).not.toHaveBeenCalledWith(expect.anything());
   });
 
   it("read organization membership, management, and request ownership by typed IDs", async () => {
@@ -227,7 +212,10 @@ describe("AccessDesk should", () => {
     const accessRequest = create(AccessRequestIdSchema, { uuid: "request-1" });
     reads.readById
       .mockResolvedValueOnce(
-        create(OrganizationViewSchema, { id: organization, member: [{ person, name: "Maya" }] }),
+        create(OrganizationViewSchema, {
+          id: organization,
+          member: [{ person, emailAddress: email }],
+        }),
       )
       .mockResolvedValueOnce(
         create(ResourceCatalogItemSchema, { id: resource, policy: { manager: [person] } }),
@@ -236,7 +224,7 @@ describe("AccessDesk should", () => {
         create(AccessRequestViewSchema, { id: accessRequest, snapshot: { requester: person } }),
       );
 
-    expect((await desk.member(organization, person))?.name).toBe("Maya");
+    expect((await desk.member(organization, person))?.emailAddress).toEqual(email);
     expect(await desk.manages(organization, person, resource)).toBe(true);
     expect(await desk.requested(organization, person, accessRequest)).toBe(true);
     expect(inOrganization).toHaveBeenCalledWith(organization);

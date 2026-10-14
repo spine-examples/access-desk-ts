@@ -22,15 +22,15 @@ export interface AccessDeskOptions {
   /**
    * Returns the address of the application server, once it listens.
    *
-   * Identity uses it to add a person to an organization's members when they
-   * accept an invitation.
+   * Identity uses it to add a person to an organization's members when an
+   * administrator adds them.
    */
   readonly server: () => string;
 }
 
 /** The assembled application. */
 export interface AccessDesk {
-  /** The Identity context, which holds people, their accounts, and invitations. */
+  /** The Identity context, which holds people, their accounts, and memberships. */
   readonly identity: BoundedContext;
   /** The Resources context, which holds each organization, its members, and what it owns. */
   readonly resources: BoundedContext;

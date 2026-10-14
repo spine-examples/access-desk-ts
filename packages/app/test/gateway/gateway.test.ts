@@ -13,25 +13,19 @@
  */
 
 import { afterEach, describe, expect, it } from "vitest";
-import type { InvitationView } from "@access-desk/identity-model/generated/accessdesk/identity/invitation/invitation_pb.js";
-import {
-  InvitationStatus,
-  OrganizationRole,
-} from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
+import type { MembershipView } from "@access-desk/identity-model/generated/accessdesk/identity/membership/membership_pb.js";
+import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 
 import { call, eventually, givenGateway, request, stopGateways } from "./given/gateway.js";
 import {
-  acceptInvitation,
   addMember,
-  declineInvitation,
-  givenInvited,
+  addOrganizationMember,
+  givenAdded,
   givenMaya,
   givenMember,
-  invitation,
-  inviteMember,
   member,
-  readInvitations,
-  revokeInvitation,
+  membership,
+  readMemberships,
 } from "./given/membership.js";
 import {
   accessRequest,
@@ -46,8 +40,6 @@ import {
 import {
   challenge,
   complete,
-  enter,
-  entering,
   session,
   signIn,
   signInWith,
@@ -60,7 +52,7 @@ afterEach(stopGateways);
 
 describe("The gateway should", () => {
   describe("sign a person in, and", () => {
-    it("tell them who they are and which invitations wait for them, in no organization", async () => {
+    it("tell them who they are and the organization they belong to", async () => {
       const running = await givenGateway();
 
       const noah = await signIn(running, "noah");
@@ -68,9 +60,16 @@ describe("The gateway should", () => {
       expect((await session(running, noah.token)).body).toEqual({
         person: { id: noah.person, email: "noah@acme.example", name: "Noah Reyes" },
         accounts: [{ provider: "google", subject: "noah" }],
-        organization: null,
-        organizations: [{ id: "acme", name: "acme", standing: "invited", role: null }],
+        organization: { id: "acme", name: "acme", role: "administrator" },
       });
+    });
+
+    it("tell a person nobody added anywhere that they belong to no organization", async () => {
+      const running = await givenGateway();
+
+      const maya = await signIn(running, "maya");
+
+      expect((await session(running, maya.token)).body.organization).toBeNull();
     });
 
     it("know the same person again at their next sign-in", async () => {
@@ -183,7 +182,7 @@ describe("The gateway should", () => {
       expect(completed.status).toBe(200);
       expect((await session(running, completed.body.token as string)).body).toMatchObject({
         person: { email: "noah@acme.example", name: "Noah@Acme.example" },
-        organizations: [{ id: "acme", standing: "invited" }],
+        organization: { id: "acme" },
       });
     });
 
@@ -252,113 +251,54 @@ describe("The gateway should", () => {
     });
   });
 
-  describe("let a signed-in person into an organization, and", () => {
-    it("make them a member when they accept the invitation waiting for them", async () => {
+  describe("put a signed-in person in their organization, and", () => {
+    it("put them in the organization they were added to, as they sign in", async () => {
       const running = await givenGateway();
+
       const noah = await signIn(running, "noah");
 
-      expect(await acceptInvitation(running, noah, "acme")).toBe("ok");
-
-      const told = await eventually(
-        () => session(running, noah.token),
-        ({ body }) => (body.organizations as { standing: string }[])[0]?.standing === "member",
-      );
-      expect(told.body.organizations).toEqual([
-        { id: "acme", name: "acme", standing: "member", role: "administrator" },
-      ]);
+      expect((await session(running, noah.token)).body.organization).toEqual({
+        id: "acme",
+        name: "acme",
+        role: "administrator",
+      });
       expect(await member(running, "acme", noah.person)).toMatchObject({
-        name: "Noah Reyes",
+        emailAddress: { value: "noah@acme.example" },
         role: OrganizationRole.ADMINISTRATOR,
       });
     });
 
-    it("drop the invitation they decline, so they can no longer accept it", async () => {
+    it("put a person added after their first sign-in in the organization at their next one", async () => {
       const running = await givenGateway();
       const noah = await signIn(running, "noah");
+      const first = await signIn(running, "maya");
+      expect((await session(running, first.token)).body.organization).toBeNull();
 
-      expect(await declineInvitation(running, noah, "acme")).toBe("ok");
-
+      await givenAdded(running, noah, "acme", "maya@acme.example");
       await eventually(
-        () => session(running, noah.token),
-        ({ body }) => (body.organizations as unknown[]).length === 0,
-      );
-      await acceptInvitation(running, noah, "acme");
-      expect((await entering(running, noah.token, "acme")).status).toBe(403);
-      expect(await member(running, "acme", noah.person)).toBeUndefined();
-    });
-
-    it("refuse an answer to an invitation sent to somebody else", async () => {
-      const running = await givenGateway();
-      const maya = await signIn(running, "maya");
-      const sentToNoah = { invitee: "noah@acme.example" };
-
-      const accepted = await acceptInvitation(running, maya, "acme", sentToNoah);
-      const declined = await declineInvitation(running, maya, "acme", sentToNoah);
-
-      expect(accepted).not.toBe("ok");
-      expect(declined).not.toBe("ok");
-      expect((await invitation(running, "acme", "noah@acme.example"))?.status).toBe(
-        InvitationStatus.PENDING,
-      );
-      expect(await member(running, "acme", maya.person)).toBeUndefined();
-    });
-
-    it("refuse an answer given in another person's name", async () => {
-      const running = await givenGateway();
-      const noah = await signIn(running, "noah");
-
-      const accepted = await acceptInvitation(running, noah, "acme", { person: "somebody-else" });
-
-      expect(accepted).not.toBe("ok");
-      expect(await member(running, "acme", "somebody-else")).toBeUndefined();
-    });
-
-    it("keep out of an organization that did not invite them", async () => {
-      const running = await givenGateway();
-      const noah = await signIn(running, "noah");
-
-      await acceptInvitation(running, noah, "globex");
-
-      expect((await entering(running, noah.token, "globex")).status).toBe(403);
-      expect(await member(running, "globex", noah.person)).toBeUndefined();
-    });
-
-    it("refuse entering an organization without a session or scalar organization id", async () => {
-      const running = await givenGateway();
-      const noah = await signIn(running, "noah");
-
-      expect((await entering(running, undefined, "acme")).status).toBe(401);
-      for (const organization of [undefined, null, 7, { uuid: "acme" }]) {
-        expect((await entering(running, noah.token, organization)).status).toBe(403);
-      }
-    });
-
-    it("refuse an empty organization id without rotating the session", async () => {
-      const running = await givenGateway();
-      const noah = await signIn(running, "noah");
-
-      const entered = await entering(running, noah.token, "");
-
-      expect(entered).toEqual({ status: 403, body: { error: "refused" } });
-      const current = await session(running, noah.token);
-      expect(current.status).toBe(200);
-      expect(current.body.organization).toBeNull();
-    });
-
-    it("exchange the session when they enter, so the earlier one stops working", async () => {
-      const running = await givenGateway();
-      const noah = await signIn(running, "noah");
-      await acceptInvitation(running, noah, "acme");
-      await eventually(
-        () => member(running, "acme", noah.person),
+        () => member(running, "acme", first.person),
         (joined) => joined !== undefined,
       );
+      const next = await signIn(running, "maya");
 
-      const entered = await enter(running, noah, "acme");
+      expect((await session(running, next.token)).body.organization).toMatchObject({
+        id: "acme",
+        role: "member",
+      });
+    });
 
-      expect(entered.token).not.toBe(noah.token);
-      expect((await session(running, noah.token)).status).toBe(401);
-      expect((await session(running, entered.token)).body.organization).toBe("acme");
+    it("keep a person in the one organization they belong to", async () => {
+      const running = await givenGateway();
+      const noah = await signIn(running, "noah");
+      const olivia = await signIn(running, "olivia");
+
+      expect(await addMember(running, olivia, "globex", "noah@acme.example")).toBe("ok");
+
+      expect((await membership(running, "noah@acme.example"))?.organization?.uuid).toBe("acme");
+      expect(await member(running, "globex", noah.person)).toBeUndefined();
+      expect(
+        (await session(running, (await signIn(running, "noah")).token)).body.organization,
+      ).toMatchObject({ id: "acme" });
     });
   });
 
@@ -444,22 +384,6 @@ describe("The gateway should", () => {
       expect(await hers.stops()).toBe(true);
     });
 
-    it("stop what a person watched in an organization once they enter it anew", async () => {
-      const running = await givenGateway();
-      const noah = await givenMember(running, "noah", "acme");
-      const earlier = await watchCatalog(running, noah);
-      await givenTold(running, noah, earlier);
-
-      // Entering exchanges the session, and the earlier one ends.
-      const entered = await enter(running, noah, "acme");
-
-      const later = await watchCatalog(running, entered);
-      await givenTold(running, entered, later);
-      expect(await registerResource(running, entered, "payroll")).toBe("ok");
-      expect(await later.hears("payroll")).toBe(true);
-      expect(earlier.told).not.toContain("payroll");
-    });
-
     it("refuse a command given in another person's name", async () => {
       const running = await givenGateway();
       const noah = await givenOpenResource(running);
@@ -477,7 +401,7 @@ describe("The gateway should", () => {
       expect(await accessRequest(running, "acme", "req-spoofed")).toBeUndefined();
     });
 
-    it("refuse a request aimed at an organization other than the one entered", async () => {
+    it("refuse a request aimed at an organization other than their own", async () => {
       const running = await givenGateway();
       const noah = await givenOpenResource(running);
       const maya = await givenMaya(running, noah);
@@ -494,7 +418,7 @@ describe("The gateway should", () => {
       const running = await givenGateway();
       const noah = await givenMember(running, "noah", "acme");
 
-      const outcome = await addMember(
+      const outcome = await addOrganizationMember(
         running,
         { ...noah, organization: "acme" },
         "acme",
@@ -505,20 +429,20 @@ describe("The gateway should", () => {
       expect(await member(running, "acme", "somebody")).toBeUndefined();
     });
 
-    it("refuse an invitation to another organization than the one entered", async () => {
+    it("refuse adding a person to another organization than their own", async () => {
       const running = await givenGateway();
       const noah = await givenMember(running, "noah", "acme");
 
-      const outcome = await inviteMember(
+      const outcome = await addMember(
         running,
-        { ...noah, organization: "acme" },
+        noah,
         "globex",
         "somebody@acme.example",
         OrganizationRole.ADMINISTRATOR,
       );
 
       expect(outcome).not.toBe("ok");
-      expect(await invitation(running, "globex", "somebody@acme.example")).toBeUndefined();
+      expect(await membership(running, "somebody@acme.example")).toBeUndefined();
     });
 
     it("refuse a member what only an administrator may do", async () => {
@@ -526,60 +450,54 @@ describe("The gateway should", () => {
       const noah = await givenOpenResource(running);
       const maya = await givenMaya(running, noah);
 
-      const invited = await inviteMember(running, maya, "acme", "olivia@acme.example");
-      const listed = await readInvitations(running, maya, "acme");
+      const added = await addMember(running, maya, "acme", "somebody@acme.example");
+      const listed = await readMemberships(running, maya, "acme");
 
-      expect(invited).not.toBe("ok");
+      expect(added).not.toBe("ok");
       expect(listed).toBe("refused");
-      expect(await invitation(running, "acme", "olivia@acme.example")).toBeUndefined();
+      expect(await membership(running, "somebody@acme.example")).toBeUndefined();
     });
 
-    it("refuse an administrator the invitations of another organization", async () => {
+    it("refuse an administrator the memberships of another organization", async () => {
       const running = await givenGateway();
       const noah = await givenMember(running, "noah", "acme");
 
-      const invited = await inviteMember(running, noah, "globex", "maya@acme.example");
-      const listed = await readInvitations(running, noah, "globex");
+      const added = await addMember(running, noah, "globex", "maya@acme.example");
+      const listed = await readMemberships(running, noah, "globex");
 
-      expect(invited).not.toBe("ok");
+      expect(added).not.toBe("ok");
       expect(listed).toBe("refused");
-      expect(await invitation(running, "globex", "maya@acme.example")).toBeUndefined();
+      expect(await membership(running, "maya@acme.example")).toBeUndefined();
     });
 
-    it("let an administrator see the organization's invitations and take one back", async () => {
+    it("let an administrator add a person and see who was added", async () => {
       const running = await givenGateway();
       const noah = await givenMember(running, "noah", "acme");
-      await givenInvited(running, noah, "acme", "maya@acme.example");
 
-      const revoked = await revokeInvitation(running, noah, "acme", "maya@acme.example");
+      await givenAdded(running, noah, "acme", "maya@acme.example");
 
-      expect(revoked).toBe("ok");
-      await eventually(
-        () => invitation(running, "acme", "maya@acme.example"),
-        (invited) => invited?.status === InvitationStatus.REVOKED,
-      );
-      const listed = await readInvitations(running, noah, "acme");
+      const listed = await readMemberships(running, noah, "acme");
       expect(listed).not.toBe("refused");
-      expect(
-        (listed as InvitationView[])
-          .map((view) => [view.invitee?.value, view.status, view.acceptedBy?.uuid])
-          .sort(),
-      ).toEqual([
-        ["maya@acme.example", InvitationStatus.REVOKED, undefined],
-        ["noah@acme.example", InvitationStatus.ACCEPTED, noah.person],
-      ]);
+      const byAddress = new Map(
+        (listed as MembershipView[]).map((view) => [view.id?.emailAddress?.value, view] as const),
+      );
+      expect([...byAddress.keys()].sort()).toEqual(["maya@acme.example", "noah@acme.example"]);
+      expect(byAddress.get("noah@acme.example")).toMatchObject({
+        role: OrganizationRole.ADMINISTRATOR,
+        person: { uuid: noah.person },
+      });
+      // Maya has not signed in yet, but she already is a person.
+      expect(byAddress.get("maya@acme.example")?.role).toBe(OrganizationRole.MEMBER);
+      expect(byAddress.get("maya@acme.example")?.person?.uuid).toMatch(/^[0-9a-f-]{36}$/);
     });
 
-    it("refuse somebody who has not signed in, or has not entered an organization", async () => {
+    it("refuse somebody who has not signed in, or belongs to no organization", async () => {
       const running = await givenGateway();
       const noah = await givenOpenResource(running);
-      const maya = await givenMaya(running, noah);
-      const signedInOnly = await signIn(running, "maya");
+      const maya = await signIn(running, "maya");
 
-      expect(await submitRequest(running, { person: maya.person }, "req-anonymous")).not.toBe("ok");
-      expect(
-        await submitRequest(running, signedInOnly, "req-not-entered", { requester: maya.person }),
-      ).not.toBe("ok");
+      expect(await submitRequest(running, { person: noah.person }, "req-anonymous")).not.toBe("ok");
+      expect(await submitRequest(running, maya, "req-nowhere")).not.toBe("ok");
     });
   });
 });

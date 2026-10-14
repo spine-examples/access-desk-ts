@@ -51,7 +51,7 @@ import type { Signed } from "./sign-in.js";
  * Has an administrator of Acme register a resource they manage themselves.
  *
  * @param running The running application.
- * @param administrator An administrator of Acme who has entered it.
+ * @param administrator An administrator of Acme who works in it.
  * @param resource The identifier of the resource, which is also its name.
  * @param organization The organization the command names. Acme when left
  *   out. The administrator acts in Acme either way, so any other organization
@@ -103,7 +103,7 @@ export function catalogItem(running: Running, organization: string, resource: st
  * open it for requests.
  *
  * @param running The running application.
- * @returns `noah`, with a session that has entered Acme.
+ * @returns `noah`, with a session in Acme.
  */
 export async function givenOpenResource(running: Running): Promise<Signed> {
   const noah = await givenMember(running, "noah", "acme");
@@ -310,7 +310,7 @@ export async function watchCatalog(
  * So an administrator registers resources until the browser hears of one.
  *
  * @param running The running application.
- * @param administrator An administrator of Acme who has entered it, to register the resources.
+ * @param administrator An administrator of Acme who works in it, to register the resources.
  * @param watched What the browser has been told, as {@link watchCatalog} returned it.
  */
 export async function givenTold(

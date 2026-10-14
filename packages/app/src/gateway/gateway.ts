@@ -65,9 +65,8 @@ export const Gateway = {
   /**
    * Starts the gateway, the only way from a browser to the application.
    *
-   * A person signs in first, which concerns no organization. They then enter
-   * one of their organizations. Only then may they give commands and read, and
-   * only within that organization.
+   * A person signs in, and works in the organization they belong to. Only a
+   * person who belongs to one may give commands and read, and only within it.
    *
    * The gateway decides who is acting and where, from the session it issued. It
    * refuses a request that names another person or another organization, and
@@ -168,7 +167,7 @@ function cancellingThrough(
  * Builds the context of a request from its session.
  *
  * The context names the signed-in person as the actor, and the organization
- * they have entered as the tenant.
+ * they belong to as the tenant.
  *
  * @param principal The person the session belongs to.
  * @param timestamp When the request was received.

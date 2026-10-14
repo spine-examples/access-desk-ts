@@ -123,7 +123,7 @@ export function signIn(running: Running, person: keyof typeof PEOPLE): Promise<S
 }
 
 /**
- * Asks the gateway who is signed in and which organizations are theirs.
+ * Asks the gateway who is signed in and which organization they belong to.
  *
  * @param running The running application.
  * @param token The session's token, when the call carries one.
@@ -142,38 +142,4 @@ export function session(running: Running, token?: string): Promise<Answered> {
  */
 export function signOut(running: Running, token?: string): Promise<Answered> {
   return call(running, "/auth/sign-out", {}, token);
-}
-
-/**
- * Asks the gateway to let a session into an organization, whatever comes of it.
- *
- * @param running The running application.
- * @param token The session's token, when the call carries one.
- * @param organization What the call names as the organization, which need not be an identifier.
- * @returns The gateway's answer.
- */
-export function entering(
-  running: Running,
-  token: string | undefined,
-  organization: unknown,
-): Promise<Answered> {
-  return call(running, "/auth/organization", { organization }, token);
-}
-
-/**
- * Enters an organization, exchanging the session for one bound to it.
- *
- * @param running The running application.
- * @param signed A signed-in person who is a member of the organization.
- * @param organization The organization's name.
- * @returns The person, with the new session.
- */
-export async function enter(
-  running: Running,
-  signed: Signed,
-  organization: string,
-): Promise<Signed> {
-  const { status, body } = await entering(running, signed.token, organization);
-  expect(status).toBe(200);
-  return { ...signed, token: body.token as string };
 }

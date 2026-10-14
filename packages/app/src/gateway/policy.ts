@@ -50,13 +50,8 @@ import {
   ResourceIdSchema,
   type ResourceId,
 } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
-import {
-  AcceptInvitationSchema,
-  DeclineInvitationSchema,
-  InviteMemberSchema,
-  RevokeInvitationSchema,
-} from "@access-desk/identity-model/generated/accessdesk/identity/invitation/commands_pb.js";
-import { InvitationViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/invitation/invitation_pb.js";
+import { AddMemberSchema } from "@access-desk/identity-model/generated/accessdesk/identity/membership/commands_pb.js";
+import { MembershipViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/membership/membership_pb.js";
 import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 import type { AccessDesk } from "./access-desk.js";
 
@@ -70,9 +65,9 @@ interface Signed {
   readonly name: string;
 }
 
-/** A signed-in person, in the organization they have entered. */
+/** A signed-in person, in the organization they belong to. */
 interface Asking extends Signed {
-  /** The organization the person has entered. */
+  /** The organization the person belongs to. */
   readonly organization: OrganizationId;
   /** The person's membership in that organization. */
   readonly member: OrganizationMember;
@@ -95,36 +90,12 @@ function rule<Who, Schema extends GenMessage<Message>>(
   return { schema, allows: (command, who, desk) => allows(command as never, who, desk) };
 }
 
-/** Whether an invitation was sent to the signed-in person's email address. */
-function invitesThem(
-  id: { readonly invitee?: EmailAddress | undefined } | undefined,
-  signed: Signed,
-): boolean {
-  return id?.invitee?.value.trim().toLowerCase() === signed.email.value;
-}
-
-/** The commands a signed-in person may give before entering an organization. */
-const SIGNED_IN_COMMANDS: readonly CommandRule<Signed>[] = [
-  rule(
-    AcceptInvitationSchema,
-    (command, signed: Signed) =>
-      command.person?.uuid === signed.person.uuid &&
-      command.name === signed.name &&
-      invitesThem(command.id, signed),
-  ),
-  rule(
-    DeclineInvitationSchema,
-    (command, signed: Signed) =>
-      command.person?.uuid === signed.person.uuid && invitesThem(command.id, signed),
-  ),
-];
-
 /**
  * The commands a member may give in their organization, each with its
  * condition.
  *
  * A command must name the signed-in person as the one acting, and the
- * organization they have entered. Finer rules, such as which manager decides
+ * organization they belong to. Finer rules, such as which manager decides
  * which request, stay in the domain.
  */
 const MEMBER_COMMANDS: readonly CommandRule<Asking>[] = [
@@ -161,14 +132,9 @@ const MEMBER_COMMANDS: readonly CommandRule<Asking>[] = [
       asking.administrator && command.organizationId?.uuid === asking.organization.uuid,
   ),
   rule(
-    InviteMemberSchema,
+    AddMemberSchema,
     (command, asking: Asking) =>
-      asking.administrator && command.id?.organization?.uuid === asking.organization.uuid,
-  ),
-  rule(
-    RevokeInvitationSchema,
-    (command, asking: Asking) =>
-      asking.administrator && command.id?.organization?.uuid === asking.organization.uuid,
+      asking.administrator && command.organization?.uuid === asking.organization.uuid,
   ),
 ];
 
@@ -300,27 +266,22 @@ function mayRead(target: Target, asking: Asking, desk: AccessDesk): boolean | Pr
   return MEMBER_READS.get(target.type)?.(target, asking, desk) ?? false;
 }
 
-const INVITATIONS = TypeUrls.derive(InvitationViewSchema);
+const MEMBERSHIPS = TypeUrls.derive(MembershipViewSchema);
 
 /** The messages Identity handles, which belong to no organization. */
 const OUTSIDE_ORGANIZATIONS: ReadonlySet<string> = new Set([
-  INVITATIONS,
-  ...[
-    AcceptInvitationSchema,
-    DeclineInvitationSchema,
-    InviteMemberSchema,
-    RevokeInvitationSchema,
-  ].map((schema) => TypeUrls.derive(schema)),
+  MEMBERSHIPS,
+  TypeUrls.derive(AddMemberSchema),
 ]);
 
 /**
- * Whether a query asks only for the invitations of one organization.
+ * Whether a query asks only for the memberships of one organization.
  *
- * Invitations of all organizations are kept together, so the query must
+ * The memberships of all organizations are kept together, so the query must
  * filter by organization.
  */
-function asksForInvitationsOf(target: Target, organization: OrganizationId): boolean {
-  const condition = target.type === INVITATIONS ? onlyCondition(target) : undefined;
+function asksForMembershipsOf(target: Target, organization: OrganizationId): boolean {
+  const condition = target.type === MEMBERSHIPS ? onlyCondition(target) : undefined;
   return (
     condition?.column === "organization" &&
     AnyMessages.unpack(condition.value, OrganizationIdSchema)?.uuid === organization.uuid
@@ -332,8 +293,8 @@ export const Policy = {
   /**
    * Whether a request is for Identity.
    *
-   * Such a request is sent without an organization, even when the person has
-   * entered one.
+   * Such a request is sent without an organization, even though the person
+   * belongs to one.
    *
    * @param request A request that reached the gateway.
    */
@@ -353,13 +314,11 @@ export const Policy = {
   /**
    * Decides whether a signed-in person may make a request.
    *
-   * 1. Anybody signed in may answer an invitation sent to their own email
-   *    address.
-   * 2. Anything else requires having entered an organization, and being a
-   *    member of it now.
-   * 3. A command must be one a member may give.
-   * 4. A query or a subscription must be for something the member may see. An
-   *    administrator may also read the organization's invitations.
+   * 1. Everything requires belonging to an organization, and being listed
+   *    among its members.
+   * 2. A command must be one a member may give.
+   * 3. A query or a subscription must be for something the member may see. An
+   *    administrator may also read who was added to the organization.
    *
    * @param desk Looks up what a rule needs to know.
    * @returns The check the gateway runs on each request.
@@ -377,14 +336,6 @@ export const Policy = {
         email: create(EmailAddressSchema, { value: email }),
         name: name ?? email,
       };
-      const command = request.kind === "command" ? request.message : undefined;
-      const answering =
-        command === undefined
-          ? undefined
-          : SIGNED_IN_COMMANDS.find(({ schema }) => isMessage(command, schema));
-      if (command !== undefined && answering !== undefined) {
-        return answering.allows(command, signed, desk);
-      }
       if (organization === undefined) {
         return false;
       }
@@ -401,6 +352,7 @@ export const Policy = {
       };
       switch (request.kind) {
         case "command": {
+          const command = request.message;
           const applies =
             command === undefined
               ? undefined
@@ -412,7 +364,7 @@ export const Policy = {
         case "query":
           return (
             (await mayRead(request.target, asking, desk)) ||
-            (asking.administrator && asksForInvitationsOf(request.target, organizationId))
+            (asking.administrator && asksForMembershipsOf(request.target, organizationId))
           );
         case "subscribe":
           return mayRead(request.target, asking, desk);

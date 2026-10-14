@@ -25,7 +25,7 @@ import {
 } from "@spine-event-engine/proto/client";
 import { type BoundedContext, SignalMetadata } from "@spine-event-engine/server";
 import { OrganizationIdSchema } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
-import { InviteMemberSchema } from "@access-desk/identity-model/generated/accessdesk/identity/invitation/commands_pb.js";
+import { AddMemberSchema } from "@access-desk/identity-model/generated/accessdesk/identity/membership/commands_pb.js";
 import {
   IdentityProvider,
   OrganizationRole,
@@ -126,7 +126,7 @@ function fakeProvider(
 }
 
 /**
- * Creates an organization and invites its first administrator.
+ * Creates an organization and adds its first administrator.
  *
  * The application has no way of creating an organization yet, so the tests
  * give the two commands themselves, in the application's own name.
@@ -148,9 +148,10 @@ async function givenOrganization(
   );
   await give(
     hosted.identity,
-    InviteMemberSchema,
-    create(InviteMemberSchema, {
-      id: { organization: { uuid: name }, invitee: { value: administrator } },
+    AddMemberSchema,
+    create(AddMemberSchema, {
+      id: { emailAddress: { value: administrator } },
+      organization: { uuid: name },
       role: OrganizationRole.ADMINISTRATOR,
     }),
   );
@@ -159,8 +160,8 @@ async function givenOrganization(
 /**
  * Starts the application behind a gateway.
  *
- * - The application server holds Acme, which invited `noah@acme.example` as
- *   its administrator, and Globex, which invited `olivia@acme.example`.
+ * - The application server holds Acme, which added `noah@acme.example` as
+ *   its administrator, and Globex, which added `olivia@acme.example`.
  * - The gateway signs people in through a fake identity provider, `fake`,
  *   standing for Google, and answers only {@link ORIGIN}.
  *

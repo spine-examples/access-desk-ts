@@ -36,7 +36,7 @@ export interface Session {
   readonly credential: { readonly kind: "cookie"; readonly value: string };
   /** The signed-in person. */
   readonly person: SignedIn;
-  /** The organization the person has entered, when they have. */
+  /** The organization the person belongs to, when they belong to one. */
   readonly organization: OrganizationId | undefined;
 }
 
@@ -72,14 +72,14 @@ export interface Issued {
   readonly token: string;
   /** The signed-in person the session stands for. */
   readonly person: BrowserPerson;
-  /** The identifier of the organization the session has entered, or `null`. */
+  /** The identifier of the organization the session works in, or `null`. */
   readonly organization: string | null;
 }
 
 /**
  * The sessions of the people who have signed in.
  *
- * A session says who a person is and which organization they have entered.
+ * A session says who a person is and which organization they work in.
  * The browser holds it as a bearer token. Ending a session also stops
  * everything opened under it.
  */
@@ -104,7 +104,7 @@ export class Sessions {
    * Gives a signed-in person a session.
    *
    * @param person The signed-in person.
-   * @param organization The organization they have entered, when they have.
+   * @param organization The organization they belong to, when they belong to one.
    * @returns The session, or `undefined` when it could not be issued.
    */
   async issue(person: SignedIn, organization?: OrganizationId): Promise<Issued | undefined> {

@@ -22,12 +22,7 @@ import {
   type PersonId,
   type OrganizationId,
 } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
-import {
-  IdentityProvider,
-  InvitationStatus,
-} from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
-import { InvitationViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/invitation/invitation_pb.js";
-import { InvitationViewQuery } from "@access-desk/identity-model/generated/accessdesk/identity/invitation/invitation_query.js";
+import { IdentityProvider } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 import { LinkExternalIdentitySchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/external_identity_commands_pb.js";
 import { ExternalIdentityLinkedSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/external_identity_events_pb.js";
 import { ExternalIdentityViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/external_identity_pb.js";
@@ -68,20 +63,16 @@ export interface SignedIn {
   readonly email: EmailAddress;
   /** The person's display name. */
   readonly name: string;
+  /** The organization the person belongs to, when they belong to one. */
+  readonly organization?: OrganizationId | undefined;
 }
-
-/** Whether a person is a member of an organization, or only invited to it. */
-export type Standing = "member" | "invited";
 
 /** What Identity knows about a signed-in person. */
 export interface Profile {
   /** The accounts the person signs in with. */
   readonly accounts: readonly { readonly provider: string; readonly subject: string }[];
-  /** The person's organizations, each with their standing in it. */
-  readonly standings: readonly {
-    readonly organization: OrganizationId;
-    readonly standing: Standing;
-  }[];
+  /** The organization the person belongs to, when they belong to one. */
+  readonly organization: OrganizationId | undefined;
 }
 
 /**
@@ -133,12 +124,28 @@ export class AccessDesk {
       return undefined;
     }
     // The account is linked a moment before the person shows with it.
-    const view = await AccessDesk.#eventually(() =>
-      ServerRequests.readById(this.#identity, PersonViewSchema, PersonIdSchema, holder),
-    );
-    return view?.emailAddress === undefined
-      ? undefined
-      : { id: holder, email: view.emailAddress, name: view.name };
+    const view = await AccessDesk.#eventually(async () => {
+      const shown = await ServerRequests.readById(
+        this.#identity,
+        PersonViewSchema,
+        PersonIdSchema,
+        holder,
+      );
+      return shown?.account.some(
+        (account) => account.provider === id.provider && account.subject === id.subject,
+      )
+        ? shown
+        : undefined;
+    });
+    if (view?.emailAddress === undefined) {
+      return undefined;
+    }
+    return {
+      id: holder,
+      email: view.emailAddress,
+      name: view.name,
+      organization: view.organization,
+    };
   }
 
   /**
@@ -160,49 +167,21 @@ export class AccessDesk {
     return linked?.person;
   }
 
-  /**
-   * A signed-in person's accounts and organizations.
-   *
-   * The person is a member where they accepted an invitation, and invited where
-   * an invitation still waits for their answer.
-   */
+  /** A signed-in person's accounts, and the organization they belong to. */
   async profile(person: SignedIn): Promise<Profile> {
-    const [invitations, view] = await Promise.all([
-      ServerRequests.find(
-        this.#identity,
-        InvitationViewSchema,
-        InvitationViewQuery.create().invitee().is(person.email).build(),
-      ),
-      ServerRequests.readById(this.#identity, PersonViewSchema, PersonIdSchema, person.id),
-    ]);
-    const standings = new Map<string, Profile["standings"][number]>();
-    for (const invitation of invitations) {
-      const organization = invitation.id?.organization;
-      if (invitation.status === InvitationStatus.PENDING && organization !== undefined) {
-        standings.set(organization.uuid, { organization, standing: "invited" });
-      }
-    }
-    for (const organization of view?.organization ?? []) {
-      standings.set(organization.uuid, { organization, standing: "member" });
-    }
+    const view = await ServerRequests.readById(
+      this.#identity,
+      PersonViewSchema,
+      PersonIdSchema,
+      person.id,
+    );
     return {
       accounts: (view?.account ?? []).map((account) => ({
         provider: IdentityProvider[account.provider].toLowerCase(),
         subject: account.subject,
       })),
-      standings: [...standings.values()],
+      organization: view?.organization,
     };
-  }
-
-  /** Whether a person is a member of an organization, as Identity knows it. */
-  async joined(person: PersonId, organization: OrganizationId): Promise<boolean> {
-    const view = await ServerRequests.readById(
-      this.#identity,
-      PersonViewSchema,
-      PersonIdSchema,
-      person,
-    );
-    return view?.organization.some((joined) => joined.uuid === organization.uuid) ?? false;
   }
 
   /** An organization with its members and resources, when it exists. */

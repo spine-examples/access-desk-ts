@@ -24,7 +24,7 @@ import { OrganizationViewSchema } from "@access-desk/resources-model/generated/a
 import type { AccessDesk } from "../../../src/gateway/access-desk.js";
 import { routing } from "../../../src/gateway/routes/route.js";
 import { sessionRoutes } from "../../../src/gateway/routes/session-routes.js";
-import type { Issued, Session, Sessions } from "../../../src/gateway/sessions.js";
+import type { Session, Sessions } from "../../../src/gateway/sessions.js";
 
 const person = {
   id: create(PersonIdSchema, { uuid: "person-1" }),
@@ -34,23 +34,21 @@ const person = {
 const organization = create(OrganizationIdSchema, { uuid: "acme" });
 const session: Session = {
   id: "session-1",
-  credential: { kind: "cookie", value: "old-token" },
+  credential: { kind: "cookie", value: "token" },
   person,
-  organization: undefined,
+  organization,
 };
 
 function fixture() {
   const sessions = {
     of: vi.fn().mockResolvedValue(session),
-    issue: vi.fn().mockResolvedValue(undefined),
     end: vi.fn().mockResolvedValue(undefined),
   };
   const desk = {
     profile: vi.fn().mockResolvedValue({
       accounts: [{ provider: "google", subject: "1" }],
-      standings: [{ organization, standing: "member" }],
+      organization,
     }),
-    joined: vi.fn().mockResolvedValue(true),
     organization: vi.fn().mockResolvedValue(
       create(OrganizationViewSchema, {
         id: organization,
@@ -58,7 +56,6 @@ function fixture() {
         member: [{ person: person.id, role: OrganizationRole.ADMINISTRATOR }],
       }),
     ),
-    member: vi.fn().mockResolvedValue({ person: person.id, role: OrganizationRole.ADMINISTRATOR }),
   };
   const routes = sessionRoutes(
     routing(["https://app.test"], sessions as unknown as Sessions),
@@ -83,25 +80,8 @@ function fixture() {
 }
 
 describe("Gateway session routes should", () => {
-  it("serialize typed session values and skip organizations without a view", async () => {
+  it("serialize typed session values with the organization the session works in", async () => {
     const { call, desk } = fixture();
-    const missing = create(OrganizationIdSchema, { uuid: "missing" });
-    desk.profile.mockResolvedValueOnce({
-      accounts: [{ provider: "google", subject: "1" }],
-      standings: [
-        { organization, standing: "member" },
-        { organization: missing, standing: "invited" },
-      ],
-    });
-    desk.organization
-      .mockResolvedValueOnce(
-        create(OrganizationViewSchema, {
-          id: organization,
-          name: "Acme",
-          member: [{ person: person.id, role: OrganizationRole.ADMINISTRATOR }],
-        }),
-      )
-      .mockResolvedValueOnce(undefined);
 
     const response = await call("/auth/session");
 
@@ -109,10 +89,19 @@ describe("Gateway session routes should", () => {
     expect(await response.json()).toEqual({
       person: { id: "person-1", email: "maya@example.com", name: "Maya" },
       accounts: [{ provider: "google", subject: "1" }],
-      organization: null,
-      organizations: [{ id: "acme", name: "Acme", standing: "member", role: "administrator" }],
+      organization: { id: "acme", name: "Acme", role: "administrator" },
     });
     expect(desk.organization).toHaveBeenCalledWith(organization);
+  });
+
+  it("tell a person who belongs to no organization that they have none", async () => {
+    const { call, sessions, desk } = fixture();
+    sessions.of.mockResolvedValueOnce({ ...session, organization: undefined });
+
+    const response = await call("/auth/session");
+
+    expect(((await response.json()) as { organization: unknown }).organization).toBeNull();
+    expect(desk.organization).not.toHaveBeenCalled();
   });
 
   it("return 401 for a session request without a resolved bearer session", async () => {
@@ -126,22 +115,6 @@ describe("Gateway session routes should", () => {
     expect(desk.profile).not.toHaveBeenCalled();
   });
 
-  it("refuse an organization Identity does not list for the person, without asking it", async () => {
-    const { call, sessions, desk } = fixture();
-    desk.joined.mockResolvedValueOnce(false);
-
-    const response = await call("/auth/organization", { organization: "made-up" });
-
-    expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ error: "refused" });
-    expect(desk.joined).toHaveBeenCalledWith(
-      person.id,
-      expect.objectContaining({ uuid: "made-up" }),
-    );
-    expect(desk.member).not.toHaveBeenCalled();
-    expect(sessions.issue).not.toHaveBeenCalled();
-  });
-
   it("answer 503 when the application server cannot be asked", async () => {
     const { call, desk } = fixture();
     desk.profile.mockRejectedValueOnce(new Error("The application server is away."));
@@ -153,34 +126,6 @@ describe("Gateway session routes should", () => {
     expect(await response.json()).toEqual({ error: "try again" });
     expect(silenced).toHaveBeenCalled();
     silenced.mockRestore();
-  });
-
-  it("return 503 without ending the old session when a replacement cannot be issued", async () => {
-    const { call, sessions, desk } = fixture();
-
-    const response = await call("/auth/organization", { organization: "acme" });
-
-    expect(response.status).toBe(503);
-    expect(await response.json()).toEqual({ error: "try again" });
-    expect(desk.member).toHaveBeenCalledWith(expect.objectContaining({ uuid: "acme" }), person.id);
-    expect(sessions.issue).toHaveBeenCalledWith(person, expect.objectContaining({ uuid: "acme" }));
-    expect(sessions.end).not.toHaveBeenCalled();
-  });
-
-  it("end the earlier session only after issuing a replacement", async () => {
-    const { call, sessions } = fixture();
-    const issued: Issued = {
-      token: "new-token",
-      person: { id: "person-1", email: "maya@example.com", name: "Maya" },
-      organization: "acme",
-    };
-    sessions.issue.mockResolvedValueOnce(issued);
-
-    const response = await call("/auth/organization", { organization: "acme" });
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual(issued);
-    expect(sessions.end).toHaveBeenCalledWith(session);
   });
 
   it("sign out with or without a session", async () => {

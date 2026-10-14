@@ -65,8 +65,8 @@ interface Watched {
  *    session's person and organization.
  * 2. The browser opens the subscription. From then on it belongs to that
  *    session.
- * 3. The session ends, because the person signs out or enters another
- *    organization. Everything it opened stops at once.
+ * 3. The session ends, because the person signs out. Everything it opened
+ *    stops at once.
  *
  * A subscription that was never opened is dropped when its session expires.
  *
