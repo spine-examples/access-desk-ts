@@ -13,28 +13,31 @@ rejections from the Event Storming board. Architecture details belong in
 
 ## Identity
 
-| Owner                  | Trigger (actor/event)                | Command                | Event(s)                          | Rejections                                 |
-| ---------------------- | ------------------------------------ | ---------------------- | --------------------------------- | ------------------------------------------ |
-| External Identity (PM) | Gateway                              | Link External Identity | External Identity Linking Started | External Identity Already Known            |
-| External Identity (PM) | on External Identity Linking Started | Register Person Email  | —                                 | —                                          |
-| Person Email           | External Identity (PM)               | Register Person Email  | Person Email Registered           | Person Email Already Registered            |
-| External Identity (PM) | on Person Email Registered           | Register Person        | —                                 | —                                          |
-| Person                 | External Identity (PM)               | Register Person        | Person Registered                 | —                                          |
-| External Identity (PM) | on Person Email Already Registered   | Add Sign-In Account    | —                                 | —                                          |
-| Person                 | External Identity (PM)               | Add Sign-In Account    | Sign-In Account Added             | —                                          |
-| External Identity (PM) | on Person Registered                 | —                      | External Identity Linked          | —                                          |
-| External Identity (PM) | on Sign-In Account Added             | —                      | External Identity Linked          | —                                          |
-| Invitation (PM)        | Organization Administrator           | Invite Member          | Member Invited                    | Member Already Invited                     |
-| Invitation (PM)        | Organization Administrator           | Revoke Invitation      | Invitation Revoked                | Invitation Not Pending                     |
-| Invitation (PM)        | Invited person, signed in            | Accept Invitation      | Invitation Accepted               | Invitation Not Pending, Not Invited Person |
-| Invitation (PM)        | Invited person, signed in            | Decline Invitation     | Invitation Declined               | Invitation Not Pending, Not Invited Person |
+| Owner                  | Trigger (actor/event)                | Command                                         | Event(s)                          | Rejections                      |
+| ---------------------- | ------------------------------------ | ----------------------------------------------- | --------------------------------- | ------------------------------- |
+| External Identity (PM) | Gateway                              | Link External Identity                          | External Identity Linking Started | External Identity Already Known |
+| External Identity (PM) | on External Identity Linking Started | Register Person Email                           | —                                 | —                               |
+| Person Email           | External Identity (PM)               | Register Person Email                           | Person Email Registered           | Person Email Already Registered |
+| External Identity (PM) | on Person Email Registered           | Register Person                                 | —                                 | —                               |
+| Person                 | External Identity (PM)               | Register Person                                 | Person Registered                 | —                               |
+| External Identity (PM) | on Person Registered                 | Add Sign-In Account                             | —                                 | —                               |
+| External Identity (PM) | on Person Email Already Registered   | Add Sign-In Account                             | —                                 | —                               |
+| Person                 | External Identity (PM)               | Add Sign-In Account                             | Sign-In Account Added             | —                               |
+| External Identity (PM) | on Sign-In Account Added             | —                                               | External Identity Linked          | —                               |
+| Membership (PM)        | Organization Administrator           | Add Member                                      | Member Adding Started             | Email Address Already Member    |
+| Membership (PM)        | on Member Adding Started             | Register Person Email                           | —                                 | —                               |
+| Membership (PM)        | on Person Email Registered           | Register Person                                 | —                                 | —                               |
+| Membership (PM)        | on Person Registered                 | Add Organization Member, then Join Organization | —                                 | —                               |
+| Membership (PM)        | on Person Email Already Registered   | Add Organization Member, then Join Organization | —                                 | —                               |
+| Person                 | Membership (PM)                      | Join Organization                               | Organization Joined               | —                               |
+| Membership (PM)        | on Organization Joined               | —                                               | Member Added                      | —                               |
 
 Projections: **External Identity View** receives External Identity Linked and
 tells which person an account belongs to. **Person View** receives Person
-Registered and Sign-In Account Added. **Invitation View** receives all four events. It keeps the invited
-email address as a column, so the invitations of one address are found by it.
-**Person View** also receives Invitation Accepted and holds the organizations
-the person is a member of.
+Registered and Sign-In Account Added. **Membership View** receives Member Added.
+It keeps the organization as a column, so an organization's members are found by it.
+**Person View** also receives Organization Joined and holds the organization the person
+belongs to; a person who was added shows there before they first sign in.
 
 ## Board transcription
 
@@ -43,7 +46,7 @@ the person is a member of.
 | Owner                      | Trigger (actor/event)              | Command                     | Event(s)                        | Rejections                           |
 | -------------------------- | ---------------------------------- | --------------------------- | ------------------------------- | ------------------------------------ |
 | Organization               | Developer, at assembly             | Create Organization         | Organization Created            | Organization Already Exists          |
-| Organization               | Invitation (PM), in Identity       | Add Organization Member     | Organization Member Added       | —                                    |
+| Organization               | Membership (PM), in Identity       | Add Organization Member     | Organization Member Added       | —                                    |
 | Resource Registration (PM) | Organization Administrator         | Register Resource           | Resource Registration Requested | —                                    |
 | Resource Registration (PM) | on Resource Registration Requested | Create Resource             | —                               | —                                    |
 | Resource                   | Resource Registration (PM)         | Create Resource             | Resource Created                | Resource Already Exists              |

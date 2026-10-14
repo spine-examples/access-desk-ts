@@ -31,7 +31,7 @@ The system has two bounded contexts:
 
 | Bounded context | Owns                                                                                                                                                                                   | Tenant mode          |
 | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| Identity        | People, the accounts they sign in with, their email addresses, and invitations to organizations                                                                                        | Global/single-tenant |
+| Identity        | People, the accounts they sign in with, their email addresses, and the organization each belongs to                                                                                    | Global/single-tenant |
 | Resources       | Organizations, their members, resources, ordered access levels, resource managers, request policy, requests, approval decisions, grants, extensions, revocation, and audit projections | Organization-scoped  |
 
 The application runs as two programs. The application server hosts the
@@ -62,37 +62,30 @@ Organization is the tenant.
   person when their providers confirm the same email address.
   Only an address the provider has verified counts.
 - An account is linked to its person once.
-- Signing in and working in an organization are separate. Signing in says who
-  a person is and concerns no organization. A signed-in person then enters one
-  organization they are a member of.
-- A user may have memberships in multiple organizations.
+- A person belongs to one organization, and stays in it. An administrator
+  adds people to the organization by email address.
+- Identity keeps the membership of each email address, keyed by the address,
+  so an address belongs to one organization even when two administrators add
+  it at once. Each organization also keeps its own members, by person and
+  email address, in Resources.
+- Adding an address registers it, the same way signing in does. When nobody
+  has signed in under it yet, a new person is registered for it, without a
+  name or an account. Identity then has the organization add that person to
+  its members and waits for it to confirm. Only then is the address added, and
+  the person joins the organization. The application gives Identity a client of
+  the application server for this.
+- Whoever first signs in under an added address is that person. The sign-in
+  adds their account, and gives the person their name.
+- A person who signs in works in the organization they belong to. A person who
+  belongs to none can do nothing yet. Creating an organization comes later.
 - Every tenant-scoped request, query, subscription, inbox row,
   outbox row, and audit record carries exactly one `OrganizationId` represented
   at the Spine boundary as the authoritative `TenantId`.
-- The browser selects an organization explicitly. Switching organizations
-  cancels tenant-scoped subscriptions, clears tenant-scoped client caches, and
-  performs authoritative queries in the new organization.
 - A trusted gateway resolves the opaque server-side session into the actor and
-  active organization. Client command fields must not be trusted as actor or
+  their organization. Client command fields must not be trusted as actor or
   tenant authority.
 - Resources is multitenant. Identity is singletenant. The gateway carries the
   signed-in person into Resources as the actor.
-- An invitation concerns a person and an organization, so it belongs to
-  neither one's tenant. Identity, which stands outside every organization,
-  holds the invitations. Each organization keeps its own members, in
-  Resources.
-- When a person accepts an invitation, Identity has the organization add them
-  to its members and waits for the organization to confirm. Only then is the
-  invitation accepted, and the organization listed among the person's. The
-  application gives Identity a client of the application server for this.
-- Which organizations are a person's to see is the application server's to
-  say, never the gateway's. Identity lists the organizations whose
-  invitations a person accepted, and finds the invitations of an email
-  address by that address.
-- A person joins an organization by invitation. An administrator invites the
-  person's email address, and the signed-in person accepts or declines.
-  The invited person answers for themselves; nobody accepts or declines on
-  behalf of another.
 - Roles and permissions are organization-scoped. A role in one organization
   gives no authority in another.
 - Storage namespaces and context-prefixed kinds provide defense in depth; they
@@ -105,17 +98,16 @@ There is no other way to sign in. Provider tokens are used for the one exchange
 and discarded. They are never stored in browser application storage or passed
 into bounded contexts.
 
-The gateway issues an opaque session. Entering an organization exchanges it for
-one bound to that organization, and the earlier one stops working. For every
+The gateway issues an opaque session at sign-in, bound to the organization the
+person belongs to, when they belong to one. For every
 command, query, and subscription the gateway takes the actor and the
 organization from the session, refuses a request that names another, checks
 that the person is a member, and admits only the commands a person may give. A
 command only the application gives, such as creating a grant, is refused from
-any client. The gateway keeps endpoints of its own only for signing in, the session,
-entering an organization, and signing out. Everything else is a command, a
-query, or a subscription it judges as it passes, including the commands and
-the query about invitations. A request about an invitation names no
-organization, and the gateway refuses one that does.
+any client. The gateway keeps endpoints of its own only for signing in, the session, and
+signing out. Everything else is a command, a query, or a subscription it judges
+as it passes, including adding a member and reading who was added. A request to
+Identity names no organization, and the gateway refuses one that does.
 
 A member reads and watches the organization and its catalog freely. Everything
 else they see only where it concerns them: the requests they made and the
@@ -124,8 +116,8 @@ requests to decide. A query or a subscription must therefore say whose it
 wants, by one condition on one column, and the gateway refuses any other.
 
 What a browser watches belongs to the session it was opened under. When the
-session ends, because the person signs out or enters another organization,
-the gateway stops everything opened under it.
+session ends, because the person signs out, the gateway stops everything opened
+under it.
 
 ### Roles, relations, and fine-grained authorization
 
@@ -133,7 +125,7 @@ Authority takes two forms, both organization-scoped.
 
 A **role** is standing authority a person holds in the organization itself:
 Member (the baseline every member holds, who may act as a requester) and
-Administrator, who invites people, revokes invitations, and registers resources.
+Administrator, who adds people to the organization and registers resources.
 A manager is to see the audit history of the resources they manage,
 and an administrator that of the whole organization.
 
@@ -156,7 +148,8 @@ invariant, and a caller-supplied identifier is never authority.
 ## Resources and policy ownership
 
 Resources is authoritative for organizations, their members, resources, and
-resource policy. Identity is authoritative for invitations. A resource carries descriptive catalog attributes — its
+resource policy. Identity is authoritative for who belongs to which organization.
+A resource carries descriptive catalog attributes — its
 identity, description, and category — that describe it for browsing but are not
 access decision rules.
 

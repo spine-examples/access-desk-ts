@@ -137,11 +137,12 @@ Answers `200`:
 {
   "token": "…",
   "person": { "id": "…", "email": "noah@acme.example", "name": "Noah Reyes" },
-  "organization": null
+  "organization": "acme"
 }
 ```
 
-`token` is the session. The session belongs to no organization yet.
+`token` is the session. It works in the organization the person belongs to,
+named in `organization`, or in none when that is `null`.
 
 Answers `403` when the sign-in was never started or was already finished, when
 the secret does not match, or when the provider confirmed no account with a
@@ -151,10 +152,9 @@ verified email address. The gateway's console says which.
 
 #### `POST /auth/session`
 
-Tells who is signed in and which organizations are theirs. Call it when the
+Tells who is signed in and which organization they belong to. Call it when the
 page opens, to learn whether the session it kept is still good, and again
-after the person signs in, answers an invitation, or enters an organization.
-Needs a session.
+after the person signs in. Needs a session.
 
 Send `{}`.
 
@@ -164,51 +164,21 @@ Answers `200`:
 {
   "person": { "id": "…", "email": "noah@acme.example", "name": "Noah Reyes" },
   "accounts": [{ "provider": "google", "subject": "1001" }],
-  "organization": null,
-  "organizations": [
-    { "id": "acme", "name": "acme", "standing": "member", "role": "administrator" },
-    { "id": "globex", "name": "globex", "standing": "invited", "role": null }
-  ]
+  "organization": { "id": "acme", "name": "acme", "role": "administrator" }
 }
 ```
 
-| Field           | Value                                                                                           |
-| --------------- | ----------------------------------------------------------------------------------------------- |
-| `person`        | The signed-in person.                                                                           |
-| `accounts`      | The accounts the person signs in with, each by its provider and the name the provider gives it. |
-| `organization`  | The organization the session has entered, or `null`.                                            |
-| `organizations` | Every organization the person belongs to or is invited to.                                      |
-| `standing`      | `member`, or `invited` while an invitation waits for their answer.                              |
-| `role`          | `member` or `administrator` for a member, and `null` for somebody only invited.                 |
+| Field          | Value                                                                                           |
+| -------------- | ----------------------------------------------------------------------------------------------- |
+| `person`       | The signed-in person.                                                                           |
+| `accounts`     | The accounts the person signs in with, each by its provider and the name the provider gives it. |
+| `organization` | The organization the session works in, or `null` when the person belongs to none.               |
+| `role`         | `member` or `administrator`.                                                                    |
+
+A person who was added to an organization after they signed in sees it from
+their next sign-in.
 
 Answers `401` when there is no session or it has ended.
-
-#### `POST /auth/organization`
-
-Enters an organization. Call it when the person chooses one of the
-organizations they are a member of. Needs a session.
-
-| Field          | Value                                                                          |
-| -------------- | ------------------------------------------------------------------------------ |
-| `organization` | The `id` of an organization from `/auth/session` whose `standing` is `member`. |
-
-Answers `200` with a new session, bound to the organization:
-
-```json
-{
-  "token": "…",
-  "person": { "id": "…", "email": "noah@acme.example", "name": "Noah Reyes" },
-  "organization": "acme"
-}
-```
-
-The earlier session stops working, so use the new `token` from then on.
-Every subscription opened under the earlier session stops with it. To enter
-another organization, call this again with the new session.
-
-Answers `401` without a session, `403` when the person is not a member of that
-organization, and `503` when the session could not be issued just now. Only an
-organization that `/auth/session` lists for the person as `member` is entered.
 
 #### `POST /auth/sign-out`
 
@@ -223,20 +193,19 @@ address, with the same `Authorization` header, as the Spine web client sends
 them. The gateway judges each as it passes and refuses whatever is not listed
 here.
 
-A request names the organization it acts in, which must be the one the session
-has entered. A request about an invitation names no organization, because
-invitations belong to none.
+A request names the organization it acts in, which must be the one the person
+belongs to. A request to Identity, such as adding a member, names no
+organization.
 
 | Request                                                          | Who may send it                                                            |
 | ---------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `AcceptInvitation`, `DeclineInvitation`                          | A signed-in person, for an invitation sent to their own email address.     |
-| `InviteMember`, `RevokeInvitation`                               | An administrator, for the organization they have entered.                  |
-| Query on `InvitationView`, filtered by `organization` alone      | An administrator, for the organization they have entered.                  |
+| `AddMember`                                                      | An administrator, for their own organization.                              |
+| Query on `MembershipView`, filtered by `organization` alone      | An administrator, for their own organization.                              |
 | `SubmitAccessRequest`, `SubmitAccessExtensionRequest`            | A member, as the requester.                                                |
 | `CancelAccessRequest`                                            | The member who made the request.                                           |
 | `ApproveAccessRequest`, `DenyAccessRequest`, `RevokeAccessGrant` | A member, as the manager. The domain checks that they manage the resource. |
 | `OpenResourceForRequests`, `CloseResourceForRequests`            | A manager of the resource, or an administrator.                            |
-| `RegisterResource`                                               | An administrator, for the organization they have entered.                  |
+| `RegisterResource`                                               | An administrator, for their own organization.                              |
 | Query or subscription on a read model                            | A member, as [What a member may read](#what-a-member-may-read) tells.      |
 
 ### What a member may read

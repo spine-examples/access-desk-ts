@@ -16,7 +16,7 @@ Two contexts (`references/architecture.md`):
 
 | Context    | Owns                                                                                                                                        | Tenancy                  |
 | ---------- |---------------------------------------------------------------------------------------------------------------------------------------------| ------------------------ |
-| Identity   | People, the accounts they sign in with, their email addresses, and invitations to organizations | Global / single-tenant   |
+| Identity   | People, the accounts they sign in with, their email addresses, and the organization each belongs to | Global / single-tenant   |
 | Resources  | Organizations, membership, resources, policy, managers, requests, approvals, grants, extensions, revocation, audit projections | Org-scoped (multitenant) |
 
 Resources owns the whole request-and-approval domain. What earlier drafts split
