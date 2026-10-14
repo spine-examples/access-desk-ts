@@ -22,20 +22,24 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
-// A person was registered at their first sign-in.
+// A person was registered under their email address.
 message PersonRegistered {
 
     // The person's identifier.
     accessdesk.identity.PersonId id = 1 [(required) = true];
 
-    // The email address the person's identity provider confirmed.
+    // The email address the person is registered under.
     spine.net.EmailAddress email_address = 2 [(required) = true];
 
-    // The person's display name with the provider.
-    string name = 3 [(required) = true];
+    // Who asked for the registration.
+    oneof invoker {
 
-    // The account the person signed in with.
-    accessdesk.identity.ExternalIdentityId account = 4 [(required) = true];
+        // The account being linked, as somebody signs in with it.
+        accessdesk.identity.ExternalIdentityId account = 3;
+
+        // The membership being added.
+        accessdesk.identity.MembershipId membership = 4;
+    }
 }
 
 // An account with another identity provider was added to a registered person.
@@ -46,4 +50,20 @@ message SignInAccountAdded {
 
     // The account that was added.
     accessdesk.identity.ExternalIdentityId account = 2 [(required) = true];
+
+    // The person's display name, when this account gave them their first one.
+    string name = 3;
+}
+
+// A person joined an organization, and belongs to it from now on.
+message OrganizationJoined {
+
+    // The person who joined.
+    accessdesk.identity.PersonId id = 1 [(required) = true];
+
+    // The membership the person joined through.
+    accessdesk.identity.MembershipId membership = 2 [(required) = true];
+
+    // The organization the person belongs to.
+    accessdesk.identity.OrganizationId organization = 3 [(required) = true];
 }

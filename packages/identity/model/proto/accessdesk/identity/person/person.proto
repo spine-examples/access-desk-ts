@@ -30,18 +30,21 @@ message Person {
     // The person's identifier.
     accessdesk.identity.PersonId id = 1;
 
-    // The email address the person was registered under, which their identity
-    // provider confirmed.
+    // The email address the person was registered under.
     spine.net.EmailAddress email_address = 2 [(required) = true];
 
-    // The person's display name when they were registered.
-    string name = 3 [(required) = true];
+    // The person's display name, once they have signed in.
+    string name = 3;
 
     // The accounts the person signs in with.
     repeated accessdesk.identity.ExternalIdentityId account = 4;
+
+    // The organization the person belongs to, once they joined one.
+    accessdesk.identity.OrganizationId organization = 5;
 }
 
-// A registered person with every account they sign in with.
+// A person with every account they sign in with and the organization they
+// belong to.
 message PersonView {
     option (entity).kind = PROJECTION;
     option (entity).visibility = FULL;
@@ -49,12 +52,15 @@ message PersonView {
     // The person's identifier.
     accessdesk.identity.PersonId id = 1;
 
-    // The email address the person was registered under.
+    // The person's email address.
     spine.net.EmailAddress email_address = 2 [(required) = true];
 
-    // The person's display name when they were registered.
-    string name = 3 [(required) = true];
+    // The person's display name when they first signed in, once they have.
+    string name = 3;
 
     // The accounts the person signs in with.
     repeated accessdesk.identity.ExternalIdentityId account = 4;
+
+    // The organization the person belongs to, once they belong to one.
+    accessdesk.identity.OrganizationId organization = 5;
 }

@@ -31,7 +31,7 @@ message RegisterResource {
     accessdesk.resources.ResourceId id = 1;
 
     // The organization the resource belongs to.
-    accessdesk.resources.OrganizationId organization_id = 2;
+    accessdesk.identity.OrganizationId organization_id = 2;
 
     // The requested resource display name, unique within the organization and
     // compared case-insensitively.

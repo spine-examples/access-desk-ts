@@ -26,7 +26,7 @@ import {
   OrganizationResourceNameAlreadyUsedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/rejections_pb.js";
 
-import { OrganizationRole } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
+import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 
 import {
   actor,
@@ -92,7 +92,7 @@ describe("OrganizationAggregate should", () => {
         create(OrganizationMemberAddedSchema, {
           organizationId: { uuid: organizationId },
           person: { uuid: "maya" },
-          name: "maya",
+          emailAddress: { value: "maya@acme.example" },
           role: OrganizationRole.MEMBER,
         }),
       );
@@ -108,7 +108,7 @@ describe("OrganizationAggregate should", () => {
       const events = await recordEvents(scope, OrganizationMemberAddedSchema);
 
       expect(
-        (await addOrganizationMember(scope, "noah", "noah", OrganizationRole.ADMINISTRATOR)).kind,
+        (await addOrganizationMember(scope, "noah", OrganizationRole.ADMINISTRATOR)).kind,
       ).toBe("ok");
 
       expect((await events.waitFor(box)).role).toBe(OrganizationRole.ADMINISTRATOR);

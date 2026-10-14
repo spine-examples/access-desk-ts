@@ -29,12 +29,16 @@ baseline: Node.js 24 or newer, pnpm 11.9, strict TypeScript, and ESM.
 
 The system has two bounded contexts:
 
-| Bounded context | Owns                                                                                                                                                                                              | Tenant mode          |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| Identity        | People, the accounts they sign in with, and their email addresses                                                                                                                                 | Global/single-tenant |
-| Resources       | Organizations, invitations, memberships, resources, ordered access levels, resource managers, request policy, requests, approval decisions, grants, extensions, revocation, and audit projections | Organization-scoped  |
+| Bounded context | Owns                                                                                                                                                                                   | Tenant mode          |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| Identity        | People, the accounts they sign in with, their email addresses, and the organization each belongs to                                                                                    | Global/single-tenant |
+| Resources       | Organizations, their members, resources, ordered access levels, resource managers, request policy, requests, approval decisions, grants, extensions, revocation, and audit projections | Organization-scoped  |
 
-An initial deployment may co-host both contexts in one Node.js application.
+The application runs as two programs. The application server hosts the
+contexts. The gateway is a separate program that reaches the server over the
+network, and it is the only one a browser talks to.
+
+An initial deployment may co-host both contexts in one application server.
 Co-location does not weaken the boundaries: each context must have its own model
 package, generated module, `BoundedContext` instance, repositories, storage
 layout, handlers, and ownership. Direct cross-context entity, repository, or
@@ -53,36 +57,67 @@ external-event receptors internally.
 Organization is the tenant.
 
 - `PersonId` is global and is not an email address.
-- A person may sign in with several accounts, such as GitHub and Google. An
-  account is named by its provider and the permanent name the provider gives
-  it. Accounts are one person when their providers confirm the same email
-  address. Only an address the provider has verified counts.
+- A person may sign in with several accounts. An account is named by its
+  provider and the permanent name the provider gives it. Accounts are one
+  person when their providers confirm the same email address.
+  Only an address the provider has verified counts.
 - An account is linked to its person once.
-- A user may have memberships in multiple organizations.
+- A person belongs to one organization, and stays in it. An administrator
+  adds people to the organization by email address.
+- Identity keeps the membership of each email address, keyed by the address,
+  so an address belongs to one organization even when two administrators add
+  it at once. Each organization also keeps its own members, by person and
+  email address, in Resources.
+- Adding an address registers it, the same way signing in does. When nobody
+  has signed in under it yet, a new person is registered for it, without a
+  name or an account. Identity then has the organization add that person to
+  its members and waits for it to confirm. Only then is the address added, and
+  the person joins the organization. The application gives Identity a client of
+  the application server for this.
+- Whoever first signs in under an added address is that person. The sign-in
+  adds their account, and gives the person their name.
+- A person who signs in works in the organization they belong to. A person who
+  belongs to none can do nothing yet. Creating an organization comes later.
 - Every tenant-scoped request, query, subscription, inbox row,
   outbox row, and audit record carries exactly one `OrganizationId` represented
   at the Spine boundary as the authoritative `TenantId`.
-- The browser selects an organization explicitly. Switching organizations
-  cancels tenant-scoped subscriptions, clears tenant-scoped client caches, and
-  performs authoritative queries in the new organization.
 - A trusted gateway resolves the opaque server-side session into the actor and
-  active organization. Client command fields must not be trusted as actor or
+  their organization. Client command fields must not be trusted as actor or
   tenant authority.
-- Resources is multitenant. Identity is singletenant.
-- A person joins an organization by invitation. An administrator invites the
-  person's email address, and the signed-in person accepts or declines.
-  The invited person answers for themselves; nobody accepts or declines on
-  behalf of another.
+- Resources is multitenant. Identity is singletenant. The gateway carries the
+  signed-in person into Resources as the actor.
 - Roles and permissions are organization-scoped. A role in one organization
   gives no authority in another.
 - Storage namespaces and context-prefixed kinds provide defense in depth; they
   never replace handler, query, subscription, and gateway authorization.
 
-Authentication must be behind an OIDC provider abstraction. Development uses a
-local identity provider; production may bind a real provider without changing
-domain code. Browser credentials are exchanged for opaque application sessions.
-Provider tokens are not stored in browser application storage or passed into
-bounded contexts.
+Authentication sits behind a provider abstraction in the gateway. Google is
+the outside provider, through `@spine-event-engine/auth`, with one
+registration for the whole installation; organizations supply nothing.
+There is no other way to sign in. Provider tokens are used for the one exchange
+and discarded. They are never stored in browser application storage or passed
+into bounded contexts.
+
+The gateway issues an opaque session at sign-in, bound to the organization the
+person belongs to, when they belong to one. For every
+command, query, and subscription the gateway takes the actor and the
+organization from the session, refuses a request that names another, checks
+that the person is a member, and admits only the commands a person may give. A
+command only the application gives, such as creating a grant, is refused from
+any client. The gateway keeps endpoints of its own only for signing in, the session, and
+signing out. Everything else is a command, a query, or a subscription it judges
+as it passes, including adding a member and reading who was added. A request to
+Identity names no organization, and the gateway refuses one that does.
+
+A member reads and watches the organization and its catalog freely. Everything
+else they see only where it concerns them: the requests they made and the
+grants they hold, those of a resource they manage, and their own queue of
+requests to decide. A query or a subscription must therefore say whose it
+wants, by one condition on one column, and the gateway refuses any other.
+
+What a browser watches belongs to the session it was opened under. When the
+session ends, because the person signs out, the gateway stops everything opened
+under it.
 
 ### Roles, relations, and fine-grained authorization
 
@@ -90,7 +125,7 @@ Authority takes two forms, both organization-scoped.
 
 A **role** is standing authority a person holds in the organization itself:
 Member (the baseline every member holds, who may act as a requester) and
-Administrator, who invites people, revokes invitations, and registers resources.
+Administrator, who adds people to the organization and registers resources.
 A manager is to see the audit history of the resources they manage,
 and an administrator that of the whole organization.
 
@@ -112,8 +147,9 @@ invariant, and a caller-supplied identifier is never authority.
 
 ## Resources and policy ownership
 
-Resources is authoritative for organizations, membership, resources, and
-resource policy. A resource carries descriptive catalog attributes — its
+Resources is authoritative for organizations, their members, resources, and
+resource policy. Identity is authoritative for who belongs to which organization.
+A resource carries descriptive catalog attributes — its
 identity, description, and category — that describe it for browsing but are not
 access decision rules.
 
@@ -279,8 +315,8 @@ approval is accepted at `A`:
 - `A >= E`: the grant keeps `[S, E)`, which has already ended, so it never
   gives access.
 
-All time-based code uses an injected clock; tests must not depend on arbitrary
-sleeping.
+All time-based code reads the current time from Spine's `Time`; tests install
+their own time provider and must not depend on arbitrary sleeping.
 
 For maximum-total-lifetime checks after a delayed scheduled approval, use the
 grant's effective start through the proposed new end, while preserving the

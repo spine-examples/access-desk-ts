@@ -1,0 +1,56 @@
+/*
+ * Copyright 2026 CodeMatters, Lda.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+ * except in compliance with the License. You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under
+ * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+ * either express or implied. See the License for the specific language governing permissions
+ * and limitations under the License.
+ */
+
+syntax = "proto3";
+
+package accessdesk.identity.membership;
+
+import "accessdesk/identity/identifiers.proto";
+import "accessdesk/identity/values.proto";
+import "spine/options.proto";
+
+option (type_url_prefix) = "type.accessdesk";
+
+// A person's membership in an organization, under their email address.
+message Membership {
+    option (entity).kind = PROCESS_MANAGER;
+
+    // The membership's ID.
+    accessdesk.identity.MembershipId id = 1;
+
+    // The organization the address is added to, once an administrator added it.
+    accessdesk.identity.OrganizationId organization = 2;
+
+    // The role the person holds in the organization.
+    accessdesk.identity.OrganizationRole role = 3;
+}
+
+// The membership of one email address, as the organization's administrators
+// see it.
+message MembershipView {
+    option (entity).kind = PROJECTION;
+    option (entity).visibility = FULL;
+
+    // The membership, which names the email address.
+    accessdesk.identity.MembershipId id = 1;
+
+    // The organization the address belongs to.
+    accessdesk.identity.OrganizationId organization = 2 [(required) = true, (column) = true];
+
+    // The role the person holds in the organization.
+    accessdesk.identity.OrganizationRole role = 3 [(required) = true];
+
+    // The person the address belongs to.
+    accessdesk.identity.PersonId person = 4 [(required) = true];
+}

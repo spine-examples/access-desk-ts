@@ -20,7 +20,7 @@ import {
   identityBlackBox,
   loadIdentityContext,
 } from "../given/identity-context.js";
-import { account, awaitLinked, github, linkExternalIdentity } from "./given/person.js";
+import { account, awaitLinked, google, linkExternalIdentity } from "./given/person.js";
 
 beforeAll(loadIdentityContext, 30_000);
 afterEach(closeIdentityBlackBoxes);
@@ -31,9 +31,9 @@ describe("ExternalIdentityViewProjection should", () => {
       const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
 
-      await linkExternalIdentity(scope, account(github, "1001"), "noah@acme.example");
+      await linkExternalIdentity(scope, account(google, "1001"), "noah@acme.example");
 
-      const linked = await awaitLinked(box, scope, account(github, "1001"));
+      const linked = await awaitLinked(box, scope, account(google, "1001"));
       expect(linked.person?.uuid).toMatch(/^[0-9a-f-]{36}$/);
     });
   });

@@ -14,11 +14,11 @@
 
 import { create } from "@bufbuild/protobuf";
 import { Projection, Subscribe } from "@spine-event-engine/server";
+import { ResourceIdSchema } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
 import {
-  ResourceIdSchema,
+  PersonIdSchema,
   type OrganizationId,
-} from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
-import { PersonIdSchema } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
+} from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { equals } from "../proto/equals.js";
 import {
   type OrganizationCreated,
@@ -38,9 +38,7 @@ export class OrganizationViewProjection extends Projection<
   OrganizationId,
   typeof OrganizationViewSchema
 > {
-  /**
-   * Records one organization in the catalog view.
-   */
+  /** Creates the view of a newly created organization. */
   @Subscribe
   onOrganizationCreated(event: OrganizationCreated): void {
     this.update((draft) => {
@@ -48,9 +46,7 @@ export class OrganizationViewProjection extends Projection<
     });
   }
 
-  /**
-   * Adds one member to the organization view.
-   */
+  /** Adds a member to the organization. */
   @Subscribe
   onOrganizationMemberAdded(event: OrganizationMemberAdded): void {
     const person = event.person;
@@ -61,15 +57,17 @@ export class OrganizationViewProjection extends Projection<
       if (!draft.member.some((existing) => equals(PersonIdSchema, existing.person, person))) {
         draft.member = [
           ...draft.member,
-          create(OrganizationMemberSchema, { person, name: event.name, role: event.role }),
+          create(OrganizationMemberSchema, {
+            person,
+            emailAddress: event.emailAddress,
+            role: event.role,
+          }),
         ];
       }
     });
   }
 
-  /**
-   * Reflects a reserved resource in its organization's view.
-   */
+  /** Adds a resource to the organization. */
   @Subscribe
   onResourceAdded(event: ResourceAdded): void {
     const resourceId = event.resourceId;

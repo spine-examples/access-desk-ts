@@ -20,45 +20,60 @@ import {
   identityBlackBox,
   loadIdentityContext,
 } from "../given/identity-context.js";
-import {
-  account,
-  addSignInAccount,
-  awaitPerson,
-  github,
-  google,
-  registerPerson,
-} from "./given/person.js";
+import { account, addSignInAccount, awaitPerson, google, registerPerson } from "./given/person.js";
+import { addMember, awaitMembership } from "../membership/given/membership.js";
+import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 
 beforeAll(loadIdentityContext, 30_000);
 afterEach(closeIdentityBlackBoxes);
 
 describe("PersonViewProjection should", () => {
   describe("react on 'PersonRegistered', and", () => {
-    it("list the person with their email address and the account they signed in with", async () => {
+    it("list the person with their email address, and no name or account yet", async () => {
       const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
 
-      await registerPerson(scope, "noah", "noah@acme.example", account(github, "1001"));
+      await registerPerson(scope, "noah", "noah@acme.example");
 
       expect(await awaitPerson(box, scope, "noah")).toMatchObject({
         emailAddress: { value: "noah@acme.example" },
-        name: "noah (name)",
-        account: [{ provider: github, subject: "1001" }],
+        name: "",
+        account: [],
       });
     });
   });
 
   describe("react on 'SignInAccountAdded', and", () => {
-    it("show every account the person signs in with", async () => {
+    it("show every account the person signs in with, and the name the first one gave", async () => {
       const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
-      await registerPerson(scope, "noah", "noah@acme.example", account(github, "1001"));
-      await awaitPerson(box, scope, "noah");
+      await registerPerson(scope, "noah", "noah@acme.example");
+      await addSignInAccount(scope, "noah", account(google, "1001"));
+      await awaitPerson(box, scope, "noah", (view) => view.account.length === 1);
 
       await addSignInAccount(scope, "noah", account(google, "g-7"));
 
       const person = await awaitPerson(box, scope, "noah", (view) => view.account.length === 2);
-      expect(person.account.map((held) => held.provider)).toEqual([github, google]);
+      expect(person.account.map((held) => held.subject)).toEqual(["1001", "g-7"]);
+      expect(person.name).toBe("noah (name)");
+    });
+  });
+
+  describe("react on 'OrganizationJoined', and", () => {
+    it("show the organization the person was added to", async () => {
+      const box = await identityBlackBox();
+      const scope = box.onBehalfOf(actor);
+
+      await addMember(scope, "noah@acme.example", OrganizationRole.MEMBER, "acme");
+
+      const person = (await awaitMembership(box, scope, "noah@acme.example")).person?.uuid ?? "";
+      const view = await awaitPerson(
+        box,
+        scope,
+        person,
+        (shown) => shown.organization !== undefined,
+      );
+      expect(view.organization?.uuid).toBe("acme");
     });
   });
 });

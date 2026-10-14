@@ -22,12 +22,19 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
-// Registers the email address an identity provider confirmed for an account.
+// Registers an email address for the person it belongs to.
 message RegisterPersonEmail {
 
     // The email address.
     spine.net.EmailAddress email_address = 1;
 
-    // The account whose linking asked for the registration.
-    accessdesk.identity.ExternalIdentityId invoker = 2 [(required) = true];
+    // Who asked for the registration.
+    oneof invoker {
+
+        // The account being linked, as somebody signs in with it.
+        accessdesk.identity.ExternalIdentityId account = 2;
+
+        // The membership being added.
+        accessdesk.identity.MembershipId membership = 3;
+    }
 }

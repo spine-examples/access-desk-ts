@@ -21,20 +21,25 @@ enum IdentityProvider {
 
     IP_UNSPECIFIED = 0;
 
-    // GitHub.
-    //
-    // An account is named by the number GitHub gives the user, the
-    // `id` of https://docs.github.com/en/rest/users/users#get-the-authenticated-user.
-    // The email address is the primary one GitHub has verified, from
-    // https://docs.github.com/en/rest/users/emails#list-email-addresses-for-the-authenticated-user.
-    //
-    GITHUB = 1;
-
     // Google.
     //
     // An account is named by the `sub` claim of the ID token, and the
     // email address is its `email` claim when `email_verified` is true. See
     // https://developers.google.com/identity/openid-connect/openid-connect#an-id-tokens-payload.
     //
-    GOOGLE = 2;
+    GOOGLE = 1;
+}
+
+// What a member may do in an organization, apart from what managing a
+// particular resource lets them do.
+enum OrganizationRole {
+
+    OR_UNSPECIFIED = 0;
+
+    // May browse the organization's resources and request access to them.
+    MEMBER = 1;
+
+    // May do everything a member may, and also add people to the organization
+    // and register resources.
+    ADMINISTRATOR = 2;
 }

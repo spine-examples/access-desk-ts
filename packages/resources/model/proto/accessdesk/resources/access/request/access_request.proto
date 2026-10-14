@@ -49,17 +49,23 @@ message AccessRequestView {
     // The request identifier.
     accessdesk.resources.AccessRequestId id = 1;
 
+    // The person requesting access.
+    accessdesk.identity.PersonId requester = 2 [(required) = true, (column) = true];
+
+    // The resource the request asks access to.
+    accessdesk.resources.ResourceId resource = 3 [(required) = true, (column) = true];
+
     // The request details.
-    accessdesk.resources.AccessRequestSnapshot snapshot = 2 [(required) = true];
+    accessdesk.resources.AccessRequestSnapshot snapshot = 4 [(required) = true];
 
     // The request status.
-    accessdesk.resources.AccessRequestStatus status = 3 [(required) = true];
+    accessdesk.resources.AccessRequestStatus status = 5 [(required) = true];
 
     // The manager who approved or denied the request.
-    accessdesk.identity.PersonId decided_by = 4;
+    accessdesk.identity.PersonId decided_by = 6;
 
     // When the request was approved or denied.
-    google.protobuf.Timestamp when_decided = 5;
+    google.protobuf.Timestamp when_decided = 7;
 }
 
 // The pending access requests assigned to a manager.

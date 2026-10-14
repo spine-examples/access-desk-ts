@@ -14,11 +14,11 @@
 
 import { create } from "@bufbuild/protobuf";
 import { Aggregate, Assign, Throws } from "@spine-event-engine/server";
+import { ResourceIdSchema } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
 import {
-  ResourceIdSchema,
+  PersonIdSchema,
   type OrganizationId,
-} from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
-import { PersonIdSchema } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
+} from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { equals } from "../proto/equals.js";
 import {
   type AddOrganizationMember,
@@ -73,21 +73,19 @@ export class OrganizationAggregate extends Aggregate<OrganizationId, typeof Orga
       throw new Error("AddOrganizationMember requires a person.");
     }
     if (this.state.membership.some((item) => equals(PersonIdSchema, item.person, person))) {
-      throw new Error(
-        "A person is added to an organization once, when they accept its invitation.",
-      );
+      throw new Error("A person is added to an organization once.");
     }
     const role = command.role;
     this.update((draft) => {
       draft.membership = [
         ...draft.membership,
-        create(OrganizationMemberSchema, { person, name: command.name, role }),
+        create(OrganizationMemberSchema, { person, emailAddress: command.emailAddress, role }),
       ];
     });
     return create(OrganizationMemberAddedSchema, {
       organizationId: this.id,
       person,
-      name: command.name,
+      emailAddress: command.emailAddress,
       role,
     });
   }
@@ -106,9 +104,9 @@ export class OrganizationAggregate extends Aggregate<OrganizationId, typeof Orga
       equals(ResourceIdSchema, reserved.id, resourceId),
     );
     if (existing === undefined) {
-      const requestedName = normalizeName(command.name);
+      const requestedName = this.#normalizeName(command.name);
       const nameTaken = this.state.resource.some(
-        (reserved) => normalizeName(reserved.name) === requestedName,
+        (reserved) => this.#normalizeName(reserved.name) === requestedName,
       );
       if (nameTaken) {
         throw OrganizationResourceNameAlreadyUsed.create({ resourceId, name: command.name });
@@ -126,9 +124,9 @@ export class OrganizationAggregate extends Aggregate<OrganizationId, typeof Orga
       name: command.name,
     });
   }
-}
 
-/** Normalizes a resource name for case-insensitive within-organization comparison. */
-function normalizeName(name: string): string {
-  return name.trim().toLowerCase();
+  /** Normalizes a resource name for case-insensitive within-organization comparison. */
+  #normalizeName(name: string): string {
+    return name.trim().toLowerCase();
+  }
 }

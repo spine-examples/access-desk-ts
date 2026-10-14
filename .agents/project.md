@@ -16,8 +16,8 @@ Two contexts (`references/architecture.md`):
 
 | Context    | Owns                                                                                                                                        | Tenancy                  |
 | ---------- |---------------------------------------------------------------------------------------------------------------------------------------------| ------------------------ |
-| Identity   | People, the accounts they sign in with, and their email addresses                                                                           | Global / single-tenant   |
-| Resources  | Organizations, invitations, membership, resources, policy, managers, requests, approvals, grants, extensions, revocation, audit projections | Org-scoped (multitenant) |
+| Identity   | People, the accounts they sign in with, their email addresses, and the organization each belongs to | Global / single-tenant   |
+| Resources  | Organizations, membership, resources, policy, managers, requests, approvals, grants, extensions, revocation, audit projections | Org-scoped (multitenant) |
 
 Resources owns the whole request-and-approval domain. What earlier drafts split
 into separate Access and Audit contexts is now internal to
@@ -36,16 +36,15 @@ Each context is **two packages** under `packages/<context>/`:
 packages/
   identity/    { model, server }      # global / single-tenant
   resources/   { model, server }
-  app/                                # composition root: complete registry + (later) Server assembly, gateway
+  app/                                # composition root: complete registry, organization setup, gateway
   web/                                # React + Vite browser client (later iterations)
 ```
 
 - **`<context>/model`** — `@access-desk/<context>-model`, `spine-proto.json` `mode: "model"`.
   Canonical `.proto` under `proto/accessdesk/<context>/` plus the generated
   `ProtoModule`; pure wire contracts, no behavior. Resources subdivides its protos
-  into per-area folders (`organization/`, `organization/invitation/`, `resource/`,
-  `access/request/`, `access/grant/`), each its
-  own sub-package under `accessdesk.resources.*`, with shared `identifiers.proto`
+  into per-area folders (`organization/`, `resource/`, `access/request/`, `access/grant/`),
+  each its own sub-package under `accessdesk.resources.*`, with shared `identifiers.proto`
   and `values.proto` at the top level (filename conventions in the `protobuf-style` skill).
 - **`<context>/server`** — `@access-desk/<context>-server`, `spine-proto.json`
   `mode: "application"`. Its `src/` and `test/` directories mirror the model's
@@ -55,8 +54,15 @@ packages/
   BlackBox tests. It is an _application_ package because
   `spine-proto handlers` discovers decorated classes only in the package that runs it.
 - **`app`** — `@access-desk/app`, `mode: "application"`, composes **both** context
-  models into the complete application `TypeRegistry`; will assemble the `Server`
-  (`Server.add(ctx)` per context) and the gateway.
+  models into the complete application `TypeRegistry`. It runs as two programs:
+  `src/server/` is the application server, which hosts both contexts;
+  `src/gateway/` is the browser-facing gateway
+  (sign-in, sessions, authorization), which reaches the server over the
+  network. The gateway's own endpoints live in `src/gateway/routes/`, and
+  are only for signing in and the session; everything else passes through
+  as Spine requests judged by `src/gateway/policy.ts`.
+  `pnpm --dir packages/app run server` and `run gateway` start each.
+  Every program is configured in one `.env` in the repository root.
 - **`web`** — `@access-desk/web`, the React/Vite client.
 
 **Dependency rule:** a `server` may depend on another context's `model` (wire
@@ -107,17 +113,19 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
   registry lookup fails with "missing metadata").
 - Multitenant BlackBox: pass `{ tenant }` to `BlackBox.from`; assert the immediate
   command ack directly and use `box.eventually(...)` only for async read-side visibility.
-- **Time is injected.** `createResourcesContext({ clock })` takes a Spine `Clock`
-  (the system clock by default); every Resources decision that depends on the
-  current time reads it. Spine constructs entities itself, so the clock is
-  process-wide — one per Resources process. Time-dependent tests pass a
-  `ManualClock` (`test/given/manual-clock.ts`) to `resourcesBlackBox(clock)` and
-  move it forward instead of sleeping. Signal timestamps come from the
-  framework's own clock and are never used for domain time.
+- **Time comes from Spine's `Time`.** Every Resources decision that depends on
+  the current time reads `Time.currentTime()` from
+  `@spine-event-engine/core/time`. Time-dependent tests pass a `ManualClock`
+  (`test/given/manual-clock.ts`, a `TimeProvider`) to `resourcesBlackBox(clock)`,
+  which installs it with `Time.setProvider` until the boxes are closed, and move
+  it forward instead of sleeping. The framework reads the same `Time` for
+  signal timestamps and delivery leases, so a test moves the clock before it
+  starts watching events. A jump of more than about thirty seconds while
+  events are watched stops their delivery.
 
 ## Dependencies
 
-- One exact Spine family pinned at **`@spine-event-engine/* 2.0.0-snapshot.21`** with
+- One exact Spine family pinned at **`@spine-event-engine/* 2.0.0-snapshot.22`** with
   `@bufbuild/protobuf 2.12.1`. Never invent an API. Keep the whole family on one
   version; upgrade it together in a dedicated task.
 

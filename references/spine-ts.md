@@ -268,7 +268,8 @@ Mark a cross-context event receptor with direct first-parameter
 
 A single-tenant producer's event has no tenant, while a multitenant entity
 handler requires one, so a raw Identity event cannot reach a Resources handler.
-Access Desk needs no such delivery: Identity and Resources exchange no facts.
+Access Desk needs no such delivery: Identity and Resources exchange no facts,
+and the gateway carries the signed-in person to Resources as the actor.
 
 ## Protobuf Any and type registries
 
@@ -317,8 +318,57 @@ Subscriptions are best-effort notices. Entity subscriptions need an
 authoritative query for reconnect/gap recovery. Command validation remains
 server-side.
 
-The gateway, not a bounded context, performs OIDC/session/CSRF/origin controls
-defined in the architecture.
+The gateway, not a bounded context, performs the provider, session, and origin
+controls defined in the architecture.
+
+- `BrowserServer.open(undefined, { backend: { baseUrl }, … })` starts a
+  standalone gateway in front of an application server in another program.
+  Pass `registry` so `authorize` receives each command decoded.
+- A standalone gateway with sessions needs `bindings`:
+  `InMemorySubscriptionBindings` locally, `DurableSubscriptionBindings` in
+  production. The application server needs a `storageFactory` there too, so
+  neither program starts under `NODE_ENV=production` while everything is kept
+  in memory.
+- Ending a session does not end its streams; Spine stops them only when the
+  session's time runs out.
+- Only Spine's own cancel effect clears a subscription everywhere it is kept,
+  and the store receives it only when a browser cancels. So the gateway
+  cancels an ending session's subscriptions through its own address with the
+  session's token. What is left is stopped in the store, which ends the stream
+  but leaves the gateway's forwarding record until the gateway stops. `dispose`
+  of an in-memory store cannot clear that record either.
+- A subscription tells only what happens after it has opened all the way to
+  the application server, a moment after the client's `activate` returns. A
+  test must first make sure updates arrive.
+- A query takes an id filter or `EQUAL` filters on top-level `(column)`
+  fields. A subscription to read models takes id filters and `EQUAL` field
+  filters, also on nested paths. A subscription to events takes only
+  `include_all`.
+- A standalone gateway cannot call the contexts. It asks the application
+  server through `@spine-event-engine/client-node`, and can read only read
+  models, not process state.
+- A request whose actor or tenant differs from what `contexts` resolves is
+  refused, so the client sends the person and organization it learned from the
+  gateway.
+- `authRoutes` match the whole address, query string included, so they suit
+  `POST` with a body, not a provider callback carrying `?code=`. Their
+  preflight answers allow no headers, so they serve only pages of the
+  gateway's own origin, as through a development proxy.
+- Without `cookies` the session is a bearer token. `OpaqueSessions.resolve`
+  accepts only `kind: "cookie"`, so the resolver passes the bearer value as
+  one.
+- `OidcFlow` accepts only HTTPS addresses and requires the `openid` scope.
+- `createGoogleProvider` returns `email_verified` as text, and needs
+  `clientAuthentication: "client_secret_post"`, or Google refuses the code
+  exchange.
+- The sign-in flow reports every provider failure the same way and prints
+  nothing. Pass the provider a `fetch` that logs a refused answer, and log the
+  `reason` of a rejected `OidcFlow.callback`.
+- In the application server, post a command in-process with
+  `context.commandBus().post(SignalEnvelopes.command({ context, schema, message }))`,
+  and read any tenant's state with
+  `context.stand().read(Schema, id, { tenantId })`. Make a message-valued id
+  with `create(IdSchema, …)`.
 
 ## Testing boundaries
 

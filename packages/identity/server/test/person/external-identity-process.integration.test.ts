@@ -20,16 +20,11 @@ import {
   closeIdentityBlackBoxes,
   identityBlackBox,
   loadIdentityContext,
+  organizations,
   readAll,
 } from "../given/identity-context.js";
-import {
-  account,
-  awaitLinked,
-  awaitPerson,
-  github,
-  google,
-  linkExternalIdentity,
-} from "./given/person.js";
+import { addMember } from "../membership/given/membership.js";
+import { account, awaitLinked, awaitPerson, google, linkExternalIdentity } from "./given/person.js";
 
 beforeAll(loadIdentityContext, 30_000);
 afterEach(closeIdentityBlackBoxes);
@@ -39,28 +34,52 @@ describe("ExternalIdentityProcessManager should", () => {
     const box = await identityBlackBox();
     const scope = box.onBehalfOf(actor);
 
-    await linkExternalIdentity(scope, account(github, "1001"), "noah@acme.example");
+    await linkExternalIdentity(scope, account(google, "1001"), "noah@acme.example");
 
-    const person = (await awaitLinked(box, scope, account(github, "1001"))).person?.uuid ?? "";
+    const person = (await awaitLinked(box, scope, account(google, "1001"))).person?.uuid ?? "";
     expect(await awaitPerson(box, scope, person)).toMatchObject({
       emailAddress: { value: "noah@acme.example" },
       name: "1001 (name)",
-      account: [{ provider: github, subject: "1001" }],
+      account: [{ provider: google, subject: "1001" }],
     });
   });
 
-  it("add an account of another provider to the person its email address is registered for", async () => {
+  it("add another account to the person its email address is registered for", async () => {
     const box = await identityBlackBox();
     const scope = box.onBehalfOf(actor);
-    await linkExternalIdentity(scope, account(github, "1001"), "noah@acme.example");
-    const first = (await awaitLinked(box, scope, account(github, "1001"))).person?.uuid ?? "";
+    await linkExternalIdentity(scope, account(google, "1001"), "noah@acme.example");
+    const first = (await awaitLinked(box, scope, account(google, "1001"))).person?.uuid ?? "";
 
     await linkExternalIdentity(scope, account(google, "g-7"), "Noah@Acme.example");
 
     expect((await awaitLinked(box, scope, account(google, "g-7"))).person?.uuid).toBe(first);
     const person = await awaitPerson(box, scope, first, (view) => view.account.length === 2);
-    expect(person.account.map((held) => held.provider)).toEqual([github, google]);
+    expect(person.account.map((held) => held.subject)).toEqual(["1001", "g-7"]);
     const people = await readAll(scope, PersonViewSchema, "query-everybody");
     expect(people.map((view) => view.id?.uuid)).toEqual([first]);
+  });
+
+  it("link the account to the person an administrator added under its email address", async () => {
+    const box = await identityBlackBox();
+    const scope = box.onBehalfOf(actor);
+    expect((await addMember(scope, "noah@acme.example")).kind).toBe("ok");
+
+    await linkExternalIdentity(scope, account(google, "1001"), "noah@acme.example");
+
+    const person = (await awaitLinked(box, scope, account(google, "1001"))).person?.uuid ?? "";
+    // The organization listed this same person when the address was added.
+    expect(organizations.added.map((member) => member.person)).toEqual([person]);
+    expect(
+      await awaitPerson(
+        box,
+        scope,
+        person,
+        (view) => view.emailAddress !== undefined && view.organization !== undefined,
+      ),
+    ).toMatchObject({
+      emailAddress: { value: "noah@acme.example" },
+      name: "1001 (name)",
+      organization: { uuid: "acme" },
+    });
   });
 });

@@ -13,47 +13,52 @@ rejections from the Event Storming board. Architecture details belong in
 
 ## Identity
 
-| Owner                  | Trigger (actor/event)                | Command                | Event(s)                          | Rejections                      |
-| ---------------------- | ------------------------------------ | ---------------------- | --------------------------------- | ------------------------------- |
-| External Identity (PM) | Gateway                              | Link External Identity | External Identity Linking Started | External Identity Already Known |
-| External Identity (PM) | on External Identity Linking Started | Register Person Email  | —                                 | —                               |
-| Person Email           | External Identity (PM)               | Register Person Email  | Person Email Registered           | Person Email Already Registered |
-| External Identity (PM) | on Person Email Registered           | Register Person        | —                                 | —                               |
-| Person                 | External Identity (PM)               | Register Person        | Person Registered                 | —                               |
-| External Identity (PM) | on Person Email Already Registered   | Add Sign-In Account    | —                                 | —                               |
-| Person                 | External Identity (PM)               | Add Sign-In Account    | Sign-In Account Added             | —                               |
-| External Identity (PM) | on Person Registered                 | —                      | External Identity Linked          | —                               |
-| External Identity (PM) | on Sign-In Account Added             | —                      | External Identity Linked          | —                               |
+| Owner                  | Trigger (actor/event)                | Command                                         | Event(s)                          | Rejections                           |
+| ---------------------- | ------------------------------------ | ----------------------------------------------- | --------------------------------- | ------------------------------------ |
+| External Identity (PM) | Gateway                              | Link External Identity                          | External Identity Linking Started | External Identity Already Known      |
+| External Identity (PM) | on External Identity Linking Started | Register Person Email                           | —                                 | —                                    |
+| Person Email           | External Identity (PM)               | Register Person Email                           | Person Email Registered           | Person Email Already Registered      |
+| External Identity (PM) | on Person Email Registered           | Register Person                                 | —                                 | —                                    |
+| Person                 | External Identity (PM)               | Register Person                                 | Person Registered                 | —                                    |
+| External Identity (PM) | on Person Registered                 | Add Sign-In Account                             | —                                 | —                                    |
+| External Identity (PM) | on Person Email Already Registered   | Add Sign-In Account                             | —                                 | —                                    |
+| Person                 | External Identity (PM)               | Add Sign-In Account                             | Sign-In Account Added             | —                                    |
+| External Identity (PM) | on Sign-In Account Added             | —                                               | External Identity Linked          | —                                    |
+| Membership (PM)        | Organization Administrator           | Add Member                                      | Member Adding Started             | Already Member Of Other Organization |
+| Membership (PM)        | on Member Adding Started             | Register Person Email                           | —                                 | —                                    |
+| Membership (PM)        | on Person Email Registered           | Register Person                                 | —                                 | —                                    |
+| Membership (PM)        | on Person Registered                 | Add Organization Member, then Join Organization | —                                 | —                                    |
+| Membership (PM)        | on Person Email Already Registered   | Add Organization Member, then Join Organization | —                                 | —                                    |
+| Person                 | Membership (PM)                      | Join Organization                               | Organization Joined               | —                                    |
+| Membership (PM)        | on Organization Joined               | —                                               | Member Added                      | —                                    |
 
 Projections: **External Identity View** receives External Identity Linked and
 tells which person an account belongs to. **Person View** receives Person
-Registered and Sign-In Account Added.
+Registered and Sign-In Account Added. **Membership View** receives Member Added.
+It keeps the organization as a column, so an organization's members are found by it.
+**Person View** also receives Organization Joined and holds the organization the person
+belongs to; a person who was added shows there before they first sign in.
 
 ## Board transcription
 
 ### Resources
 
-| Owner                      | Trigger (actor/event)              | Command                     | Event(s)                        | Rejections                                 |
-| -------------------------- | ---------------------------------- | --------------------------- | ------------------------------- | ------------------------------------------ |
-| Organization               | Developer, at assembly             | Create Organization         | Organization Created            | Organization Already Exists                |
-| Invitation (PM)            | Organization Administrator         | Invite Member               | Member Invited                  | Member Already Invited                     |
-| Invitation (PM)            | Organization Administrator         | Revoke Invitation           | Invitation Revoked              | Invitation Not Pending                     |
-| Invitation (PM)            | Invited person, signed in          | Accept Invitation           | Invitation Accepted             | Invitation Not Pending, Not Invited Person |
-| Invitation (PM)            | Invited person, signed in          | Decline Invitation          | Invitation Declined             | Invitation Not Pending, Not Invited Person |
-| Invitation (PM)            | on Invitation Accepted             | Add Organization Member     | —                               | —                                          |
-| Organization               | Invitation (PM)                    | Add Organization Member     | Organization Member Added       | —                                          |
-| Resource Registration (PM) | Organization Administrator         | Register Resource           | Resource Registration Requested | —                                          |
-| Resource Registration (PM) | on Resource Registration Requested | Create Resource             | —                               | —                                          |
-| Resource                   | Resource Registration (PM)         | Create Resource             | Resource Created                | Resource Already Exists                    |
-| Resource Registration (PM) | on Resource Already Exists         | —                           | Resource Registration Failed    | —                                          |
-| Resource Registration (PM) | on Resource Created                | Add Resource                | —                               | —                                          |
-| Organization               | Resource Registration (PM)         | Add Resource                | Resource Added                  | Resource Name Already Used                 |
-| Resource Registration (PM) | on Resource Name Already Used      | Delete Resource             | —                               | —                                          |
-| Resource                   | Resource Registration (PM)         | Delete Resource             | Resource Deleted                | —                                          |
-| Resource Registration (PM) | on Resource Added                  | —                           | Resource Registered             | —                                          |
-| Resource Registration (PM) | on Resource Deleted                | —                           | Resource Registration Failed    | —                                          |
-| Resource                   | Resource Manager                   | Open Resource For Requests  | Resource Opened For Requests    | Resource Already Open For Requests         |
-| Resource                   | Resource Manager                   | Close Resource For Requests | Resource Closed For Requests    | Resource Already Closed For Requests       |
+| Owner                      | Trigger (actor/event)              | Command                     | Event(s)                        | Rejections                           |
+| -------------------------- | ---------------------------------- | --------------------------- | ------------------------------- | ------------------------------------ |
+| Organization               | Developer, at assembly             | Create Organization         | Organization Created            | Organization Already Exists          |
+| Organization               | Membership (PM), in Identity       | Add Organization Member     | Organization Member Added       | —                                    |
+| Resource Registration (PM) | Organization Administrator         | Register Resource           | Resource Registration Requested | —                                    |
+| Resource Registration (PM) | on Resource Registration Requested | Create Resource             | —                               | —                                    |
+| Resource                   | Resource Registration (PM)         | Create Resource             | Resource Created                | Resource Already Exists              |
+| Resource Registration (PM) | on Resource Already Exists         | —                           | Resource Registration Failed    | —                                    |
+| Resource Registration (PM) | on Resource Created                | Add Resource                | —                               | —                                    |
+| Organization               | Resource Registration (PM)         | Add Resource                | Resource Added                  | Resource Name Already Used           |
+| Resource Registration (PM) | on Resource Name Already Used      | Delete Resource             | —                               | —                                    |
+| Resource                   | Resource Registration (PM)         | Delete Resource             | Resource Deleted                | —                                    |
+| Resource Registration (PM) | on Resource Added                  | —                           | Resource Registered             | —                                    |
+| Resource Registration (PM) | on Resource Deleted                | —                           | Resource Registration Failed    | —                                    |
+| Resource                   | Resource Manager                   | Open Resource For Requests  | Resource Opened For Requests    | Resource Already Open For Requests   |
+| Resource                   | Resource Manager                   | Close Resource For Requests | Resource Closed For Requests    | Resource Already Closed For Requests |
 
 Process: **Resource Registration** runs `Register Resource → Resource
 Registration Requested → Create Resource → Resource Created → Add Resource →
@@ -62,8 +67,7 @@ If `Add Resource` rejects `Resource Name Already Used`, it runs `Delete Resource
 → Resource Deleted → Resource Registration Failed`, then completes.
 
 Projections: **Organization View** receives Organization Created, Organization
-Member Added, and Resource Added. **Invitation View** receives Member Invited, Invitation
-Revoked, Invitation Accepted, and Invitation Declined. **Resource Catalog Item** receives Resource
+Member Added, and Resource Added. **Resource Catalog Item** receives Resource
 Created, Resource Deleted, Resource Opened For Requests, and Resource Closed For
 Requests. The request-and-approval process reads the resource catalog directly
 for policy; there is no separate request-policy mirror projection.
