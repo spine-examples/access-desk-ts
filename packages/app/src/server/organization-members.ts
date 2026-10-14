@@ -42,8 +42,7 @@ export const ReachedOrganizationMembers = {
    * server.
    *
    * An organization keeps its members itself, as its own tenant in Resources.
-   * So Identity adds a person who accepted an invitation the way any client of
-   * the server would:
+   * So Identity adds a person the way any client of the server would:
    *
    * 1. It checks whether the person is a member already. If so, nothing more
    *    is done, and they keep the role they hold.
@@ -52,7 +51,7 @@ export const ReachedOrganizationMembers = {
    * 3. If no confirmation comes in time, it checks once more whether the
    *    person is a member. If they are not, it logs that and fails.
    *
-   * So an acceptance that failed halfway can be given again.
+   * So adding that failed halfway can be tried again.
    *
    * @param server Returns the address of the application server, once it listens.
    * @param patienceMs How long to wait for the organization to confirm. Ten
@@ -83,7 +82,7 @@ export const ReachedOrganizationMembers = {
 
     return {
       async add(member: NewMember): Promise<void> {
-        const { organization, person, name, role } = member;
+        const { organization, person, email, role } = member;
         if (await alreadyMember(member)) {
           return;
         }
@@ -92,7 +91,7 @@ export const ReachedOrganizationMembers = {
           message: create(AddOrganizationMemberSchema, {
             organizationId: { uuid: organization.uuid },
             person: { uuid: person.uuid },
-            name,
+            emailAddress: email,
             role,
           }),
           event: OrganizationMemberAddedSchema,

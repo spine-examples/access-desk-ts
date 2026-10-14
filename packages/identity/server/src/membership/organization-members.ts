@@ -12,6 +12,7 @@
  * and limitations under the License.
  */
 
+import type { EmailAddress } from "@spine-event-engine/proto";
 import type {
   OrganizationId,
   PersonId,
@@ -24,8 +25,8 @@ export interface NewMember {
   readonly organization: OrganizationId;
   /** The person who joins. */
   readonly person: PersonId;
-  /** The person's display name. */
-  readonly name: string;
+  /** The email address the person was added under. */
+  readonly email: EmailAddress;
   /** The role the person will hold in the organization. */
   readonly role: OrganizationRole;
 }

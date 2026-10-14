@@ -57,7 +57,7 @@ export function identityModule(): IdentityModule {
 export interface AddedMember {
   readonly organization: string;
   readonly person: string;
-  readonly name: string;
+  readonly email: string;
   readonly role: number;
 }
 
@@ -91,7 +91,7 @@ export async function identityBlackBox(): Promise<BlackBox> {
         organizations.added.push({
           organization: member.organization.uuid,
           person: member.person.uuid,
-          name: member.name,
+          email: member.email.value,
           role: member.role,
         });
         return Promise.resolve();

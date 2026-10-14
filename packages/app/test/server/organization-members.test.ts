@@ -13,6 +13,7 @@
  */
 
 import { create } from "@bufbuild/protobuf";
+import { EmailAddressSchema, type EmailAddress } from "@spine-event-engine/proto";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   type OrganizationId,
@@ -60,7 +61,7 @@ function joining(organization: string, person: string, role = OrganizationRole.M
   return {
     organization: create(OrganizationIdSchema, { uuid: organization }),
     person: create(PersonIdSchema, { uuid: person }),
-    name: `${person} (name)`,
+    email: create(EmailAddressSchema, { value: `${person}@acme.example` }),
     role,
   };
 }
@@ -70,7 +71,7 @@ function organizationId(uuid: string) {
 }
 
 describe("The organizations' members, reached through the application server, should", () => {
-  it("add a person to the members of an organization, with their name and role", async () => {
+  it("add a person to the members of an organization, with their email address and role", async () => {
     const server = await hosted();
     await givenOrganization(server, organizationId("acme"));
 
@@ -81,7 +82,11 @@ describe("The organizations' members, reached through the application server, sh
       (organization) => organization?.member.length === 1,
     );
     expect(view?.member).toMatchObject([
-      { person: { uuid: "noah" }, name: "noah (name)", role: OrganizationRole.ADMINISTRATOR },
+      {
+        person: { uuid: "noah" },
+        emailAddress: { value: "noah@acme.example" },
+        role: OrganizationRole.ADMINISTRATOR,
+      },
     ]);
   });
 
@@ -146,10 +151,10 @@ describe("The organizations' members, reached through the application server, sh
     const members = membersOf(server, 300);
     const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
-    // An organization adds nobody without a name.
-    await expect(members.add({ ...joining("acme", "noah"), name: "" })).rejects.toThrow(
-      "The organization did not add the person to its members.",
-    );
+    // An organization adds nobody without an email address.
+    await expect(
+      members.add({ ...joining("acme", "noah"), email: undefined as unknown as EmailAddress }),
+    ).rejects.toThrow("The organization did not add the person to its members.");
 
     expect(warned).toHaveBeenCalledWith(
       "Organization acme did not add person noah to its members.",

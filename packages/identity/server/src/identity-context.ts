@@ -13,29 +13,27 @@
  */
 
 import { create } from "@bufbuild/protobuf";
+import type { EmailAddress } from "@spine-event-engine/proto";
 import { BoundedContext, CommandRouting, EventRouting } from "@spine-event-engine/server";
 import {
-  InvitationIdSchema,
+  MembershipIdSchema,
   type ExternalIdentityId,
-  type InvitationId,
-  type PersonId,
+  type MembershipId,
 } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
-import { PersonEmailRegisteredSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/person_email_events_pb.js";
+import { AddMemberSchema } from "@access-desk/identity-model/generated/accessdesk/identity/membership/commands_pb.js";
+import {
+  PersonEmailRegisteredSchema,
+  type PersonEmailRegistered,
+} from "@access-desk/identity-model/generated/accessdesk/identity/person/person_email_events_pb.js";
 import { PersonEmailAlreadyRegisteredSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/person_email_rejections_pb.js";
 import {
+  OrganizationJoinedSchema,
   PersonRegisteredSchema,
   SignInAccountAddedSchema,
 } from "@access-desk/identity-model/generated/accessdesk/identity/person/events_pb.js";
-import {
-  AcceptInvitationSchema,
-  DeclineInvitationSchema,
-  InviteMemberSchema,
-  RevokeInvitationSchema,
-} from "@access-desk/identity-model/generated/accessdesk/identity/invitation/commands_pb.js";
-import { InvitationAcceptedSchema } from "@access-desk/identity-model/generated/accessdesk/identity/invitation/events_pb.js";
-import { InvitationProcessManager } from "./invitation/invitation-process.js";
-import { InvitationViewProjection } from "./invitation/invitation-view-projection.js";
-import type { OrganizationMembers } from "./invitation/organization-members.js";
+import { MembershipProcessManager } from "./membership/membership-process.js";
+import { MembershipViewProjection } from "./membership/membership-view-projection.js";
+import type { OrganizationMembers } from "./membership/organization-members.js";
 import { ExternalIdentityProcessManager } from "./person/external-identity-process.js";
 import { ExternalIdentityViewProjection } from "./person/external-identity-view-projection.js";
 import { PersonAggregate } from "./person/person-aggregate.js";
@@ -49,8 +47,8 @@ export interface IdentityContextOptions {
 }
 
 /**
- * The Identity bounded context, which says who a person is, which
- * organizations invited them, and which they are a member of.
+ * The Identity bounded context, which says who a person is and which
+ * organization they belong to.
  */
 export const IdentityContext = {
   /**
@@ -63,44 +61,52 @@ export const IdentityContext = {
     /** The account an event about signing in belongs to. */
     const accountOf = (identity: ExternalIdentityId | undefined): ExternalIdentityId[] =>
       identity === undefined ? [] : [identity];
+    /** The account that asked for an email address to be registered, when an account did. */
+    const askingAccount = (invoker: PersonEmailRegistered["invoker"]): ExternalIdentityId[] =>
+      invoker.case === "account" ? [invoker.value] : [];
+    /** The membership that asked for an email address to be registered, when one did. */
+    const askingMembership = (invoker: PersonEmailRegistered["invoker"]): MembershipId[] =>
+      invoker.case === "membership" ? [membershipOf(invoker.value.emailAddress)] : [];
     /**
-     * The invitation a command is about.
+     * The membership of an email address.
      *
-     * Email addresses are kept in lower case. So the invited address is put in
-     * lower case before the invitation is looked up, however it was written.
+     * Email addresses are kept in lower case. So the address is put in lower
+     * case before its membership is looked up, however it was written.
      */
-    const invitationOf = (id: InvitationId | undefined): InvitationId =>
-      create(InvitationIdSchema, {
-        ...(id?.organization === undefined ? {} : { organization: id.organization }),
-        invitee: { value: (id?.invitee?.value ?? "").trim().toLowerCase() },
+    const membershipOf = (address: EmailAddress | undefined): MembershipId =>
+      create(MembershipIdSchema, {
+        emailAddress: { value: (address?.value ?? "").trim().toLowerCase() },
       });
 
     const accountRouting = EventRouting.create<ExternalIdentityId>()
-      .route(PersonEmailRegisteredSchema, (event) => accountOf(event.invoker))
-      .route(PersonEmailAlreadyRegisteredSchema, (rejection) => accountOf(rejection.invoker))
-      .route(PersonRegisteredSchema, (event) => accountOf(event.account))
+      .route(PersonEmailRegisteredSchema, (event) => askingAccount(event.invoker))
+      .route(PersonEmailAlreadyRegisteredSchema, (rejection) => askingAccount(rejection.invoker))
+      .route(PersonRegisteredSchema, (event) => askingAccount(event.invoker))
       .route(SignInAccountAddedSchema, (event) => accountOf(event.account));
-    const invitationCommands = CommandRouting.create<InvitationId>()
-      .route(InviteMemberSchema, (command) => invitationOf(command.id))
-      .route(RevokeInvitationSchema, (command) => invitationOf(command.id))
-      .route(AcceptInvitationSchema, (command) => invitationOf(command.id))
-      .route(DeclineInvitationSchema, (command) => invitationOf(command.id));
-    const personRouting = EventRouting.create<PersonId>().route(
-      InvitationAcceptedSchema,
-      (event) => (event.person === undefined ? [] : [event.person]),
+    const membershipCommands = CommandRouting.create<MembershipId>().route(
+      AddMemberSchema,
+      (command) => membershipOf(command.id?.emailAddress),
     );
+    const membershipEvents = EventRouting.create<MembershipId>()
+      .route(PersonEmailRegisteredSchema, (event) => askingMembership(event.invoker))
+      .route(PersonEmailAlreadyRegisteredSchema, (rejection) => askingMembership(rejection.invoker))
+      .route(PersonRegisteredSchema, (event) => askingMembership(event.invoker))
+      .route(OrganizationJoinedSchema, (event) =>
+        event.membership === undefined ? [] : [event.membership],
+      );
     return BoundedContext.singleTenant("Identity")
       .withGeneratedRegistryRoot(new URL("..", import.meta.url))
       .add(ExternalIdentityProcessManager, { eventRouting: accountRouting })
       .add(ExternalIdentityViewProjection)
       .add(PersonEmailAggregate)
       .add(PersonAggregate)
-      .add(PersonViewProjection, { eventRouting: personRouting })
-      .add(InvitationProcessManager, {
-        commandRouting: invitationCommands,
-        onCreate: (entity) => new InvitationProcessManager(entity, options.members),
+      .add(PersonViewProjection)
+      .add(MembershipProcessManager, {
+        commandRouting: membershipCommands,
+        eventRouting: membershipEvents,
+        onCreate: (entity) => new MembershipProcessManager(entity, options.members),
       })
-      .add(InvitationViewProjection)
+      .add(MembershipViewProjection)
       .buildAsync();
   },
 };
