@@ -73,21 +73,19 @@ export class OrganizationAggregate extends Aggregate<OrganizationId, typeof Orga
       throw new Error("AddOrganizationMember requires a person.");
     }
     if (this.state.membership.some((item) => equals(PersonIdSchema, item.person, person))) {
-      throw new Error(
-        "A person is added to an organization once, when they accept its invitation.",
-      );
+      throw new Error("A person is added to an organization once.");
     }
     const role = command.role;
     this.update((draft) => {
       draft.membership = [
         ...draft.membership,
-        create(OrganizationMemberSchema, { person, name: command.name, role }),
+        create(OrganizationMemberSchema, { person, emailAddress: command.emailAddress, role }),
       ];
     });
     return create(OrganizationMemberAddedSchema, {
       organizationId: this.id,
       person,
-      name: command.name,
+      emailAddress: command.emailAddress,
       role,
     });
   }

@@ -37,11 +37,10 @@ export function createOrganization(scope: BlackBoxScope, name = "Acme") {
   );
 }
 
-/** Posts `AddOrganizationMember` for the person with the given identifier, name, and role. */
+/** Posts `AddOrganizationMember` for the person with the given identifier and role. */
 export function addOrganizationMember(
   scope: BlackBoxScope,
   person: string,
-  name: string = person,
   role: OrganizationRole = OrganizationRole.MEMBER,
 ) {
   return scope.post(
@@ -49,7 +48,7 @@ export function addOrganizationMember(
     create(AddOrganizationMemberSchema, {
       organizationId: { uuid: organizationId },
       person: { uuid: person },
-      name,
+      emailAddress: { value: `${person}@acme.example` },
       role,
     }),
   );

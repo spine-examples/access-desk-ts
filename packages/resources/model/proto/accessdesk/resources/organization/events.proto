@@ -19,6 +19,7 @@ package accessdesk.resources.organization;
 import "accessdesk/resources/identifiers.proto";
 import "accessdesk/identity/identifiers.proto";
 import "accessdesk/identity/values.proto";
+import "spine/net/email_address.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
@@ -43,8 +44,8 @@ message OrganizationMemberAdded {
     // The person added as a member.
     accessdesk.identity.PersonId person = 2 [(required) = true];
 
-    // The member's display name.
-    string name = 3 [(required) = true];
+    // The email address the person was added under.
+    spine.net.EmailAddress email_address = 3 [(required) = true];
 
     // The role the member holds in the organization.
     accessdesk.identity.OrganizationRole role = 4 [(required) = true];
