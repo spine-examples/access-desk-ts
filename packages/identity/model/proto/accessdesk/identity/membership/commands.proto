@@ -1,0 +1,36 @@
+/*
+ * Copyright 2026 CodeMatters, Lda.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+ * except in compliance with the License. You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under
+ * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+ * either express or implied. See the License for the specific language governing permissions
+ * and limitations under the License.
+ */
+
+syntax = "proto3";
+
+package accessdesk.identity.membership;
+
+import "accessdesk/identity/identifiers.proto";
+import "accessdesk/identity/values.proto";
+import "spine/options.proto";
+
+option (type_url_prefix) = "type.accessdesk";
+
+// Adds a person to the members of an organization, by their email address.
+message AddMember {
+
+    // The membership, which names the email address of the person to add.
+    accessdesk.identity.MembershipId id = 1;
+
+    // The organization the person joins.
+    accessdesk.identity.OrganizationId organization = 2 [(required) = true];
+
+    // The role the person will hold in the organization.
+    accessdesk.identity.OrganizationRole role = 3 [(required) = true];
+}
