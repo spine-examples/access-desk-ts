@@ -13,24 +13,24 @@ rejections from the Event Storming board. Architecture details belong in
 
 ## Identity
 
-| Owner                  | Trigger (actor/event)                | Command                                         | Event(s)                          | Rejections                      |
-| ---------------------- | ------------------------------------ | ----------------------------------------------- | --------------------------------- | ------------------------------- |
-| External Identity (PM) | Gateway                              | Link External Identity                          | External Identity Linking Started | External Identity Already Known |
-| External Identity (PM) | on External Identity Linking Started | Register Person Email                           | —                                 | —                               |
-| Person Email           | External Identity (PM)               | Register Person Email                           | Person Email Registered           | Person Email Already Registered |
-| External Identity (PM) | on Person Email Registered           | Register Person                                 | —                                 | —                               |
-| Person                 | External Identity (PM)               | Register Person                                 | Person Registered                 | —                               |
-| External Identity (PM) | on Person Registered                 | Add Sign-In Account                             | —                                 | —                               |
-| External Identity (PM) | on Person Email Already Registered   | Add Sign-In Account                             | —                                 | —                               |
-| Person                 | External Identity (PM)               | Add Sign-In Account                             | Sign-In Account Added             | —                               |
-| External Identity (PM) | on Sign-In Account Added             | —                                               | External Identity Linked          | —                               |
-| Membership (PM)        | Organization Administrator           | Add Member                                      | Member Adding Started             | Email Address Already Member    |
-| Membership (PM)        | on Member Adding Started             | Register Person Email                           | —                                 | —                               |
-| Membership (PM)        | on Person Email Registered           | Register Person                                 | —                                 | —                               |
-| Membership (PM)        | on Person Registered                 | Add Organization Member, then Join Organization | —                                 | —                               |
-| Membership (PM)        | on Person Email Already Registered   | Add Organization Member, then Join Organization | —                                 | —                               |
-| Person                 | Membership (PM)                      | Join Organization                               | Organization Joined               | —                               |
-| Membership (PM)        | on Organization Joined               | —                                               | Member Added                      | —                               |
+| Owner                  | Trigger (actor/event)                | Command                                         | Event(s)                          | Rejections                           |
+| ---------------------- | ------------------------------------ | ----------------------------------------------- | --------------------------------- | ------------------------------------ |
+| External Identity (PM) | Gateway                              | Link External Identity                          | External Identity Linking Started | External Identity Already Known      |
+| External Identity (PM) | on External Identity Linking Started | Register Person Email                           | —                                 | —                                    |
+| Person Email           | External Identity (PM)               | Register Person Email                           | Person Email Registered           | Person Email Already Registered      |
+| External Identity (PM) | on Person Email Registered           | Register Person                                 | —                                 | —                                    |
+| Person                 | External Identity (PM)               | Register Person                                 | Person Registered                 | —                                    |
+| External Identity (PM) | on Person Registered                 | Add Sign-In Account                             | —                                 | —                                    |
+| External Identity (PM) | on Person Email Already Registered   | Add Sign-In Account                             | —                                 | —                                    |
+| Person                 | External Identity (PM)               | Add Sign-In Account                             | Sign-In Account Added             | —                                    |
+| External Identity (PM) | on Sign-In Account Added             | —                                               | External Identity Linked          | —                                    |
+| Membership (PM)        | Organization Administrator           | Add Member                                      | Member Adding Started             | Already Member Of Other Organization |
+| Membership (PM)        | on Member Adding Started             | Register Person Email                           | —                                 | —                                    |
+| Membership (PM)        | on Person Email Registered           | Register Person                                 | —                                 | —                                    |
+| Membership (PM)        | on Person Registered                 | Add Organization Member, then Join Organization | —                                 | —                                    |
+| Membership (PM)        | on Person Email Already Registered   | Add Organization Member, then Join Organization | —                                 | —                                    |
+| Person                 | Membership (PM)                      | Join Organization                               | Organization Joined               | —                                    |
+| Membership (PM)        | on Organization Joined               | —                                               | Member Added                      | —                                    |
 
 Projections: **External Identity View** receives External Identity Linked and
 tells which person an account belongs to. **Person View** receives Person

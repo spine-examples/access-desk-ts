@@ -33,7 +33,7 @@ import {
   type MemberAddingStarted,
 } from "@access-desk/identity-model/generated/accessdesk/identity/membership/events_pb.js";
 import { MembershipSchema } from "@access-desk/identity-model/generated/accessdesk/identity/membership/membership_pb.js";
-import { EmailAddressAlreadyMember } from "@access-desk/identity-model/generated/accessdesk/identity/membership/rejections.js";
+import { AlreadyMemberOfOtherOrganization } from "@access-desk/identity-model/generated/accessdesk/identity/membership/rejections.js";
 import {
   JoinOrganizationSchema,
   RegisterPersonSchema,
@@ -89,12 +89,12 @@ export class MembershipProcessManager extends ProcessManager<
    * already.
    */
   @Assign
-  @Throws(EmailAddressAlreadyMember)
+  @Throws(AlreadyMemberOfOtherOrganization)
   addMember(command: AddMember): MemberAddingStarted {
     const { organization, role } = command;
     const current = this.state.organization;
     if (current !== undefined && current.uuid !== organization?.uuid) {
-      throw EmailAddressAlreadyMember.create({ id: this.id });
+      throw AlreadyMemberOfOtherOrganization.create({ id: this.id });
     }
     this.update((draft) => {
       draft.organization = organization;

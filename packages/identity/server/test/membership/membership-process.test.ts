@@ -15,7 +15,7 @@
 import { create } from "@bufbuild/protobuf";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { MemberAddingStartedSchema } from "@access-desk/identity-model/generated/accessdesk/identity/membership/events_pb.js";
-import { EmailAddressAlreadyMemberSchema } from "@access-desk/identity-model/generated/accessdesk/identity/membership/rejections_pb.js";
+import { AlreadyMemberOfOtherOrganizationSchema } from "@access-desk/identity-model/generated/accessdesk/identity/membership/rejections_pb.js";
 import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 
 import {
@@ -65,12 +65,12 @@ describe("MembershipProcessManager should", () => {
       await started.cancel();
     });
 
-    it("reject an address that belongs to another organization with 'EmailAddressAlreadyMember'", async () => {
+    it("reject an address that belongs to another organization with 'AlreadyMemberOfOtherOrganization'", async () => {
       const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await addMember(scope, "noah@acme.example")).kind).toBe("ok");
 
-      await expectRejection(box, scope, EmailAddressAlreadyMemberSchema, () =>
+      await expectRejection(box, scope, AlreadyMemberOfOtherOrganizationSchema, () =>
         addMember(scope, "noah@acme.example", OrganizationRole.ADMINISTRATOR, "globex"),
       );
     });
@@ -81,7 +81,7 @@ describe("MembershipProcessManager should", () => {
       expect((await addMember(scope, " Noah@Acme.example ")).kind).toBe("ok");
       await awaitMembership(box, scope, "noah@acme.example");
 
-      await expectRejection(box, scope, EmailAddressAlreadyMemberSchema, () =>
+      await expectRejection(box, scope, AlreadyMemberOfOtherOrganizationSchema, () =>
         addMember(scope, "NOAH@ACME.EXAMPLE", OrganizationRole.MEMBER, "globex"),
       );
     });

@@ -23,7 +23,7 @@ option (type_url_prefix) = "type.accessdesk";
 
 // The email address already belongs to another organization, so it cannot be
 // added to this one.
-message EmailAddressAlreadyMember {
+message AlreadyMemberOfOtherOrganization {
 
     // The membership, which names the email address that was to be added.
     accessdesk.identity.MembershipId id = 1 [(required) = true];
