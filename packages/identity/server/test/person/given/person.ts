@@ -72,33 +72,25 @@ export function registerPersonEmail(
 ) {
   return scope.post(
     RegisterPersonEmailSchema,
-    create(RegisterPersonEmailSchema, { emailAddress: { value: email }, invoker }),
-  );
-}
-
-/**
- * Posts `RegisterPerson` for the person with the given identifier, email
- * address, and first account. The display name is the identifier followed by
- * `(name)`.
- */
-export function registerPerson(
-  scope: BlackBoxScope,
-  person: string,
-  email: string,
-  identity: ExternalIdentityId,
-) {
-  return scope.post(
-    RegisterPersonSchema,
-    create(RegisterPersonSchema, {
-      id: { uuid: person },
+    create(RegisterPersonEmailSchema, {
       emailAddress: { value: email },
-      name: `${person} (name)`,
-      account: identity,
+      invoker: { case: "account", value: invoker },
     }),
   );
 }
 
-/** Posts `AddSignInAccount`, adding the account to the person with the given identifier. */
+/** Posts `RegisterPerson` for the person with the given identifier and email address. */
+export function registerPerson(scope: BlackBoxScope, person: string, email: string) {
+  return scope.post(
+    RegisterPersonSchema,
+    create(RegisterPersonSchema, { id: { uuid: person }, emailAddress: { value: email } }),
+  );
+}
+
+/**
+ * Posts `AddSignInAccount` for the account. The name its provider gives is the
+ * person's identifier followed by `(name)`.
+ */
 export function addSignInAccount(
   scope: BlackBoxScope,
   person: string,
@@ -106,7 +98,11 @@ export function addSignInAccount(
 ) {
   return scope.post(
     AddSignInAccountSchema,
-    create(AddSignInAccountSchema, { id: { uuid: person }, account: identity }),
+    create(AddSignInAccountSchema, {
+      id: { uuid: person },
+      account: identity,
+      name: `${person} (name)`,
+    }),
   );
 }
 

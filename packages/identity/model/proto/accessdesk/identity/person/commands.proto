@@ -22,20 +22,24 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
-// Registers a person who signs in for the first time.
+// Registers a person under their email address.
 message RegisterPerson {
 
     // The person's identifier.
     accessdesk.identity.PersonId id = 1;
 
-    // The email address the person's identity provider confirmed.
+    // The email address the person is registered under.
     spine.net.EmailAddress email_address = 2 [(required) = true];
 
-    // The person's display name with the provider.
-    string name = 3 [(required) = true];
+    // Who asked for the registration.
+    oneof invoker {
 
-    // The account the person signs in with.
-    accessdesk.identity.ExternalIdentityId account = 4 [(required) = true];
+        // The account being linked, as somebody signs in with it.
+        accessdesk.identity.ExternalIdentityId account = 3;
+
+        // The membership being added.
+        accessdesk.identity.MembershipId membership = 4;
+    }
 }
 
 // Adds to a registered person an account with another identity provider.
@@ -46,4 +50,23 @@ message AddSignInAccount {
 
     // The account to add.
     accessdesk.identity.ExternalIdentityId account = 2 [(required) = true];
+
+    // The display name the account's provider gives.
+    //
+    // It becomes the person's name when they have none yet.
+    //
+    string name = 3;
+}
+
+// Makes a person a member of an organization.
+message JoinOrganization {
+
+    // The person who joins.
+    accessdesk.identity.PersonId id = 1;
+
+    // The membership the person joins through.
+    accessdesk.identity.MembershipId membership = 2 [(required) = true];
+
+    // The organization the person joins.
+    accessdesk.identity.OrganizationId organization = 3 [(required) = true];
 }

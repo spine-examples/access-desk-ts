@@ -21,7 +21,7 @@ import {
   loadIdentityContext,
 } from "../given/identity-context.js";
 import { account, addSignInAccount, awaitPerson, google, registerPerson } from "./given/person.js";
-import { acceptInvitation, inviteMember } from "../invitation/given/invitation.js";
+import { addMember, awaitMembership } from "../membership/given/membership.js";
 import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 
 beforeAll(loadIdentityContext, 30_000);
@@ -29,53 +29,51 @@ afterEach(closeIdentityBlackBoxes);
 
 describe("PersonViewProjection should", () => {
   describe("react on 'PersonRegistered', and", () => {
-    it("list the person with their email address and the account they signed in with", async () => {
+    it("list the person with their email address, and no name or account yet", async () => {
       const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
 
-      await registerPerson(scope, "noah", "noah@acme.example", account(google, "1001"));
+      await registerPerson(scope, "noah", "noah@acme.example");
 
       expect(await awaitPerson(box, scope, "noah")).toMatchObject({
         emailAddress: { value: "noah@acme.example" },
-        name: "noah (name)",
-        account: [{ provider: google, subject: "1001" }],
+        name: "",
+        account: [],
       });
     });
   });
 
   describe("react on 'SignInAccountAdded', and", () => {
-    it("show every account the person signs in with", async () => {
+    it("show every account the person signs in with, and the name the first one gave", async () => {
       const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
-      await registerPerson(scope, "noah", "noah@acme.example", account(google, "1001"));
-      await awaitPerson(box, scope, "noah");
+      await registerPerson(scope, "noah", "noah@acme.example");
+      await addSignInAccount(scope, "noah", account(google, "1001"));
+      await awaitPerson(box, scope, "noah", (view) => view.account.length === 1);
 
       await addSignInAccount(scope, "noah", account(google, "g-7"));
 
       const person = await awaitPerson(box, scope, "noah", (view) => view.account.length === 2);
       expect(person.account.map((held) => held.subject)).toEqual(["1001", "g-7"]);
+      expect(person.name).toBe("noah (name)");
     });
   });
 
-  describe("react on 'InvitationAccepted', and", () => {
-    it("show every organization whose invitation the person accepted", async () => {
+  describe("react on 'OrganizationJoined', and", () => {
+    it("show the organization the person was added to", async () => {
       const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
-      await registerPerson(scope, "noah", "noah@acme.example", account(google, "1001"));
-      await awaitPerson(box, scope, "noah");
-      await inviteMember(scope, "noah@acme.example", OrganizationRole.MEMBER, "acme");
-      await inviteMember(scope, "noah@acme.example", OrganizationRole.MEMBER, "globex");
 
-      await acceptInvitation(box, "noah@acme.example", "noah", "Noah", "noah", "acme");
-      await acceptInvitation(box, "noah@acme.example", "noah", "Noah", "noah", "globex");
+      await addMember(scope, "noah@acme.example", OrganizationRole.MEMBER, "acme");
 
-      const person = await awaitPerson(
+      const person = (await awaitMembership(box, scope, "noah@acme.example")).person?.uuid ?? "";
+      const view = await awaitPerson(
         box,
         scope,
-        "noah",
-        (view) => view.organization.length === 2,
+        person,
+        (shown) => shown.organization !== undefined,
       );
-      expect(person.organization.map((joined) => joined.uuid).sort()).toEqual(["acme", "globex"]);
+      expect(view.organization?.uuid).toBe("acme");
     });
   });
 });

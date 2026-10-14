@@ -31,6 +31,13 @@ message PersonEmailAlreadyRegistered {
     // The person the address belongs to.
     accessdesk.identity.PersonId person = 2 [(required) = true];
 
-    // The account whose linking asked for the registration.
-    accessdesk.identity.ExternalIdentityId invoker = 3 [(required) = true];
+    // Who asked for the registration.
+    oneof invoker {
+
+        // The account being linked, as somebody signs in with it.
+        accessdesk.identity.ExternalIdentityId account = 3;
+
+        // The membership being added.
+        accessdesk.identity.MembershipId membership = 4;
+    }
 }

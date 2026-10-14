@@ -15,15 +15,15 @@
 import { Projection, Subscribe } from "@spine-event-engine/server";
 import type { PersonId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import type {
+  OrganizationJoined,
   PersonRegistered,
   SignInAccountAdded,
 } from "@access-desk/identity-model/generated/accessdesk/identity/person/events_pb.js";
-import type { InvitationAccepted } from "@access-desk/identity-model/generated/accessdesk/identity/invitation/events_pb.js";
 import { PersonViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/person_pb.js";
 
 /**
- * Each person who has signed in, with the accounts they sign in with and the
- * organizations they are a member of.
+ * Each person, with the accounts they sign in with and the organization they
+ * belong to.
  */
 export class PersonViewProjection extends Projection<PersonId, typeof PersonViewSchema> {
   /** Creates the view of a newly registered person. */
@@ -31,8 +31,6 @@ export class PersonViewProjection extends Projection<PersonId, typeof PersonView
   onPersonRegistered(event: PersonRegistered): void {
     this.update((draft) => {
       draft.emailAddress = event.emailAddress;
-      draft.name = event.name;
-      draft.account = event.account === undefined ? [] : [event.account];
     });
   }
 
@@ -43,20 +41,17 @@ export class PersonViewProjection extends Projection<PersonId, typeof PersonView
       if (event.account !== undefined) {
         draft.account.push(event.account);
       }
+      if (event.name !== "") {
+        draft.name = event.name;
+      }
     });
   }
 
-  /** Adds the organization whose invitation the person accepted to those they are a member of. */
+  /** Sets the organization the person joined. */
   @Subscribe
-  onInvitationAccepted(event: InvitationAccepted): void {
-    const organization = event.id?.organization;
-    if (organization === undefined) {
-      return;
-    }
+  onOrganizationJoined(event: OrganizationJoined): void {
     this.update((draft) => {
-      if (!draft.organization.some((joined) => joined.uuid === organization.uuid)) {
-        draft.organization.push(organization);
-      }
+      draft.organization = event.organization;
     });
   }
 }

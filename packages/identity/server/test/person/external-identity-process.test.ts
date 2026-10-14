@@ -85,14 +85,14 @@ describe("ExternalIdentityProcessManager should", () => {
 
       expect(await registered.waitFor(box)).toMatchObject({
         emailAddress: { value: "noah@acme.example" },
-        invoker: { provider: google, subject: "1001" },
+        invoker: { case: "account", value: { provider: google, subject: "1001" } },
       });
       await registered.cancel();
     });
   });
 
   describe("react on 'PersonEmailRegistered', and", () => {
-    it("register the new person with the email address, the provider's name, and the account", async () => {
+    it("register the new person under the email address, naming the account as the invoker", async () => {
       const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
       const emailRegistered = await recordEvents(scope, PersonEmailRegisteredSchema);
@@ -105,8 +105,7 @@ describe("ExternalIdentityProcessManager should", () => {
         create(PersonRegisteredSchema, {
           id: person,
           emailAddress: { value: "noah@acme.example" },
-          name: "1001 (name)",
-          account: account(google, "1001"),
+          invoker: { case: "account", value: account(google, "1001") },
         }),
       );
       await Promise.all([emailRegistered.cancel(), personRegistered.cancel()]);
@@ -133,19 +132,23 @@ describe("ExternalIdentityProcessManager should", () => {
   });
 
   describe("react on 'PersonRegistered', and", () => {
-    it("emit 'ExternalIdentityLinked' with the person registered for the account", async () => {
+    it("add the account, with the provider's name, to the new person", async () => {
       const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
       const registered = await recordEvents(scope, PersonRegisteredSchema);
-      const linked = await recordEvents(scope, ExternalIdentityLinkedSchema);
+      const added = await recordEvents(scope, SignInAccountAddedSchema);
 
       await linkExternalIdentity(scope, account(google, "1001"), "noah@acme.example");
 
       const person = (await registered.waitFor(box)).id;
-      expect(await linked.waitFor(box)).toEqual(
-        create(ExternalIdentityLinkedSchema, { id: account(google, "1001"), person }),
+      expect(await added.waitFor(box)).toEqual(
+        create(SignInAccountAddedSchema, {
+          id: person,
+          account: account(google, "1001"),
+          name: "1001 (name)",
+        }),
       );
-      await Promise.all([registered.cancel(), linked.cancel()]);
+      await Promise.all([registered.cancel(), added.cancel()]);
     });
   });
 

@@ -20,8 +20,10 @@ import {
   closeIdentityBlackBoxes,
   identityBlackBox,
   loadIdentityContext,
+  organizations,
   readAll,
 } from "../given/identity-context.js";
+import { addMember } from "../membership/given/membership.js";
 import { account, awaitLinked, awaitPerson, google, linkExternalIdentity } from "./given/person.js";
 
 beforeAll(loadIdentityContext, 30_000);
@@ -42,7 +44,7 @@ describe("ExternalIdentityProcessManager should", () => {
     });
   });
 
-  it("add an account of another provider to the person its email address is registered for", async () => {
+  it("add another account to the person its email address is registered for", async () => {
     const box = await identityBlackBox();
     const scope = box.onBehalfOf(actor);
     await linkExternalIdentity(scope, account(google, "1001"), "noah@acme.example");
@@ -55,5 +57,29 @@ describe("ExternalIdentityProcessManager should", () => {
     expect(person.account.map((held) => held.subject)).toEqual(["1001", "g-7"]);
     const people = await readAll(scope, PersonViewSchema, "query-everybody");
     expect(people.map((view) => view.id?.uuid)).toEqual([first]);
+  });
+
+  it("link the account to the person an administrator added under its email address", async () => {
+    const box = await identityBlackBox();
+    const scope = box.onBehalfOf(actor);
+    expect((await addMember(scope, "noah@acme.example")).kind).toBe("ok");
+
+    await linkExternalIdentity(scope, account(google, "1001"), "noah@acme.example");
+
+    const person = (await awaitLinked(box, scope, account(google, "1001"))).person?.uuid ?? "";
+    // The organization listed this same person when the address was added.
+    expect(organizations.added.map((member) => member.person)).toEqual([person]);
+    expect(
+      await awaitPerson(
+        box,
+        scope,
+        person,
+        (view) => view.emailAddress !== undefined && view.organization !== undefined,
+      ),
+    ).toMatchObject({
+      emailAddress: { value: "noah@acme.example" },
+      name: "1001 (name)",
+      organization: { uuid: "acme" },
+    });
   });
 });

@@ -15,7 +15,10 @@
 import { create } from "@bufbuild/protobuf";
 import { EmailAddressSchema } from "@spine-event-engine/proto";
 import { Assign, Command, ProcessManager, React, Throws } from "@spine-event-engine/server";
-import type { ExternalIdentityId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
+import type {
+  ExternalIdentityId,
+  PersonId,
+} from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import {
   AddSignInAccountSchema,
   RegisterPersonSchema,
@@ -49,9 +52,9 @@ import { ExternalIdentityAlreadyKnown } from "@access-desk/identity-model/genera
  * 1. Somebody signs in with an account Access Desk has not seen, and the
  *    provider confirms the account's email address.
  * 2. The email address is registered.
- * 3. When the address was not registered yet, a new person is registered with
- *    the account. When it is already registered for a person, the account is
- *    added to that person.
+ * 3. When the address was not registered yet, a new person is registered
+ *    under it.
+ * 4. The account is linked to that person.
  */
 export class ExternalIdentityProcessManager extends ProcessManager<
   ExternalIdentityId,
@@ -79,7 +82,10 @@ export class ExternalIdentityProcessManager extends ProcessManager<
   @Command
   onExternalIdentityLinkingStarted(event: ExternalIdentityLinkingStarted): RegisterPersonEmail {
     const { emailAddress } = event;
-    return create(RegisterPersonEmailSchema, { emailAddress, invoker: this.id });
+    return create(RegisterPersonEmailSchema, {
+      emailAddress,
+      invoker: { case: "account", value: this.id },
+    });
   }
 
   /** Registers a new person, as the email address was not registered before. */
@@ -88,21 +94,20 @@ export class ExternalIdentityProcessManager extends ProcessManager<
     return create(RegisterPersonSchema, {
       id: event.person,
       emailAddress: event.emailAddress,
-      name: this.state.name,
-      account: this.id,
+      invoker: { case: "account", value: this.id },
     });
+  }
+
+  /** Adds the account to the new person. */
+  @Command
+  onPersonRegistered(event: PersonRegistered): AddSignInAccount {
+    return this.accountFor(event.id);
   }
 
   /** Adds the account to the person the email address is registered for. */
   @Command
   onPersonEmailAlreadyRegistered(rejection: EmailAlreadyRegistered): AddSignInAccount {
-    return create(AddSignInAccountSchema, { id: rejection.person, account: this.id });
-  }
-
-  /** Links the account to the person registered with it. */
-  @React
-  onPersonRegistered(event: PersonRegistered): ExternalIdentityLinked {
-    return this.linked(event);
+    return this.accountFor(rejection.person);
   }
 
   /** Links the account to the person it was added to. */
@@ -111,7 +116,12 @@ export class ExternalIdentityProcessManager extends ProcessManager<
     return this.linked(event);
   }
 
-  private linked(event: PersonRegistered | SignInAccountAdded): ExternalIdentityLinked {
+  /** Adds the account, with the name its provider gives, to the person. */
+  private accountFor(person: PersonId | undefined): AddSignInAccount {
+    return create(AddSignInAccountSchema, { id: person, account: this.id, name: this.state.name });
+  }
+
+  private linked(event: SignInAccountAdded): ExternalIdentityLinked {
     const person = event.id;
     if (person === undefined) {
       throw new Error("An account is linked to a person.");

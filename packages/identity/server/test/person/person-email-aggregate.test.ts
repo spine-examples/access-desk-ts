@@ -42,7 +42,7 @@ describe("PersonEmailAggregate should", () => {
       const event = await registered.waitFor(box);
       expect(event).toMatchObject({
         emailAddress: { value: "noah@acme.example" },
-        invoker: { provider: google, subject: "1001" },
+        invoker: { case: "account", value: { provider: google, subject: "1001" } },
       });
       expect(event.person?.uuid).toMatch(/^[0-9a-f-]{36}$/);
       await registered.cancel();
@@ -60,7 +60,7 @@ describe("PersonEmailAggregate should", () => {
       );
 
       expect(rejection.person).toEqual(first);
-      expect(rejection.invoker).toEqual(account(google, "g-7"));
+      expect(rejection.invoker).toEqual({ case: "account", value: account(google, "g-7") });
       expect(registered.received).toHaveLength(1);
       await registered.cancel();
     });
