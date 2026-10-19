@@ -29,6 +29,7 @@ import {
   AccessExtensionRequestSubmittedSchema,
   AccessRequestApprovalFailedSchema,
   AccessRequestApprovalStartedSchema,
+  AccessRequestApprovedSchema,
   AccessRequestCanceledSchema,
   AccessRequestDeniedSchema,
   AccessRequestSubmissionFailedSchema,
@@ -249,6 +250,16 @@ describe("AuditEntryProjection should", () => {
     });
   });
 
+  it("on 'AccessRequestApproved' record that the request was granted, and by whose approval", async () => {
+    const box = await resourcesBlackBox(testClock());
+
+    const requester = await givenActiveGrant(box, "audit-approved", 10);
+
+    const { entry, fact } = await awaitEntry(box, requester, AccessRequestApprovedSchema);
+    expect(fact.id?.uuid).toBe("audit-approved");
+    expect(entry).toMatchObject({ resource: { uuid: resourceUuid }, actor: { uuid: "primary" } });
+  });
+
   it("on 'AccessRequestApprovalFailed' record which approved request could not be granted", async () => {
     const clock = testClock();
     const box = await resourcesBlackBox(clock);
@@ -370,6 +381,7 @@ describe("AuditEntryProjection should", () => {
         "AccessRequestSubmitted",
         "AccessRequestApprovalStarted",
         "AccessGrantCreated",
+        "AccessRequestApproved",
       ].sort(),
     );
     expect(history.every((entry) => entry.resource?.uuid === resourceUuid)).toBe(true);

@@ -35,6 +35,7 @@ import {
   AccessExtensionRequestSubmittedSchema,
   AccessRequestApprovalFailedSchema,
   AccessRequestApprovalStartedSchema,
+  AccessRequestApprovedSchema,
   AccessRequestCanceledSchema,
   AccessRequestDeniedSchema,
   AccessRequestSubmissionFailedSchema,
@@ -43,6 +44,7 @@ import {
   type AccessExtensionRequestSubmitted,
   type AccessRequestApprovalFailed,
   type AccessRequestApprovalStarted,
+  type AccessRequestApproved,
   type AccessRequestCanceled,
   type AccessRequestDenied,
   type AccessRequestSubmissionFailed,
@@ -182,6 +184,15 @@ export class AuditEntryProjection extends Projection<AuditEntryId, typeof AuditE
       actor: event.decidedBy,
       resource: AuditEntryProjection.requested(event.snapshot),
       when: event.whenDecided,
+    });
+  }
+
+  /** Records that an approved request was granted, by whose approval. */
+  @Subscribe
+  onAccessRequestApproved(event: AccessRequestApproved, context: EventContext): void {
+    this.record(AccessRequestApprovedSchema, event, context, {
+      actor: AuditEntryProjection.askedBy(context),
+      resource: AuditEntryProjection.requested(event.snapshot),
     });
   }
 

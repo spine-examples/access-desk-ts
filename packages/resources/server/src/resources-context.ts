@@ -172,6 +172,7 @@ export const ResourcesContext = {
       AccessRequestSubmissionFailedSchema,
       AccessExtensionRequestSubmissionFailedSchema,
       AccessRequestApprovalStartedSchema,
+      AccessRequestApprovedSchema,
       AccessRequestApprovalFailedSchema,
       AccessRequestDeniedSchema,
       AccessRequestCanceledSchema,
