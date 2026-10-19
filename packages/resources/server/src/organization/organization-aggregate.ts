@@ -87,6 +87,7 @@ export class OrganizationAggregate extends Aggregate<OrganizationId, typeof Orga
       person,
       emailAddress: command.emailAddress,
       role,
+      addedBy: command.addedBy,
     });
   }
 

@@ -50,6 +50,7 @@ describe("MembershipProcessManager should", () => {
         person,
         email: "noah@acme.example",
         role: OrganizationRole.ADMINISTRATOR,
+        addedBy: undefined,
       },
     ]);
     // The person exists before they sign in, with no name and no account yet.
@@ -61,6 +62,26 @@ describe("MembershipProcessManager should", () => {
       account: [],
       organization: { uuid: organizationId },
     });
+  });
+
+  it("tell the organization which administrator added the person", async () => {
+    const box = await identityBlackBox();
+    const administrator = box.onBehalfOf("person-olivia");
+
+    expect(
+      (
+        await addMember(
+          administrator,
+          "noah@acme.example",
+          OrganizationRole.MEMBER,
+          organizationId,
+          "person-olivia",
+        )
+      ).kind,
+    ).toBe("ok");
+
+    await awaitMembership(box, administrator, "noah@acme.example");
+    expect(organizations.added.map((member) => member.addedBy)).toEqual(["person-olivia"]);
   });
 
   it("have the organization list the person who already signed in under the address", async () => {

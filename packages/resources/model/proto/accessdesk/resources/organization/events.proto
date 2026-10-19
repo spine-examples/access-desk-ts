@@ -49,6 +49,12 @@ message OrganizationMemberAdded {
 
     // The role the member holds in the organization.
     accessdesk.identity.OrganizationRole role = 4 [(required) = true];
+
+    // The administrator who added the person.
+    //
+    // This field is empty, when the application added the person itself.
+    //
+    accessdesk.identity.PersonId added_by = 5;
 }
 
 // A resource was added to an organization.

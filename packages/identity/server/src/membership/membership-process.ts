@@ -55,8 +55,9 @@ import type { OrganizationMembers } from "./organization-members.js";
 /**
  * A person's membership in an organization, under their email address.
  *
- * 1. An administrator adds the address, and says which role the person holds.
- *    An address belongs to at most one organization.
+ * 1. An administrator adds the address, and says which role the person holds
+ *    and who they are themselves. An address belongs to at most one
+ *    organization.
  * 2. The address is registered. When nobody has signed in under it yet, a new
  *    person is registered for it, without an account. Whoever signs in under
  *    the address later is that person.
@@ -91,7 +92,7 @@ export class MembershipProcessManager extends ProcessManager<
   @Assign
   @Throws(AlreadyMemberOfOtherOrganization)
   addMember(command: AddMember): MemberAddingStarted {
-    const { organization, role } = command;
+    const { organization, role, addedBy } = command;
     const current = this.state.organization;
     if (current !== undefined && current.uuid !== organization?.uuid) {
       throw AlreadyMemberOfOtherOrganization.create({ id: this.id });
@@ -99,6 +100,7 @@ export class MembershipProcessManager extends ProcessManager<
     this.update((draft) => {
       draft.organization = organization;
       draft.role = role;
+      draft.addedBy = addedBy;
     });
     return create(MemberAddingStartedSchema, { id: this.id, organization, role });
   }
@@ -151,7 +153,7 @@ export class MembershipProcessManager extends ProcessManager<
    * does, and has the person join it.
    */
   async #join(person: PersonId | undefined): Promise<JoinOrganization> {
-    const { organization, role } = this.state;
+    const { organization, role, addedBy } = this.state;
     if (person === undefined || organization === undefined) {
       throw new Error("A person is added to the organization the address was added to.");
     }
@@ -159,7 +161,7 @@ export class MembershipProcessManager extends ProcessManager<
     if (email === undefined) {
       throw new Error("A membership names an email address.");
     }
-    await this.#members.add({ organization, person, email, role });
+    await this.#members.add({ organization, person, email, role, addedBy });
     return create(JoinOrganizationSchema, { id: person, membership: this.id, organization });
   }
 }

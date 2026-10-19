@@ -98,6 +98,20 @@ describe("OrganizationAggregate should", () => {
       );
       await events.cancel();
     });
+
+    it("tell which administrator added the person", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      expect((await createOrganization(scope)).kind).toBe("ok");
+      const events = await recordEvents(scope, OrganizationMemberAddedSchema);
+
+      expect(
+        (await addOrganizationMember(scope, "maya", OrganizationRole.MEMBER, "noah")).kind,
+      ).toBe("ok");
+
+      expect((await events.waitFor(box)).addedBy?.uuid).toBe("noah");
+      await events.cancel();
+    });
   });
 
   describe("handle 'AddOrganizationMember' as an administrator, and", () => {

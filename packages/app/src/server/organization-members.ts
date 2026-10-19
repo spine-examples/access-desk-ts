@@ -82,7 +82,7 @@ export const ReachedOrganizationMembers = {
 
     return {
       async add(member: NewMember): Promise<void> {
-        const { organization, person, email, role } = member;
+        const { organization, person, email, role, addedBy } = member;
         if (await alreadyMember(member)) {
           return;
         }
@@ -93,6 +93,7 @@ export const ReachedOrganizationMembers = {
             person: { uuid: person.uuid },
             emailAddress: email,
             role,
+            ...(addedBy === undefined ? {} : { addedBy }),
           }),
           event: OrganizationMemberAddedSchema,
           answers: (event: OrganizationMemberAdded) => event.person?.uuid === person.uuid,

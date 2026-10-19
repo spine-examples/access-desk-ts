@@ -45,6 +45,9 @@ import { session, signIn, type PEOPLE, type Signed } from "./sign-in.js";
  * @param organization The organization's name.
  * @param email The email address of the person to add.
  * @param role The role the person is to hold. A member's when left out.
+ * @param addedBy The identifier of the administrator the command names as the
+ *   one who adds. Whoever adds when left out, so any other person here is one
+ *   the gateway must refuse.
  * @returns `"ok"` when the gateway let the command through, and why not otherwise.
  */
 export function addMember(
@@ -53,6 +56,7 @@ export function addMember(
   organization: string,
   email: string,
   role: OrganizationRole = OrganizationRole.MEMBER,
+  addedBy: string = as.person,
 ): Promise<string> {
   return post(
     running,
@@ -62,6 +66,7 @@ export function addMember(
       id: { emailAddress: { value: email } },
       organization: organizationId(organization),
       role,
+      addedBy: { uuid: addedBy },
     }),
   );
 }

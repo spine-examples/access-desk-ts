@@ -34,6 +34,12 @@ message Membership {
 
     // The role the person holds in the organization.
     accessdesk.identity.OrganizationRole role = 3;
+
+    // The administrator who added the person.
+    //
+    // This field is empty, when the application added the person itself.
+    //
+    accessdesk.identity.PersonId added_by = 4;
 }
 
 // The membership of one email address, as the organization's administrators
