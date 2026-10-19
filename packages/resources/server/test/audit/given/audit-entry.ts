@@ -14,14 +14,23 @@
 
 import { create, type Message, type MessageShape } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
-import { AnyMessages } from "@spine-event-engine/core";
+import { AnyMessages, SignalEnvelopes, TypeUrls } from "@spine-event-engine/core";
+import { Time } from "@spine-event-engine/core/time";
+import {
+  CommandIdSchema,
+  EventContextSchema,
+  MessageIdSchema,
+  type MessageId,
+} from "@spine-event-engine/proto";
 import { type BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
 import {
   AuditEntrySchema,
   type AuditEntry,
 } from "@access-desk/resources-model/generated/accessdesk/resources/audit/audit_entry_pb.js";
 import { ResourceIdSchema } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
-import { readAll, readWhere } from "../../given/resources-context.js";
+import { RegisterResourceSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_registration_commands_pb.js";
+import { ResourceRegisteredSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_registration_events_pb.js";
+import { contextOf, readAll, readWhere, testActorContext } from "../../given/resources-context.js";
 
 /**
  * Reads the whole history of the organization.
@@ -134,4 +143,61 @@ export async function awaitEntries(
       (rows) => of(rows).length >= times,
     ),
   );
+}
+
+/**
+ * A command to register a resource, to use as what led to an action.
+ *
+ * @param uuid The identifier of the command.
+ */
+export function registrationCommand(uuid: string): MessageId {
+  return create(MessageIdSchema, {
+    id: AnyMessages.pack(CommandIdSchema, create(CommandIdSchema, { uuid })),
+    typeUrl: TypeUrls.derive(RegisterResourceSchema),
+  });
+}
+
+/** Which change of which resource an action records. */
+export interface Recording {
+  /** The identifier of the resource that changed. */
+  readonly by: string;
+  /** How many times the resource had changed before. */
+  readonly version: number;
+  /** What led to the change. */
+  readonly cause: MessageId;
+}
+
+/**
+ * Records that a resource was registered, as its registration would.
+ *
+ * The test picks the change and its cause, to set up cases the real flow
+ * never produces.
+ *
+ * @param box The BlackBox whose context records the fact.
+ * @param resource The identifier of the registered resource.
+ * @param recording Which change records the fact.
+ */
+export async function recordRegistered(
+  box: BlackBox,
+  resource: string,
+  recording: Recording,
+): Promise<void> {
+  const producer = create(ResourceIdSchema, { uuid: recording.by });
+  await contextOf(box)
+    .eventBus()
+    .post(
+      SignalEnvelopes.event({
+        context: create(EventContextSchema, {
+          timestamp: Time.currentTime(),
+          producerId: AnyMessages.pack(ResourceIdSchema, producer),
+          version: { number: recording.version },
+          origin: {
+            case: "pastMessage",
+            value: { message: recording.cause, actorContext: testActorContext() },
+          },
+        }),
+        schema: ResourceRegisteredSchema,
+        message: create(ResourceRegisteredSchema, { id: { uuid: resource } }),
+      }),
+    );
 }

@@ -14,6 +14,7 @@
 
 import { create, type Message, type MessageShape } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
+import { AnySchema } from "@bufbuild/protobuf/wkt";
 import { AnyMessages } from "@spine-event-engine/core";
 import type { EventContext } from "@spine-event-engine/proto";
 import { Projection, Subscribe } from "@spine-event-engine/server";
@@ -72,6 +73,7 @@ import {
   type ResourceRegistrationFailed,
 } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_registration_events_pb.js";
 import type { AccessRequestSnapshot } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
+import { equals } from "../proto/equals.js";
 
 /**
  * An entry in an organization's audit trail.
@@ -155,7 +157,10 @@ export class AuditEntryProjection extends Projection<AuditEntryId, typeof AuditE
     event: AccessRequestSubmissionFailed,
     context: EventContext,
   ): void {
-    this.record(AccessRequestSubmissionFailedSchema, event, context, { actor: event.requester });
+    this.record(AccessRequestSubmissionFailedSchema, event, context, {
+      actor: event.requester,
+      resource: event.resource,
+    });
   }
 
   /** Records that a request for an extension never reached a manager. */
@@ -166,6 +171,7 @@ export class AuditEntryProjection extends Projection<AuditEntryId, typeof AuditE
   ): void {
     this.record(AccessExtensionRequestSubmissionFailedSchema, event, context, {
       actor: event.requester,
+      resource: event.resource,
     });
   }
 
@@ -244,6 +250,7 @@ export class AuditEntryProjection extends Projection<AuditEntryId, typeof AuditE
    *   when it happened.
    * @param entry Who took the action, and the resource it concerns. Also
    *   when it was taken, where the action itself states the moment.
+   * @throws Error When the entry already holds a different action.
    */
   private record<Schema extends GenMessage<Message>>(
     schema: Schema,
@@ -252,6 +259,13 @@ export class AuditEntryProjection extends Projection<AuditEntryId, typeof AuditE
     entry: Partial<Pick<AuditEntry, "actor" | "resource" | "when">>,
   ): void {
     const packed = AnyMessages.pack(schema, event);
+    const recorded = this.state.event;
+    if (recorded !== undefined) {
+      if (equals(AnySchema, recorded, packed)) {
+        return;
+      }
+      throw new Error(`An audit entry for this ${schema.typeName} holds a different action.`);
+    }
     this.update((draft) => {
       draft.when = entry.when ?? context.timestamp;
       draft.actor = entry.actor;

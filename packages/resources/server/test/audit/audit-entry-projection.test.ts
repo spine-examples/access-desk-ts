@@ -12,7 +12,8 @@
  * and limitations under the License.
  */
 
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { create } from "@bufbuild/protobuf";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 import {
   AccessGrantCreatedSchema,
@@ -65,11 +66,20 @@ import {
   actor,
   closeResourcesBlackBoxes,
   loadResourcesContext,
+  organizationId,
   resourcesBlackBox,
 } from "../given/resources-context.js";
 import { addOrganizationMember, createOrganization } from "../organization/given/organization.js";
 import { closeResource, openResource, registerResource } from "../resource/given/resource.js";
-import { awaitEntries, awaitEntry, factsOf, readHistoryOf } from "./given/audit-entry.js";
+import {
+  awaitEntries,
+  awaitEntry,
+  factsOf,
+  readHistory,
+  readHistoryOf,
+  recordRegistered,
+  registrationCommand,
+} from "./given/audit-entry.js";
 
 // The history is made of the facts the other flows record, produced here
 // through the real commands of those flows.
@@ -190,7 +200,11 @@ describe("AuditEntryProjection should", () => {
 
     const { entry, fact } = await awaitEntry(box, requester, AccessRequestSubmissionFailedSchema);
     expect(fact.id?.uuid).toBe("audit-too-long");
-    expect(entry.actor?.uuid).toBe(actor);
+    expect(entry).toMatchObject({ resource: { uuid: resourceUuid }, actor: { uuid: actor } });
+    // Managers see it in the resource's history.
+    expect(factsOf(await readHistoryOf(requester, resourceUuid))).toContain(
+      "AccessRequestSubmissionFailed",
+    );
   });
 
   it("on 'AccessExtensionRequestSubmissionFailed' record whose extension request never reached a manager", async () => {
@@ -210,7 +224,10 @@ describe("AuditEntryProjection should", () => {
       AccessExtensionRequestSubmissionFailedSchema,
     );
     expect(fact.id?.uuid).toBe("audit-no-grant");
-    expect(entry.actor?.uuid).toBe(actor);
+    expect(entry).toMatchObject({ resource: { uuid: resourceUuid }, actor: { uuid: actor } });
+    expect(factsOf(await readHistoryOf(requester, resourceUuid))).toContain(
+      "AccessExtensionRequestSubmissionFailed",
+    );
   });
 
   it("on 'AccessRequestApprovalStarted' record which manager approved a request, and when", async () => {
@@ -357,5 +374,72 @@ describe("AuditEntryProjection should", () => {
     );
     expect(history.every((entry) => entry.resource?.uuid === resourceUuid)).toBe(true);
     expect(factsOf(await readHistoryOf(requester, "ledger"))).toEqual(["ResourceRegistered"]);
+  });
+
+  it("keep two actions apart when one command led to both", async () => {
+    const box = await resourcesBlackBox(testClock());
+    const reader = box.onBehalfOf(actor);
+    const command = registrationCommand("one-command");
+
+    // Two resources are registered as a result of the same command.
+    await recordRegistered(box, "ledger", { by: "ledger", version: 0, cause: command });
+    await recordRegistered(box, "payroll", { by: "payroll", version: 0, cause: command });
+
+    const registered = await awaitEntries(box, reader, ResourceRegisteredSchema, 2);
+    expect(registered.map((entry) => entry.resource?.uuid).sort()).toEqual(["ledger", "payroll"]);
+  });
+
+  it("never replace an entry with a different action", async () => {
+    const box = await resourcesBlackBox(testClock());
+    const reader = box.onBehalfOf(actor);
+    await recordRegistered(box, "ledger", {
+      by: "ledger",
+      version: 4,
+      cause: registrationCommand("first"),
+    });
+    await awaitEntry(box, reader, ResourceRegisteredSchema);
+
+    // A different action claims the same entry: same resource, same version.
+    await recordRegistered(box, "ledger-copy", {
+      by: "ledger",
+      version: 4,
+      cause: registrationCommand("second"),
+    });
+    // Events arrive in order, so once this entry appears, the claim was handled.
+    await recordRegistered(box, "payroll", {
+      by: "payroll",
+      version: 0,
+      cause: registrationCommand("third"),
+    });
+
+    const registered = await awaitEntries(box, reader, ResourceRegisteredSchema, 2);
+    expect(registered.map((entry) => entry.resource?.uuid).sort()).toEqual(["ledger", "payroll"]);
+  });
+
+  it("log an action that does not say what changed, and make no entry of it", async () => {
+    const box = await resourcesBlackBox(testClock());
+    const scope = box.onBehalfOf(actor);
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      await scope.postEvent(
+        ResourceRegisteredSchema,
+        create(ResourceRegisteredSchema, { id: { uuid: "ledger" } }),
+      );
+
+      expect(logged).toHaveBeenCalledWith(
+        expect.stringContaining(ResourceRegisteredSchema.typeName),
+        expect.objectContaining({
+          missing: ["producer", "version"],
+          origin: "importContext",
+          sentBy: expect.objectContaining({
+            actor: { value: actor },
+            tenantId: { value: organizationId },
+          }) as unknown,
+        }),
+      );
+      expect(await readHistory(scope)).toEqual([]);
+    } finally {
+      logged.mockRestore();
+    }
   });
 });
