@@ -51,10 +51,6 @@ message AddOrganizationMember {
     accessdesk.identity.OrganizationRole role = 4 [(required) = true];
 
     // The administrator who added the person.
-    //
-    // The person themselves when they are the organization's first
-    // administrator.
-    //
     accessdesk.identity.PersonId added_by = 5 [(required) = true];
 }
 

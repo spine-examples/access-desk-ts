@@ -55,8 +55,8 @@ import type { OrganizationMembers } from "./organization-members.js";
 /**
  * A person's membership in an organization, under their email address.
  *
- * 1. An administrator adds the address, and says which role the person holds
- *    and who they are themselves. An address belongs to at most one
+ * 1. An administrator adds the address, chooses the person's role, and names
+ *    themselves as the one adding. An address belongs to at most one
  *    organization.
  * 2. The address is registered. When nobody has signed in under it yet, a new
  *    person is registered for it, without an account. Whoever signs in under
@@ -161,7 +161,7 @@ export class MembershipProcessManager extends ProcessManager<
     if (email === undefined) {
       throw new Error("A membership names an email address.");
     }
-    await this.#members.add({ organization, person, email, role, addedBy });
+    await this.#members.add({ organization, person, email, role, addedBy: addedBy ?? person });
     return create(JoinOrganizationSchema, { id: person, membership: this.id, organization });
   }
 }

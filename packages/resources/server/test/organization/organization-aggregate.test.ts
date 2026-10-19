@@ -94,12 +94,13 @@ describe("OrganizationAggregate should", () => {
           person: { uuid: "maya" },
           emailAddress: { value: "maya@acme.example" },
           role: OrganizationRole.MEMBER,
+          addedBy: { uuid: "maya" },
         }),
       );
       await events.cancel();
     });
 
-    it("tell which administrator added the person", async () => {
+    it("name the administrator who added the person", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await createOrganization(scope)).kind).toBe("ok");

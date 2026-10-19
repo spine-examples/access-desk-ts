@@ -93,7 +93,7 @@ export const ReachedOrganizationMembers = {
             person: { uuid: person.uuid },
             emailAddress: email,
             role,
-            ...(addedBy === undefined ? {} : { addedBy }),
+            addedBy,
           }),
           event: OrganizationMemberAddedSchema,
           answers: (event: OrganizationMemberAdded) => event.person?.uuid === person.uuid,

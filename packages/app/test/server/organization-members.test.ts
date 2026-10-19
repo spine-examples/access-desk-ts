@@ -57,12 +57,18 @@ function membersOf(server: Hosted, patienceMs?: number) {
   return members;
 }
 
-function joining(organization: string, person: string, role = OrganizationRole.MEMBER) {
+function joining(
+  organization: string,
+  person: string,
+  role = OrganizationRole.MEMBER,
+  addedBy = person,
+) {
   return {
     organization: create(OrganizationIdSchema, { uuid: organization }),
     person: create(PersonIdSchema, { uuid: person }),
     email: create(EmailAddressSchema, { value: `${person}@acme.example` }),
     role,
+    addedBy: create(PersonIdSchema, { uuid: addedBy }),
   };
 }
 

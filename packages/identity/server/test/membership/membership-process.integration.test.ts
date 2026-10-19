@@ -50,7 +50,7 @@ describe("MembershipProcessManager should", () => {
         person,
         email: "noah@acme.example",
         role: OrganizationRole.ADMINISTRATOR,
-        addedBy: undefined,
+        addedBy: person,
       },
     ]);
     // The person exists before they sign in, with no name and no account yet.
@@ -64,7 +64,7 @@ describe("MembershipProcessManager should", () => {
     });
   });
 
-  it("tell the organization which administrator added the person", async () => {
+  it("pass the organization which administrator added the person", async () => {
     const box = await identityBlackBox();
     const administrator = box.onBehalfOf("person-olivia");
 
