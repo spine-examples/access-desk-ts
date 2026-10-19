@@ -107,7 +107,7 @@ export function signInRoutes(
 
   const routes = [
     /**
-     * Tells a sign-in page which identity providers it may offer.
+     * Lists the identity providers a sign-in page may offer.
      *
      * Needs no session. Send `{}`.
      *

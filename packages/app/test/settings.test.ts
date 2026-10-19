@@ -28,11 +28,11 @@ const gateway = {
 };
 
 describe("The settings should", () => {
-  it("tell where the application server listens", () => {
+  it("give where the application server listens", () => {
     expect(Settings.ofServer(server)).toEqual({ listening: { host: "127.0.0.1", port: 8090 } });
   });
 
-  it("tell how the gateway is set up, reaching the server where the server listens", () => {
+  it("describe how the gateway is set up, reaching the server where the server listens", () => {
     expect(Settings.ofGateway(gateway)).toEqual({
       listening: { host: "127.0.0.1", port: 8080 },
       serverUrl: "http://127.0.0.1:8090",
@@ -50,7 +50,7 @@ describe("The settings should", () => {
     );
   });
 
-  it("tell an address reached only from the same machine from any other", () => {
+  it("distinguish an address reached only from the same machine from any other", () => {
     for (const host of [
       "127.0.0.1",
       "127.1.2.3",

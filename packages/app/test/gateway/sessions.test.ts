@@ -74,21 +74,21 @@ describe("Gateway sessions should", () => {
     expect(await sessions.of(request(issued?.token ?? ""))).toBeUndefined();
   });
 
-  it("stop what was opened under a session when it ends, and tell sessions apart", async () => {
+  it("stop what was opened under a session when it ends, and keep sessions apart", async () => {
     const ended: string[] = [];
-    const told = new Sessions({
+    const issued = new Sessions({
       closeFor: async (session) => {
         // What is opened is closed in the session's name, so its token must still work.
         ended.push(`closing ${session.id}`);
-        expect(await told.of(request(session.credential.value))).toBeDefined();
+        expect(await issued.of(request(session.credential.value))).toBeDefined();
       },
       stop: async (session) => {
         ended.push(`stopped ${session}`);
-        expect(await told.of(request(first?.credential.value ?? ""))).toBeUndefined();
+        expect(await issued.of(request(first?.credential.value ?? ""))).toBeUndefined();
       },
     });
-    const first = await told.of(request((await told.issue(person))?.token ?? ""));
-    const second = await told.of(request((await told.issue(person))?.token ?? ""));
+    const first = await issued.of(request((await issued.issue(person))?.token ?? ""));
+    const second = await issued.of(request((await issued.issue(person))?.token ?? ""));
     expect(first).toBeDefined();
     expect(second).toBeDefined();
     if (first === undefined || second === undefined) {
@@ -97,12 +97,12 @@ describe("Gateway sessions should", () => {
     // Two sessions of one person are two sessions.
     expect(first.id).not.toBe(second.id);
 
-    await told.end(first);
+    await issued.end(first);
 
     expect(ended).toEqual([`closing ${first.id}`, `stopped ${first.id}`]);
-    expect(await told.of(request(first.credential.value))).toBeUndefined();
-    expect(await told.of(request(second.credential.value))).toBeDefined();
-    await told.close();
+    expect(await issued.of(request(first.credential.value))).toBeUndefined();
+    expect(await issued.of(request(second.credential.value))).toBeDefined();
+    await issued.close();
   });
 
   it("refuse absent, malformed, and unknown bearer credentials", async () => {

@@ -87,8 +87,8 @@ export const SignInProvider = {
    * @returns The provider, or `undefined` when Google could not be reached.
    */
   async google(application: OAuthApplication): Promise<SignInProvider | undefined> {
-    // The provider sends no client secret unless told how. Google expects it
-    // with the code exchange.
+    // The provider does not send a client secret unless explicitly configured to do so.
+    // Google expects it with the code exchange.
     const google = await createGoogleProvider({
       ...application,
       clientAuthentication: "client_secret_post",
