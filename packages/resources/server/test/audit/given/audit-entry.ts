@@ -38,7 +38,7 @@ export function readHistory(reader: BlackBoxScope): Promise<AuditEntry[]> {
  *
  * @param reader The actor scope that reads.
  * @param resource The identifier of the resource.
- * @returns The entries that tell of what happened to the resource.
+ * @returns The entries about what happened to the resource.
  */
 export function readHistoryOf(reader: BlackBoxScope, resource: string): Promise<AuditEntry[]> {
   return readWhere(
@@ -52,7 +52,7 @@ export function readHistoryOf(reader: BlackBoxScope, resource: string): Promise<
 }
 
 /** An entry of the history, with the fact it keeps. */
-export interface Told<Schema extends GenMessage<Message>> {
+export interface Recorded<Schema extends GenMessage<Message>> {
   /** The entry. */
   readonly entry: AuditEntry;
   /** The fact the entry keeps. */
@@ -72,10 +72,10 @@ export function factsOf(entries: readonly AuditEntry[]): string[] {
   });
 }
 
-function toldOf<Schema extends GenMessage<Message>>(
+function recordedOf<Schema extends GenMessage<Message>>(
   rows: readonly AuditEntry[],
   schema: Schema,
-): Told<Schema>[] {
+): Recorded<Schema>[] {
   return rows.flatMap((entry) => {
     const fact = entry.event === undefined ? undefined : AnyMessages.unpack(entry.event, schema);
     return fact === undefined ? [] : [{ entry, fact }];
@@ -83,7 +83,7 @@ function toldOf<Schema extends GenMessage<Message>>(
 }
 
 /**
- * Waits until the history tells of a fact.
+ * Waits until the history holds an entry of an event.
  *
  * @param box The BlackBox whose bounded waiting backs the read.
  * @param reader The actor scope that reads.
@@ -96,9 +96,9 @@ export async function awaitEntry<Schema extends GenMessage<Message>>(
   reader: BlackBoxScope,
   schema: Schema,
   accept: (fact: MessageShape<Schema>) => boolean = () => true,
-): Promise<Told<Schema>> {
-  const matching = (rows: AuditEntry[]): Told<Schema>[] =>
-    toldOf(rows, schema).filter(({ fact }) => accept(fact));
+): Promise<Recorded<Schema>> {
+  const matching = (rows: AuditEntry[]): Recorded<Schema>[] =>
+    recordedOf(rows, schema).filter(({ fact }) => accept(fact));
   const [found] = matching(
     await box.eventually(
       () => readHistory(reader),
@@ -106,13 +106,13 @@ export async function awaitEntry<Schema extends GenMessage<Message>>(
     ),
   );
   if (found === undefined) {
-    throw new Error(`The history tells of no such thing: ${schema.typeName}.`);
+    throw new Error(`The history holds no entry of ${schema.typeName}.`);
   }
   return found;
 }
 
 /**
- * Waits until the history tells of facts of one kind a number of times.
+ * Waits until the history holds a number of entries of one kind of event.
  *
  * @param box The BlackBox whose bounded waiting backs the read.
  * @param reader The actor scope that reads.
@@ -126,7 +126,8 @@ export async function awaitEntries(
   schema: GenMessage<Message>,
   times: number,
 ): Promise<AuditEntry[]> {
-  const of = (rows: AuditEntry[]): AuditEntry[] => toldOf(rows, schema).map(({ entry }) => entry);
+  const of = (rows: AuditEntry[]): AuditEntry[] =>
+    recordedOf(rows, schema).map(({ entry }) => entry);
   return of(
     await box.eventually(
       () => readHistory(reader),

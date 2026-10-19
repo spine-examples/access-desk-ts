@@ -91,7 +91,7 @@ describe("AuditEntryProjection should", () => {
     expect(entry.resource).toBeUndefined();
   });
 
-  it("on 'ResourceRegistered' tell which resource was registered, and by whom", async () => {
+  it("on 'ResourceRegistered' record which resource was registered, and by whom", async () => {
     const box = await resourcesBlackBox(testClock());
     const administrator = box.onBehalfOf("noah");
     await createOrganization(administrator);
@@ -107,7 +107,7 @@ describe("AuditEntryProjection should", () => {
     });
   });
 
-  it("on 'ResourceRegistrationFailed' tell which resource could not be registered, and who tried", async () => {
+  it("on 'ResourceRegistrationFailed' record which resource could not be registered, and who tried", async () => {
     const box = await resourcesBlackBox(testClock());
     const administrator = box.onBehalfOf("noah");
     await createOrganization(administrator);
@@ -122,7 +122,7 @@ describe("AuditEntryProjection should", () => {
     expect(entry).toMatchObject({ resource: { uuid: "ledger-2" }, actor: { uuid: "noah" } });
   });
 
-  it("on 'ResourceOpenedForRequests' and 'ResourceClosedForRequests' tell each opening and closing apart", async () => {
+  it("on 'ResourceOpenedForRequests' and 'ResourceClosedForRequests' keep each opening and closing apart", async () => {
     const box = await resourcesBlackBox(testClock());
     const manager = box.onBehalfOf("primary");
     // Seeding opens the resource once.
@@ -143,7 +143,7 @@ describe("AuditEntryProjection should", () => {
     });
   });
 
-  it("on 'AccessRequestSubmitted' keep the request, and tell who asked for access to what", async () => {
+  it("on 'AccessRequestSubmitted' keep the request, and name who asked for access to what", async () => {
     const box = await resourcesBlackBox(testClock());
     const requester = box.onBehalfOf(actor);
     await seed(box, [actor, "primary"]);
@@ -160,7 +160,7 @@ describe("AuditEntryProjection should", () => {
     });
   });
 
-  it("on 'AccessExtensionRequestSubmitted' keep the request, and tell who asked to extend access to what", async () => {
+  it("on 'AccessExtensionRequestSubmitted' keep the request, and name who asked to extend access to what", async () => {
     const box = await resourcesBlackBox(testClock());
     const requester = await givenActiveGrant(box, "audit-grant", 10);
 
@@ -175,7 +175,7 @@ describe("AuditEntryProjection should", () => {
     expect(entry).toMatchObject({ resource: { uuid: resourceUuid }, actor: { uuid: actor } });
   });
 
-  it("on 'AccessRequestSubmissionFailed' tell whose request never reached a manager", async () => {
+  it("on 'AccessRequestSubmissionFailed' record whose request never reached a manager", async () => {
     const box = await resourcesBlackBox(testClock());
     const requester = box.onBehalfOf(actor);
     await seed(box, [actor, "primary"]);
@@ -193,7 +193,7 @@ describe("AuditEntryProjection should", () => {
     expect(entry.actor?.uuid).toBe(actor);
   });
 
-  it("on 'AccessExtensionRequestSubmissionFailed' tell whose extension request never reached a manager", async () => {
+  it("on 'AccessExtensionRequestSubmissionFailed' record whose extension request never reached a manager", async () => {
     const box = await resourcesBlackBox(testClock());
     const requester = box.onBehalfOf(actor);
     await seed(box, [actor, "primary"]);
@@ -213,7 +213,7 @@ describe("AuditEntryProjection should", () => {
     expect(entry.actor?.uuid).toBe(actor);
   });
 
-  it("on 'AccessRequestApprovalStarted' tell which manager approved a request, and when", async () => {
+  it("on 'AccessRequestApprovalStarted' record which manager approved a request, and when", async () => {
     const clock = testClock();
     const box = await resourcesBlackBox(clock);
     const requester = box.onBehalfOf(actor);
@@ -232,7 +232,7 @@ describe("AuditEntryProjection should", () => {
     });
   });
 
-  it("on 'AccessRequestApprovalFailed' tell which approved request could not be granted", async () => {
+  it("on 'AccessRequestApprovalFailed' record which approved request could not be granted", async () => {
     const clock = testClock();
     const box = await resourcesBlackBox(clock);
     const requester = await givenActiveGrant(box, "audit-grant", 10);
@@ -255,7 +255,7 @@ describe("AuditEntryProjection should", () => {
     });
   });
 
-  it("on 'AccessRequestDenied' keep the reason, and tell which manager denied a request, and when", async () => {
+  it("on 'AccessRequestDenied' keep the reason, and name which manager denied a request, and when", async () => {
     const clock = testClock();
     const box = await resourcesBlackBox(clock);
     const requester = box.onBehalfOf(actor);
@@ -275,7 +275,7 @@ describe("AuditEntryProjection should", () => {
     });
   });
 
-  it("on 'AccessRequestCanceled' tell that the requester canceled their request", async () => {
+  it("on 'AccessRequestCanceled' record that the requester canceled their request", async () => {
     const box = await resourcesBlackBox(testClock());
     const requester = box.onBehalfOf(actor);
     await seed(box, [actor, "primary"]);
@@ -288,7 +288,7 @@ describe("AuditEntryProjection should", () => {
     expect(entry).toMatchObject({ resource: { uuid: resourceUuid }, actor: { uuid: actor } });
   });
 
-  it("on 'AccessGrantCreated' keep the grant, and tell by whose approval access was granted to what", async () => {
+  it("on 'AccessGrantCreated' keep the grant, and name by whose approval access was granted to what", async () => {
     const box = await resourcesBlackBox(testClock());
 
     const requester = await givenActiveGrant(box, "audit-grant", 10);
@@ -302,7 +302,7 @@ describe("AuditEntryProjection should", () => {
     expect(entry).toMatchObject({ resource: { uuid: resourceUuid }, actor: { uuid: "primary" } });
   });
 
-  it("on 'AccessGrantExtended' keep the grant, and tell by whose approval access was extended", async () => {
+  it("on 'AccessGrantExtended' keep the grant, and name by whose approval access was extended", async () => {
     const box = await resourcesBlackBox(testClock());
     const requester = await givenActiveGrant(box, "audit-grant", 10);
 
@@ -316,7 +316,7 @@ describe("AuditEntryProjection should", () => {
     expect(entry).toMatchObject({ resource: { uuid: resourceUuid }, actor: { uuid: "primary" } });
   });
 
-  it("on 'AccessGrantRevoked' keep the reason, and tell which manager revoked access, and when", async () => {
+  it("on 'AccessGrantRevoked' keep the reason, and name which manager revoked access, and when", async () => {
     const clock = testClock();
     const box = await resourcesBlackBox(clock);
     const requester = await givenActiveGrant(box, "audit-grant", 10);
@@ -338,7 +338,7 @@ describe("AuditEntryProjection should", () => {
     });
   });
 
-  it("tell the history of one resource apart from everything else", async () => {
+  it("keep the history of one resource apart from everything else", async () => {
     const box = await resourcesBlackBox(testClock());
     const requester = await givenActiveGrant(box, "audit-grant", 10);
     await registerResource(requester, "ledger");

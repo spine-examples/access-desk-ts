@@ -26,7 +26,7 @@ option (type_url_prefix) = "type.accessdesk";
 
 // An entry in an organization's audit trail.
 //
-// It tells of one action the organization accepted: who took it, when, on
+// It records one action the organization accepted: who took it, when, on
 // which resource, and everything the action stated, such as the reason a
 // request was denied. An entry is never changed.
 //
