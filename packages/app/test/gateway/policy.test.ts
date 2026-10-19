@@ -29,6 +29,7 @@ import {
   AccessDecisionAssignmentSchema,
   AccessRequestViewSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_pb.js";
+import { AuditEntrySchema } from "@access-desk/resources-model/generated/accessdesk/resources/audit/audit_entry_pb.js";
 import { ResourceIdSchema } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
 import { ResourceCatalogItemSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_pb.js";
 import { AddOrganizationMemberSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
@@ -148,28 +149,33 @@ describe("Gateway policy should", () => {
     const adding = create(AddMemberSchema, {
       id: { emailAddress: { value: "noah@example.com" } },
       organization: { uuid: "acme" },
+      addedBy: { uuid: "person-1" },
     });
 
     expect(await authorize(nowhere, command(adding))).toBe(false);
     expect(application.member).not.toHaveBeenCalled();
   });
 
-  it("let an administrator add people only to their own organization", async () => {
+  it("let an administrator add people only to their own organization, in their own name", async () => {
     const administrator = Policy.authorization(
       desk(OrganizationRole.ADMINISTRATOR) as unknown as AccessDesk,
     );
     const member = Policy.authorization(desk() as unknown as AccessDesk);
-    const addingTo = (organization: string) =>
+    const addingTo = (organization: string, addedBy: string | null = "person-1") =>
       command(
         create(AddMemberSchema, {
           id: { emailAddress: { value: "noah@example.com" } },
           organization: { uuid: organization },
+          ...(addedBy === null ? {} : { addedBy: { uuid: addedBy } }),
         }),
       );
 
     expect(await administrator(principal, addingTo("acme"))).toBe(true);
     expect(await administrator(principal, addingTo("globex"))).toBe(false);
     expect(await member(principal, addingTo("acme"))).toBe(false);
+    // Not in the name of another person, nor with the field left empty.
+    expect(await administrator(principal, addingTo("acme", "person-2"))).toBe(false);
+    expect(await administrator(principal, addingTo("acme", null))).toBe(false);
   });
 
   it("refuse missing email and missing organization before checking membership", async () => {
@@ -213,52 +219,112 @@ describe("Gateway policy should", () => {
     expect(await authorize(principal, { kind: "cancel" } as IncomingRequest)).toBe(true);
   });
 
-  it("allow an administrator only the exact memberships query for their organization", async () => {
-    const administrator = desk(OrganizationRole.ADMINISTRATOR);
-    const member = desk();
-    const acme = create(OrganizationIdSchema, { uuid: "acme" });
-    const globex = create(OrganizationIdSchema, { uuid: "globex" });
-    const targetFor = (id: typeof acme) =>
-      create(TargetSchema, {
-        type: TypeUrls.derive(MembershipViewSchema),
-        criterion: {
-          case: "filters",
-          value: {
-            filter: [
-              {
-                filter: [
-                  {
-                    fieldPath: { fieldName: ["organization"] },
-                    value: AnyMessages.pack(OrganizationIdSchema, id),
-                    operator: Filter_Operator.EQUAL,
-                  },
-                ],
-              },
-            ],
+  it.each([["memberships", MembershipViewSchema]])(
+    "allow an administrator only the exact %s query for their organization",
+    async (_what, schema) => {
+      const administrator = desk(OrganizationRole.ADMINISTRATOR);
+      const member = desk();
+      const acme = create(OrganizationIdSchema, { uuid: "acme" });
+      const globex = create(OrganizationIdSchema, { uuid: "globex" });
+      const targetFor = (id: typeof acme) =>
+        create(TargetSchema, {
+          type: TypeUrls.derive(schema),
+          criterion: {
+            case: "filters",
+            value: {
+              filter: [
+                {
+                  filter: [
+                    {
+                      fieldPath: { fieldName: ["organization"] },
+                      value: AnyMessages.pack(OrganizationIdSchema, id),
+                      operator: Filter_Operator.EQUAL,
+                    },
+                  ],
+                },
+              ],
+            },
           },
-        },
-      });
-    const queryFor = (id: typeof acme): IncomingRequest =>
-      ({ kind: "query", target: targetFor(id) }) as IncomingRequest;
+        });
+      const queryFor = (id: typeof acme): IncomingRequest =>
+        ({ kind: "query", target: targetFor(id) }) as IncomingRequest;
+      const authorize = (application: ReturnType<typeof desk>) =>
+        Policy.authorization(application as unknown as AccessDesk);
 
-    expect(
-      await Policy.authorization(administrator as unknown as AccessDesk)(principal, queryFor(acme)),
-    ).toBe(true);
-    expect(
-      await Policy.authorization(administrator as unknown as AccessDesk)(
-        principal,
-        queryFor(globex),
-      ),
-    ).toBe(false);
-    expect(
-      await Policy.authorization(member as unknown as AccessDesk)(principal, queryFor(acme)),
-    ).toBe(false);
-    expect(
-      await Policy.authorization(administrator as unknown as AccessDesk)(principal, {
-        kind: "subscribe",
-        target: targetFor(acme),
-      } as IncomingRequest),
-    ).toBe(false);
+      expect(await authorize(administrator)(principal, queryFor(acme))).toBe(true);
+      expect(await authorize(administrator)(principal, queryFor(globex))).toBe(false);
+      // Not of every organization at once.
+      expect(
+        await authorize(administrator)(principal, {
+          kind: "query",
+          target: create(TargetSchema, {
+            type: TypeUrls.derive(schema),
+            criterion: { case: "includeAll", value: true },
+          }),
+        } as IncomingRequest),
+      ).toBe(false);
+      expect(await authorize(member)(principal, queryFor(acme))).toBe(false);
+      expect(
+        await authorize(administrator)(principal, {
+          kind: "subscribe",
+          target: targetFor(acme),
+        } as IncomingRequest),
+      ).toBe(false);
+    },
+  );
+
+  it("let a manager read and watch the history of a resource they manage, and refuse any other member", async () => {
+    const manager = desk();
+    const member = desk();
+    member.manages.mockResolvedValue(false);
+    const everything = create(TargetSchema, {
+      type: TypeUrls.derive(AuditEntrySchema),
+      criterion: { case: "includeAll", value: true },
+    });
+
+    for (const kind of ["query", "subscribe"] as const) {
+      const asking = (target: typeof everything, application = manager) =>
+        Policy.authorization(application as unknown as AccessDesk)(principal, {
+          kind,
+          target,
+        } as IncomingRequest);
+
+      expect(await asking(where(AuditEntrySchema, "resource", payroll))).toBe(true);
+      // The history of the whole organization is not a manager's to see.
+      expect(await asking(everything)).toBe(false);
+      expect(await asking(where(AuditEntrySchema, "actor", me))).toBe(false);
+      // Somebody who manages nothing sees no history at all.
+      expect(await asking(where(AuditEntrySchema, "resource", payroll), member)).toBe(false);
+      expect(await asking(everything, member)).toBe(false);
+    }
+    expect(manager.manages).toHaveBeenCalledWith(
+      expect.objectContaining({ uuid: "acme" }),
+      expect.objectContaining({ uuid: "person-1" }),
+      expect.objectContaining({ uuid: "payroll" }),
+    );
+  });
+
+  it("let an administrator read and watch the history of the whole organization", async () => {
+    const administrator = desk(OrganizationRole.ADMINISTRATOR);
+    administrator.manages.mockResolvedValue(false);
+    const authorize = Policy.authorization(administrator as unknown as AccessDesk);
+    const everything = create(TargetSchema, {
+      type: TypeUrls.derive(AuditEntrySchema),
+      criterion: { case: "includeAll", value: true },
+    });
+
+    for (const kind of ["query", "subscribe"] as const) {
+      expect(await authorize(principal, { kind, target: everything } as IncomingRequest)).toBe(
+        true,
+      );
+      // Of a resource too, whether or not they manage it.
+      expect(
+        await authorize(principal, {
+          kind,
+          target: where(AuditEntrySchema, "resource", payroll),
+        } as IncomingRequest),
+      ).toBe(true);
+    }
   });
 
   it("let every member read and watch the organization and its catalog", async () => {
