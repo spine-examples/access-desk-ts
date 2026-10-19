@@ -16,8 +16,8 @@ syntax = "proto3";
 
 package accessdesk.resources;
 
+import "google/protobuf/any.proto";
 import "accessdesk/identity/identifiers.proto";
-import "spine/core/diagnostics.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
@@ -52,15 +52,18 @@ message ResourceAccessId {
 
 // Identifies an entry in an organization's audit trail.
 //
-// A single command or event can lead to several actions, but never to two of
-// the same kind. So the cause of an action and its kind, taken together, are
-// unique.
+// Each action is recorded by what it changed, such as a resource or a
+// request, at one version of it. What changes records an action of one kind
+// at most once at each version.
 //
 message AuditEntryId {
 
-    // The command, or the earlier event, that led to the recorded action.
-    spine.core.MessageId cause = 1 [(required) = true];
+    // What recorded the action, such as the resource or the request it changed.
+    google.protobuf.Any producer = 1 [(required) = true];
+
+    // The version of what recorded the action.
+    int32 version = 2;
 
     // The type URL of the event that records the action.
-    string event_type = 2 [(required) = true];
+    string event_type = 3 [(required) = true];
 }

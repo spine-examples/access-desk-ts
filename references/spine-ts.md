@@ -258,11 +258,16 @@ from its entry command.
 route that takes two arguments also receives the `EventContext`. It holds:
 
 - `timestamp`: when the event was recorded;
-- `producerId` and `version`: which entity recorded it, and at which version;
+- `producerId` and `version`: the entity that recorded the event, and how
+  many times that entity had changed before. All events from one handler call
+  share the version. A new entity starts at `0`;
 - `origin.pastMessage`: what caused the event. That is the ID of the command
   or event that led to it, and the `actorContext` of whoever sent the first
   command in the chain. The actor stays the same through the commands a
   process sends and the events it reacts to.
+
+An event posted with a `BlackBox` scope's `postEvent` has no producer and no
+version, and its origin is `importContext`.
 
 ## External events
 

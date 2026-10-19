@@ -344,6 +344,11 @@ Anything else, such as a reason, is read from the event itself. A reader that
 knows the application's types can turn any entry into JSON, whatever its
 event.
 
+Each entry records one change of one thing, such as a resource or a request.
+So two actions never share an entry, even when one command led to both. An
+entry is never replaced. An action that does not say what changed gets no
+entry, and is logged as an error instead.
+
 Audit projections and human-readable timelines are derived views, not editable
 sources of truth. Retention/export policy remains a deployment decision and
 must be documented before production use.
