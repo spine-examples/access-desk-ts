@@ -38,8 +38,11 @@ message AccessRequestSubmissionFailed {
     // The request whose submission failed.
     accessdesk.resources.AccessRequestId id = 1 [(required) = true];
 
+    // The resource the request was for.
+    accessdesk.resources.ResourceId resource = 2 [(required) = true];
+
     // The person who submitted the request.
-    accessdesk.identity.PersonId requester = 2 [(required) = true];
+    accessdesk.identity.PersonId requester = 3 [(required) = true];
 }
 
 // The submission of an access extension request started.
@@ -58,8 +61,11 @@ message AccessExtensionRequestSubmissionFailed {
     // The extension request whose submission failed.
     accessdesk.resources.AccessRequestId id = 1 [(required) = true];
 
+    // The resource the request was for.
+    accessdesk.resources.ResourceId resource = 2 [(required) = true];
+
     // The person who submitted the request.
-    accessdesk.identity.PersonId requester = 2 [(required) = true];
+    accessdesk.identity.PersonId requester = 3 [(required) = true];
 }
 
 // An access request was accepted for a manager decision.
