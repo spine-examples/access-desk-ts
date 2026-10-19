@@ -93,12 +93,14 @@ export function registerResource(
 }
 
 /**
- * Reads the history of Acme through the gateway as the browser client does.
+ * Reads the history of an organization through the gateway as the browser
+ * client does.
  *
  * @param running The running application.
  * @param as The signed-in person who reads.
  * @param of The identifier of the resource whose history is asked for. The
  *   history of the whole organization when left out.
+ * @param organization The organization the request names. Acme when left out.
  * @returns The entries of the history, or `"refused"` when the gateway or the
  *   application server did not answer the request.
  */
@@ -106,8 +108,9 @@ export function readHistory(
   running: Running,
   as: Signed,
   of?: string,
+  organization = "acme",
 ): Promise<AuditEntry[] | "refused"> {
-  const acting = { ...as, organization: "acme" };
+  const acting = { ...as, organization };
   return read(
     running,
     acting,

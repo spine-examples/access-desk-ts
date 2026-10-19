@@ -462,6 +462,28 @@ describe("The gateway should", () => {
       expect(await readHistory(running, maya)).toBe("refused");
     });
 
+    it("keep an organization's history from the administrators of another", async () => {
+      const running = await givenGateway();
+      const noah = await givenOpenResource(running);
+      await eventually(
+        () => readHistory(running, noah),
+        (entries) => entries !== "refused" && entries.length >= 3,
+      );
+      const olivia = await givenMember(running, "olivia", "globex");
+
+      // Globex's administrator sees only that she joined Globex.
+      const globex = await eventually(
+        () => readHistory(running, olivia, undefined, "globex"),
+        (entries) => entries !== "refused" && entries.length >= 1,
+      );
+      expect(globex === "refused" ? [] : globex.map((entry) => History.memberIn(entry))).toEqual([
+        olivia.person,
+      ]);
+      // Acme's resource is not in Globex's history, and Acme's history is closed to her.
+      expect(await readHistory(running, olivia, "payroll", "globex")).toEqual([]);
+      expect(await readHistory(running, olivia)).toBe("refused");
+    });
+
     it("refuse an administrator a resource registered for another organization", async () => {
       const running = await givenGateway();
       const noah = await givenMember(running, "noah", "acme");
