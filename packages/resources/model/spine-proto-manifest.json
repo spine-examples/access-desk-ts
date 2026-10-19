@@ -1,6 +1,6 @@
 {
   "formatVersion": 2,
-  "generationId": "27ebe50b-2382-448c-ab4b-28720702df35",
+  "generationId": "1e3f7856-c757-4dde-b922-ed969dde9bb6",
   "packageName": "@access-desk/resources-model",
   "packageVersion": "0.0.0",
   "protoFiles": [
@@ -12,6 +12,7 @@
     "accessdesk/resources/access/request/commands.proto",
     "accessdesk/resources/access/request/events.proto",
     "accessdesk/resources/access/request/rejections.proto",
+    "accessdesk/resources/audit/audit_entry.proto",
     "accessdesk/resources/identifiers.proto",
     "accessdesk/resources/organization/commands.proto",
     "accessdesk/resources/organization/events.proto",
@@ -35,6 +36,7 @@
     "accessdesk/resources/access/request/commands.proto": "generated/accessdesk/resources/access/request/commands_pb.js",
     "accessdesk/resources/access/request/events.proto": "generated/accessdesk/resources/access/request/events_pb.js",
     "accessdesk/resources/access/request/rejections.proto": "generated/accessdesk/resources/access/request/rejections_pb.js",
+    "accessdesk/resources/audit/audit_entry.proto": "generated/accessdesk/resources/audit/audit_entry_pb.js",
     "accessdesk/resources/identifiers.proto": "generated/accessdesk/resources/identifiers_pb.js",
     "accessdesk/resources/organization/commands.proto": "generated/accessdesk/resources/organization/commands_pb.js",
     "accessdesk/resources/organization/events.proto": "generated/accessdesk/resources/organization/events_pb.js",

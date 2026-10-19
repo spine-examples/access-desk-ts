@@ -52,9 +52,10 @@ message OrganizationMemberAdded {
 
     // The administrator who added the person.
     //
-    // This field is empty, when the application added the person itself.
+    // The person themselves when they are the organization's first
+    // administrator.
     //
-    accessdesk.identity.PersonId added_by = 5;
+    accessdesk.identity.PersonId added_by = 5 [(required) = true];
 }
 
 // A resource was added to an organization.

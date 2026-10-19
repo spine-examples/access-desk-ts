@@ -37,7 +37,8 @@ message Membership {
 
     // The administrator who added the person.
     //
-    // This field is empty, when the application added the person itself.
+    // This field is empty when the person is the organization's first
+    // administrator, who counts as adding themselves.
     //
     accessdesk.identity.PersonId added_by = 4;
 }

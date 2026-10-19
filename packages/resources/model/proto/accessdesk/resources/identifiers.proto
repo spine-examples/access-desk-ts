@@ -17,6 +17,7 @@ syntax = "proto3";
 package accessdesk.resources;
 
 import "accessdesk/identity/identifiers.proto";
+import "spine/core/diagnostics.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
@@ -47,4 +48,19 @@ message ResourceAccessId {
 
     // The resource the access applies to.
     ResourceId resource = 2 [(required) = true];
+}
+
+// Identifies an entry in an organization's audit trail.
+//
+// A single command or event can lead to several actions, but never to two of
+// the same kind. So the cause of an action and its kind, taken together, are
+// unique.
+//
+message AuditEntryId {
+
+    // The command, or the earlier event, that led to the recorded action.
+    spine.core.MessageId cause = 1 [(required) = true];
+
+    // The type URL of the event that records the action.
+    string event_type = 2 [(required) = true];
 }
