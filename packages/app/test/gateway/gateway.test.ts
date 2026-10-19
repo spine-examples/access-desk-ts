@@ -32,6 +32,9 @@ import {
   catalogItem,
   givenOpenResource,
   givenTold,
+  History,
+  readHistory,
+  readHistoryOfActor,
   readRequests,
   registerResource,
   submitRequest,
@@ -52,7 +55,7 @@ afterEach(stopGateways);
 
 describe("The gateway should", () => {
   describe("sign a person in, and", () => {
-    it("tell them who they are and the organization they belong to", async () => {
+    it("say who they are and the organization they belong to", async () => {
       const running = await givenGateway();
 
       const noah = await signIn(running, "noah");
@@ -64,7 +67,7 @@ describe("The gateway should", () => {
       });
     });
 
-    it("tell a person nobody added anywhere that they belong to no organization", async () => {
+    it("say to a person nobody added anywhere that they belong to no organization", async () => {
       const running = await givenGateway();
 
       const maya = await signIn(running, "maya");
@@ -112,7 +115,7 @@ describe("The gateway should", () => {
       expect((await session(running, "no-such-token")).status).toBe(401);
     });
 
-    it("refuse a call from a page it was not told about", async () => {
+    it("refuse a call from a page it does not know", async () => {
       const running = await givenGateway();
 
       const answered = await request(running, "/auth/options", "{}", {
@@ -142,7 +145,7 @@ describe("The gateway should", () => {
       expect(response.headers.get("cache-control")).toBe("no-store");
     });
 
-    it("tell a sign-in page which identity providers it may offer", async () => {
+    it("list the identity providers a sign-in page may offer", async () => {
       const running = await givenGateway();
 
       const { status, body } = await call(running, "/auth/options");
@@ -354,6 +357,111 @@ describe("The gateway should", () => {
       expect(await readRequests(running, maya, { resource: "payroll" })).toBe("refused");
     });
 
+    it("show an administrator the history of the whole organization, and who did each thing", async () => {
+      const running = await givenGateway();
+      const noah = await givenOpenResource(running);
+      const maya = await givenMaya(running, noah);
+
+      const history = await eventually(
+        () => readHistory(running, noah),
+        (entries) => entries !== "refused" && entries.length >= 4,
+      );
+
+      expect(history).not.toBe("refused");
+      const seen = (history === "refused" ? [] : history).map((entry) => ({
+        event: History.factOf(entry),
+        actor: entry.actor?.uuid,
+        person: History.memberIn(entry),
+        resource: entry.resource?.uuid,
+      }));
+      const empty = undefined;
+      expect(seen).toHaveLength(4);
+      expect(seen).toEqual(
+        expect.arrayContaining([
+          // Nobody added Noah, the first administrator, so he added himself. Noah added Maya.
+          {
+            event: "OrganizationMemberAdded",
+            actor: noah.person,
+            person: noah.person,
+            resource: empty,
+          },
+          {
+            event: "OrganizationMemberAdded",
+            actor: noah.person,
+            person: maya.person,
+            resource: empty,
+          },
+          // The session says who registered and opened the resource.
+          {
+            event: "ResourceRegistered",
+            actor: noah.person,
+            person: empty,
+            resource: "payroll",
+          },
+          {
+            event: "ResourceOpenedForRequests",
+            actor: noah.person,
+            person: empty,
+            resource: "payroll",
+          },
+        ]),
+      );
+    });
+
+    it("show an administrator what one person did, the latest first", async () => {
+      const running = await givenGateway();
+      const noah = await givenOpenResource(running);
+      const maya = await givenMaya(running, noah);
+      // Maya manages the ledger.
+      expect(await registerResource(running, noah, "ledger", "acme", maya.person)).toBe("ok");
+
+      const byNoah = await eventually(
+        () => readHistoryOfActor(running, noah, noah.person),
+        (entries) => entries !== "refused" && entries.length >= 5,
+      );
+
+      expect(byNoah).not.toBe("refused");
+      const entries = byNoah === "refused" ? [] : byNoah;
+      expect(entries.every((entry) => entry.actor?.uuid === noah.person)).toBe(true);
+      // He added himself, as the first administrator, and then Maya.
+      expect(entries.map((entry) => History.factOf(entry)).sort()).toEqual([
+        "OrganizationMemberAdded",
+        "OrganizationMemberAdded",
+        "ResourceOpenedForRequests",
+        "ResourceRegistered",
+        "ResourceRegistered",
+      ]);
+      const moments = entries.map((entry) => entry.when?.seconds ?? 0n);
+      expect(moments).toEqual(moments.toSorted((left, right) => Number(right - left)));
+      // Not even of herself, as she administers nothing.
+      expect(await readHistoryOfActor(running, maya, maya.person)).toBe("refused");
+    });
+
+    it("show a manager the history of a resource they manage, and no other member any history", async () => {
+      const running = await givenGateway();
+      const noah = await givenOpenResource(running);
+      const maya = await givenMaya(running, noah);
+      // Maya manages nothing yet, and administers nothing.
+      expect(await readHistory(running, maya)).toBe("refused");
+      expect(await readHistory(running, maya, "payroll")).toBe("refused");
+      expect(await registerResource(running, noah, "ledger", "acme", maya.person)).toBe("ok");
+
+      const managed = await eventually(
+        () => readHistory(running, maya, "ledger"),
+        (entries) => entries !== "refused" && entries.length === 1,
+      );
+
+      expect(managed === "refused" ? [] : managed.map((entry) => History.factOf(entry))).toEqual([
+        "ResourceRegistered",
+      ]);
+      expect(managed).toMatchObject([
+        { resource: { uuid: "ledger" }, actor: { uuid: noah.person } },
+      ]);
+      // What she does not manage, and the whole organization, stay closed to her.
+      expect(await readHistory(running, maya, "payroll")).toBe("refused");
+      expect(await readHistory(running, maya)).toBe("refused");
+    });
+
     it("refuse an administrator a resource registered for another organization", async () => {
       const running = await givenGateway();
       const noah = await givenMember(running, "noah", "acme");
@@ -364,7 +472,7 @@ describe("The gateway should", () => {
       expect(await catalogItem(running, "acme", "ledger")).toBeUndefined();
     });
 
-    it("tell a browser nothing more of what it watched once its person signs out", async () => {
+    it("send a browser nothing more of what it watched once its person signs out", async () => {
       const running = await givenGateway();
       const noah = await givenMember(running, "noah", "acme");
       const maya = await givenMaya(running, noah);
@@ -378,9 +486,9 @@ describe("The gateway should", () => {
       expect((await signOut(running, maya.token)).status).toBe(200);
       expect(await registerResource(running, noah, "ledger")).toBe("ok");
 
-      // Whoever is still signed in is told, so the news did go out.
+      // Whoever is still signed in hears of it, so the news did go out.
       expect(await his.hears("ledger")).toBe(true);
-      expect(hers.told).not.toContain("ledger");
+      expect(hers.received).not.toContain("ledger");
       expect(await hers.stops()).toBe(true);
     });
 
@@ -439,6 +547,23 @@ describe("The gateway should", () => {
         "globex",
         "somebody@acme.example",
         OrganizationRole.ADMINISTRATOR,
+      );
+
+      expect(outcome).not.toBe("ok");
+      expect(await membership(running, "somebody@acme.example")).toBeUndefined();
+    });
+
+    it("refuse adding a person in the name of another administrator", async () => {
+      const running = await givenGateway();
+      const noah = await givenMember(running, "noah", "acme");
+
+      const outcome = await addMember(
+        running,
+        noah,
+        "acme",
+        "somebody@acme.example",
+        OrganizationRole.MEMBER,
+        "somebody-else",
       );
 
       expect(outcome).not.toBe("ok");

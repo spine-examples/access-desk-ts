@@ -168,6 +168,7 @@ describe("The assembled application should", () => {
         person: { uuid: person },
         emailAddress: NOAH,
         role: OrganizationRole.MEMBER,
+        addedBy: { uuid: person },
       }),
       { organization: acme },
     );

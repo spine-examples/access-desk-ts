@@ -171,7 +171,7 @@ describe("AccessRequestProcessManager should", () => {
       (present) => !present,
     );
 
-    // The grant takes the proposed end, and tells which request extended it.
+    // The grant takes the proposed end, and names the request that extended it.
     const extended = await awaitGrantView(
       box,
       requester,

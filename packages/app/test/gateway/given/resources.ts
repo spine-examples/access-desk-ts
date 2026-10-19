@@ -13,6 +13,7 @@
  */
 
 import { create } from "@bufbuild/protobuf";
+import type { Any } from "@bufbuild/protobuf/wkt";
 import { AnyMessages, TypeUrls } from "@spine-event-engine/core";
 import { TopicSchema } from "@spine-event-engine/proto/client";
 import { expect } from "vitest";
@@ -24,9 +25,15 @@ import {
 import { AccessRequestViewQuery } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_query.js";
 import { SubmitAccessRequestSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/commands_pb.js";
 import {
+  AuditEntrySchema,
+  type AuditEntry,
+} from "@access-desk/resources-model/generated/accessdesk/resources/audit/audit_entry_pb.js";
+import { AuditEntryQuery } from "@access-desk/resources-model/generated/accessdesk/resources/audit/audit_entry_query.js";
+import {
   AccessRequestIdSchema,
   ResourceIdSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
+import { OrganizationMemberAddedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
 import { OpenResourceForRequestsSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/commands_pb.js";
 import { ResourceCatalogItemSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_pb.js";
 import { RegisterResourceSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_registration_commands_pb.js";
@@ -48,7 +55,7 @@ import { givenMember } from "./membership.js";
 import type { Signed } from "./sign-in.js";
 
 /**
- * Has an administrator of Acme register a resource they manage themselves.
+ * Has an administrator of Acme register a resource.
  *
  * @param running The running application.
  * @param administrator An administrator of Acme who works in it.
@@ -56,6 +63,8 @@ import type { Signed } from "./sign-in.js";
  * @param organization The organization the command names. Acme when left
  *   out. The administrator acts in Acme either way, so any other organization
  *   here is one the gateway must refuse.
+ * @param manager The identifier of the person who is to manage the resource.
+ *   The administrator themselves when left out.
  * @returns `"ok"` when the gateway let the command through, and why not otherwise.
  */
 export function registerResource(
@@ -63,6 +72,7 @@ export function registerResource(
   administrator: Signed,
   resource: string,
   organization = "acme",
+  manager: string = administrator.person,
 ): Promise<string> {
   return post(
     running,
@@ -75,12 +85,84 @@ export function registerResource(
       description: `${resource} production`,
       category: "application",
       sensitivity: Sensitivity.RESTRICTED,
-      manager: [{ uuid: administrator.person }],
+      manager: [{ uuid: manager }],
       accessLevel: [{ name: "Read", rank: 1 }],
       maximumDuration: { seconds: 3600n },
     }),
   );
 }
+
+/**
+ * Reads the history of Acme through the gateway as the browser client does.
+ *
+ * @param running The running application.
+ * @param as The signed-in person who reads.
+ * @param of The identifier of the resource whose history is asked for. The
+ *   history of the whole organization when left out.
+ * @returns The entries of the history, or `"refused"` when the gateway or the
+ *   application server did not answer the request.
+ */
+export function readHistory(
+  running: Running,
+  as: Signed,
+  of?: string,
+): Promise<AuditEntry[] | "refused"> {
+  const acting = { ...as, organization: "acme" };
+  return read(
+    running,
+    acting,
+    AuditEntrySchema,
+    of === undefined
+      ? everything(AuditEntrySchema, acting)
+      : AuditEntryQuery.create()
+          .resource()
+          .is(create(ResourceIdSchema, { uuid: of }))
+          .orderBy("when", "desc")
+          .build(),
+  );
+}
+
+/**
+ * Reads what one person did in Acme through the gateway, the latest first.
+ *
+ * @param running The running application.
+ * @param as The signed-in person who reads.
+ * @param actor The identifier of the person whose actions are asked for.
+ * @returns The entries of the history, or `"refused"` when the gateway or the
+ *   application server did not answer the request.
+ */
+export function readHistoryOfActor(
+  running: Running,
+  as: Signed,
+  actor: string,
+): Promise<AuditEntry[] | "refused"> {
+  return read(
+    running,
+    { ...as, organization: "acme" },
+    AuditEntrySchema,
+    AuditEntryQuery.create()
+      .actor()
+      .is(create(PersonIdSchema, { uuid: actor }))
+      .orderBy("when", "desc")
+      .build(),
+  );
+}
+
+/** Reads the facts the entries of a history keep. */
+export const History = {
+  /** The name of the fact an entry keeps, such as `ResourceRegistered`. */
+  factOf(entry: { readonly event?: Any | undefined }): string {
+    const url = entry.event?.typeUrl ?? "";
+    return url.slice(url.lastIndexOf(".") + 1);
+  },
+
+  /** The person who became a member, in an entry of the organization's history. */
+  memberIn(entry: { readonly event?: Any | undefined }): string | undefined {
+    return entry.event === undefined
+      ? undefined
+      : AnyMessages.unpack(entry.event, OrganizationMemberAddedSchema)?.person?.uuid;
+  },
+};
 
 /**
  * Reads a resource of an organization's catalog, as the application server holds it.
@@ -214,22 +296,22 @@ export function readRequests(
   return read(running, acting, AccessRequestViewSchema, asking);
 }
 
-/** What a browser has been told while it watches the catalog of an organization. */
+/** What a browser has received while it watches the catalog of an organization. */
 export interface Watched {
-  /** The resources it was told about, in the order it was told. */
-  readonly told: string[];
+  /** The resources it received news of, in the order they came. */
+  readonly received: string[];
   /**
-   * Waits until the browser is told about a resource.
+   * Waits until the browser receives news of a resource.
    *
    * @param resource The identifier of the resource.
    * @param patienceMs How long to wait. Fifteen seconds when left out.
-   * @returns Whether it was told in time.
+   * @returns Whether the news came in time.
    */
   hears(resource: string, patienceMs?: number): Promise<boolean>;
   /**
-   * Waits until the browser is told nothing more, because its stream has ended.
+   * Waits until the browser receives nothing more, because its stream has ended.
    *
-   * @returns Whether the telling ended in time.
+   * @returns Whether the stream ended in time.
    */
   stops(): Promise<boolean>;
 }
@@ -241,7 +323,7 @@ export interface Watched {
  * @param running The running application.
  * @param as The signed-in person who watches.
  * @param organization The organization whose catalog it is. Acme when left out.
- * @returns What the browser has been told since, once its subscription is opened.
+ * @returns What the browser has received since, once its subscription is opened.
  */
 export async function watchCatalog(
   running: Running,
@@ -261,7 +343,7 @@ export async function watchCatalog(
     }),
     { kind: "entity", authoritativeQuery: () => everything(ResourceCatalogItemSchema, acting) },
   );
-  const told: string[] = [];
+  const received: string[] = [];
   let ended = false;
   void (async () => {
     try {
@@ -275,22 +357,22 @@ export async function watchCatalog(
               ? AnyMessages.unpack(kind.value, ResourceCatalogItemSchema)
               : undefined;
           if (item?.id !== undefined) {
-            told.push(item.id.uuid);
+            received.push(item.id.uuid);
           }
         }
       }
     } catch {
-      // A stream the gateway ended is one the browser is told nothing more on.
+      // A stream the gateway ended is one the browser receives nothing more on.
     } finally {
       ended = true;
     }
   })();
   await subscription.activate();
   return {
-    told,
+    received,
     hears: (resource, patienceMs) =>
       eventually(
-        () => Promise.resolve(told.includes(resource)),
+        () => Promise.resolve(received.includes(resource)),
         (heard) => heard,
         patienceMs,
       ),
@@ -303,15 +385,15 @@ export async function watchCatalog(
 }
 
 /**
- * Waits until a browser is really being told what it watches.
+ * Waits until a browser really receives what it watches.
  *
- * A subscription tells only what happens after it has opened all the way to
+ * A subscription reports only what happens after it has opened all the way to
  * the application server, which is a moment after the browser's call returns.
  * So an administrator registers resources until the browser hears of one.
  *
  * @param running The running application.
  * @param administrator An administrator of Acme who works in it, to register the resources.
- * @param watched What the browser has been told, as {@link watchCatalog} returned it.
+ * @param watched What the browser has received, as {@link watchCatalog} returned it.
  */
 export async function givenTold(
   running: Running,
@@ -325,5 +407,5 @@ export async function givenTold(
       return;
     }
   }
-  throw new Error("The browser was never told what it watches.");
+  throw new Error("The browser never received what it watches.");
 }
