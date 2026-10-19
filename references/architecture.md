@@ -109,11 +109,16 @@ signing out. Everything else is a command, a query, or a subscription it judges
 as it passes, including adding a member and reading who was added. A request to
 Identity names no organization, and the gateway refuses one that does.
 
-A member reads and watches the organization and its catalog freely. Everything
-else they see only where it concerns them: the requests they made and the
-grants they hold, those of a resource they manage, and their own queue of
-requests to decide. A query or a subscription must therefore say whose it
-wants, by one condition on one column, and the gateway refuses any other.
+A member can read and watch the organization and its catalog. Everything else
+they see only where it concerns them:
+
+- the requests they made and the grants they hold;
+- their own queue of requests to decide;
+- for a resource they manage, its requests, grants, and history.
+
+So a query or a subscription must say whose data it wants, with exactly one
+condition on one column. The gateway refuses anything else. An administrator
+can also read the history of the whole organization.
 
 What a browser watches belongs to the session it was opened under. When the
 session ends, because the person signs out, the gateway stops everything opened
@@ -250,8 +255,8 @@ A submission is checked before the request is accepted, and changes no grant:
    gives no access — the submission fails and the request ends without effect.
    Otherwise the request is submitted and awaits a manager's decision.
 
-A first-time request and an extension request tell the start and the failure
-of their submission with their own facts.
+A first-time request and an extension request record the start and the
+failure of their submission with their own events.
 
 Grants change only after approval.
 
@@ -330,6 +335,14 @@ immutable, organization-scoped, and rebuildable from durable facts, recording
 actor, time, reason, related identifiers, correlation, and causation while
 redacting secrets, credentials, and unnecessary payload data. Audit ingestion
 must not synchronously block the originating business command.
+
+The history is the `AuditEntry` read model. Every accepted action in the
+membership, resource, request, and grant flows adds one entry. An entry stores
+the event exactly as it was recorded, plus three fields used to find and sort
+entries: when it happened, who did it, and which resource it concerns.
+Anything else, such as a reason, is read from the event itself. A reader that
+knows the application's types can turn any entry into JSON, whatever its
+event.
 
 Audit projections and human-readable timelines are derived views, not editable
 sources of truth. Retention/export policy remains a deployment decision and

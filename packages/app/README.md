@@ -67,7 +67,7 @@ Every endpoint of its own works the same way:
 
 | Status | Body                           | Means                                                            |
 | ------ | ------------------------------ | ---------------------------------------------------------------- |
-| `200`  | as each endpoint tells         | Done.                                                            |
+| `200`  | as each endpoint describes     | Done.                                                            |
 | `401`  | `{ "error": "not signed in" }` | The endpoint needs a session, and there is none or it has ended. |
 | `403`  | `{ "error": "refused" }`       | The person may not do this, or the request is malformed.         |
 | `503`  | `{ "error": "try again" }`     | The gateway could not do it just now.                            |
@@ -87,7 +87,7 @@ A person signs in in four steps.
 
 #### `POST /auth/options`
 
-Tells which identity providers a sign-in page may offer. Needs no session.
+Lists the identity providers a sign-in page may offer. Needs no session.
 
 Send `{}`.
 
@@ -199,14 +199,14 @@ organization.
 
 | Request                                                          | Who may send it                                                            |
 | ---------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `AddMember`                                                      | An administrator, for their own organization.                              |
+| `AddMember`                                                      | An administrator, for their own organization, naming themselves as adder.  |
 | Query on `MembershipView`, filtered by `organization` alone      | An administrator, for their own organization.                              |
 | `SubmitAccessRequest`, `SubmitAccessExtensionRequest`            | A member, as the requester.                                                |
 | `CancelAccessRequest`                                            | The member who made the request.                                           |
 | `ApproveAccessRequest`, `DenyAccessRequest`, `RevokeAccessGrant` | A member, as the manager. The domain checks that they manage the resource. |
 | `OpenResourceForRequests`, `CloseResourceForRequests`            | A manager of the resource, or an administrator.                            |
 | `RegisterResource`                                               | An administrator, for their own organization.                              |
-| Query or subscription on a read model                            | A member, as [What a member may read](#what-a-member-may-read) tells.      |
+| Query or subscription on a read model                            | A member, as [What a member may read](#what-a-member-may-read) describes.  |
 
 ### What a member may read
 
@@ -225,6 +225,8 @@ refused.
 | `AccessGrantView`          | `grantee` equal to the person's own identifier   | The member themselves.               |
 | `AccessGrantView`          | `resource` equal to one resource's identifier    | A manager of that resource.          |
 | `AccessDecisionAssignment` | the one kept under the person's own identifier   | The member themselves, as a manager. |
+| `AuditEntry`               | `resource` equal to one resource's identifier    | A manager of that resource.          |
+| `AuditEntry`               | anything                                         | An administrator.                    |
 
 A subscription takes the same condition as a filter on its topic. The decision
 queue is asked for by its identifier, which is the manager's own.
