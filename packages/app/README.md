@@ -198,8 +198,8 @@ belongs to. A request to Identity, such as adding a member, names no
 organization.
 
 | Request                                                          | Who may send it                                                            |
-| ---------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `AddMember`                                                      | An administrator, for their own organization, naming themselves as adder.  |
+| ---------------------------------------------------------------- |----------------------------------------------------------------------------|
+| `AddMember`                                                      | An administrator, for their own organization.                              |
 | Query on `MembershipView`, filtered by `organization` alone      | An administrator, for their own organization.                              |
 | `SubmitAccessRequest`, `SubmitAccessExtensionRequest`            | A member, as the requester.                                                |
 | `CancelAccessRequest`                                            | The member who made the request.                                           |

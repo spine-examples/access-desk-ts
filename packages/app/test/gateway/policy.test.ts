@@ -219,59 +219,56 @@ describe("Gateway policy should", () => {
     expect(await authorize(principal, { kind: "cancel" } as IncomingRequest)).toBe(true);
   });
 
-  it.each([["memberships", MembershipViewSchema]])(
-    "allow an administrator only the exact %s query for their organization",
-    async (_what, schema) => {
-      const administrator = desk(OrganizationRole.ADMINISTRATOR);
-      const member = desk();
-      const acme = create(OrganizationIdSchema, { uuid: "acme" });
-      const globex = create(OrganizationIdSchema, { uuid: "globex" });
-      const targetFor = (id: typeof acme) =>
-        create(TargetSchema, {
-          type: TypeUrls.derive(schema),
-          criterion: {
-            case: "filters",
-            value: {
-              filter: [
-                {
-                  filter: [
-                    {
-                      fieldPath: { fieldName: ["organization"] },
-                      value: AnyMessages.pack(OrganizationIdSchema, id),
-                      operator: Filter_Operator.EQUAL,
-                    },
-                  ],
-                },
-              ],
-            },
+  it("allow an administrator only the exact memberships query for their organization", async () => {
+    const administrator = desk(OrganizationRole.ADMINISTRATOR);
+    const member = desk();
+    const acme = create(OrganizationIdSchema, { uuid: "acme" });
+    const globex = create(OrganizationIdSchema, { uuid: "globex" });
+    const targetFor = (id: typeof acme) =>
+      create(TargetSchema, {
+        type: TypeUrls.derive(MembershipViewSchema),
+        criterion: {
+          case: "filters",
+          value: {
+            filter: [
+              {
+                filter: [
+                  {
+                    fieldPath: { fieldName: ["organization"] },
+                    value: AnyMessages.pack(OrganizationIdSchema, id),
+                    operator: Filter_Operator.EQUAL,
+                  },
+                ],
+              },
+            ],
           },
-        });
-      const queryFor = (id: typeof acme): IncomingRequest =>
-        ({ kind: "query", target: targetFor(id) }) as IncomingRequest;
-      const authorize = (application: ReturnType<typeof desk>) =>
-        Policy.authorization(application as unknown as AccessDesk);
+        },
+      });
+    const queryFor = (id: typeof acme): IncomingRequest =>
+      ({ kind: "query", target: targetFor(id) }) as IncomingRequest;
+    const authorize = (application: ReturnType<typeof desk>) =>
+      Policy.authorization(application as unknown as AccessDesk);
 
-      expect(await authorize(administrator)(principal, queryFor(acme))).toBe(true);
-      expect(await authorize(administrator)(principal, queryFor(globex))).toBe(false);
-      // Not of every organization at once.
-      expect(
-        await authorize(administrator)(principal, {
-          kind: "query",
-          target: create(TargetSchema, {
-            type: TypeUrls.derive(schema),
-            criterion: { case: "includeAll", value: true },
-          }),
-        } as IncomingRequest),
-      ).toBe(false);
-      expect(await authorize(member)(principal, queryFor(acme))).toBe(false);
-      expect(
-        await authorize(administrator)(principal, {
-          kind: "subscribe",
-          target: targetFor(acme),
-        } as IncomingRequest),
-      ).toBe(false);
-    },
-  );
+    expect(await authorize(administrator)(principal, queryFor(acme))).toBe(true);
+    expect(await authorize(administrator)(principal, queryFor(globex))).toBe(false);
+    // Not of every organization at once.
+    expect(
+      await authorize(administrator)(principal, {
+        kind: "query",
+        target: create(TargetSchema, {
+          type: TypeUrls.derive(MembershipViewSchema),
+          criterion: { case: "includeAll", value: true },
+        }),
+      } as IncomingRequest),
+    ).toBe(false);
+    expect(await authorize(member)(principal, queryFor(acme))).toBe(false);
+    expect(
+      await authorize(administrator)(principal, {
+        kind: "subscribe",
+        target: targetFor(acme),
+      } as IncomingRequest),
+    ).toBe(false);
+  });
 
   it("let a manager read and watch the audit trail of a resource they manage, and refuse any other member", async () => {
     const manager = desk();

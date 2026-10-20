@@ -55,7 +55,7 @@ afterEach(stopGateways);
 
 describe("The gateway should", () => {
   describe("sign a person in, and", () => {
-    it("say who they are and the organization they belong to", async () => {
+    it("tell them who they are and the organization they belong to", async () => {
       const running = await givenGateway();
 
       const noah = await signIn(running, "noah");
@@ -67,7 +67,7 @@ describe("The gateway should", () => {
       });
     });
 
-    it("say to a person nobody added anywhere that they belong to no organization", async () => {
+    it("tell a person nobody added anywhere that they belong to no organization", async () => {
       const running = await givenGateway();
 
       const maya = await signIn(running, "maya");
