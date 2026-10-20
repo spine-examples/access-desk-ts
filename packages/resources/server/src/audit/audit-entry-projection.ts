@@ -286,10 +286,10 @@ export class AuditEntryProjection extends Projection<AuditEntryId, typeof AuditE
   }
 
   /**
-   * The person in whose name the organization was asked to do what led to a fact.
+   * The person in whose name the organization was asked to do what led to an event.
    *
-   * @param context What the organization recorded about the fact.
-   * @returns The person, or `undefined` when the fact came of no person's asking.
+   * @param context What the organization recorded about the event.
+   * @returns The person, or `undefined` when the event came of no person's asking.
    */
   private static askedBy(context: EventContext): PersonId | undefined {
     const origin = context.origin;

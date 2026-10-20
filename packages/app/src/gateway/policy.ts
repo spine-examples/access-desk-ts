@@ -240,10 +240,10 @@ type ReadRule = (target: Target, asking: Asking, desk: AccessDesk) => boolean | 
  * - the requests they made, and those for a resource they manage;
  * - the grants they hold, and those to a resource they manage;
  * - their own queue of requests to decide;
- * - the history of a resource they manage.
+ * - the audit trail of a resource they manage.
  *
- * So a query for requests, grants, or history must filter by the person or by
- * the resource. An administrator sees the history of the whole organization,
+ * So a query for requests, grants, or audit trail must filter by the person or by
+ * the resource. An administrator sees the audit trail of the whole organization,
  * and need not filter it. The decision queue is asked for by its identifier,
  * which is the manager's own. Anything not listed here cannot be read.
  */

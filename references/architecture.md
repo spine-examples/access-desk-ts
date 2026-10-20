@@ -114,11 +114,11 @@ they see only where it concerns them:
 
 - the requests they made and the grants they hold;
 - their own queue of requests to decide;
-- for a resource they manage, its requests, grants, and history.
+- for a resource they manage, its requests, grants, and audit trail.
 
 So a query or a subscription must say whose data it wants, with exactly one
 condition on one column. The gateway refuses anything else. An administrator
-can also read the history of the whole organization.
+can also read the audit trail of the whole organization.
 
 What a browser watches belongs to the session it was opened under. When the
 session ends, because the person signs out, the gateway stops everything opened
@@ -131,7 +131,7 @@ Authority takes two forms, both organization-scoped.
 A **role** is standing authority a person holds in the organization itself:
 Member (the baseline every member holds, who may act as a requester) and
 Administrator, who adds people to the organization and registers resources.
-A manager is to see the audit history of the resources they manage,
+A manager is to see the audit trail of the resources they manage,
 and an administrator that of the whole organization.
 
 A **relation** is a position toward one specific entity, read from domain state
@@ -336,7 +336,7 @@ actor, time, reason, related identifiers, correlation, and causation while
 redacting secrets, credentials, and unnecessary payload data. Audit ingestion
 must not synchronously block the originating business command.
 
-The history is the `AuditEntry` read model. Every accepted action in the
+The audit trail is the `AuditEntry` read model. Every accepted action in the
 membership, resource, request, and grant flows adds one entry. An entry stores
 the event exactly as it was recorded, plus three fields used to find and sort
 entries: when it happened, who did it, and which resource it concerns.

@@ -79,7 +79,7 @@ export function addMember(
  * person joins.
  *
  * @param running The running application.
- * @param as Who adds the person. The command also names them as the one adding.
+ * @param as Who adds the person.
  * @param organization The organization's name.
  * @param person The identifier of the person to add.
  * @returns `"ok"` when the gateway let the command through, and why not otherwise.

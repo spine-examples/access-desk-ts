@@ -28,7 +28,7 @@ import {
   eventually,
   givenOrganization,
   givenServer,
-  historyOf,
+  auditTrailOf,
   organizationView,
   type Hosted,
 } from "./given/hosted.js";
@@ -106,7 +106,7 @@ describe("The organizations' members, reached through the application server, sh
     await membersOf(server).add(joining("acme", "maya", OrganizationRole.MEMBER, "noah"));
 
     const [entry] = await eventually(
-      () => historyOf(server, organizationId("acme")),
+      () => auditTrailOf(server, organizationId("acme")),
       (entries) => entries.length === 1,
     );
     const added =

@@ -273,7 +273,7 @@ describe("Gateway policy should", () => {
     },
   );
 
-  it("let a manager read and watch the history of a resource they manage, and refuse any other member", async () => {
+  it("let a manager read and watch the audit trail of a resource they manage, and refuse any other member", async () => {
     const manager = desk();
     const member = desk();
     member.manages.mockResolvedValue(false);
@@ -290,10 +290,10 @@ describe("Gateway policy should", () => {
         } as IncomingRequest);
 
       expect(await asking(where(AuditEntrySchema, "resource", payroll))).toBe(true);
-      // The history of the whole organization is not a manager's to see.
+      // The audit trail of the whole organization is not a manager's to see.
       expect(await asking(everything)).toBe(false);
       expect(await asking(where(AuditEntrySchema, "actor", me))).toBe(false);
-      // Somebody who manages nothing sees no history at all.
+      // Somebody who manages nothing sees no audit trail at all.
       expect(await asking(where(AuditEntrySchema, "resource", payroll), member)).toBe(false);
       expect(await asking(everything, member)).toBe(false);
     }
@@ -304,7 +304,7 @@ describe("Gateway policy should", () => {
     );
   });
 
-  it("let an administrator read and watch the history of the whole organization", async () => {
+  it("let an administrator read and watch the audit trail of the whole organization", async () => {
     const administrator = desk(OrganizationRole.ADMINISTRATOR);
     administrator.manages.mockResolvedValue(false);
     const authorize = Policy.authorization(administrator as unknown as AccessDesk);

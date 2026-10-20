@@ -33,48 +33,48 @@ import { ResourceRegisteredSchema } from "@access-desk/resources-model/generated
 import { contextOf, readAll, readWhere, testActorContext } from "../../given/resources-context.js";
 
 /**
- * Reads the whole history of the organization.
+ * Reads the whole audit trail of the organization.
  *
  * @param reader The actor scope that reads.
- * @returns Every entry of the history.
+ * @returns Every entry of the audit trail.
  */
-export function readHistory(reader: BlackBoxScope): Promise<AuditEntry[]> {
-  return readAll(reader, AuditEntrySchema, "history");
+export function readAuditTrail(reader: BlackBoxScope): Promise<AuditEntry[]> {
+  return readAll(reader, AuditEntrySchema, "audit-trail");
 }
 
 /**
- * Reads the history of one resource.
+ * Reads the audit trail of one resource.
  *
  * @param reader The actor scope that reads.
  * @param resource The identifier of the resource.
  * @returns The entries about what happened to the resource.
  */
-export function readHistoryOf(reader: BlackBoxScope, resource: string): Promise<AuditEntry[]> {
+export function readAuditTrailOf(reader: BlackBoxScope, resource: string): Promise<AuditEntry[]> {
   return readWhere(
     reader,
     AuditEntrySchema,
-    "history-of-resource",
+    "audit-trail-of-resource",
     "resource",
     ResourceIdSchema,
     create(ResourceIdSchema, { uuid: resource }),
   );
 }
 
-/** An entry of the history, with the fact it keeps. */
+/** An entry of the audit trail, with the event it keeps. */
 export interface Recorded<Schema extends GenMessage<Message>> {
   /** The entry. */
   readonly entry: AuditEntry;
-  /** The fact the entry keeps. */
-  readonly fact: MessageShape<Schema>;
+  /** The event the entry keeps. */
+  readonly event: MessageShape<Schema>;
 }
 
 /**
- * The names of the facts some entries keep, such as `AccessGrantRevoked`.
+ * The names of the events some entries keep, such as `AccessGrantRevoked`.
  *
  * @param entries The entries.
- * @returns The name of each entry's fact, in the order of the entries.
+ * @returns The name of each entry's event, in the order of the entries.
  */
-export function factsOf(entries: readonly AuditEntry[]): string[] {
+export function eventsOf(entries: readonly AuditEntry[]): string[] {
   return entries.map((entry) => {
     const url = entry.event?.typeUrl ?? "";
     return url.slice(url.lastIndexOf(".") + 1);
@@ -86,46 +86,46 @@ function recordedOf<Schema extends GenMessage<Message>>(
   schema: Schema,
 ): Recorded<Schema>[] {
   return rows.flatMap((entry) => {
-    const fact = entry.event === undefined ? undefined : AnyMessages.unpack(entry.event, schema);
-    return fact === undefined ? [] : [{ entry, fact }];
+    const event = entry.event === undefined ? undefined : AnyMessages.unpack(entry.event, schema);
+    return event === undefined ? [] : [{ entry, event }];
   });
 }
 
 /**
- * Waits until the history holds an entry of an event.
+ * Waits until the audit trail holds an entry of an event.
  *
  * @param box The BlackBox whose bounded waiting backs the read.
  * @param reader The actor scope that reads.
- * @param schema The kind of the fact.
+ * @param schema The type of the event.
  * @param accept Whether an entry of that kind is the awaited one. Any, when left out.
- * @returns The entry, and the fact it keeps.
+ * @returns The entry, and the event it keeps.
  */
 export async function awaitEntry<Schema extends GenMessage<Message>>(
   box: BlackBox,
   reader: BlackBoxScope,
   schema: Schema,
-  accept: (fact: MessageShape<Schema>) => boolean = () => true,
+  accept: (event: MessageShape<Schema>) => boolean = () => true,
 ): Promise<Recorded<Schema>> {
   const matching = (rows: AuditEntry[]): Recorded<Schema>[] =>
-    recordedOf(rows, schema).filter(({ fact }) => accept(fact));
+    recordedOf(rows, schema).filter(({ event }) => accept(event));
   const [found] = matching(
     await box.eventually(
-      () => readHistory(reader),
+      () => readAuditTrail(reader),
       (rows) => matching(rows).length > 0,
     ),
   );
   if (found === undefined) {
-    throw new Error(`The history holds no entry of ${schema.typeName}.`);
+    throw new Error(`The audit trail holds no entry of ${schema.typeName}.`);
   }
   return found;
 }
 
 /**
- * Waits until the history holds a number of entries of one kind of event.
+ * Waits until the audit trail holds a number of entries of one kind of event.
  *
  * @param box The BlackBox whose bounded waiting backs the read.
  * @param reader The actor scope that reads.
- * @param schema The kind of the facts.
+ * @param schema The type of the events.
  * @param times How many entries of that kind to wait for.
  * @returns The entries of that kind.
  */
@@ -139,7 +139,7 @@ export async function awaitEntries(
     recordedOf(rows, schema).map(({ entry }) => entry);
   return of(
     await box.eventually(
-      () => readHistory(reader),
+      () => readAuditTrail(reader),
       (rows) => of(rows).length >= times,
     ),
   );
@@ -173,9 +173,9 @@ export interface Recording {
  * The test picks the change and its cause, to set up cases the real flow
  * never produces.
  *
- * @param box The BlackBox whose context records the fact.
+ * @param box The BlackBox whose context records the event.
  * @param resource The identifier of the registered resource.
- * @param recording Which change records the fact.
+ * @param recording Which change records the event.
  */
 export async function recordRegistered(
   box: BlackBox,

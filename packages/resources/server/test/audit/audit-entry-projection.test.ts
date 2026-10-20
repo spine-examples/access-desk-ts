@@ -75,14 +75,14 @@ import { closeResource, openResource, registerResource } from "../resource/given
 import {
   awaitEntries,
   awaitEntry,
-  factsOf,
-  readHistory,
-  readHistoryOf,
+  eventsOf,
+  readAuditTrail,
+  readAuditTrailOf,
   recordRegistered,
   registrationCommand,
 } from "./given/audit-entry.js";
 
-// The history is made of the facts the other flows record, produced here
+// The audit trail is made of the events the other flows record, produced here
 // through the real commands of those flows.
 beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
@@ -95,8 +95,8 @@ describe("AuditEntryProjection should", () => {
 
     await addOrganizationMember(administrator, "maya", OrganizationRole.MEMBER, "noah");
 
-    const { entry, fact } = await awaitEntry(box, administrator, OrganizationMemberAddedSchema);
-    expect(fact.person?.uuid).toBe("maya");
+    const { entry, event } = await awaitEntry(box, administrator, OrganizationMemberAddedSchema);
+    expect(event.person?.uuid).toBe("maya");
     expect(entry.when).toEqual(minutesIn(0));
     expect(entry.actor?.uuid).toBe("noah");
     expect(entry.resource).toBeUndefined();
@@ -109,8 +109,8 @@ describe("AuditEntryProjection should", () => {
 
     await registerResource(administrator, "ledger");
 
-    const { entry, fact } = await awaitEntry(box, administrator, ResourceRegisteredSchema);
-    expect(fact.id?.uuid).toBe("ledger");
+    const { entry, event } = await awaitEntry(box, administrator, ResourceRegisteredSchema);
+    expect(event.id?.uuid).toBe("ledger");
     expect(entry).toMatchObject({
       resource: { uuid: "ledger" },
       actor: { uuid: "noah" },
@@ -128,8 +128,8 @@ describe("AuditEntryProjection should", () => {
     // The organization holds a resource under that name already.
     await registerResource(administrator, "ledger-2", "ledger");
 
-    const { entry, fact } = await awaitEntry(box, administrator, ResourceRegistrationFailedSchema);
-    expect(fact.id?.uuid).toBe("ledger-2");
+    const { entry, event } = await awaitEntry(box, administrator, ResourceRegistrationFailedSchema);
+    expect(event.id?.uuid).toBe("ledger-2");
     expect(entry).toMatchObject({ resource: { uuid: "ledger-2" }, actor: { uuid: "noah" } });
   });
 
@@ -161,9 +161,9 @@ describe("AuditEntryProjection should", () => {
 
     await submitAndAssign(box, requester, "audit-requested", "primary");
 
-    const { entry, fact } = await awaitEntry(box, requester, AccessRequestSubmittedSchema);
-    expect(fact.id?.uuid).toBe("audit-requested");
-    expect(fact.snapshot?.justification).toBe("Need payroll review");
+    const { entry, event } = await awaitEntry(box, requester, AccessRequestSubmittedSchema);
+    expect(event.id?.uuid).toBe("audit-requested");
+    expect(event.snapshot?.justification).toBe("Need payroll review");
     expect(entry).toMatchObject({
       resource: { uuid: resourceUuid },
       actor: { uuid: actor },
@@ -180,9 +180,13 @@ describe("AuditEntryProjection should", () => {
       submitExtensionRequest("audit-extension", { grant: { uuid: "audit-grant" } }),
     );
 
-    const { entry, fact } = await awaitEntry(box, requester, AccessExtensionRequestSubmittedSchema);
-    expect(fact.id?.uuid).toBe("audit-extension");
-    expect(fact.snapshot?.justification).toBe("Keep payroll access a little longer");
+    const { entry, event } = await awaitEntry(
+      box,
+      requester,
+      AccessExtensionRequestSubmittedSchema,
+    );
+    expect(event.id?.uuid).toBe("audit-extension");
+    expect(event.snapshot?.justification).toBe("Keep payroll access a little longer");
     expect(entry).toMatchObject({ resource: { uuid: resourceUuid }, actor: { uuid: actor } });
   });
 
@@ -199,11 +203,11 @@ describe("AuditEntryProjection should", () => {
       }),
     );
 
-    const { entry, fact } = await awaitEntry(box, requester, AccessRequestSubmissionFailedSchema);
-    expect(fact.id?.uuid).toBe("audit-too-long");
+    const { entry, event } = await awaitEntry(box, requester, AccessRequestSubmissionFailedSchema);
+    expect(event.id?.uuid).toBe("audit-too-long");
     expect(entry).toMatchObject({ resource: { uuid: resourceUuid }, actor: { uuid: actor } });
-    // Managers see it in the resource's history.
-    expect(factsOf(await readHistoryOf(requester, resourceUuid))).toContain(
+    // Managers see it in the resource's audit trail.
+    expect(eventsOf(await readAuditTrailOf(requester, resourceUuid))).toContain(
       "AccessRequestSubmissionFailed",
     );
   });
@@ -219,14 +223,14 @@ describe("AuditEntryProjection should", () => {
       submitExtensionRequest("audit-no-grant", { grant: { uuid: "no-such-grant" } }),
     );
 
-    const { entry, fact } = await awaitEntry(
+    const { entry, event } = await awaitEntry(
       box,
       requester,
       AccessExtensionRequestSubmissionFailedSchema,
     );
-    expect(fact.id?.uuid).toBe("audit-no-grant");
+    expect(event.id?.uuid).toBe("audit-no-grant");
     expect(entry).toMatchObject({ resource: { uuid: resourceUuid }, actor: { uuid: actor } });
-    expect(factsOf(await readHistoryOf(requester, resourceUuid))).toContain(
+    expect(eventsOf(await readAuditTrailOf(requester, resourceUuid))).toContain(
       "AccessExtensionRequestSubmissionFailed",
     );
   });
@@ -241,8 +245,8 @@ describe("AuditEntryProjection should", () => {
 
     await approveAccessRequest(box, "audit-approved", "primary");
 
-    const { entry, fact } = await awaitEntry(box, requester, AccessRequestApprovalStartedSchema);
-    expect(fact.id?.uuid).toBe("audit-approved");
+    const { entry, event } = await awaitEntry(box, requester, AccessRequestApprovalStartedSchema);
+    expect(event.id?.uuid).toBe("audit-approved");
     expect(entry).toMatchObject({
       resource: { uuid: resourceUuid },
       actor: { uuid: "primary" },
@@ -255,8 +259,8 @@ describe("AuditEntryProjection should", () => {
 
     const requester = await givenActiveGrant(box, "audit-approved", 10);
 
-    const { entry, fact } = await awaitEntry(box, requester, AccessRequestApprovedSchema);
-    expect(fact.id?.uuid).toBe("audit-approved");
+    const { entry, event } = await awaitEntry(box, requester, AccessRequestApprovedSchema);
+    expect(event.id?.uuid).toBe("audit-approved");
     expect(entry).toMatchObject({ resource: { uuid: resourceUuid }, actor: { uuid: "primary" } });
   });
 
@@ -274,8 +278,8 @@ describe("AuditEntryProjection should", () => {
 
     await approveAccessRequest(box, "audit-late", "primary");
 
-    const { entry, fact } = await awaitEntry(box, requester, AccessRequestApprovalFailedSchema);
-    expect(fact.id?.uuid).toBe("audit-late");
+    const { entry, event } = await awaitEntry(box, requester, AccessRequestApprovalFailedSchema);
+    expect(event.id?.uuid).toBe("audit-late");
     expect(entry).toMatchObject({
       resource: { uuid: resourceUuid },
       actor: { uuid: "primary" },
@@ -293,9 +297,9 @@ describe("AuditEntryProjection should", () => {
 
     await denyAccessRequest(box, "audit-denied", "primary", "Insufficient justification.");
 
-    const { entry, fact } = await awaitEntry(box, requester, AccessRequestDeniedSchema);
-    expect(fact.id?.uuid).toBe("audit-denied");
-    expect(fact.reason).toBe("Insufficient justification.");
+    const { entry, event } = await awaitEntry(box, requester, AccessRequestDeniedSchema);
+    expect(event.id?.uuid).toBe("audit-denied");
+    expect(event.reason).toBe("Insufficient justification.");
     expect(entry).toMatchObject({
       resource: { uuid: resourceUuid },
       actor: { uuid: "primary" },
@@ -311,8 +315,8 @@ describe("AuditEntryProjection should", () => {
 
     await cancelAccessRequest(requester, "audit-canceled");
 
-    const { entry, fact } = await awaitEntry(box, requester, AccessRequestCanceledSchema);
-    expect(fact.id?.uuid).toBe("audit-canceled");
+    const { entry, event } = await awaitEntry(box, requester, AccessRequestCanceledSchema);
+    expect(event.id?.uuid).toBe("audit-canceled");
     expect(entry).toMatchObject({ resource: { uuid: resourceUuid }, actor: { uuid: actor } });
   });
 
@@ -321,8 +325,8 @@ describe("AuditEntryProjection should", () => {
 
     const requester = await givenActiveGrant(box, "audit-grant", 10);
 
-    const { entry, fact } = await awaitEntry(box, requester, AccessGrantCreatedSchema);
-    expect(fact).toMatchObject({
+    const { entry, event } = await awaitEntry(box, requester, AccessGrantCreatedSchema);
+    expect(event).toMatchObject({
       id: { uuid: "audit-grant" },
       request: { uuid: "audit-grant" },
       access: { grantee: { uuid: actor } },
@@ -336,8 +340,8 @@ describe("AuditEntryProjection should", () => {
 
     await approveExtension(box, "audit-extension", "audit-grant", 5);
 
-    const { entry, fact } = await awaitEntry(box, requester, AccessGrantExtendedSchema);
-    expect(fact).toMatchObject({
+    const { entry, event } = await awaitEntry(box, requester, AccessGrantExtendedSchema);
+    expect(event).toMatchObject({
       id: { uuid: "audit-grant" },
       request: { uuid: "audit-extension" },
     });
@@ -354,8 +358,8 @@ describe("AuditEntryProjection should", () => {
     await revokeGrant(box, "audit-grant", "primary", "No longer on the project.");
     await awaitGrantRevoked(box, requester, "audit-grant");
 
-    const { entry, fact } = await awaitEntry(box, requester, AccessGrantRevokedSchema);
-    expect(fact).toMatchObject({
+    const { entry, event } = await awaitEntry(box, requester, AccessGrantRevokedSchema);
+    expect(event).toMatchObject({
       id: { uuid: "audit-grant" },
       reason: "No longer on the project.",
     });
@@ -366,16 +370,16 @@ describe("AuditEntryProjection should", () => {
     });
   });
 
-  it("keep the history of one resource apart from everything else", async () => {
+  it("keep the audit trail of one resource apart from everything else", async () => {
     const box = await resourcesBlackBox(testClock());
     const requester = await givenActiveGrant(box, "audit-grant", 10);
     await registerResource(requester, "ledger");
     await awaitEntry(box, requester, ResourceRegisteredSchema);
 
-    const history = await readHistoryOf(requester, resourceUuid);
+    const trail = await readAuditTrailOf(requester, resourceUuid);
 
     // What happened to the payroll resource, and nothing of the members or of the ledger.
-    expect(factsOf(history).sort()).toEqual(
+    expect(eventsOf(trail).sort()).toEqual(
       [
         "ResourceOpenedForRequests",
         "AccessRequestSubmitted",
@@ -384,8 +388,8 @@ describe("AuditEntryProjection should", () => {
         "AccessRequestApproved",
       ].sort(),
     );
-    expect(history.every((entry) => entry.resource?.uuid === resourceUuid)).toBe(true);
-    expect(factsOf(await readHistoryOf(requester, "ledger"))).toEqual(["ResourceRegistered"]);
+    expect(trail.every((entry) => entry.resource?.uuid === resourceUuid)).toBe(true);
+    expect(eventsOf(await readAuditTrailOf(requester, "ledger"))).toEqual(["ResourceRegistered"]);
   });
 
   it("keep two actions apart when one command led to both", async () => {
@@ -449,7 +453,7 @@ describe("AuditEntryProjection should", () => {
           }) as unknown,
         }),
       );
-      expect(await readHistory(scope)).toEqual([]);
+      expect(await readAuditTrail(scope)).toEqual([]);
     } finally {
       logged.mockRestore();
     }

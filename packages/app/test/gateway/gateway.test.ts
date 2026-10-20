@@ -32,9 +32,9 @@ import {
   catalogItem,
   givenOpenResource,
   givenTold,
-  History,
-  readHistory,
-  readHistoryOfActor,
+  AuditTrail,
+  readAuditTrail,
+  readAuditTrailOfActor,
   readRequests,
   registerResource,
   submitRequest,
@@ -357,21 +357,21 @@ describe("The gateway should", () => {
       expect(await readRequests(running, maya, { resource: "payroll" })).toBe("refused");
     });
 
-    it("show an administrator the history of the whole organization, and who did each thing", async () => {
+    it("show an administrator the audit trail of the whole organization, and who did each thing", async () => {
       const running = await givenGateway();
       const noah = await givenOpenResource(running);
       const maya = await givenMaya(running, noah);
 
-      const history = await eventually(
-        () => readHistory(running, noah),
+      const trail = await eventually(
+        () => readAuditTrail(running, noah),
         (entries) => entries !== "refused" && entries.length >= 4,
       );
 
-      expect(history).not.toBe("refused");
-      const seen = (history === "refused" ? [] : history).map((entry) => ({
-        event: History.factOf(entry),
+      expect(trail).not.toBe("refused");
+      const seen = (trail === "refused" ? [] : trail).map((entry) => ({
+        event: AuditTrail.eventOf(entry),
         actor: entry.actor?.uuid,
-        person: History.memberIn(entry),
+        person: AuditTrail.memberIn(entry),
         resource: entry.resource?.uuid,
       }));
       const empty = undefined;
@@ -416,7 +416,7 @@ describe("The gateway should", () => {
       expect(await registerResource(running, noah, "ledger", "acme", maya.person)).toBe("ok");
 
       const byNoah = await eventually(
-        () => readHistoryOfActor(running, noah, noah.person),
+        () => readAuditTrailOfActor(running, noah, noah.person),
         (entries) => entries !== "refused" && entries.length >= 5,
       );
 
@@ -424,7 +424,7 @@ describe("The gateway should", () => {
       const entries = byNoah === "refused" ? [] : byNoah;
       expect(entries.every((entry) => entry.actor?.uuid === noah.person)).toBe(true);
       // He added himself, as the first administrator, and then Maya.
-      expect(entries.map((entry) => History.factOf(entry)).sort()).toEqual([
+      expect(entries.map((entry) => AuditTrail.eventOf(entry)).sort()).toEqual([
         "OrganizationMemberAdded",
         "OrganizationMemberAdded",
         "ResourceOpenedForRequests",
@@ -434,54 +434,54 @@ describe("The gateway should", () => {
       const moments = entries.map((entry) => entry.when?.seconds ?? 0n);
       expect(moments).toEqual(moments.toSorted((left, right) => Number(right - left)));
       // Not even of herself, as she administers nothing.
-      expect(await readHistoryOfActor(running, maya, maya.person)).toBe("refused");
+      expect(await readAuditTrailOfActor(running, maya, maya.person)).toBe("refused");
     });
 
-    it("show a manager the history of a resource they manage, and no other member any history", async () => {
+    it("show a manager the audit trail of a resource they manage, and no other member any audit trail", async () => {
       const running = await givenGateway();
       const noah = await givenOpenResource(running);
       const maya = await givenMaya(running, noah);
       // Maya manages nothing yet, and administers nothing.
-      expect(await readHistory(running, maya)).toBe("refused");
-      expect(await readHistory(running, maya, "payroll")).toBe("refused");
+      expect(await readAuditTrail(running, maya)).toBe("refused");
+      expect(await readAuditTrail(running, maya, "payroll")).toBe("refused");
       expect(await registerResource(running, noah, "ledger", "acme", maya.person)).toBe("ok");
 
       const managed = await eventually(
-        () => readHistory(running, maya, "ledger"),
+        () => readAuditTrail(running, maya, "ledger"),
         (entries) => entries !== "refused" && entries.length === 1,
       );
 
-      expect(managed === "refused" ? [] : managed.map((entry) => History.factOf(entry))).toEqual([
-        "ResourceRegistered",
-      ]);
+      expect(
+        managed === "refused" ? [] : managed.map((entry) => AuditTrail.eventOf(entry)),
+      ).toEqual(["ResourceRegistered"]);
       expect(managed).toMatchObject([
         { resource: { uuid: "ledger" }, actor: { uuid: noah.person } },
       ]);
       // What she does not manage, and the whole organization, stay closed to her.
-      expect(await readHistory(running, maya, "payroll")).toBe("refused");
-      expect(await readHistory(running, maya)).toBe("refused");
+      expect(await readAuditTrail(running, maya, "payroll")).toBe("refused");
+      expect(await readAuditTrail(running, maya)).toBe("refused");
     });
 
-    it("keep an organization's history from the administrators of another", async () => {
+    it("keep an organization's audit trail from the administrators of another", async () => {
       const running = await givenGateway();
       const noah = await givenOpenResource(running);
       await eventually(
-        () => readHistory(running, noah),
+        () => readAuditTrail(running, noah),
         (entries) => entries !== "refused" && entries.length >= 3,
       );
       const olivia = await givenMember(running, "olivia", "globex");
 
       // Globex's administrator sees only that she joined Globex.
       const globex = await eventually(
-        () => readHistory(running, olivia, undefined, "globex"),
+        () => readAuditTrail(running, olivia, undefined, "globex"),
         (entries) => entries !== "refused" && entries.length >= 1,
       );
-      expect(globex === "refused" ? [] : globex.map((entry) => History.memberIn(entry))).toEqual([
-        olivia.person,
-      ]);
-      // Acme's resource is not in Globex's history, and Acme's history is closed to her.
-      expect(await readHistory(running, olivia, "payroll", "globex")).toEqual([]);
-      expect(await readHistory(running, olivia)).toBe("refused");
+      expect(globex === "refused" ? [] : globex.map((entry) => AuditTrail.memberIn(entry))).toEqual(
+        [olivia.person],
+      );
+      // Acme's resource is not in Globex's audit trail, and Acme's audit trail is closed to her.
+      expect(await readAuditTrail(running, olivia, "payroll", "globex")).toEqual([]);
+      expect(await readAuditTrail(running, olivia)).toBe("refused");
     });
 
     it("refuse an administrator a resource registered for another organization", async () => {

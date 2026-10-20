@@ -136,12 +136,12 @@ export function organizationView(
 }
 
 /**
- * Reads the whole history of an organization from its own tenant.
+ * Reads the whole audit trail of an organization from its own tenant.
  *
- * @param hosted The running server whose Resources context keeps the history.
+ * @param hosted The running server whose Resources context keeps the audit trail.
  * @param organization The organization's value ID, used as the tenant.
  */
-export async function historyOf(
+export async function auditTrailOf(
   hosted: Hosted,
   organization: OrganizationId,
 ): Promise<AuditEntry[]> {

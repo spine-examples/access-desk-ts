@@ -160,8 +160,8 @@ export const ResourcesContext = {
       .route(AccessGrantCreatedSchema, (event) => grantOf(event))
       .route(AccessGrantExtendedSchema, (event) => grantOf(event))
       .route(AccessGrantRevokedSchema, (event) => grantOf(event));
-    /** The events the organization's history records. */
-    const historyEvents = [
+    /** The events the organization's audit trail records. */
+    const auditTrailEvents = [
       OrganizationMemberAddedSchema,
       ResourceRegisteredSchema,
       ResourceRegistrationFailedSchema,
@@ -213,9 +213,9 @@ export const ResourcesContext = {
         }),
       ];
     };
-    const historyRouting = EventRouting.create<AuditEntryId>();
-    for (const fact of historyEvents) {
-      historyRouting.route(fact, (_fact, context) => entryOf(fact, context));
+    const auditTrailRouting = EventRouting.create<AuditEntryId>();
+    for (const event of auditTrailEvents) {
+      auditTrailRouting.route(event, (_event, context) => entryOf(event, context));
     }
     const builder = BoundedContext.multitenant("Resources")
       .withGeneratedRegistryRoot(new URL("..", import.meta.url))
@@ -229,7 +229,7 @@ export const ResourcesContext = {
       .add(AccessDecisionAssignmentProjection, { eventRouting: decisionRouting })
       .add(ResourceAccessAggregate)
       .add(AccessGrantViewProjection, { eventRouting: grantViewRouting })
-      .add(AuditEntryProjection, { eventRouting: historyRouting });
+      .add(AuditEntryProjection, { eventRouting: auditTrailRouting });
     return builder.buildAsync();
   },
 };

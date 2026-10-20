@@ -93,18 +93,18 @@ export function registerResource(
 }
 
 /**
- * Reads the history of an organization through the gateway as the browser
+ * Reads the audit trail of an organization through the gateway as the browser
  * client does.
  *
  * @param running The running application.
  * @param as The signed-in person who reads.
- * @param of The identifier of the resource whose history is asked for. The
- *   history of the whole organization when left out.
- * @param organization The organization the request names. Acme when left out.
- * @returns The entries of the history, or `"refused"` when the gateway or the
+ * @param of The identifier of the resource whose audit trail is asked for. The
+ *   audit trail of the whole organization when left out.
+ * @param organization The organization the request names.
+ * @returns The entries of the audit trail, or `"refused"` when the gateway or the
  *   application server did not answer the request.
  */
-export function readHistory(
+export function readAuditTrail(
   running: Running,
   as: Signed,
   of?: string,
@@ -131,10 +131,10 @@ export function readHistory(
  * @param running The running application.
  * @param as The signed-in person who reads.
  * @param actor The identifier of the person whose actions are asked for.
- * @returns The entries of the history, or `"refused"` when the gateway or the
+ * @returns The entries of the audit trail, or `"refused"` when the gateway or the
  *   application server did not answer the request.
  */
-export function readHistoryOfActor(
+export function readAuditTrailOfActor(
   running: Running,
   as: Signed,
   actor: string,
@@ -151,15 +151,15 @@ export function readHistoryOfActor(
   );
 }
 
-/** Reads the facts the entries of a history keep. */
-export const History = {
-  /** The name of the fact an entry keeps, such as `ResourceRegistered`. */
-  factOf(entry: { readonly event?: Any | undefined }): string {
+/** Reads the events the entries of the audit trail keep. */
+export const AuditTrail = {
+  /** The name of the event an entry keeps, such as `ResourceRegistered`. */
+  eventOf(entry: { readonly event?: Any | undefined }): string {
     const url = entry.event?.typeUrl ?? "";
     return url.slice(url.lastIndexOf(".") + 1);
   },
 
-  /** The person who became a member, in an entry of the organization's history. */
+  /** The person who became a member, in an entry of the organization's audit trail. */
   memberIn(entry: { readonly event?: Any | undefined }): string | undefined {
     return entry.event === undefined
       ? undefined
@@ -216,7 +216,7 @@ export async function givenOpenResource(running: Running): Promise<Signed> {
  * @param id The identifier of the request.
  * @param claimed What the command claims instead of the usual: the person
  *   who requests, who is the one acted for when left out, and the
- *   organization the request names, which is Acme when left out.
+ *   organization the request names.
  * @returns `"ok"` when the gateway let the command through, and why not otherwise.
  */
 export function submitRequest(
@@ -269,7 +269,7 @@ export type RequestsAsked =
  * @param running The running application.
  * @param as The signed-in person who reads.
  * @param asked Which requests to ask for. The person's own when left out.
- * @param organization The organization the request names. Acme when left out.
+ * @param organization The organization the request names.
  * @returns The requests, or `"refused"` when the gateway or the application
  *   server did not answer the request.
  */
@@ -325,7 +325,7 @@ export interface Watched {
  *
  * @param running The running application.
  * @param as The signed-in person who watches.
- * @param organization The organization whose catalog it is. Acme when left out.
+ * @param organization The organization whose catalog it is.
  * @returns What the browser has received since, once its subscription is opened.
  */
 export async function watchCatalog(
