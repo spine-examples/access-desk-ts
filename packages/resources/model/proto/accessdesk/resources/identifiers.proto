@@ -16,7 +16,6 @@ syntax = "proto3";
 
 package accessdesk.resources;
 
-import "google/protobuf/any.proto";
 import "accessdesk/identity/identifiers.proto";
 import "spine/options.proto";
 
@@ -51,19 +50,7 @@ message ResourceAccessId {
 }
 
 // Identifies an entry in an organization's audit trail.
-//
-// Each action is recorded by what it changed, such as a resource or a
-// request, at one version of it. What changes records an action of one kind
-// at most once at each version.
-//
 message AuditEntryId {
 
-    // What recorded the action, such as the resource or the request it changed.
-    google.protobuf.Any producer = 1 [(required) = true];
-
-    // The version of what recorded the action.
-    int32 version = 2;
-
-    // The type URL of the event that records the action.
-    string event_type = 3 [(required) = true];
+    string uuid = 1 [(required) = true];
 }

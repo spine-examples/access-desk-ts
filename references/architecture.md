@@ -345,8 +345,11 @@ knows the application's types can turn any entry into JSON, whatever its
 event.
 
 Each entry records one change of one thing, such as a resource or a request.
-So two actions never share an entry, even when one command led to both. An
-entry is never replaced. An action that does not say what changed gets no
+Its ID is a name-based UUID (version 5) of what changed, the version of it, and
+the type of the event. So the same action always gets the same ID, however
+many times its event is delivered or the audit trail is rebuilt, and two
+actions never share an entry, even when one command led to both. An entry is
+never replaced. An action that does not say what changed gets no
 entry, and is logged as an error instead.
 
 Audit projections and human-readable timelines are derived views, not editable

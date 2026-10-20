@@ -12,9 +12,8 @@
  * and limitations under the License.
  */
 
-import { create, type Message } from "@bufbuild/protobuf";
+import type { Message } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
-import { TypeUrls } from "@spine-event-engine/core";
 import { anyIs, anyUnpack } from "@bufbuild/protobuf/wkt";
 import type { EventContext } from "@spine-event-engine/proto";
 import { BoundedContext, EventRouting } from "@spine-event-engine/server";
@@ -45,7 +44,6 @@ import {
   AccessRequestSubmittedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
 import {
-  AuditEntryIdSchema,
   type AccessGrantId,
   type AccessRequestId,
   type AuditEntryId,
@@ -80,6 +78,7 @@ import { AccessRequestViewProjection } from "./access/request/access-request-vie
 import { AccessDecisionAssignmentProjection } from "./access/request/access-decision-assignment-projection.js";
 import { ResourceAccessAggregate } from "./access/grant/resource-access-aggregate.js";
 import { AccessGrantViewProjection } from "./access/grant/access-grant-view-projection.js";
+import { AuditEntryIds } from "./audit/audit-entry-ids.js";
 import { AuditEntryProjection } from "./audit/audit-entry-projection.js";
 
 /**
@@ -191,13 +190,7 @@ export const ResourcesContext = {
         );
         return [];
       }
-      return [
-        create(AuditEntryIdSchema, {
-          producer,
-          version: version.number,
-          eventType: TypeUrls.derive(kind),
-        }),
-      ];
+      return [AuditEntryIds.of(producer, version, kind)];
     };
     const auditTrailRouting = EventRouting.create<AuditEntryId>();
     for (const event of auditTrailEvents) {
