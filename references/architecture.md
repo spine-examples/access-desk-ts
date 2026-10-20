@@ -349,13 +349,6 @@ So two actions never share an entry, even when one command led to both. An
 entry is never replaced. An action that does not say what changed gets no
 entry, and is logged as an error instead.
 
-Only the outcome of each step a person cares about is recorded: a member
-added, a resource registered, opened, or closed, a request submitted,
-approved, denied, canceled, or failed, and access granted, extended, or
-revoked. The steps in between, such as the checks before a request is
-submitted, get no entry. Neither does the organization's creation: it is set
-up before anyone belongs to it, so nobody took that action.
-
 Audit projections and human-readable timelines are derived views, not editable
 sources of truth. Retention/export policy remains a deployment decision and
 must be documented before production use.
