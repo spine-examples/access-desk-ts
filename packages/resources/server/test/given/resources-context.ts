@@ -16,7 +16,7 @@ import { create, type Message, type MessageShape } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { AnyMessages, TypeUrls } from "@spine-event-engine/core";
 import { Time, type TimeProvider } from "@spine-event-engine/core/time";
-import { SignalMetadata } from "@spine-event-engine/server";
+import { SignalMetadata, type BoundedContext } from "@spine-event-engine/server";
 import { type ActorContext, TenantIdSchema, UserIdSchema } from "@spine-event-engine/proto";
 import {
   CompositeFilter_CompositeOperator,
@@ -63,6 +63,7 @@ function loaded(): ResourcesModule {
 }
 
 const ownedBlackBoxes = new Set<BlackBox>();
+const contexts = new WeakMap<BlackBox, BoundedContext>();
 
 /**
  * Starts one Resources BlackBox bound to the organization's tenant.
@@ -79,13 +80,29 @@ export async function resourcesBlackBox(clock?: TimeProvider): Promise<BlackBox>
   }
   // Grant flows cross several entities before a read model settles, so waits
   // get generous headroom; they still return as soon as the outcome is visible.
-  const box = await BlackBox.from(await loaded().ResourcesContext.create(), {
+  const context = await loaded().ResourcesContext.create();
+  const box = await BlackBox.from(context, {
     tenant: organizationId,
     timeoutMs: 20_000,
     intervalMs: 20,
   });
   ownedBlackBoxes.add(box);
+  contexts.set(box, context);
   return box;
+}
+
+/**
+ * The Resources context behind a BlackBox, for tests that post events
+ * directly.
+ *
+ * @param box A BlackBox opened through {@link resourcesBlackBox}.
+ */
+export function contextOf(box: BlackBox): BoundedContext {
+  const context = contexts.get(box);
+  if (context === undefined) {
+    throw new Error("Open the BlackBox through resourcesBlackBox() to reach its context.");
+  }
+  return context;
 }
 
 /**

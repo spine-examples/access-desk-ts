@@ -1,0 +1,57 @@
+/*
+ * Copyright 2026 CodeMatters, Lda.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+ * except in compliance with the License. You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under
+ * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+ * either express or implied. See the License for the specific language governing permissions
+ * and limitations under the License.
+ */
+
+syntax = "proto3";
+
+package accessdesk.resources.audit;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+import "accessdesk/resources/identifiers.proto";
+import "accessdesk/identity/identifiers.proto";
+import "spine/options.proto";
+
+option (type_url_prefix) = "type.accessdesk";
+
+// An entry in an organization's audit trail.
+//
+// It records one action the organization accepted: who took it, when, on
+// which resource, and everything the action stated, such as the reason a
+// request was denied.
+//
+// An entry is never changed.
+//
+message AuditEntry {
+    option (entity).kind = PROJECTION;
+    option (entity).visibility = FULL;
+
+    // The entry's ID.
+    accessdesk.resources.AuditEntryId id = 1;
+
+    // When the action was taken.
+    google.protobuf.Timestamp when = 2 [(required) = true, (column) = true];
+
+    // The person who took the action.
+    //
+    // For an action that followed from another, such as access being
+    // granted on approval, it is the person who took the first one.
+    //
+    accessdesk.identity.PersonId actor = 3 [(required) = true, (column) = true];
+
+    // The resource the action concerns, when it concerns one.
+    accessdesk.resources.ResourceId resource = 4 [(column) = true];
+
+    // The action, as the organization recorded it.
+    google.protobuf.Any event = 5 [(required) = true];
+}

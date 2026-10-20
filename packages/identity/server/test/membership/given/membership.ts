@@ -32,13 +32,16 @@ export const organizationId = "acme";
  * @param scope Where to post the command.
  * @param email The email address of the person to add.
  * @param role The role the person is to hold. A member's when left out.
- * @param organization The organization to add them to. Acme when left out.
+ * @param organization The organization to add them to.
+ * @param addedBy The administrator who adds them. Left out when the
+ *   application adds them itself.
  */
 export function addMember(
   scope: BlackBoxScope,
   email: string,
   role: OrganizationRole = OrganizationRole.MEMBER,
   organization: string = organizationId,
+  addedBy?: string,
 ) {
   return scope.post(
     AddMemberSchema,
@@ -46,6 +49,7 @@ export function addMember(
       id: { emailAddress: { value: email } },
       organization: { uuid: organization },
       role,
+      ...(addedBy === undefined ? {} : { addedBy: { uuid: addedBy } }),
     }),
   );
 }

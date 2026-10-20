@@ -58,8 +58,8 @@ interface Watched {
 /**
  * The subscriptions signed-in people hold through the gateway.
  *
- * A browser subscribes to read models, then opens the subscription to be
- * told of every change. A subscription belongs to the session that opened it:
+ * A browser subscribes to read models, then opens the subscription to
+ * receive every change. A subscription belongs to the session that opened it:
  *
  * 1. A browser subscribes. The gateway keeps the subscription for the
  *    session's person and organization.
@@ -78,7 +78,7 @@ interface Watched {
  *    application server. A cancel that fails is tried again, three times in
  *    all.
  * 2. Once the session has ended, anything still open is stopped in the
- *    gateway. The browser is told nothing more, though Spine remembers the
+ *    gateway. The browser receives nothing more, though Spine remembers the
  *    subscription until the gateway stops.
  */
 export class Watching implements SubscriptionBindings, OpenedUnderSessions {

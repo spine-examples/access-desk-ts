@@ -48,3 +48,9 @@ message ResourceAccessId {
     // The resource the access applies to.
     ResourceId resource = 2 [(required) = true];
 }
+
+// Identifies an entry in an organization's audit trail.
+message AuditEntryId {
+
+    string uuid = 1 [(required) = true];
+}

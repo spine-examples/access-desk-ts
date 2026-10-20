@@ -13,6 +13,7 @@
  */
 
 import { create } from "@bufbuild/protobuf";
+import { AnyMessages } from "@spine-event-engine/core";
 import { EmailAddressSchema, type EmailAddress } from "@spine-event-engine/proto";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {
@@ -21,11 +22,13 @@ import {
   PersonIdSchema,
 } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
+import { OrganizationMemberAddedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
 
 import {
   eventually,
   givenOrganization,
   givenServer,
+  auditTrailOf,
   organizationView,
   type Hosted,
 } from "./given/hosted.js";
@@ -57,12 +60,18 @@ function membersOf(server: Hosted, patienceMs?: number) {
   return members;
 }
 
-function joining(organization: string, person: string, role = OrganizationRole.MEMBER) {
+function joining(
+  organization: string,
+  person: string,
+  role = OrganizationRole.MEMBER,
+  addedBy = person,
+) {
   return {
     organization: create(OrganizationIdSchema, { uuid: organization }),
     person: create(PersonIdSchema, { uuid: person }),
     email: create(EmailAddressSchema, { value: `${person}@acme.example` }),
     role,
+    addedBy: create(PersonIdSchema, { uuid: addedBy }),
   };
 }
 
@@ -88,6 +97,24 @@ describe("The organizations' members, reached through the application server, sh
         role: OrganizationRole.ADMINISTRATOR,
       },
     ]);
+  });
+
+  it("say which administrator added the person", async () => {
+    const server = await hosted();
+    await givenOrganization(server, organizationId("acme"));
+
+    await membersOf(server).add(joining("acme", "maya", OrganizationRole.MEMBER, "noah"));
+
+    const [entry] = await eventually(
+      () => auditTrailOf(server, organizationId("acme")),
+      (entries) => entries.length === 1,
+    );
+    const added =
+      entry?.event === undefined
+        ? undefined
+        : AnyMessages.unpack(entry.event, OrganizationMemberAddedSchema);
+    expect(added).toMatchObject({ person: { uuid: "maya" }, addedBy: { uuid: "noah" } });
+    expect(entry?.actor?.uuid).toBe("noah");
   });
 
   it("add each person to the organization they join, and to no other", async () => {

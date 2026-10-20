@@ -42,6 +42,7 @@ export function addOrganizationMember(
   scope: BlackBoxScope,
   person: string,
   role: OrganizationRole = OrganizationRole.MEMBER,
+  addedBy: string = person,
 ) {
   return scope.post(
     AddOrganizationMemberSchema,
@@ -50,6 +51,7 @@ export function addOrganizationMember(
       person: { uuid: person },
       emailAddress: { value: `${person}@acme.example` },
       role,
+      addedBy: { uuid: addedBy },
     }),
   );
 }

@@ -1,0 +1,460 @@
+/*
+ * Copyright 2026 CodeMatters, Lda.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+ * except in compliance with the License. You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under
+ * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+ * either express or implied. See the License for the specific language governing permissions
+ * and limitations under the License.
+ */
+
+import { create } from "@bufbuild/protobuf";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
+import {
+  AccessGrantCreatedSchema,
+  AccessGrantExtendedSchema,
+  AccessGrantRevokedSchema,
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/events_pb.js";
+import {
+  SubmitAccessExtensionRequestSchema,
+  SubmitAccessRequestSchema,
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/commands_pb.js";
+import {
+  AccessExtensionRequestSubmissionFailedSchema,
+  AccessExtensionRequestSubmittedSchema,
+  AccessRequestApprovalFailedSchema,
+  AccessRequestApprovalStartedSchema,
+  AccessRequestApprovedSchema,
+  AccessRequestCanceledSchema,
+  AccessRequestDeniedSchema,
+  AccessRequestSubmissionFailedSchema,
+  AccessRequestSubmittedSchema,
+} from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
+import { OrganizationMemberAddedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
+import {
+  ResourceClosedForRequestsSchema,
+  ResourceOpenedForRequestsSchema,
+} from "@access-desk/resources-model/generated/accessdesk/resources/resource/events_pb.js";
+import {
+  ResourceRegisteredSchema,
+  ResourceRegistrationFailedSchema,
+} from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_registration_events_pb.js";
+import {
+  approveExtension,
+  awaitGrantIssued,
+  awaitGrantRevoked,
+  givenActiveGrant,
+  minutesIn,
+  revokeGrant,
+  testClock,
+} from "../access/grant/given/resource-access.js";
+import {
+  approveAccessRequest,
+  cancelAccessRequest,
+  denyAccessRequest,
+  resourceUuid,
+  seed,
+  submitAndAssign,
+  submitExtensionRequest,
+  submitRequest,
+} from "../access/request/given/access-request.js";
+import {
+  actor,
+  closeResourcesBlackBoxes,
+  loadResourcesContext,
+  resourcesBlackBox,
+} from "../given/resources-context.js";
+import { addOrganizationMember, createOrganization } from "../organization/given/organization.js";
+import { closeResource, openResource, registerResource } from "../resource/given/resource.js";
+import {
+  awaitEntries,
+  awaitEntry,
+  eventsOf,
+  readAuditTrail,
+  readAuditTrailOf,
+  recordRegistered,
+  registrationCommand,
+} from "./given/audit-entry.js";
+
+// The audit trail is made of the events the other flows record, produced here
+// through the real commands of those flows.
+beforeAll(loadResourcesContext, 30_000);
+afterEach(closeResourcesBlackBoxes);
+
+describe("AuditEntryProjection should", () => {
+  it("on 'OrganizationMemberAdded' record who became a member", async () => {
+    const box = await resourcesBlackBox(testClock());
+    const administrator = box.onBehalfOf("noah");
+    await createOrganization(administrator);
+
+    await addOrganizationMember(administrator, "maya", OrganizationRole.MEMBER, "noah");
+
+    const { entry, event } = await awaitEntry(box, administrator, OrganizationMemberAddedSchema);
+    expect(event.person?.uuid).toBe("maya");
+    expect(entry.when).toEqual(minutesIn(0));
+    expect(entry.actor?.uuid).toBe("noah");
+    expect(entry.resource).toBeUndefined();
+  });
+
+  it("on 'ResourceRegistered' record which resource was registered", async () => {
+    const box = await resourcesBlackBox(testClock());
+    const administrator = box.onBehalfOf("noah");
+    await createOrganization(administrator);
+
+    await registerResource(administrator, "ledger");
+
+    const { entry, event } = await awaitEntry(box, administrator, ResourceRegisteredSchema);
+    expect(event.id?.uuid).toBe("ledger");
+    expect(entry).toMatchObject({
+      resource: { uuid: "ledger" },
+      actor: { uuid: "noah" },
+      when: minutesIn(0),
+    });
+  });
+
+  it("on 'ResourceRegistrationFailed' record which resource could not be registered", async () => {
+    const box = await resourcesBlackBox(testClock());
+    const administrator = box.onBehalfOf("noah");
+    await createOrganization(administrator);
+    await registerResource(administrator, "ledger-1", "ledger");
+    await awaitEntry(box, administrator, ResourceRegisteredSchema);
+
+    // The organization holds a resource under that name already.
+    await registerResource(administrator, "ledger-2", "ledger");
+
+    const { entry, event } = await awaitEntry(box, administrator, ResourceRegistrationFailedSchema);
+    expect(event.id?.uuid).toBe("ledger-2");
+    expect(entry).toMatchObject({ resource: { uuid: "ledger-2" }, actor: { uuid: "noah" } });
+  });
+
+  it("on 'ResourceOpenedForRequests' and 'ResourceClosedForRequests' keep each opening and closing apart", async () => {
+    const box = await resourcesBlackBox(testClock());
+    const manager = box.onBehalfOf("primary");
+    // Seeding opens the resource once.
+    await seed(box, [actor, "primary"]);
+
+    await closeResource(manager, resourceUuid);
+    await awaitEntry(box, manager, ResourceClosedForRequestsSchema);
+    await openResource(manager, resourceUuid);
+
+    // The clock has not moved, and the two openings are still two entries.
+    const opened = await awaitEntries(box, manager, ResourceOpenedForRequestsSchema, 2);
+    expect(opened.map((entry) => entry.actor?.uuid).sort()).toEqual(["primary", actor].sort());
+    expect(opened.every((entry) => entry.resource?.uuid === resourceUuid)).toBe(true);
+    const closed = await awaitEntry(box, manager, ResourceClosedForRequestsSchema);
+    expect(closed.entry).toMatchObject({
+      resource: { uuid: resourceUuid },
+      actor: { uuid: "primary" },
+    });
+  });
+
+  it("on 'AccessRequestSubmitted' record the request", async () => {
+    const box = await resourcesBlackBox(testClock());
+    const requester = box.onBehalfOf(actor);
+    await seed(box, [actor, "primary"]);
+
+    await submitAndAssign(box, requester, "audit-requested", "primary");
+
+    const { entry, event } = await awaitEntry(box, requester, AccessRequestSubmittedSchema);
+    expect(event.id?.uuid).toBe("audit-requested");
+    expect(event.snapshot?.justification).toBe("Need payroll review");
+    expect(entry).toMatchObject({
+      resource: { uuid: resourceUuid },
+      actor: { uuid: actor },
+      when: minutesIn(0),
+    });
+  });
+
+  it("on 'AccessExtensionRequestSubmitted' record the extension request", async () => {
+    const box = await resourcesBlackBox(testClock());
+    const requester = await givenActiveGrant(box, "audit-grant", 10);
+
+    await requester.post(
+      SubmitAccessExtensionRequestSchema,
+      submitExtensionRequest("audit-extension", { grant: { uuid: "audit-grant" } }),
+    );
+
+    const { entry, event } = await awaitEntry(
+      box,
+      requester,
+      AccessExtensionRequestSubmittedSchema,
+    );
+    expect(event.id?.uuid).toBe("audit-extension");
+    expect(event.snapshot?.justification).toBe("Keep payroll access a little longer");
+    expect(entry).toMatchObject({ resource: { uuid: resourceUuid }, actor: { uuid: actor } });
+  });
+
+  it("on 'AccessRequestSubmissionFailed' record whose request never reached a manager", async () => {
+    const box = await resourcesBlackBox(testClock());
+    const requester = box.onBehalfOf(actor);
+    await seed(box, [actor, "primary"]);
+
+    // The resource lets nobody hold access for two hours.
+    await requester.post(
+      SubmitAccessRequestSchema,
+      submitRequest("audit-too-long", {
+        period: { kind: { case: "immediateDuration", value: { seconds: 7200n } } },
+      }),
+    );
+
+    const { entry, event } = await awaitEntry(box, requester, AccessRequestSubmissionFailedSchema);
+    expect(event.id?.uuid).toBe("audit-too-long");
+    expect(entry).toMatchObject({ resource: { uuid: resourceUuid }, actor: { uuid: actor } });
+    // Managers see it in the resource's audit trail.
+    expect(eventsOf(await readAuditTrailOf(requester, resourceUuid))).toContain(
+      "AccessRequestSubmissionFailed",
+    );
+  });
+
+  it("on 'AccessExtensionRequestSubmissionFailed' record whose extension request never reached a manager", async () => {
+    const box = await resourcesBlackBox(testClock());
+    const requester = box.onBehalfOf(actor);
+    await seed(box, [actor, "primary"]);
+
+    // Nobody holds the access the request asks to extend.
+    await requester.post(
+      SubmitAccessExtensionRequestSchema,
+      submitExtensionRequest("audit-no-grant", { grant: { uuid: "no-such-grant" } }),
+    );
+
+    const { entry, event } = await awaitEntry(
+      box,
+      requester,
+      AccessExtensionRequestSubmissionFailedSchema,
+    );
+    expect(event.id?.uuid).toBe("audit-no-grant");
+    expect(entry).toMatchObject({ resource: { uuid: resourceUuid }, actor: { uuid: actor } });
+    expect(eventsOf(await readAuditTrailOf(requester, resourceUuid))).toContain(
+      "AccessExtensionRequestSubmissionFailed",
+    );
+  });
+
+  it("on 'AccessRequestApprovalStarted' record which manager approved a request", async () => {
+    const clock = testClock();
+    const box = await resourcesBlackBox(clock);
+    const requester = box.onBehalfOf(actor);
+    await seed(box, [actor, "primary"]);
+    await submitAndAssign(box, requester, "audit-approved", "primary");
+    clock.advanceMinutes(5);
+
+    await approveAccessRequest(box, "audit-approved", "primary");
+
+    const { entry, event } = await awaitEntry(box, requester, AccessRequestApprovalStartedSchema);
+    expect(event.id?.uuid).toBe("audit-approved");
+    expect(entry).toMatchObject({
+      resource: { uuid: resourceUuid },
+      actor: { uuid: "primary" },
+      when: minutesIn(5),
+    });
+  });
+
+  it("on 'AccessRequestApproved' record that the request was granted", async () => {
+    const box = await resourcesBlackBox(testClock());
+
+    const requester = await givenActiveGrant(box, "audit-approved", 10);
+
+    const { entry, event } = await awaitEntry(box, requester, AccessRequestApprovedSchema);
+    expect(event.id?.uuid).toBe("audit-approved");
+    expect(entry).toMatchObject({ resource: { uuid: resourceUuid }, actor: { uuid: "primary" } });
+  });
+
+  it("on 'AccessRequestApprovalFailed' record which approved request could not be granted", async () => {
+    const clock = testClock();
+    const box = await resourcesBlackBox(clock);
+    const requester = await givenActiveGrant(box, "audit-grant", 10);
+    await requester.post(
+      SubmitAccessExtensionRequestSchema,
+      submitExtensionRequest("audit-late", { grant: { uuid: "audit-grant" } }),
+    );
+    await awaitEntry(box, requester, AccessExtensionRequestSubmittedSchema);
+    // The access ends before the manager decides.
+    clock.advanceMinutes(10);
+
+    await approveAccessRequest(box, "audit-late", "primary");
+
+    const { entry, event } = await awaitEntry(box, requester, AccessRequestApprovalFailedSchema);
+    expect(event.id?.uuid).toBe("audit-late");
+    expect(entry).toMatchObject({
+      resource: { uuid: resourceUuid },
+      actor: { uuid: "primary" },
+      when: minutesIn(10),
+    });
+  });
+
+  it("on 'AccessRequestDenied' record the denied request", async () => {
+    const clock = testClock();
+    const box = await resourcesBlackBox(clock);
+    const requester = box.onBehalfOf(actor);
+    await seed(box, [actor, "primary"]);
+    await submitAndAssign(box, requester, "audit-denied", "primary");
+    clock.advanceMinutes(5);
+
+    await denyAccessRequest(box, "audit-denied", "primary", "Insufficient justification.");
+
+    const { entry, event } = await awaitEntry(box, requester, AccessRequestDeniedSchema);
+    expect(event.id?.uuid).toBe("audit-denied");
+    expect(event.reason).toBe("Insufficient justification.");
+    expect(entry).toMatchObject({
+      resource: { uuid: resourceUuid },
+      actor: { uuid: "primary" },
+      when: minutesIn(5),
+    });
+  });
+
+  it("on 'AccessRequestCanceled' record that the requester canceled their request", async () => {
+    const box = await resourcesBlackBox(testClock());
+    const requester = box.onBehalfOf(actor);
+    await seed(box, [actor, "primary"]);
+    await submitAndAssign(box, requester, "audit-canceled", "primary");
+
+    await cancelAccessRequest(requester, "audit-canceled");
+
+    const { entry, event } = await awaitEntry(box, requester, AccessRequestCanceledSchema);
+    expect(event.id?.uuid).toBe("audit-canceled");
+    expect(entry).toMatchObject({ resource: { uuid: resourceUuid }, actor: { uuid: actor } });
+  });
+
+  it("on 'AccessGrantCreated' record the grant", async () => {
+    const box = await resourcesBlackBox(testClock());
+
+    const requester = await givenActiveGrant(box, "audit-grant", 10);
+
+    const { entry, event } = await awaitEntry(box, requester, AccessGrantCreatedSchema);
+    expect(event).toMatchObject({
+      id: { uuid: "audit-grant" },
+      request: { uuid: "audit-grant" },
+      access: { grantee: { uuid: actor } },
+    });
+    expect(entry).toMatchObject({ resource: { uuid: resourceUuid }, actor: { uuid: "primary" } });
+  });
+
+  it("on 'AccessGrantExtended' record the extended grant", async () => {
+    const box = await resourcesBlackBox(testClock());
+    const requester = await givenActiveGrant(box, "audit-grant", 10);
+
+    await approveExtension(box, "audit-extension", "audit-grant", 5);
+
+    const { entry, event } = await awaitEntry(box, requester, AccessGrantExtendedSchema);
+    expect(event).toMatchObject({
+      id: { uuid: "audit-grant" },
+      request: { uuid: "audit-extension" },
+    });
+    expect(entry).toMatchObject({ resource: { uuid: resourceUuid }, actor: { uuid: "primary" } });
+  });
+
+  it("on 'AccessGrantRevoked' record the revoked grant", async () => {
+    const clock = testClock();
+    const box = await resourcesBlackBox(clock);
+    const requester = await givenActiveGrant(box, "audit-grant", 10);
+    await awaitGrantIssued(box, requester, "audit-grant");
+    clock.advanceMinutes(3);
+
+    await revokeGrant(box, "audit-grant", "primary", "No longer on the project.");
+    await awaitGrantRevoked(box, requester, "audit-grant");
+
+    const { entry, event } = await awaitEntry(box, requester, AccessGrantRevokedSchema);
+    expect(event).toMatchObject({
+      id: { uuid: "audit-grant" },
+      reason: "No longer on the project.",
+    });
+    expect(entry).toMatchObject({
+      resource: { uuid: resourceUuid },
+      actor: { uuid: "primary" },
+      when: minutesIn(3),
+    });
+  });
+
+  it("keep the audit trail of one resource apart from everything else", async () => {
+    const box = await resourcesBlackBox(testClock());
+    const requester = await givenActiveGrant(box, "audit-grant", 10);
+    await registerResource(requester, "ledger");
+    await awaitEntry(box, requester, ResourceRegisteredSchema);
+
+    const trail = await readAuditTrailOf(requester, resourceUuid);
+
+    // What happened to the payroll resource, and nothing of the members or of the ledger.
+    expect(eventsOf(trail).sort()).toEqual(
+      [
+        "ResourceOpenedForRequests",
+        "AccessRequestSubmitted",
+        "AccessRequestApprovalStarted",
+        "AccessGrantCreated",
+        "AccessRequestApproved",
+      ].sort(),
+    );
+    expect(trail.every((entry) => entry.resource?.uuid === resourceUuid)).toBe(true);
+    expect(eventsOf(await readAuditTrailOf(requester, "ledger"))).toEqual(["ResourceRegistered"]);
+  });
+
+  it("keep two actions apart when one command led to both", async () => {
+    const box = await resourcesBlackBox(testClock());
+    const reader = box.onBehalfOf(actor);
+    const command = registrationCommand("one-command");
+
+    // Two resources are registered as a result of the same command.
+    await recordRegistered(box, "ledger", { by: "ledger", version: 0, cause: command });
+    await recordRegistered(box, "payroll", { by: "payroll", version: 0, cause: command });
+
+    const registered = await awaitEntries(box, reader, ResourceRegisteredSchema, 2);
+    expect(registered.map((entry) => entry.resource?.uuid).sort()).toEqual(["ledger", "payroll"]);
+  });
+
+  it("never replace an entry with a different action", async () => {
+    const box = await resourcesBlackBox(testClock());
+    const reader = box.onBehalfOf(actor);
+    await recordRegistered(box, "ledger", {
+      by: "ledger",
+      version: 4,
+      cause: registrationCommand("first"),
+    });
+    await awaitEntry(box, reader, ResourceRegisteredSchema);
+
+    // A different action claims the same entry: same resource, same version.
+    await recordRegistered(box, "ledger-copy", {
+      by: "ledger",
+      version: 4,
+      cause: registrationCommand("second"),
+    });
+    // Events arrive in order, so once this entry appears, the claim was handled.
+    await recordRegistered(box, "payroll", {
+      by: "payroll",
+      version: 0,
+      cause: registrationCommand("third"),
+    });
+
+    const registered = await awaitEntries(box, reader, ResourceRegisteredSchema, 2);
+    expect(registered.map((entry) => entry.resource?.uuid).sort()).toEqual(["ledger", "payroll"]);
+  });
+
+  it("log an action that does not say what changed, and make no entry of it", async () => {
+    const box = await resourcesBlackBox(testClock());
+    const scope = box.onBehalfOf(actor);
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      await scope.postEvent(
+        ResourceRegisteredSchema,
+        create(ResourceRegisteredSchema, { id: { uuid: "ledger" } }),
+      );
+
+      expect(logged).toHaveBeenCalledWith(
+        expect.stringContaining(ResourceRegisteredSchema.typeName),
+        expect.objectContaining({
+          origin: {
+            case: "importContext",
+            value: expect.objectContaining({
+              actor: expect.objectContaining({ value: actor }) as unknown,
+            }) as unknown,
+          },
+        }),
+      );
+      expect(await readAuditTrail(scope)).toEqual([]);
+    } finally {
+      logged.mockRestore();
+    }
+  });
+});

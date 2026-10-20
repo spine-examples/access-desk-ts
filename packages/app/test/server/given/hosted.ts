@@ -18,6 +18,10 @@ import { SignalEnvelopes } from "@spine-event-engine/core";
 import { TenantIdSchema, UserIdSchema } from "@spine-event-engine/proto";
 import { type BoundedContext, Server, SignalMetadata } from "@spine-event-engine/server";
 import { type OrganizationId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
+import {
+  AuditEntrySchema,
+  type AuditEntry,
+} from "@access-desk/resources-model/generated/accessdesk/resources/audit/audit_entry_pb.js";
 import { CreateOrganizationSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
 import {
   OrganizationViewSchema,
@@ -129,6 +133,22 @@ export function organizationView(
   return hosted.resources.stand().read(OrganizationViewSchema, organization, {
     tenantId: tenant(organization),
   });
+}
+
+/**
+ * Reads the whole audit trail of an organization from its own tenant.
+ *
+ * @param hosted The running server whose Resources context keeps the audit trail.
+ * @param organization The organization's value ID, used as the tenant.
+ */
+export async function auditTrailOf(
+  hosted: Hosted,
+  organization: OrganizationId,
+): Promise<AuditEntry[]> {
+  const entries = await hosted.resources
+    .stand()
+    .readAllVersioned(AuditEntrySchema, { tenantId: tenant(organization) });
+  return entries.map(({ state }) => state);
 }
 
 /**

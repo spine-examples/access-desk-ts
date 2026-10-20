@@ -31,6 +31,7 @@ import {
   SubmitAccessExtensionRequestSchema,
   SubmitAccessRequestSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/commands_pb.js";
+import { AuditEntrySchema } from "@access-desk/resources-model/generated/accessdesk/resources/audit/audit_entry_pb.js";
 import { OrganizationViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
 import {
   CloseResourceForRequestsSchema,
@@ -134,7 +135,9 @@ const MEMBER_COMMANDS: readonly CommandRule<Asking>[] = [
   rule(
     AddMemberSchema,
     (command, asking: Asking) =>
-      asking.administrator && command.organization?.uuid === asking.organization.uuid,
+      asking.administrator &&
+      command.organization?.uuid === asking.organization.uuid &&
+      command.addedBy?.uuid === asking.person.uuid,
   ),
 ];
 
@@ -236,11 +239,13 @@ type ReadRule = (target: Target, asking: Asking, desk: AccessDesk) => boolean | 
  *
  * - the requests they made, and those for a resource they manage;
  * - the grants they hold, and those to a resource they manage;
- * - their own queue of requests to decide.
+ * - their own queue of requests to decide;
+ * - the audit trail of a resource they manage.
  *
- * So a query for requests or grants must filter by the person or by the
- * resource. The decision queue is asked for by its identifier, which is the
- * manager's own. Anything not listed here cannot be read.
+ * So a query for requests, grants, or audit trail must filter by the person or by
+ * the resource. An administrator sees the audit trail of the whole organization,
+ * and need not filter it. The decision queue is asked for by its identifier,
+ * which is the manager's own. Anything not listed here cannot be read.
  */
 const MEMBER_READS: ReadonlyMap<string, ReadRule> = new Map<string, ReadRule>([
   [TypeUrls.derive(OrganizationViewSchema), () => true],
@@ -258,6 +263,10 @@ const MEMBER_READS: ReadonlyMap<string, ReadRule> = new Map<string, ReadRule>([
   [
     TypeUrls.derive(AccessDecisionAssignmentSchema),
     (target, asking) => asksForOwnById(target, asking.person),
+  ],
+  [
+    TypeUrls.derive(AuditEntrySchema),
+    (target, asking, desk) => asking.administrator || asksForManaged(target, asking, desk),
   ],
 ]);
 

@@ -56,6 +56,7 @@ import {
   approveAccessRequest,
   cancelAccessRequest,
   denyAccessRequest,
+  resourceUuid,
   seed,
   statusOf,
   submitAndAssign,
@@ -321,6 +322,7 @@ describe("AccessRequestProcessManager should", () => {
 
         const event = await failed.waitFor(box, (e) => e.id?.uuid === "req-held-second");
         expect(event.requester?.uuid).toBe(actor);
+        expect(event.resource?.uuid).toBe(resourceUuid);
         expect(submitted.received.map((e) => e.id?.uuid)).not.toContain("req-held-second");
         expect(await statusOf(requester, "req-held-second")).toBeUndefined();
       } finally {
@@ -569,7 +571,8 @@ describe("AccessRequestProcessManager should", () => {
           submitExtensionRequest("ext-over", { grant: { uuid: "req-over" } }),
         );
 
-        await failed.waitFor(box, (e) => e.id?.uuid === "ext-over");
+        const event = await failed.waitFor(box, (e) => e.id?.uuid === "ext-over");
+        expect(event.resource?.uuid).toBe(resourceUuid);
         expect(await statusOf(requester, "ext-over")).toBeUndefined();
       } finally {
         await failed.cancel();

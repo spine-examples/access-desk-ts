@@ -59,12 +59,13 @@ export interface AddedMember {
   readonly person: string;
   readonly email: string;
   readonly role: number;
+  readonly addedBy: string;
 }
 
 /**
  * The organizations' members, standing in for the Resources context.
  *
- * It keeps who was added, and refuses to add anybody while told to.
+ * It keeps who was added, and refuses to add anybody while asked.
  */
 export const organizations = {
   /** Everybody the organizations were asked to add, in order. */
@@ -93,6 +94,7 @@ export async function identityBlackBox(): Promise<BlackBox> {
           person: member.person.uuid,
           email: member.email.value,
           role: member.role,
+          addedBy: member.addedBy.uuid,
         });
         return Promise.resolve();
       },

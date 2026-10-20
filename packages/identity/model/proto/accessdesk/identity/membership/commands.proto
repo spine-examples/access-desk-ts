@@ -33,4 +33,11 @@ message AddMember {
 
     // The role the person will hold in the organization.
     accessdesk.identity.OrganizationRole role = 3 [(required) = true];
+
+    // The administrator who adds the person.
+    //
+    // This field is empty when the person is the organization's first
+    // administrator, who counts as adding themselves.
+    //
+    accessdesk.identity.PersonId added_by = 4;
 }

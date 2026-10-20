@@ -29,6 +29,11 @@ export interface NewMember {
   readonly email: EmailAddress;
   /** The role the person will hold in the organization. */
   readonly role: OrganizationRole;
+  /**
+   * The administrator who added the person. The person themselves when they
+   * are the organization's first administrator.
+   */
+  readonly addedBy: PersonId;
 }
 
 /**

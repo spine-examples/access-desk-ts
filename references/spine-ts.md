@@ -254,6 +254,21 @@ that was never started by its entry command cannot react to a later fact when
 its required fields are still empty. Test such reactions by running the process
 from its entry command.
 
+**What an event's context holds.** A `@Subscribe` handler or an event
+route that takes two arguments also receives the `EventContext`. It holds:
+
+- `timestamp`: when the event was recorded;
+- `producerId` and `version`: the entity that recorded the event, and how
+  many times that entity had changed before. All events from one handler call
+  share the version. A new entity starts at `0`;
+- `origin.pastMessage`: what caused the event. That is the ID of the command
+  or event that led to it, and the `actorContext` of whoever sent the first
+  command in the chain. The actor stays the same through the commands a
+  process sends and the events it reacts to.
+
+An event posted with a `BlackBox` scope's `postEvent` has no producer and no
+version, and its origin is `importContext`.
+
 ## External events
 
 Mark a cross-context event receptor with direct first-parameter
@@ -337,7 +352,7 @@ controls defined in the architecture.
   session's token. What is left is stopped in the store, which ends the stream
   but leaves the gateway's forwarding record until the gateway stops. `dispose`
   of an in-memory store cannot clear that record either.
-- A subscription tells only what happens after it has opened all the way to
+- A subscription reports only what happens after it has opened all the way to
   the application server, a moment after the client's `activate` returns. A
   test must first make sure updates arrive.
 - A query takes an id filter or `EQUAL` filters on top-level `(column)`

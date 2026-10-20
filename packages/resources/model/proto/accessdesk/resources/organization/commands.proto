@@ -49,6 +49,9 @@ message AddOrganizationMember {
 
     // The role the person will hold in the organization.
     accessdesk.identity.OrganizationRole role = 4 [(required) = true];
+
+    // The administrator who added the person.
+    accessdesk.identity.PersonId added_by = 5 [(required) = true];
 }
 
 // Adds a resource to an organization.

@@ -12,24 +12,41 @@
  * and limitations under the License.
  */
 
+import type { Message } from "@bufbuild/protobuf";
+import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { anyIs, anyUnpack } from "@bufbuild/protobuf/wkt";
 import type { EventContext } from "@spine-event-engine/proto";
 import { BoundedContext, EventRouting } from "@spine-event-engine/server";
-import { ResourceAddedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
-import { ResourceDeletedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/events_pb.js";
+import {
+  OrganizationMemberAddedSchema,
+  ResourceAddedSchema,
+} from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
+import {
+  ResourceClosedForRequestsSchema,
+  ResourceDeletedSchema,
+  ResourceOpenedForRequestsSchema,
+} from "@access-desk/resources-model/generated/accessdesk/resources/resource/events_pb.js";
+import {
+  ResourceRegisteredSchema,
+  ResourceRegistrationFailedSchema,
+} from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_registration_events_pb.js";
 import { ResourceAlreadyExistsSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/rejections_pb.js";
 import { OrganizationResourceNameAlreadyUsedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/rejections_pb.js";
 import {
+  AccessExtensionRequestSubmissionFailedSchema,
   AccessExtensionRequestSubmittedSchema,
   AccessRequestApprovalFailedSchema,
+  AccessRequestApprovalStartedSchema,
   AccessRequestApprovedSchema,
   AccessRequestCanceledSchema,
   AccessRequestDeniedSchema,
+  AccessRequestSubmissionFailedSchema,
   AccessRequestSubmittedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/events_pb.js";
 import {
   type AccessGrantId,
   type AccessRequestId,
+  type AuditEntryId,
   type ResourceId,
 } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
 import {
@@ -61,6 +78,8 @@ import { AccessRequestViewProjection } from "./access/request/access-request-vie
 import { AccessDecisionAssignmentProjection } from "./access/request/access-decision-assignment-projection.js";
 import { ResourceAccessAggregate } from "./access/grant/resource-access-aggregate.js";
 import { AccessGrantViewProjection } from "./access/grant/access-grant-view-projection.js";
+import { AuditEntryIds } from "./audit/audit-entry-ids.js";
+import { AuditEntryProjection } from "./audit/audit-entry-projection.js";
 
 /**
  * The Resources bounded context.
@@ -140,6 +159,43 @@ export const ResourcesContext = {
       .route(AccessGrantCreatedSchema, (event) => grantOf(event))
       .route(AccessGrantExtendedSchema, (event) => grantOf(event))
       .route(AccessGrantRevokedSchema, (event) => grantOf(event));
+    /** The events the organization's audit trail records. */
+    const auditTrailEvents = [
+      OrganizationMemberAddedSchema,
+      ResourceRegisteredSchema,
+      ResourceRegistrationFailedSchema,
+      ResourceOpenedForRequestsSchema,
+      ResourceClosedForRequestsSchema,
+      AccessRequestSubmittedSchema,
+      AccessExtensionRequestSubmittedSchema,
+      AccessRequestSubmissionFailedSchema,
+      AccessExtensionRequestSubmissionFailedSchema,
+      AccessRequestApprovalStartedSchema,
+      AccessRequestApprovedSchema,
+      AccessRequestApprovalFailedSchema,
+      AccessRequestDeniedSchema,
+      AccessRequestCanceledSchema,
+      AccessGrantCreatedSchema,
+      AccessGrantExtendedSchema,
+      AccessGrantRevokedSchema,
+    ] as const;
+
+    /** The entry of the audit trail an action makes. */
+    const entryOf = (kind: GenMessage<Message>, context: EventContext): AuditEntryId[] => {
+      const { producerId: producer, version } = context;
+      if (producer === undefined || version === undefined) {
+        console.error(
+          `The audit trail left out a ${kind.typeName}, because the event does not say what changed.`,
+          context,
+        );
+        return [];
+      }
+      return [AuditEntryIds.of(producer, version, kind)];
+    };
+    const auditTrailRouting = EventRouting.create<AuditEntryId>();
+    for (const event of auditTrailEvents) {
+      auditTrailRouting.route(event, (_event, context) => entryOf(event, context));
+    }
     const builder = BoundedContext.multitenant("Resources")
       .withGeneratedRegistryRoot(new URL("..", import.meta.url))
       .add(OrganizationAggregate)
@@ -151,7 +207,8 @@ export const ResourcesContext = {
       .add(AccessRequestViewProjection)
       .add(AccessDecisionAssignmentProjection, { eventRouting: decisionRouting })
       .add(ResourceAccessAggregate)
-      .add(AccessGrantViewProjection, { eventRouting: grantViewRouting });
+      .add(AccessGrantViewProjection, { eventRouting: grantViewRouting })
+      .add(AuditEntryProjection, { eventRouting: auditTrailRouting });
     return builder.buildAsync();
   },
 };

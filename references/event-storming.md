@@ -118,8 +118,3 @@ Projection inputs and outputs drawn on the board:
 
 Projection: **Access Grant View** receives Access Grant Created, Access Grant
 Extended, and Access Grant Revoked.
-
-#### Audit
-
-Projections over durable facts, retained in history and redacted. Details in
-`references/architecture.md`.

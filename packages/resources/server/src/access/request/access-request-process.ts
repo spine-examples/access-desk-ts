@@ -508,7 +508,11 @@ export class AccessRequestProcessManager extends ProcessManager<
     this.update((draft) => {
       draft.status = AccessRequestStatus.SUBMISSION_FAILED;
     });
-    const failure = { id: this.id, requester: snapshot.requester };
+    const resource = snapshot.kind.value?.resource;
+    if (resource === undefined) {
+      throw new Error("A submitted request must name its resource.");
+    }
+    const failure = { id: this.id, resource, requester: snapshot.requester };
     return snapshot.kind.case === "extension"
       ? create(AccessExtensionRequestSubmissionFailedSchema, failure)
       : create(AccessRequestSubmissionFailedSchema, failure);
