@@ -37,11 +37,7 @@ export function createOrganization(scope: BlackBoxScope, name = "Acme") {
   );
 }
 
-/**
- * Posts `AddOrganizationMember` for the person with the given identifier and
- * role, added by the given administrator, or by themselves when none is
- * named, as the first administrator is.
- */
+/** Posts `AddOrganizationMember` for the person with the given identifier and role. */
 export function addOrganizationMember(
   scope: BlackBoxScope,
   person: string,

@@ -81,6 +81,12 @@ export function eventsOf(entries: readonly AuditEntry[]): string[] {
   });
 }
 
+/**
+ * The entries that keep an event of one type, each with that event.
+ *
+ * @param rows The entries to look through.
+ * @param schema The type of the event.
+ */
 function recordedOf<Schema extends GenMessage<Message>>(
   rows: readonly AuditEntry[],
   schema: Schema,

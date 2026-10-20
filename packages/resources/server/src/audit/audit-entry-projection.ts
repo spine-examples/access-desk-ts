@@ -82,8 +82,10 @@ import { equals } from "../proto/equals.js";
  *
  * Each action the organization accepts in the membership, resource, request,
  * and grant flows makes one entry. The entry keeps the action as it was
- * recorded, and beside it when it was taken, who took it, and the resource it
- * concerns. It is never changed.
+ * recorded, and besides it when it was taken, who took it, and the resource it
+ * concerns.
+ *
+ * It is never changed.
  *
  * Who took the action is the person the action names, such as the requester
  * or the manager who decided. Where it names nobody, as when access is granted
@@ -242,7 +244,7 @@ export class AuditEntryProjection extends Projection<AuditEntryId, typeof AuditE
     });
   }
 
-  /** Records that a manager revoked access, and when. */
+  /** Records that a manager revoked access. */
   @Subscribe
   onAccessGrantRevoked(event: AccessGrantRevoked, context: EventContext): void {
     this.record(AccessGrantRevokedSchema, event, context, {

@@ -55,16 +55,17 @@ import type { OrganizationMembers } from "./organization-members.js";
 /**
  * A person's membership in an organization, under their email address.
  *
- * 1. An administrator adds the address, chooses the person's role, and names
- *    themselves as the one adding. An address belongs to at most one
+ * 1. An administrator adds a person to the organization by their email
+ *    address, and chooses the role the person holds. The administrator is
+ *    recorded as the one who added them. A person belongs to at most one
  *    organization.
- * 2. The address is registered. When nobody has signed in under it yet, a new
- *    person is registered for it, without an account. Whoever signs in under
- *    the address later is that person.
+ * 2. The person's email address is registered. When nobody has signed in
+ *    under it yet, a new person is registered for it, without an account.
+ *    Whoever signs in under that email address later is that person.
  * 3. The person joins the organization.
  *
- * Adding the address to the same organization again runs the adding again,
- * which also finishes one the organization refused before.
+ * Adding the same person to the same organization again runs the adding
+ * again, which also finishes one the organization refused before.
  */
 export class MembershipProcessManager extends ProcessManager<
   MembershipId,
@@ -86,7 +87,7 @@ export class MembershipProcessManager extends ProcessManager<
   }
 
   /**
-   * Starts adding the address, unless it belongs to another organization
+   * Starts adding the person, unless they belong to another organization
    * already.
    */
   @Assign
@@ -105,7 +106,7 @@ export class MembershipProcessManager extends ProcessManager<
     return create(MemberAddingStartedSchema, { id: this.id, organization, role });
   }
 
-  /** Registers the address. */
+  /** Registers the person's email address. */
   @Command
   onMemberAddingStarted(_event: MemberAddingStarted): RegisterPersonEmail {
     return create(RegisterPersonEmailSchema, {
@@ -114,7 +115,7 @@ export class MembershipProcessManager extends ProcessManager<
     });
   }
 
-  /** Registers the new person the address was registered for. */
+  /** Registers a new person for an email address nobody has signed in under yet. */
   @Command
   onPersonEmailRegistered(event: PersonEmailRegistered): RegisterPerson {
     return create(RegisterPersonSchema, {
@@ -131,8 +132,8 @@ export class MembershipProcessManager extends ProcessManager<
   }
 
   /**
-   * Has the organization list the person the address already belongs to, then
-   * has them join it.
+   * Has the organization list the person who already holds the email address,
+   * then has them join it.
    */
   @Command
   onPersonEmailAlreadyRegistered(
@@ -141,7 +142,7 @@ export class MembershipProcessManager extends ProcessManager<
     return this.#join(rejection.person);
   }
 
-  /** Finishes adding the address, as the person has joined the organization. */
+  /** Finishes adding the person, as they have joined the organization. */
   @React
   onOrganizationJoined(event: OrganizationJoined): MemberAdded {
     const { id: person, organization } = event;
@@ -155,7 +156,7 @@ export class MembershipProcessManager extends ProcessManager<
   async #join(person: PersonId | undefined): Promise<JoinOrganization> {
     const { organization, role, addedBy } = this.state;
     if (person === undefined || organization === undefined) {
-      throw new Error("A person is added to the organization the address was added to.");
+      throw new Error("A person joins the organization an administrator added them to.");
     }
     const email = this.id.emailAddress;
     if (email === undefined) {

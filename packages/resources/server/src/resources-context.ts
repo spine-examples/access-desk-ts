@@ -12,11 +12,11 @@
  * and limitations under the License.
  */
 
-import { create, toJson, type Message } from "@bufbuild/protobuf";
+import { create, type Message } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { TypeUrls } from "@spine-event-engine/core";
-import { anyIs, anyUnpack, timestampDate } from "@bufbuild/protobuf/wkt";
-import { ActorContextSchema, type EventContext } from "@spine-event-engine/proto";
+import { anyIs, anyUnpack } from "@bufbuild/protobuf/wkt";
+import type { EventContext } from "@spine-event-engine/proto";
 import { BoundedContext, EventRouting } from "@spine-event-engine/server";
 import {
   OrganizationMemberAddedSchema,
@@ -183,25 +183,11 @@ export const ResourcesContext = {
 
     /** The entry of the audit trail an action makes. */
     const entryOf = (kind: GenMessage<Message>, context: EventContext): AuditEntryId[] => {
-      const { producerId: producer, version, timestamp, origin } = context;
+      const { producerId: producer, version } = context;
       if (producer === undefined || version === undefined) {
-        const sender =
-          origin.case === "pastMessage"
-            ? origin.value.actorContext
-            : origin.case === "importContext"
-              ? origin.value
-              : undefined;
         console.error(
           `The audit trail left out a ${kind.typeName}, because the event does not say what changed.`,
-          {
-            missing: [
-              ...(producer === undefined ? ["producer"] : []),
-              ...(version === undefined ? ["version"] : []),
-            ],
-            when: timestamp === undefined ? undefined : timestampDate(timestamp).toISOString(),
-            origin: origin.case ?? "none",
-            sentBy: sender === undefined ? undefined : toJson(ActorContextSchema, sender),
-          },
+          context,
         );
         return [];
       }

@@ -67,7 +67,6 @@ import {
   actor,
   closeResourcesBlackBoxes,
   loadResourcesContext,
-  organizationId,
   resourcesBlackBox,
 } from "../given/resources-context.js";
 import { addOrganizationMember, createOrganization } from "../organization/given/organization.js";
@@ -88,7 +87,7 @@ beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
 
 describe("AuditEntryProjection should", () => {
-  it("on 'OrganizationMemberAdded' keep who became a member, and name the administrator who added them", async () => {
+  it("on 'OrganizationMemberAdded' record who became a member", async () => {
     const box = await resourcesBlackBox(testClock());
     const administrator = box.onBehalfOf("noah");
     await createOrganization(administrator);
@@ -102,7 +101,7 @@ describe("AuditEntryProjection should", () => {
     expect(entry.resource).toBeUndefined();
   });
 
-  it("on 'ResourceRegistered' record which resource was registered, and by whom", async () => {
+  it("on 'ResourceRegistered' record which resource was registered", async () => {
     const box = await resourcesBlackBox(testClock());
     const administrator = box.onBehalfOf("noah");
     await createOrganization(administrator);
@@ -118,7 +117,7 @@ describe("AuditEntryProjection should", () => {
     });
   });
 
-  it("on 'ResourceRegistrationFailed' record which resource could not be registered, and who tried", async () => {
+  it("on 'ResourceRegistrationFailed' record which resource could not be registered", async () => {
     const box = await resourcesBlackBox(testClock());
     const administrator = box.onBehalfOf("noah");
     await createOrganization(administrator);
@@ -154,7 +153,7 @@ describe("AuditEntryProjection should", () => {
     });
   });
 
-  it("on 'AccessRequestSubmitted' keep the request, and name who asked for access to what", async () => {
+  it("on 'AccessRequestSubmitted' record the request", async () => {
     const box = await resourcesBlackBox(testClock());
     const requester = box.onBehalfOf(actor);
     await seed(box, [actor, "primary"]);
@@ -171,7 +170,7 @@ describe("AuditEntryProjection should", () => {
     });
   });
 
-  it("on 'AccessExtensionRequestSubmitted' keep the request, and name who asked to extend access to what", async () => {
+  it("on 'AccessExtensionRequestSubmitted' record the extension request", async () => {
     const box = await resourcesBlackBox(testClock());
     const requester = await givenActiveGrant(box, "audit-grant", 10);
 
@@ -235,7 +234,7 @@ describe("AuditEntryProjection should", () => {
     );
   });
 
-  it("on 'AccessRequestApprovalStarted' record which manager approved a request, and when", async () => {
+  it("on 'AccessRequestApprovalStarted' record which manager approved a request", async () => {
     const clock = testClock();
     const box = await resourcesBlackBox(clock);
     const requester = box.onBehalfOf(actor);
@@ -254,7 +253,7 @@ describe("AuditEntryProjection should", () => {
     });
   });
 
-  it("on 'AccessRequestApproved' record that the request was granted, and by whose approval", async () => {
+  it("on 'AccessRequestApproved' record that the request was granted", async () => {
     const box = await resourcesBlackBox(testClock());
 
     const requester = await givenActiveGrant(box, "audit-approved", 10);
@@ -287,7 +286,7 @@ describe("AuditEntryProjection should", () => {
     });
   });
 
-  it("on 'AccessRequestDenied' keep the reason, and name which manager denied a request, and when", async () => {
+  it("on 'AccessRequestDenied' record the denied request", async () => {
     const clock = testClock();
     const box = await resourcesBlackBox(clock);
     const requester = box.onBehalfOf(actor);
@@ -320,7 +319,7 @@ describe("AuditEntryProjection should", () => {
     expect(entry).toMatchObject({ resource: { uuid: resourceUuid }, actor: { uuid: actor } });
   });
 
-  it("on 'AccessGrantCreated' keep the grant, and name by whose approval access was granted to what", async () => {
+  it("on 'AccessGrantCreated' record the grant", async () => {
     const box = await resourcesBlackBox(testClock());
 
     const requester = await givenActiveGrant(box, "audit-grant", 10);
@@ -334,7 +333,7 @@ describe("AuditEntryProjection should", () => {
     expect(entry).toMatchObject({ resource: { uuid: resourceUuid }, actor: { uuid: "primary" } });
   });
 
-  it("on 'AccessGrantExtended' keep the grant, and name by whose approval access was extended", async () => {
+  it("on 'AccessGrantExtended' record the extended grant", async () => {
     const box = await resourcesBlackBox(testClock());
     const requester = await givenActiveGrant(box, "audit-grant", 10);
 
@@ -348,7 +347,7 @@ describe("AuditEntryProjection should", () => {
     expect(entry).toMatchObject({ resource: { uuid: resourceUuid }, actor: { uuid: "primary" } });
   });
 
-  it("on 'AccessGrantRevoked' keep the reason, and name which manager revoked access, and when", async () => {
+  it("on 'AccessGrantRevoked' record the revoked grant", async () => {
     const clock = testClock();
     const box = await resourcesBlackBox(clock);
     const requester = await givenActiveGrant(box, "audit-grant", 10);
@@ -445,12 +444,12 @@ describe("AuditEntryProjection should", () => {
       expect(logged).toHaveBeenCalledWith(
         expect.stringContaining(ResourceRegisteredSchema.typeName),
         expect.objectContaining({
-          missing: ["producer", "version"],
-          origin: "importContext",
-          sentBy: expect.objectContaining({
-            actor: { value: actor },
-            tenantId: { value: organizationId },
-          }) as unknown,
+          origin: {
+            case: "importContext",
+            value: expect.objectContaining({
+              actor: expect.objectContaining({ value: actor }) as unknown,
+            }) as unknown,
+          },
         }),
       );
       expect(await readAuditTrail(scope)).toEqual([]);

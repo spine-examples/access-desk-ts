@@ -357,7 +357,7 @@ describe("The gateway should", () => {
       expect(await readRequests(running, maya, { resource: "payroll" })).toBe("refused");
     });
 
-    it("show an administrator the audit trail of the whole organization, and who did each thing", async () => {
+    it("show an administrator the audit trail of the whole organization", async () => {
       const running = await givenGateway();
       const noah = await givenOpenResource(running);
       const maya = await givenMaya(running, noah);

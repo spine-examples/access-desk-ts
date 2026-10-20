@@ -28,7 +28,9 @@ option (type_url_prefix) = "type.accessdesk";
 //
 // It records one action the organization accepted: who took it, when, on
 // which resource, and everything the action stated, such as the reason a
-// request was denied. An entry is never changed.
+// request was denied.
+//
+// An entry is never changed.
 //
 message AuditEntry {
     option (entity).kind = PROJECTION;
