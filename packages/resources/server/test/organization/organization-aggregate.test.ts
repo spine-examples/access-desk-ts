@@ -194,7 +194,7 @@ describe("OrganizationAggregate should", () => {
       );
 
       expect(rejection).toMatchObject({ resourceId: { uuid: "payroll-b" }, name: " payroll " });
-      const views = await readOrganizationViews(scope);
+      const views = await awaitOrganizationView(box, scope, (view) => view.resource.length > 0);
       expect(views[0]?.resource).toMatchObject([{ id: { uuid: "payroll-a" }, name: "Payroll" }]);
       expect(views[0]?.resource).toHaveLength(1);
     });
