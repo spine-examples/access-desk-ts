@@ -172,6 +172,81 @@ describe("postAndAwait should", () => {
   });
 });
 
+describe("postAndAwaitView should", () => {
+  /**
+   * Creating an organization, which shows in its view under its name.
+   *
+   * @param organization The organization, whose name is its identifier.
+   * @param name The name the organization is created under.
+   */
+  function creationShown(organization: string, name: string = organization) {
+    return {
+      command: CreateOrganizationSchema,
+      message: create(CreateOrganizationSchema, { id: { uuid: organization }, name }),
+      view: OrganizationViewSchema,
+      idSchema: OrganizationIdSchema,
+      id: organizationId(organization),
+      shows: (view: { readonly name: string }) => (view.name === "" ? undefined : view.name),
+    };
+  }
+
+  it("give the command and return what the read model shows once an update shows it", async () => {
+    const server = await hosted();
+    const connection = connectionTo(() => server.url);
+
+    const shown = await client.ServerRequests.postAndAwaitView(
+      connection.in(organizationId("acme")).onBehalfOf("access-desk"),
+      creationShown("acme"),
+    );
+
+    expect(shown).toBe("acme");
+  });
+
+  it("read the read model once more when no update showed the effect in time", async () => {
+    const server = await hosted();
+    await givenOrganization(server, organizationId("acme"));
+    const connection = connectionTo(() => server.url);
+
+    // An organization is created once, so creating it again changes nothing
+    // its view would be updated for. It shows what the earlier one did.
+    const shown = await client.ServerRequests.postAndAwaitView(
+      connection.in(organizationId("acme")).onBehalfOf("access-desk"),
+      creationShown("acme"),
+      300,
+    );
+
+    expect(shown).toBe("acme");
+  });
+
+  it("return nothing when the read model does not show the effect in time", async () => {
+    const server = await hosted();
+    const connection = connectionTo(() => server.url);
+
+    const shown = await client.ServerRequests.postAndAwaitView(
+      connection.in(organizationId("acme")).onBehalfOf("access-desk"),
+      { ...creationShown("acme"), shows: (): string | undefined => undefined },
+      300,
+    );
+
+    expect(shown).toBeUndefined();
+    expect((await organizationView(server, organizationId("acme")))?.name).toBe("acme");
+  });
+
+  it("return nothing when the command is refused", async () => {
+    const server = await hosted();
+    const connection = connectionTo(() => server.url);
+
+    // An organization needs a name.
+    const shown = await client.ServerRequests.postAndAwaitView(
+      connection.in(organizationId("acme")).onBehalfOf("access-desk"),
+      creationShown("acme", ""),
+      300,
+    );
+
+    expect(shown).toBeUndefined();
+  });
+});
+
 describe("readById should", () => {
   it("read a read model of an organization by its identifier", async () => {
     const server = await hosted();

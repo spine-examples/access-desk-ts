@@ -119,6 +119,55 @@ export interface Awaited<Command extends GenMessage<Message>, Event extends GenM
   readonly answers: (event: MessageShape<Event>) => boolean;
 }
 
+/** A command, and the read model that shows what it changed. */
+export interface AwaitedView<
+  Command extends GenMessage<Message>,
+  View extends GenMessage<Message>,
+  IdSchema extends GenMessage<Message>,
+  Shown,
+> {
+  /** The type of the command. */
+  readonly command: Command;
+  /** The command to post. */
+  readonly message: MessageShape<Command>;
+  /** The kind of read model that shows what the command changed. */
+  readonly view: View;
+  /** The kind of the read model's identifier. */
+  readonly idSchema: IdSchema;
+  /** The identifier of the read model. */
+  readonly id: MessageShape<IdSchema>;
+  /**
+   * What the read model shows once the command has had its effect.
+   *
+   * @returns What it shows, or `undefined` while it does not show it yet.
+   */
+  readonly shows: (view: MessageShape<View>) => Shown | undefined;
+}
+
+/** The read models a program asks the application server about. */
+const Targets = {
+  /**
+   * The one read model of a kind with an identifier.
+   *
+   * @param schema The kind of read model.
+   * @param idSchema The kind of its identifier.
+   * @param id The identifier.
+   */
+  byId<IdSchema extends GenMessage<Message>>(
+    schema: GenMessage<Message>,
+    idSchema: IdSchema,
+    id: MessageShape<IdSchema>,
+  ) {
+    return create(TargetSchema, {
+      type: TypeUrls.derive(schema),
+      criterion: {
+        case: "filters",
+        value: { idFilter: { id: [AnyMessages.pack(idSchema, id)] } },
+      },
+    });
+  },
+};
+
 /** The requests a program makes to the application server. */
 export const ServerRequests = {
   /**
@@ -198,17 +247,110 @@ export const ServerRequests = {
     const response = await request.send(
       create(QuerySchema, {
         id: create(QueryIdSchema, { value: `read-${type}-${crypto.randomUUID()}` }),
-        target: create(TargetSchema, {
-          type,
-          criterion: {
-            case: "filters",
-            value: { idFilter: { id: [AnyMessages.pack(idSchema, id)] } },
-          },
-        }),
+        target: Targets.byId(schema, idSchema, id),
       }),
     );
     const state = response.message[0]?.state;
     return state === undefined ? undefined : AnyMessages.unpack(state, schema);
+  },
+
+  /**
+   * Posts a command and waits until a read model shows what it changed.
+   *
+   * It suits a command whose effect comes later in a chain of steps, which
+   * no single event of the command tells:
+   *
+   * 1. It subscribes to the read model, and opens the subscription.
+   * 2. It posts the command.
+   * 3. It waits for an update of the read model that shows the effect.
+   * 4. When no such update comes in time, it reads the read model once more.
+   *    This Spine snapshot may open a subscription a moment after it says it
+   *    has, and an update in that moment is not delivered.
+   *
+   * @param request The client that posts the command.
+   * @param awaited The command, and the read model that shows its effect.
+   * @param patienceMs How long to wait for the update. Ten seconds by default.
+   * @returns What the read model shows, or `undefined` if the command was not
+   *   accepted or the read model did not show its effect in time.
+   */
+  async postAndAwaitView<
+    Command extends GenMessage<Message>,
+    View extends GenMessage<Message>,
+    IdSchema extends GenMessage<Message>,
+    Shown,
+  >(
+    request: ServerRequest,
+    awaited: AwaitedView<Command, View, IdSchema, Shown>,
+    patienceMs: number = PATIENCE_MS,
+  ): Promise<Shown | undefined> {
+    const target = Targets.byId(awaited.view, awaited.idSchema, awaited.id);
+    const type = TypeUrls.derive(awaited.view);
+    const watching = await request.createSubscription(
+      create(TopicSchema, {
+        id: create(TopicIdSchema, { value: `awaited-${type}-${crypto.randomUUID()}` }),
+        target,
+      }),
+      {
+        kind: "entity",
+        authoritativeQuery: () =>
+          create(QuerySchema, {
+            id: create(QueryIdSchema, { value: `awaited-${type}-${crypto.randomUUID()}` }),
+            target,
+          }),
+      },
+    );
+    /** What a state of the read model shows, when it shows the effect. */
+    const shownBy = (state: Parameters<typeof AnyMessages.unpack>[0] | undefined) => {
+      const view = state === undefined ? undefined : AnyMessages.unpack(state, awaited.view);
+      return view === undefined ? undefined : awaited.shows(view);
+    };
+    const shown = (async (): Promise<Shown | undefined> => {
+      for await (const delivery of watching.updates) {
+        const states =
+          delivery.kind === "resynchronization"
+            ? delivery.response.message.map(({ state }) => state)
+            : delivery.update.update.case === "entityUpdates"
+              ? delivery.update.update.value.update.map(({ kind }) =>
+                  kind.case === "state" ? kind.value : undefined,
+                )
+              : [];
+        for (const state of states) {
+          const result = shownBy(state);
+          if (result !== undefined) {
+            return result;
+          }
+        }
+      }
+      return undefined;
+    })();
+    shown.catch(() => undefined);
+    let giveUp: ReturnType<typeof setTimeout> | undefined;
+    const tooLate = new Promise<undefined>((resolve) => {
+      giveUp = setTimeout(() => {
+        resolve(undefined);
+      }, patienceMs);
+    });
+    try {
+      await watching.activate();
+      const given = await request.post(awaited.command, awaited.message);
+      if (given.kind !== "ok") {
+        return undefined;
+      }
+      const result = await Promise.race([shown, tooLate]);
+      if (result !== undefined) {
+        return result;
+      }
+      const last = await ServerRequests.readById(
+        request,
+        awaited.view,
+        awaited.idSchema,
+        awaited.id,
+      );
+      return last === undefined ? undefined : awaited.shows(last);
+    } finally {
+      clearTimeout(giveUp);
+      await watching.cancel();
+    }
   },
 
   /**

@@ -24,7 +24,6 @@ import {
 } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { IdentityProvider } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 import { LinkExternalIdentitySchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/external_identity_commands_pb.js";
-import { ExternalIdentityLinkedSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/external_identity_events_pb.js";
 import { ExternalIdentityViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/external_identity_pb.js";
 import { PersonViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/person_pb.js";
 import {
@@ -153,18 +152,17 @@ export class AccessDesk {
    *
    * @returns The person, or `undefined` when Identity did not link the account in time.
    */
-  async #link(
-    id: ExternalIdentityId,
-    email: EmailAddress,
-    name: string,
-  ): Promise<PersonId | undefined> {
-    const linked = await ServerRequests.postAndAwait(this.#identity, {
+  #link(id: ExternalIdentityId, email: EmailAddress, name: string): Promise<PersonId | undefined> {
+    // The account is linked several steps after the command, so its view tells
+    // when, by naming the person.
+    return ServerRequests.postAndAwaitView(this.#identity, {
       command: LinkExternalIdentitySchema,
       message: create(LinkExternalIdentitySchema, { id, emailAddress: email, name }),
-      event: ExternalIdentityLinkedSchema,
-      answers: (event) => event.id?.provider === id.provider && event.id.subject === id.subject,
+      view: ExternalIdentityViewSchema,
+      idSchema: ExternalIdentityIdSchema,
+      id,
+      shows: (view) => view.person,
     });
-    return linked?.person;
   }
 
   /** A signed-in person's accounts, and the organization they belong to. */

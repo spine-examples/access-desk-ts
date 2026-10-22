@@ -22,8 +22,10 @@ import {
 } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { IdentityProvider } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 import { PersonViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/person_pb.js";
-import { ExternalIdentityViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/external_identity_pb.js";
-import { ExternalIdentityLinkedSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/external_identity_events_pb.js";
+import {
+  ExternalIdentityViewSchema,
+  type ExternalIdentityView,
+} from "@access-desk/identity-model/generated/accessdesk/identity/person/external_identity_pb.js";
 import { OrganizationViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
 import { ResourceCatalogItemSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_pb.js";
 import { AccessRequestViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/request/access_request_pb.js";
@@ -37,7 +39,7 @@ import type { ServerConnection } from "../../src/server/client.js";
 const reads = vi.hoisted(() => ({
   readById: vi.fn(),
   find: vi.fn(),
-  postAndAwait: vi.fn(),
+  postAndAwaitView: vi.fn(),
 }));
 vi.mock("../../src/server/client.js", () => ({ ServerRequests: reads }));
 
@@ -79,7 +81,7 @@ describe("AccessDesk should", () => {
     });
     // Nobody added her to an organization.
     expect(signed?.organization).toBeUndefined();
-    expect(reads.postAndAwait).not.toHaveBeenCalled();
+    expect(reads.postAndAwaitView).not.toHaveBeenCalled();
     expect(inOrganization).toHaveBeenCalledWith();
     expect(onBehalfOf).toHaveBeenCalledWith("access-desk-gateway");
     expect(reads.readById).toHaveBeenNthCalledWith(
@@ -106,37 +108,38 @@ describe("AccessDesk should", () => {
       .mockResolvedValueOnce(
         create(PersonViewSchema, { emailAddress: email, name: "Maya", account: [account] }),
       );
-    reads.postAndAwait.mockResolvedValue(
-      create(ExternalIdentityLinkedSchema, { id: account, person }),
-    );
+    reads.postAndAwaitView.mockResolvedValue(person);
 
     const signed = await desk.signIn({ id: account, email, name: "Maya" });
 
     expect(signed?.id.uuid).toBe("person-1");
-    const awaited = reads.postAndAwait.mock.calls[0]?.[1] as {
+    const awaited = reads.postAndAwaitView.mock.calls[0]?.[1] as {
       readonly message: {
         readonly id?: { readonly subject: string };
         readonly emailAddress?: { readonly value: string };
       };
-      readonly answers: (event: {
-        readonly id?: { readonly provider: IdentityProvider; readonly subject: string };
-      }) => boolean;
+      readonly view: unknown;
+      readonly idSchema: unknown;
+      readonly id: unknown;
+      readonly shows: (view: ExternalIdentityView) => { readonly uuid: string } | undefined;
     };
     expect(awaited.message).toMatchObject({
       id: { subject: "google-1" },
       emailAddress: { value: "maya@example.com" },
     });
-    expect(awaited.answers({ id: account })).toBe(true);
-    expect(
-      awaited.answers({ id: { provider: IdentityProvider.IP_UNSPECIFIED, subject: "google-1" } }),
-    ).toBe(false);
+    // The account's own view tells when it is linked, by naming the person.
+    expect(awaited.view).toBe(ExternalIdentityViewSchema);
+    expect(awaited.idSchema).toBe(ExternalIdentityIdSchema);
+    expect(awaited.id).toEqual(account);
+    expect(awaited.shows(create(ExternalIdentityViewSchema, { person }))?.uuid).toBe("person-1");
+    expect(awaited.shows(create(ExternalIdentityViewSchema, {}))).toBeUndefined();
     expect(reads.readById).toHaveBeenCalledTimes(3);
   });
 
   it("return no person when an unknown account cannot be linked", async () => {
     const { desk } = givenDesk();
     reads.readById.mockResolvedValueOnce(undefined);
-    reads.postAndAwait.mockResolvedValueOnce(undefined);
+    reads.postAndAwaitView.mockResolvedValueOnce(undefined);
 
     expect(await desk.signIn({ id: account, email, name: "Maya" })).toBeUndefined();
   });
