@@ -12,12 +12,27 @@
  * and limitations under the License.
  */
 
+import { createPrivateKey, createSecretKey, type KeyObject } from "node:crypto";
 import { BlockList, isIP } from "node:net";
 
 /** The addresses that are reached only from the same machine. */
 const LOOPBACK = new BlockList();
 LOOPBACK.addSubnet("127.0.0.0", 8, "ipv4");
 LOOPBACK.addAddress("::1", "ipv6");
+
+/**
+ * Stands in for a session key that could not be read, as an empty text does
+ * for a missing setting, so that one error names every problem.
+ *
+ * Nothing is signed with it: settings with a problem are refused as a whole.
+ */
+const UNREADABLE_KEY = createSecretKey(new Uint8Array(1));
+
+/** Where an organization's identifier goes in the address of its database. */
+const ORGANIZATION = "{organization}";
+
+/** What the name of a database may be made of. */
+const DATABASE_NAME = /^[A-Za-z0-9_-]+$/;
 
 /** Where a program listens. */
 export interface Listening {
@@ -35,10 +50,55 @@ export interface ProviderSettings {
   readonly clientSecret: string;
 }
 
+/** Where a program keeps what it must remember. */
+export type StorageSettings =
+  /** In the program's memory. Everything is forgotten when the program stops. */
+  | { readonly kind: "memory" }
+  /** In a PostgreSQL database, which keeps everything across restarts. */
+  | {
+      readonly kind: "postgresql";
+      /** The address of the database, with the account to sign in to it. */
+      readonly url: string;
+    };
+
+/** An organization the application server keeps, and the database it keeps it in. */
+export interface OrganizationDatabase {
+  /** The organization's identifier. */
+  readonly organization: string;
+  /** The address of its database, with the account to sign in to it. */
+  readonly url: string;
+}
+
+/** Where the application server keeps each organization and everything it owns. */
+export type ResourcesStorageSettings =
+  /** In the server's memory, for any organization. Everything is forgotten when it stops. */
+  | { readonly kind: "memory" }
+  /**
+   * In PostgreSQL, each organization in a database of its own. The server
+   * keeps only the organizations listed.
+   */
+  | {
+      readonly kind: "postgresql";
+      /** Each organization the server keeps, with its database. */
+      readonly organizations: readonly OrganizationDatabase[];
+      /**
+       * The address of the database of what people subscribed to, which
+       * belongs to no one organization.
+       */
+      readonly subscriptionsUrl: string;
+    };
+
 /** How the application server is set up. */
 export interface ServerSettings {
   /** Where the application server listens. */
   readonly listening: Listening;
+  /**
+   * Where the application server keeps the people, the accounts they sign in
+   * with, their email addresses, and their memberships.
+   */
+  readonly identityStorage: StorageSettings;
+  /** Where the application server keeps each organization and everything it owns. */
+  readonly resourcesStorage: ResourcesStorageSettings;
 }
 
 /** How the gateway is set up. */
@@ -54,6 +114,15 @@ export interface GatewaySettings {
   readonly webUrl: string;
   /** How Access Desk is registered with Google, which people sign in through. */
   readonly google: ProviderSettings;
+  /** Where the gateway keeps the subscriptions people hold and the sessions they ended. */
+  readonly storage: StorageSettings;
+  /**
+   * The private key the gateway signs sessions with.
+   *
+   * A session stays good across a restart of the gateway while the key stays
+   * the same.
+   */
+  readonly sessionKey: KeyObject;
 }
 
 /**
@@ -65,6 +134,17 @@ class Reading {
   readonly #environment: NodeJS.ProcessEnv;
   /** The problems found so far, one sentence each. */
   readonly #problems: string[] = [];
+  /** Where the programs keep their data, once read. */
+  #storageKind: StorageSettings["kind"] | undefined;
+  /** The PostgreSQL server the programs keep their data on, once read. */
+  #databaseServer:
+    | {
+        readonly host: string;
+        readonly port: number;
+        readonly user: string;
+        readonly password: string;
+      }
+    | undefined;
 
   constructor(environment: NodeJS.ProcessEnv) {
     this.#environment = environment;
@@ -107,6 +187,138 @@ class Reading {
     };
   }
 
+  /**
+   * Where a program keeps its data, from `ACCESS_DESK_STORAGE`.
+   *
+   * @param database The setting that names the program's database on the
+   *   PostgreSQL server. It must be set only when the data is kept in PostgreSQL.
+   */
+  storage(database: string): StorageSettings {
+    return this.#storage() === "postgresql"
+      ? { kind: "postgresql", url: this.#databaseUrl(this.#databaseName(database)) }
+      : { kind: "memory" };
+  }
+
+  /**
+   * Where the application server keeps each organization, from
+   * `ACCESS_DESK_STORAGE`.
+   *
+   * In PostgreSQL, `ACCESS_DESK_ORGANIZATIONS` lists the organizations, and
+   * `ACCESS_DESK_ORGANIZATION_DATABASE` names each one's database, with
+   * `{organization}` where its identifier goes. `ACCESS_DESK_RESOURCES_DATABASE`
+   * names the database of what people subscribed to. They must be set only when
+   * the data is kept in PostgreSQL.
+   */
+  resourcesStorage(): ResourcesStorageSettings {
+    if (this.#storage() !== "postgresql") {
+      return { kind: "memory" };
+    }
+    const organizations = this.#organizations("ACCESS_DESK_ORGANIZATIONS");
+    const name = "ACCESS_DESK_ORGANIZATION_DATABASE";
+    const database = this.text(name);
+    if (
+      database !== "" &&
+      !(
+        database.includes(ORGANIZATION) && DATABASE_NAME.test(database.replaceAll(ORGANIZATION, ""))
+      )
+    ) {
+      this.#problems.push(
+        `${name} must name a database of letters, digits, "-", and "_", ` +
+          `with ${ORGANIZATION} where the organization goes, and is "${database}".`,
+      );
+    }
+    return {
+      kind: "postgresql",
+      organizations: organizations.map((organization) => ({
+        organization,
+        url: this.#databaseUrl(database.replaceAll(ORGANIZATION, organization)),
+      })),
+      subscriptionsUrl: this.#databaseUrl(this.#databaseName("ACCESS_DESK_RESOURCES_DATABASE")),
+    };
+  }
+
+  /** Where the programs keep their data, from `ACCESS_DESK_STORAGE`. */
+  #storage(): StorageSettings["kind"] {
+    if (this.#storageKind === undefined) {
+      const kind = this.text("ACCESS_DESK_STORAGE");
+      if (kind !== "" && kind !== "memory" && kind !== "postgresql") {
+        this.#problems.push(
+          `ACCESS_DESK_STORAGE must be "memory" or "postgresql", and is "${kind}".`,
+        );
+      }
+      this.#storageKind = kind === "postgresql" ? "postgresql" : "memory";
+    }
+    return this.#storageKind;
+  }
+
+  /** Organizations that must be listed, each once, separated by commas. */
+  #organizations(name: string): string[] {
+    const text = this.text(name);
+    const organizations = text.split(",").map((organization) => organization.trim());
+    const valid =
+      organizations.every((organization) => /^[A-Za-z0-9_-]+$/.test(organization)) &&
+      new Set(organizations).size === organizations.length;
+    if (text !== "" && !valid) {
+      this.#problems.push(
+        `${name} must list organizations, each once, separated by commas, each of ` +
+          `letters, digits, "-", and "_", and is "${text}".`,
+      );
+    }
+    return text === "" || !valid ? [] : organizations;
+  }
+
+  /** The name of a database on the PostgreSQL server, which must be set. */
+  #databaseName(name: string): string {
+    const text = this.text(name);
+    if (text !== "" && !DATABASE_NAME.test(text)) {
+      this.#problems.push(
+        `${name} must name a database of letters, digits, "-", and "_", and is "${text}".`,
+      );
+    }
+    return text;
+  }
+
+  /**
+   * The address of a database on the PostgreSQL server, from
+   * `ACCESS_DESK_DATABASE_HOST`, `_PORT`, `_USER`, and `_PASSWORD`.
+   */
+  #databaseUrl(database: string): string {
+    this.#databaseServer ??= {
+      host: this.text("ACCESS_DESK_DATABASE_HOST"),
+      port: this.port("ACCESS_DESK_DATABASE_PORT"),
+      user: this.text("ACCESS_DESK_DATABASE_USER"),
+      password: this.text("ACCESS_DESK_DATABASE_PASSWORD"),
+    };
+    const { host, port, user, password } = this.#databaseServer;
+    const address = isIP(host) === 6 ? `[${host}]` : host;
+    return (
+      `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}` +
+      `@${address}:${port.toString()}/${encodeURIComponent(database)}`
+    );
+  }
+
+  /** A P-256 private key that must be set, written in base64 as PKCS #8. */
+  signingKey(name: string): KeyObject {
+    const text = this.text(name);
+    if (text === "") {
+      return UNREADABLE_KEY;
+    }
+    try {
+      const key = createPrivateKey({
+        key: Buffer.from(text, "base64"),
+        format: "der",
+        type: "pkcs8",
+      });
+      if (key.asymmetricKeyDetails?.namedCurve === "prime256v1") {
+        return key;
+      }
+    } catch {
+      // Reported below, like a key of another kind.
+    }
+    this.#problems.push(`${name} must be a P-256 private key, written in base64 as PKCS #8.`);
+    return UNREADABLE_KEY;
+  }
+
   /** Returns the settings, or throws one error that lists every problem. */
   done<Settings>(settings: Settings): Settings {
     if (this.#problems.length > 0) {
@@ -131,7 +343,11 @@ export const Settings = {
    */
   ofServer(environment: NodeJS.ProcessEnv): ServerSettings {
     const reading = new Reading(environment);
-    return reading.done({ listening: reading.listening("ACCESS_DESK_SERVER") });
+    return reading.done({
+      listening: reading.listening("ACCESS_DESK_SERVER"),
+      identityStorage: reading.storage("ACCESS_DESK_IDENTITY_DATABASE"),
+      resourcesStorage: reading.resourcesStorage(),
+    });
   },
 
   /**
@@ -150,6 +366,8 @@ export const Settings = {
       serverUrl: `http://${server.host}:${server.port.toString()}`,
       webUrl: `https://${web.host}:${web.port.toString()}/`,
       google: reading.provider("GOOGLE"),
+      storage: reading.storage("ACCESS_DESK_GATEWAY_DATABASE"),
+      sessionKey: reading.signingKey("ACCESS_DESK_SESSION_KEY"),
     });
   },
 
