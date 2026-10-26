@@ -16,17 +16,40 @@ import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 import type { AuthenticatedPrincipal, IncomingRequest } from "@spine-event-engine/auth";
 import { TypeUrls } from "@spine-event-engine/core";
 import { ActorContextSchema, type ActorContext } from "@spine-event-engine/proto";
-import { SubscriptionSchema, TopicSchema } from "@spine-event-engine/proto/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  SubscriptionSchema,
+  TopicSchema,
+  type Subscription,
+} from "@spine-event-engine/proto/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
+import { typeRegistry } from "../../generated/model-registry.js";
 import type { Session } from "../../src/gateway/sessions.js";
-import { Watching } from "../../src/gateway/watching.js";
+import { Watching, type CancelAsBrowser } from "../../src/gateway/watching.js";
+import { TestStorages, type TestStorage } from "../given/storage.js";
 
-let watching = new Watching();
+let storage: TestStorage;
+let watching: Watching;
+
+beforeEach(async () => {
+  storage = await TestStorages.singleTenant(typeRegistry);
+  watching = await watchingAgain();
+});
+
 afterEach(async () => {
   await watching.close();
-  watching = new Watching();
+  await storage.drop();
 });
+
+/**
+ * What people watch through a gateway, over the subscriptions the test's
+ * storage keeps. A second one stands for the gateway after a restart.
+ *
+ * @param cancelAsBrowser Cancels a subscription the way its browser would.
+ */
+async function watchingAgain(cancelAsBrowser?: CancelAsBrowser): Promise<Watching> {
+  return new Watching(await storage.open(), cancelAsBrowser);
+}
 
 /**
  * Who watches, and in which organization.
@@ -62,6 +85,16 @@ function principal(person: string, organization: string, session: string): Authe
  * @returns The identifier of the subscription.
  */
 async function subscribed(context: ActorContext): Promise<string> {
+  return (await subscription(context)).id?.value ?? "";
+}
+
+/**
+ * Has a person subscribe to their organization.
+ *
+ * @param context Who subscribes, and in which organization.
+ * @returns The subscription, as the gateway hands it to the browser.
+ */
+async function subscription(context: ActorContext): Promise<Subscription> {
   const topic = create(TopicSchema, {
     id: { value: crypto.randomUUID() },
     target: {
@@ -74,18 +107,19 @@ async function subscribed(context: ActorContext): Promise<string> {
     topic: { kind: "subscription-topic", bytes: toBinary(TopicSchema, topic) },
     whenExpires: Date.now() + 60_000,
   });
-  return fromBinary(SubscriptionSchema, kept.bytes).id?.value ?? "";
+  return fromBinary(SubscriptionSchema, kept.bytes);
 }
 
 /**
  * The gateway's word that it allowed a subscription to be opened.
  *
- * @param id The identifier of the subscription.
+ * @param id The identifier of the subscription, or the whole subscription as
+ *   the browser sends it.
  */
-function opening(id: string): IncomingRequest {
+function opening(id: string | Subscription): IncomingRequest {
   return {
     kind: "activate",
-    subscription: create(SubscriptionSchema, { id: { value: id } }),
+    subscription: typeof id === "string" ? create(SubscriptionSchema, { id: { value: id } }) : id,
   } as IncomingRequest;
 }
 
@@ -180,6 +214,22 @@ describe("What people watch through the gateway should", () => {
     expect(begun).toBe(false);
   });
 
+  it("outlast a restart of the gateway, and stop when the session that opens it again ends", async () => {
+    const maya = watcher("maya", "acme");
+    const made = await subscription(maya);
+    const id = made.id?.value ?? "";
+    await watching.close();
+    watching = await watchingAgain();
+
+    // The browser opens the subscription it holds, in the session it holds.
+    watching.claim(principal("maya", "acme", "session-1"), opening(made));
+    const stream = await opened(id, maya);
+    await watching.stop("session-1");
+
+    await stream.ending;
+    expect(stream.stopped).toBe(true);
+  });
+
   it("go on when another session of the same person ends", async () => {
     const maya = watcher("maya", "acme");
     const id = await subscribed(maya);
@@ -272,7 +322,7 @@ describe("What people watch through the gateway should", () => {
   it("be cancelled in the name of a session about to end, as its browser would", async () => {
     const cancelled: { readonly id: string | undefined; readonly token: string }[] = [];
     await watching.close();
-    watching = new Watching((subscription, token) => {
+    watching = await watchingAgain((subscription, token) => {
       cancelled.push({ id: fromBinary(SubscriptionSchema, subscription.bytes).id?.value, token });
       return Promise.resolve();
     });
@@ -284,7 +334,7 @@ describe("What people watch through the gateway should", () => {
     ];
     watching.claim(principal("maya", "acme", "session-1"), opening(hers));
     watching.claim(principal("maya", "acme", "session-2"), opening(alsoHers));
-    const ending = { id: "session-1", credential: { kind: "cookie", value: "token-1" } };
+    const ending = { id: "session-1", credential: { kind: "bearer", value: "token-1" } };
 
     await watching.closeFor(ending as Session);
 
@@ -296,7 +346,7 @@ describe("What people watch through the gateway should", () => {
   it("be cancelled on a later try, when the first one fails", async () => {
     let tries = 0;
     await watching.close();
-    watching = new Watching(() => {
+    watching = await watchingAgain(() => {
       tries += 1;
       return tries < 3 ? Promise.reject(new Error("Not this time.")) : Promise.resolve();
     });
@@ -307,7 +357,7 @@ describe("What people watch through the gateway should", () => {
 
     await watching.closeFor({
       id: "session-1",
-      credential: { kind: "cookie", value: "token-1" },
+      credential: { kind: "bearer", value: "token-1" },
     } as Session);
 
     expect(tries).toBe(3);
@@ -318,7 +368,7 @@ describe("What people watch through the gateway should", () => {
   it("leave a session's subscriptions to be stopped when they cannot be cancelled", async () => {
     let tries = 0;
     await watching.close();
-    watching = new Watching(() => {
+    watching = await watchingAgain(() => {
       tries += 1;
       return Promise.reject(new Error("The gateway cannot be called."));
     });
@@ -330,7 +380,7 @@ describe("What people watch through the gateway should", () => {
 
     await watching.closeFor({
       id: "session-1",
-      credential: { kind: "cookie", value: "token-1" },
+      credential: { kind: "bearer", value: "token-1" },
     } as Session);
     expect(stream.stopped).toBe(false);
     await watching.stop("session-1");

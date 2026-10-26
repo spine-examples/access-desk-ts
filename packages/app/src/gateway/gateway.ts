@@ -12,6 +12,7 @@
  * and limitations under the License.
  */
 
+import type { KeyObject } from "node:crypto";
 import { create } from "@bufbuild/protobuf";
 import { createGrpcWebTransport } from "@connectrpc/connect-node";
 import {
@@ -24,8 +25,10 @@ import type { TypeRegistryLookup } from "@spine-event-engine/core";
 import { Time } from "@spine-event-engine/core/time";
 import { TenantIdSchema, UserIdSchema } from "@spine-event-engine/proto";
 import { BrowserServer } from "@spine-event-engine/server/browser";
+import type { StorageFactory } from "@spine-event-engine/storage";
 import { ServerConnection } from "../server/client.js";
 import { AccessDesk } from "./access-desk.js";
+import type { EndedSessions } from "./ended-sessions.js";
 import { Policy } from "./policy.js";
 import { routing } from "./routes/route.js";
 import { sessionRoutes } from "./routes/session-routes.js";
@@ -50,6 +53,19 @@ export interface GatewayOptions {
   readonly port: number;
   /** The identity providers people sign in through, such as Google, by key. */
   readonly external: Readonly<Record<string, ExternalSignIn>>;
+  /** The P-256 private key the gateway signs sessions with. */
+  readonly sessionKey: KeyObject;
+  /**
+   * Where the gateway keeps what it must remember across a restart: the
+   * subscriptions people hold, and the sessions they ended. Whoever passes
+   * them closes them.
+   */
+  readonly keeping: {
+    /** The subscriptions people hold. */
+    readonly subscriptions: StorageFactory;
+    /** The sessions people ended before they expired. */
+    readonly endedSessions: EndedSessions;
+  };
 }
 
 /** A running gateway. */
@@ -80,8 +96,15 @@ export const Gateway = {
     const desk = new AccessDesk(server);
     const origins = [...options.origins];
     const listening: { address?: string } = {};
-    const watching = new Watching(cancellingThrough(() => listening.address, origins[0]));
-    const sessions = new Sessions(watching);
+    const watching = new Watching(
+      options.keeping.subscriptions,
+      cancellingThrough(() => listening.address, origins[0]),
+    );
+    const sessions = new Sessions({
+      key: options.sessionKey,
+      ended: options.keeping.endedSessions,
+      opened: watching,
+    });
     const route = routing(origins, sessions);
     const signIn = signInRoutes(route, desk, sessions, options.external);
     const allows = Policy.authorization(desk);

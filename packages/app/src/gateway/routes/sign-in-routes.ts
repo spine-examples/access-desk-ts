@@ -96,7 +96,7 @@ export function signInRoutes(
         sessionIssuer: {
           async issue(principal) {
             const created = await sessions.create(principal);
-            return created.kind === "created"
+            return created.kind === "issued"
               ? { credential: created.credential, session: created.session }
               : undefined;
           },

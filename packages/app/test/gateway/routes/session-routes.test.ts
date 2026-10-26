@@ -34,7 +34,7 @@ const person = {
 const organization = create(OrganizationIdSchema, { uuid: "acme" });
 const session: Session = {
   id: "session-1",
-  credential: { kind: "cookie", value: "token" },
+  credential: { kind: "bearer", value: "token" },
   person,
   organization,
 };
