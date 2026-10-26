@@ -1,0 +1,132 @@
+/*
+ * Copyright 2026 CodeMatters, Lda.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+ * except in compliance with the License. You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under
+ * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+ * either express or implied. See the License for the specific language governing permissions
+ * and limitations under the License.
+ */
+
+import { timestampMs, type Timestamp } from "@bufbuild/protobuf/wkt";
+import type { SignedTokenRevocation } from "@spine-event-engine/auth";
+import { Time } from "@spine-event-engine/core/time";
+import { Pool } from "pg";
+import type { StorageSettings } from "../settings.js";
+
+/**
+ * The sessions people ended before they expired, by signing out.
+ *
+ * A session's token carries its own signature, so it would keep working
+ * until it expires. The gateway remembers the sessions that were ended, and
+ * refuses their tokens. A session is forgotten once it would have expired,
+ * as its token no longer works anyway.
+ */
+export interface EndedSessions extends SignedTokenRevocation {
+  /** Closes the store. Whoever opened it closes it. */
+  close(): Promise<void>;
+}
+
+/** Opens the store of ended sessions. */
+export const EndedSessions = {
+  /**
+   * Opens the store of ended sessions where the settings name.
+   *
+   * In PostgreSQL, the store keeps its table in the gateway's database, and
+   * creates the table when it is not there.
+   *
+   * @param settings Where the gateway keeps its data.
+   * @returns The opened store.
+   */
+  async open(settings: StorageSettings): Promise<EndedSessions> {
+    return settings.kind === "memory"
+      ? new EndedInMemory()
+      : await EndedInPostgres.open(settings.url);
+  },
+};
+
+/** The ended sessions, kept in the gateway's memory. A restart forgets them. */
+class EndedInMemory implements EndedSessions {
+  readonly kind = "supported";
+  /** When each ended session would have expired, in milliseconds, by its token's identifier. */
+  readonly #expiring = new Map<string, number>();
+
+  isRevoked(token: string): Promise<boolean> {
+    return Promise.resolve(this.#expiring.has(token));
+  }
+
+  revoke(token: string, expiresAt: Timestamp): Promise<void> {
+    const now = Time.currentTimeMillis();
+    for (const [ended, expiring] of this.#expiring) {
+      if (expiring <= now) {
+        this.#expiring.delete(ended);
+      }
+    }
+    this.#expiring.set(token, timestampMs(expiresAt));
+    return Promise.resolve();
+  }
+
+  close(): Promise<void> {
+    this.#expiring.clear();
+    return Promise.resolve();
+  }
+}
+
+/** The ended sessions, kept in the gateway's PostgreSQL database. */
+class EndedInPostgres implements EndedSessions {
+  readonly kind = "supported";
+  /** The connections to the gateway's database. */
+  readonly #pool: Pool;
+
+  private constructor(pool: Pool) {
+    this.#pool = pool;
+  }
+
+  /**
+   * Connects to the gateway's database, and makes the table of ended sessions
+   * when it is not there.
+   *
+   * @param url The address of the gateway's database.
+   */
+  static async open(url: string): Promise<EndedInPostgres> {
+    // Signing out is rare, so two connections are plenty.
+    const pool = new Pool({ connectionString: url, max: 2 });
+    try {
+      await pool.query(
+        `CREATE TABLE IF NOT EXISTS ended_session (
+           token_id   TEXT        PRIMARY KEY,
+           expires_at TIMESTAMPTZ NOT NULL
+         )`,
+      );
+    } catch (error) {
+      await pool.end();
+      throw error;
+    }
+    return new EndedInPostgres(pool);
+  }
+
+  async isRevoked(token: string): Promise<boolean> {
+    const found = await this.#pool.query("SELECT 1 FROM ended_session WHERE token_id = $1", [
+      token,
+    ]);
+    return (found.rowCount ?? 0) > 0;
+  }
+
+  async revoke(token: string, expiresAt: Timestamp): Promise<void> {
+    await this.#pool.query("DELETE FROM ended_session WHERE expires_at <= $1", [
+      new Date(Time.currentTimeMillis()),
+    ]);
+    await this.#pool.query(
+      "INSERT INTO ended_session (token_id, expires_at) VALUES ($1, $2) ON CONFLICT (token_id) DO NOTHING",
+      [token, new Date(timestampMs(expiresAt))],
+    );
+  }
+
+  close(): Promise<void> {
+    return this.#pool.end();
+  }
+}
