@@ -120,13 +120,31 @@ describe("The settings should", () => {
       ...inPostgres,
       ACCESS_DESK_DATABASE_HOST: "::1",
       ACCESS_DESK_DATABASE_PORT: "6543",
-      ACCESS_DESK_DATABASE_PASSWORD: "p@ss:w/rd%",
+      ACCESS_DESK_DATABASE_PASSWORD: " p@ss:w/rd% ",
     });
 
+    // The spaces around the password are part of it.
     expect(settings.identityStorage).toEqual({
       kind: "postgresql",
-      url: "postgresql://desk:p%40ss%3Aw%2Frd%25@[::1]:6543/accessdesk_identity",
+      url: "postgresql://desk:%20p%40ss%3Aw%2Frd%25%20@[::1]:6543/accessdesk_identity",
     });
+  });
+
+  it("refuse a database name PostgreSQL would cut short", () => {
+    expect(() =>
+      Settings.ofServer({ ...inPostgres, ACCESS_DESK_IDENTITY_DATABASE: "a".repeat(64) }),
+    ).toThrow(/ACCESS_DESK_IDENTITY_DATABASE must name a database of at most 63 characters/);
+    const long = "o".repeat(45);
+    expect(() =>
+      Settings.ofServer({ ...inPostgres, ACCESS_DESK_ORGANIZATIONS: `teamdev, ${long}` }),
+    ).toThrow(
+      new RegExp(
+        `ACCESS_DESK_ORGANIZATION_DATABASE names databases longer than 63 characters for ${long}\\.`,
+      ),
+    );
+    expect(() =>
+      Settings.ofServer({ ...inPostgres, ACCESS_DESK_IDENTITY_DATABASE: "a".repeat(63) }),
+    ).not.toThrow();
   });
 
   it("refuse to assume anything, and name every setting that is missing", () => {

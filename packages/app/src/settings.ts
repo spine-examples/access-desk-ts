@@ -34,6 +34,12 @@ const ORGANIZATION = "{organization}";
 /** What the name of a database may be made of. */
 const DATABASE_NAME = /^[A-Za-z0-9_-]+$/;
 
+/**
+ * The longest name of a database, in characters. PostgreSQL cuts a longer
+ * name short, so two databases could end up with one name.
+ */
+const DATABASE_NAME_LENGTH = 63;
+
 /** Where a program listens. */
 export interface Listening {
   /** The address to listen on. */
@@ -164,6 +170,18 @@ class Reading {
     return value;
   }
 
+  /**
+   * A secret that must be set, taken exactly as it is written, with any
+   * spaces around it.
+   */
+  secret(name: string): string {
+    const value = this.#environment[name] ?? "";
+    if (value === "") {
+      this.#problems.push(`${name} is not set.`);
+    }
+    return value;
+  }
+
   /** A port that must be set. */
   port(name: string): number {
     const text = this.text(name);
@@ -216,22 +234,30 @@ class Reading {
     const organizations = this.#organizations("ACCESS_DESK_ORGANIZATIONS");
     const name = "ACCESS_DESK_ORGANIZATION_DATABASE";
     const database = this.text(name);
-    if (
-      database !== "" &&
-      !(
-        database.includes(ORGANIZATION) && DATABASE_NAME.test(database.replaceAll(ORGANIZATION, ""))
-      )
-    ) {
+    const valid =
+      database.includes(ORGANIZATION) && DATABASE_NAME.test(database.replaceAll(ORGANIZATION, ""));
+    if (database !== "" && !valid) {
       this.#problems.push(
         `${name} must name a database of letters, digits, "-", and "_", ` +
           `with ${ORGANIZATION} where the organization goes, and is "${database}".`,
       );
     }
+    const databases = organizations.map((organization) => ({
+      organization,
+      database: database.replaceAll(ORGANIZATION, organization),
+    }));
+    const tooLong = valid ? databases.filter((each) => !this.#short(each.database)) : [];
+    if (tooLong.length > 0) {
+      this.#problems.push(
+        `${name} names databases longer than ${DATABASE_NAME_LENGTH.toString()} characters ` +
+          `for ${tooLong.map(({ organization }) => organization).join(", ")}.`,
+      );
+    }
     return {
       kind: "postgresql",
-      organizations: organizations.map((organization) => ({
+      organizations: databases.map(({ organization, database: named }) => ({
         organization,
-        url: this.#databaseUrl(database.replaceAll(ORGANIZATION, organization)),
+        url: this.#databaseUrl(named),
       })),
       subscriptionsUrl: this.#databaseUrl(this.#databaseName("ACCESS_DESK_RESOURCES_DATABASE")),
     };
@@ -256,7 +282,7 @@ class Reading {
     const text = this.text(name);
     const organizations = text.split(",").map((organization) => organization.trim());
     const valid =
-      organizations.every((organization) => /^[A-Za-z0-9_-]+$/.test(organization)) &&
+      organizations.every((organization) => DATABASE_NAME.test(organization)) &&
       new Set(organizations).size === organizations.length;
     if (text !== "" && !valid) {
       this.#problems.push(
@@ -274,8 +300,18 @@ class Reading {
       this.#problems.push(
         `${name} must name a database of letters, digits, "-", and "_", and is "${text}".`,
       );
+    } else if (!this.#short(text)) {
+      this.#problems.push(
+        `${name} must name a database of at most ${DATABASE_NAME_LENGTH.toString()} characters, ` +
+          `and is "${text}".`,
+      );
     }
     return text;
+  }
+
+  /** Whether a database's name is short enough for PostgreSQL to keep it whole. */
+  #short(database: string): boolean {
+    return Buffer.byteLength(database, "utf8") <= DATABASE_NAME_LENGTH;
   }
 
   /**
@@ -287,7 +323,7 @@ class Reading {
       host: this.text("ACCESS_DESK_DATABASE_HOST"),
       port: this.port("ACCESS_DESK_DATABASE_PORT"),
       user: this.text("ACCESS_DESK_DATABASE_USER"),
-      password: this.text("ACCESS_DESK_DATABASE_PASSWORD"),
+      password: this.secret("ACCESS_DESK_DATABASE_PASSWORD"),
     };
     const { host, port, user, password } = this.#databaseServer;
     const address = isIP(host) === 6 ? `[${host}]` : host;

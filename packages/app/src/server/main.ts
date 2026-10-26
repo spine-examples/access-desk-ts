@@ -81,14 +81,23 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
     if (!stopping) {
       stopping = true;
-      void server
-        .close()
-        .then(() => contexts.close())
-        .then(() => {
-          identityStorage.close();
-          resourcesStorage.organizations.close();
-          resourcesStorage.subscriptions?.close();
-        });
+      // Each is closed even when closing another fails.
+      void (async () => {
+        try {
+          await server.close();
+        } finally {
+          try {
+            await contexts.close();
+          } finally {
+            identityStorage.close();
+            resourcesStorage.organizations.close();
+            resourcesStorage.subscriptions?.close();
+          }
+        }
+      })().catch((error: unknown) => {
+        console.error("The application server did not stop cleanly.", error);
+        process.exitCode = 1;
+      });
     }
   });
 }

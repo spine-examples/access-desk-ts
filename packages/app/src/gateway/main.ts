@@ -80,12 +80,21 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
     if (!stopping) {
       stopping = true;
-      void gateway
-        .close()
-        .then(() => endedSessions.close())
-        .then(() => {
-          subscriptions.close();
-        });
+      // Each is closed even when closing another fails.
+      void (async () => {
+        try {
+          await gateway.close();
+        } finally {
+          try {
+            await endedSessions.close();
+          } finally {
+            subscriptions.close();
+          }
+        }
+      })().catch((error: unknown) => {
+        console.error("The gateway did not stop cleanly.", error);
+        process.exitCode = 1;
+      });
     }
   });
 }
