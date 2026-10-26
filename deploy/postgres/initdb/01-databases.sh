@@ -24,8 +24,14 @@
 #
 set -eu
 
-# Makes one database, unless it is there already.
+# Makes one database, unless it is there already. PostgreSQL cuts a name
+# longer than 63 characters short, so two databases could end up with one
+# name; such a name is refused instead.
 create() {
+    if [ "${#1}" -gt 63 ]; then
+        echo "The database name \"$1\" is longer than 63 characters." >&2
+        exit 1
+    fi
     psql -v ON_ERROR_STOP=1 --quiet --username "$POSTGRES_USER" --dbname postgres \
         --set=name="$1" <<'SQL'
 SELECT format('CREATE DATABASE %I', :'name')
