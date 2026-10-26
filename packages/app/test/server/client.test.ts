@@ -151,7 +151,7 @@ describe("postAndAwaitView should", () => {
     expect(shown).toBe("acme");
   });
 
-  it("read the read model once more when no update showed the effect in time", async () => {
+  it("return what the read model shows already, when it showed the effect before the command", async () => {
     const server = await hosted();
     await givenOrganization(server, organizationId("acme"));
     const connection = connectionTo(() => server.url);

@@ -192,10 +192,14 @@ export const ServerRequests = {
    *
    * 1. It subscribes to the read model, and opens the subscription.
    * 2. It posts the command.
-   * 3. It waits for an update of the read model that shows the effect.
-   * 4. When no such update comes in time, it reads the read model once more.
-   *    The read model may have shown the effect before the subscription
-   *    opened, as when another sign-in of the same account linked it first.
+   * 3. It reads the read model. It may show the effect already, from before
+   *    the subscription opened, as when another sign-in of the same account
+   *    linked it first. Any later change comes as an update, since the
+   *    subscription is open.
+   * 4. Otherwise it waits for an update of the read model that shows the
+   *    effect.
+   * 5. When no such update comes in time, it reads the read model once more,
+   *    in case an update was missed.
    *
    * @param request The client that posts the command.
    * @param awaited The command, and the read model that shows its effect.
@@ -266,17 +270,16 @@ export const ServerRequests = {
       if (given.kind !== "ok") {
         return undefined;
       }
-      const result = await Promise.race([shown, tooLate]);
-      if (result !== undefined) {
-        return result;
-      }
-      const last = await ServerRequests.readById(
-        request,
-        awaited.view,
-        awaited.idSchema,
-        awaited.id,
-      );
-      return last === undefined ? undefined : awaited.shows(last);
+      const showsNow = async () => {
+        const view = await ServerRequests.readById(
+          request,
+          awaited.view,
+          awaited.idSchema,
+          awaited.id,
+        );
+        return view === undefined ? undefined : awaited.shows(view);
+      };
+      return (await showsNow()) ?? (await Promise.race([shown, tooLate])) ?? (await showsNow());
     } finally {
       clearTimeout(giveUp);
       await watching.cancel();
