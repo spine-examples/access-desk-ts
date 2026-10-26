@@ -153,8 +153,6 @@ export class AccessDesk {
    * @returns The person, or `undefined` when Identity did not link the account in time.
    */
   #link(id: ExternalIdentityId, email: EmailAddress, name: string): Promise<PersonId | undefined> {
-    // The account is linked several steps after the command, so its view tells
-    // when, by naming the person.
     return ServerRequests.postAndAwaitView(this.#identity, {
       command: LinkExternalIdentitySchema,
       message: create(LinkExternalIdentitySchema, { id, emailAddress: email, name }),

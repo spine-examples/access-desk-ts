@@ -85,13 +85,14 @@ export function sessionRoutes(
      * Signs the person out. Everything they watch stops, and the session no
      * longer works.
      *
+     * A token that does not resolve is ended as well. It may still be good,
+     * as when the gateway could not tell whether its session had ended.
+     *
      * Send `{}`. Answers `200` with `{}`, with or without a session, and `503`
      * when the gateway could not remember that the session ended.
      */
     route("/auth/sign-out", async (_body, session, request) => {
       if (session === undefined) {
-        // The token may still be good though it did not resolve, as when the
-        // gateway could not tell whether its session had ended.
         await sessions.endUnresolved(request);
       } else {
         await sessions.end(session);
