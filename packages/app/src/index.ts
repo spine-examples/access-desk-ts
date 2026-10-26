@@ -19,5 +19,8 @@
 export { typeRegistry } from "../generated/model-registry.js";
 export { AccessDesk, type AccessDeskOptions } from "./server/access-desk.js";
 export { Gateway, type GatewayOptions } from "./gateway/gateway.js";
+export { EndedSessions } from "./gateway/ended-sessions.js";
+export { Storage } from "./storage.js";
+export type { StorageSettings } from "./settings.js";
 export type { ExternalSignIn } from "./gateway/routes/sign-in-routes.js";
 export { type SignInProvider } from "./gateway/providers.js";
