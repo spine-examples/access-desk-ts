@@ -26,19 +26,83 @@ The file is ignored by Git.
 Every setting is required. Nothing is assumed: a program that misses a
 setting refuses to start and names it.
 
-| Variable                   | Read by             | Meaning                                                |
-| -------------------------- | ------------------- | ------------------------------------------------------ |
-| `ACCESS_DESK_SERVER_HOST`  | server, gateway     | The address the application server listens on.         |
-| `ACCESS_DESK_SERVER_PORT`  | server, gateway     | The port the application server listens on.            |
-| `ACCESS_DESK_GATEWAY_HOST` | gateway, web client | The address the gateway listens on.                    |
-| `ACCESS_DESK_GATEWAY_PORT` | gateway, web client | The port the gateway listens on.                       |
-| `ACCESS_DESK_WEB_HOST`     | gateway, web client | The address the web client listens on.                 |
-| `ACCESS_DESK_WEB_PORT`     | gateway, web client | The port the web client listens on.                    |
-| `GOOGLE_CLIENT_ID`         | gateway             | The client identifier of the Google OAuth application. |
-| `GOOGLE_CLIENT_SECRET`     | gateway             | The client secret of the Google OAuth application.     |
+| Variable                            | Read by             | Meaning                                                 |
+| ----------------------------------- | ------------------- | ------------------------------------------------------- |
+| `ACCESS_DESK_SERVER_HOST`           | server, gateway     | The address the application server listens on.          |
+| `ACCESS_DESK_SERVER_PORT`           | server, gateway     | The port the application server listens on.             |
+| `ACCESS_DESK_GATEWAY_HOST`          | gateway, web client | The address the gateway listens on.                     |
+| `ACCESS_DESK_GATEWAY_PORT`          | gateway, web client | The port the gateway listens on.                        |
+| `ACCESS_DESK_WEB_HOST`              | gateway, web client | The address the web client listens on.                  |
+| `ACCESS_DESK_WEB_PORT`              | gateway, web client | The port the web client listens on.                     |
+| `GOOGLE_CLIENT_ID`                  | gateway             | The client identifier of the Google OAuth application.  |
+| `GOOGLE_CLIENT_SECRET`              | gateway             | The client secret of the Google OAuth application.      |
+| `ACCESS_DESK_STORAGE`               | server, gateway     | `memory`, or `postgresql` to keep data across restarts. |
+| `ACCESS_DESK_DATABASE_HOST`         | server, gateway     | The address of the PostgreSQL server.                   |
+| `ACCESS_DESK_DATABASE_PORT`         | server, gateway     | The port of the PostgreSQL server.                      |
+| `ACCESS_DESK_DATABASE_USER`         | server, gateway     | The account the programs sign in to it with.            |
+| `ACCESS_DESK_DATABASE_PASSWORD`     | server, gateway     | The password of that account, written as it is.         |
+| `ACCESS_DESK_IDENTITY_DATABASE`     | server              | The database of people and their memberships.           |
+| `ACCESS_DESK_ORGANIZATIONS`         | server              | The organizations kept in PostgreSQL, by commas.        |
+| `ACCESS_DESK_ORGANIZATION_DATABASE` | server              | Each one's database, with `{organization}` in it.       |
+| `ACCESS_DESK_RESOURCES_DATABASE`    | server              | The database of subscriptions to the organizations.     |
+| `ACCESS_DESK_GATEWAY_DATABASE`      | gateway             | The database of subscriptions and ended sessions.       |
+| `ACCESS_DESK_SESSION_KEY`           | gateway             | The P-256 key sessions are signed with, in base64.      |
+
+The PostgreSQL server, the databases, and the organizations are needed only
+for `postgresql`. The server and the account are set once, and each program
+names its databases on that server. A program elsewhere, such as in a
+container, changes only `ACCESS_DESK_DATABASE_HOST` and `_PORT`.
+`pnpm --dir packages/app run session-key` prints a new session key. Sessions
+stay good while the key stays the same; a new key signs everybody out.
 
 People sign in through Google. If the gateway cannot reach Google when it
 starts, it does not start.
+
+### What survives a restart
+
+With `postgresql`, a restarted application server still knows every person,
+the accounts they sign in with, and their memberships. A restarted gateway
+keeps everybody signed in, keeps ended sessions ended, and keeps the
+subscriptions people hold until their sessions expire. A browser opens its
+subscriptions again after the restart.
+
+With `postgresql`, it also knows the organizations `ACCESS_DESK_ORGANIZATIONS`
+lists, and everything in them. Spine's PostgreSQL storage keeps each
+organization in a database of its own and must know every one when it opens,
+so the server keeps no other organization: a command for one is refused. A
+new organization needs its database, its place in the list, and a restart.
+With `memory`, the server keeps any organization, and forgets them all when it
+stops.
+
+For local development there are two organizations, `teamdev` and
+`codematters`, in the databases `accessdesk_resources_teamdev` and
+`accessdesk_resources_codematters`. Nothing creates the organizations
+themselves yet; their databases are ready for them.
+
+### The database
+
+`ACCESS_DESK_STORAGE=postgresql` needs a PostgreSQL server. For development,
+[`deploy/compose.yaml`](../../deploy/compose.yaml) runs one in Docker, with the
+port and the account of `ACCESS_DESK_DATABASE_PORT`, `_USER`, and `_PASSWORD`.
+From the repository root:
+
+```sh
+pnpm run postgres:start
+```
+
+It listens at `ACCESS_DESK_DATABASE_HOST` and `_PORT`, which must be an IP
+address for Docker. Each start makes the databases the settings name that are
+missing: Identity's, one for each organization `ACCESS_DESK_ORGANIZATIONS`
+lists, the one for subscriptions to them, the gateway's, and the one the tests
+make their databases from. So an organization added to the list gets its
+database at the next start. The data is kept across stops.
+`pnpm run postgres:stop` stops it; `pnpm run postgres:delete` removes the
+containers of `deploy/compose.yaml` and deletes the data too.
+
+The development server signs every program in as one administrator of the
+whole server, which also lets the tests make and delete their databases.
+Elsewhere, give each program an account of its own that may create tables in
+its own database and do nothing more.
 
 ## Run it
 
@@ -198,7 +262,7 @@ belongs to. A request to Identity, such as adding a member, names no
 organization.
 
 | Request                                                          | Who may send it                                                            |
-| ---------------------------------------------------------------- |----------------------------------------------------------------------------|
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | `AddMember`                                                      | An administrator, for their own organization.                              |
 | Query on `MembershipView`, filtered by `organization` alone      | An administrator, for their own organization.                              |
 | `SubmitAccessRequest`, `SubmitAccessExtensionRequest`            | A member, as the requester.                                                |
