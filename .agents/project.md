@@ -94,8 +94,9 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
 - `pnpm run test` — builds, then a single central `vitest run` from the root, with
   every test keeping its data in memory.
 - `pnpm run test:postgresql` — the same tests, each in throwaway PostgreSQL
-  databases made where `ACCESS_DESK_TEST_DATABASE_URL` points. Needs the
-  database server running.
+  databases made on the server of `ACCESS_DESK_DATABASE_HOST` and the rest,
+  from the database `ACCESS_DESK_TEST_DATABASE` names. Needs the database
+  server running.
 - `pnpm run verify` — build → typecheck → typecheck:tests → lint → test. **This is the gate.**
   It runs the tests in memory only; run `pnpm run test:postgresql` as well after
   a change to storage, delivery, or anything PostgreSQL keeps.

@@ -17,10 +17,9 @@
 # Makes the databases the settings name, for local development, unless they
 # are there already.
 #
-# The PostgreSQL server runs it when it first starts, and `pnpm run
-# postgres:start` runs it on every start, so an organization added to
-# ACCESS_DESK_ORGANIZATIONS gets its database. Spine creates the tables inside
-# the databases. It does not create databases.
+# The PostgreSQL server runs it when it first starts.
+#
+# Spine creates the tables inside the databases. It does not create databases.
 #
 set -eu
 
@@ -51,13 +50,12 @@ done
 
 # What people subscribed to in Resources, which belongs to no one
 # organization.
-create "$ACCESS_DESK_RESOURCES_DATABASE"
+create "$ACCESS_DESK_RESOURCES_SUBSCRIPTIONS_DATABASE"
 
 # The subscriptions people hold and the sessions they ended. The gateway
 # keeps them.
 create "$ACCESS_DESK_GATEWAY_DATABASE"
 
-# The tests on PostgreSQL connect to the database their address names to make
-# their throwaway databases, and delete them when they finish.
-tests=${ACCESS_DESK_TEST_DATABASE_URL##*/}
-create "${tests%%\?*}"
+# The tests on PostgreSQL connect to it to make their throwaway databases, and
+# delete them when they finish.
+create "$ACCESS_DESK_TEST_DATABASE"
