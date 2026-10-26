@@ -104,20 +104,8 @@ export class ServerConnection {
 /** A client that acts as one person or program. */
 export type ServerRequest = ReturnType<ServerClient["onBehalfOf"]>;
 
-/** How long to wait for the event by default. */
+/** How long to wait for a command's effect by default. */
 export const PATIENCE_MS = 10_000; // 10 seconds.
-
-/** A command and the event it is expected to cause. */
-export interface Awaited<Command extends GenMessage<Message>, Event extends GenMessage<Message>> {
-  /** The type of the command. */
-  readonly command: Command;
-  /** The command to post. */
-  readonly message: MessageShape<Command>;
-  /** The type of the event to wait for. */
-  readonly event: Event;
-  /** Whether an event is the one this command caused. */
-  readonly answers: (event: MessageShape<Event>) => boolean;
-}
 
 /** A command, and the read model that shows what it changed. */
 export interface AwaitedView<
@@ -171,64 +159,6 @@ const Targets = {
 /** The requests a program makes to the application server. */
 export const ServerRequests = {
   /**
-   * Posts a command and waits for the event it causes.
-   *
-   * @param request The client that posts the command.
-   * @param awaited The command and the event to wait for.
-   * @param patienceMs How long to wait for the event. Ten seconds by default.
-   * @returns The event, or `undefined` if the command was not accepted or the
-   *   event did not come in time.
-   */
-  async postAndAwait<Command extends GenMessage<Message>, Event extends GenMessage<Message>>(
-    request: ServerRequest,
-    awaited: Awaited<Command, Event>,
-    patienceMs: number = PATIENCE_MS,
-  ): Promise<MessageShape<Event> | undefined> {
-    const watching = await request.createSubscription(
-      create(TopicSchema, {
-        id: create(TopicIdSchema, { value: `awaited-${crypto.randomUUID()}` }),
-        target: create(TargetSchema, {
-          type: TypeUrls.derive(awaited.event),
-          criterion: { case: "includeAll", value: true },
-        }),
-      }),
-      { kind: "event" },
-    );
-    const answered = (async (): Promise<MessageShape<Event> | undefined> => {
-      for await (const delivery of watching.updates) {
-        if (delivery.kind !== "update" || delivery.update.update.case !== "eventUpdates") {
-          continue;
-        }
-        for (const event of delivery.update.update.value.event) {
-          const fact =
-            event.message === undefined
-              ? undefined
-              : AnyMessages.unpack(event.message, awaited.event);
-          if (fact !== undefined && awaited.answers(fact)) {
-            return fact;
-          }
-        }
-      }
-      return undefined;
-    })();
-    answered.catch(() => undefined);
-    let giveUp: ReturnType<typeof setTimeout> | undefined;
-    const tooLate = new Promise<undefined>((resolve) => {
-      giveUp = setTimeout(() => {
-        resolve(undefined);
-      }, patienceMs);
-    });
-    try {
-      await watching.activate();
-      const given = await request.post(awaited.command, awaited.message);
-      return given.kind === "ok" ? await Promise.race([answered, tooLate]) : undefined;
-    } finally {
-      clearTimeout(giveUp);
-      await watching.cancel();
-    }
-  },
-
-  /**
    * Reads one read model by its identifier.
    *
    * @param request The client that reads.
@@ -264,8 +194,8 @@ export const ServerRequests = {
    * 2. It posts the command.
    * 3. It waits for an update of the read model that shows the effect.
    * 4. When no such update comes in time, it reads the read model once more.
-   *    This Spine snapshot may open a subscription a moment after it says it
-   *    has, and an update in that moment is not delivered.
+   *    The read model may have shown the effect before the subscription
+   *    opened, as when another sign-in of the same account linked it first.
    *
    * @param request The client that posts the command.
    * @param awaited The command, and the read model that shows its effect.

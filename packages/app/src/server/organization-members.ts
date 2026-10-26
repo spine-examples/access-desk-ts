@@ -13,16 +13,14 @@
  */
 
 import { create } from "@bufbuild/protobuf";
+import type { Subscription } from "@spine-event-engine/client-node";
 import type { NewMember, OrganizationMembers } from "@access-desk/identity-server";
 import { AddOrganizationMemberSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
 import {
   type OrganizationId,
   OrganizationIdSchema,
 } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
-import {
-  type OrganizationMemberAdded,
-  OrganizationMemberAddedSchema,
-} from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
+import { OrganizationMemberAddedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
 import { OrganizationViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
 import { PATIENCE_MS, ServerConnection, ServerRequests } from "./client.js";
 
@@ -80,30 +78,54 @@ export const ReachedOrganizationMembers = {
       return held !== undefined;
     };
 
+    /**
+     * Whether the organization confirmed that it added the person.
+     *
+     * The subscription brings only the event the command caused. It ends with
+     * no event when the organization does not confirm in time.
+     */
+    const confirmed = async (subscription: Subscription): Promise<boolean> => {
+      try {
+        for await (const delivery of subscription.updates) {
+          if (
+            delivery.kind === "update" &&
+            delivery.update.update.case === "eventUpdates" &&
+            delivery.update.update.value.event.length > 0
+          ) {
+            return true;
+          }
+        }
+        return false;
+      } catch {
+        return false;
+      } finally {
+        await subscription.cancel();
+      }
+    };
+
     return {
       async add(member: NewMember): Promise<void> {
         const { organization, person, email, role, addedBy } = member;
         if (await alreadyMember(member)) {
           return;
         }
-        const awaited = {
-          command: AddOrganizationMemberSchema,
-          message: create(AddOrganizationMemberSchema, {
+        const posted = await organizationOf(organization).postAndSubscribe(
+          AddOrganizationMemberSchema,
+          create(AddOrganizationMemberSchema, {
             organizationId: { uuid: organization.uuid },
             person: { uuid: person.uuid },
             emailAddress: email,
             role,
             addedBy,
           }),
-          event: OrganizationMemberAddedSchema,
-          answers: (event: OrganizationMemberAdded) => event.person?.uuid === person.uuid,
-        };
-        const added = await ServerRequests.postAndAwait(
-          organizationOf(organization),
-          awaited,
-          patienceMs,
+          {
+            events: [OrganizationMemberAddedSchema],
+            firstUpdateTimeoutMs: patienceMs,
+            onFirstUpdateTimeout: (subscription) => subscription.cancel(),
+          },
         );
-        if (added === undefined && !(await alreadyMember(member))) {
+        const added = posted.kind === "accepted" && (await confirmed(posted.subscription));
+        if (!added && !(await alreadyMember(member))) {
           console.warn(
             `Organization ${organization.uuid} did not add person ${person.uuid} to its members.`,
           );
