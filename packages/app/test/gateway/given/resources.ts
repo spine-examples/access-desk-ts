@@ -403,10 +403,19 @@ export async function givenTold(
   administrator: Signed,
   watched: Watched,
 ): Promise<void> {
+  const probes: string[] = [];
   for (let attempt = 0; attempt < 40; attempt += 1) {
     const probe = `probe-${crypto.randomUUID()}`;
+    probes.push(probe);
     expect(await registerResource(running, administrator, probe)).toBe("ok");
-    if (await watched.hears(probe, 500)) {
+    // A registration can take longer than the wait to reach the browser, so
+    // any probe heard, however late, shows the browser receives what it watches.
+    const heard = await eventually(
+      () => Promise.resolve(probes.some((sent) => watched.received.includes(sent))),
+      (any) => any,
+      500,
+    );
+    if (heard) {
       return;
     }
   }

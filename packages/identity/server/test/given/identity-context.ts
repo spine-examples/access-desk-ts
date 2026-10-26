@@ -19,10 +19,10 @@ import { SignalMetadata } from "@spine-event-engine/server";
 import { type ActorContext, UserIdSchema } from "@spine-event-engine/proto";
 import { QueryIdSchema, QuerySchema, TargetSchema } from "@spine-event-engine/proto/client";
 import { BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
+import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
 
 import { typeRegistry } from "../../generated/model-registry.js";
 import { eventRecording } from "./event-recording.js";
-import { TestStorages, type TestStorage } from "./storage.js";
 
 /** The gateway acting in the tests, once a provider has confirmed a person. */
 export const actor = "gateway";
