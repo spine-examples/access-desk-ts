@@ -38,6 +38,17 @@ The application runs as two programs. The application server hosts the
 contexts. The gateway is a separate program that reaches the server over the
 network, and it is the only one a browser talks to.
 
+Each program keeps what it must remember in a PostgreSQL database of its own,
+or in memory for development and tests. The application server keeps
+Identity's people, their accounts, their email addresses, and their
+memberships. The gateway keeps the subscriptions people hold and the sessions
+they ended. Resources keeps each organization in a database of its own, and
+what people subscribed to in one more. Spine's PostgreSQL storage must know
+every organization when it opens, so the application server keeps only the
+organizations its settings list; local development has two, `teamdev` and
+`codematters`. Until that storage takes an organization it has not seen
+before, a new organization needs a restart.
+
 An initial deployment may co-host both contexts in one application server.
 Co-location does not weaken the boundaries: each context must have its own model
 package, generated module, `BoundedContext` instance, repositories, storage
@@ -81,8 +92,8 @@ Organization is the tenant.
 - Every tenant-scoped request, query, subscription, inbox row,
   outbox row, and audit record carries exactly one `OrganizationId` represented
   at the Spine boundary as the authoritative `TenantId`.
-- A trusted gateway resolves the opaque server-side session into the actor and
-  their organization. Client command fields must not be trusted as actor or
+- A trusted gateway resolves the session it signed into the actor and their
+  organization. Client command fields must not be trusted as actor or
   tenant authority.
 - Resources is multitenant. Identity is singletenant. The gateway carries the
   signed-in person into Resources as the actor.
@@ -98,8 +109,10 @@ There is no other way to sign in. Provider tokens are used for the one exchange
 and discarded. They are never stored in browser application storage or passed
 into bounded contexts.
 
-The gateway issues an opaque session at sign-in, bound to the organization the
-person belongs to, when they belong to one. For every
+The gateway issues a session at sign-in, bound to the organization the
+person belongs to, when they belong to one. The session's token carries the
+gateway's signature, so it stays good when the gateway restarts. The gateway
+remembers the sessions that were ended, so their tokens stay refused. For every
 command, query, and subscription the gateway takes the actor and the
 organization from the session, refuses a request that names another, checks
 that the person is a member, and admits only the commands a person may give. A

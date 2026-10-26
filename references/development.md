@@ -102,7 +102,7 @@ restore the files and remove the debug afterward; never commit or leave
 
 Completion reports must name the commands run, outcomes, untested boundaries,
 and any follow-up decision. A passing local BlackBox test must not be described
-as proof of cross-process, browser, authentication, or production Datastore
+as proof of cross-process, browser, authentication, or production database
 behavior.
 
 ## Repository hygiene
