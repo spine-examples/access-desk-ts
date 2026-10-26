@@ -29,8 +29,6 @@ import { account, google, linkExternalIdentity } from "./given/person.js";
 beforeAll(loadIdentityContext, 30_000);
 afterEach(closeIdentityBlackBoxes);
 
-// An email address is registered when an account is linked under it. So the
-// tests link accounts.
 describe("PersonEmailAggregate should", () => {
   describe("handle 'RegisterPersonEmail', and", () => {
     it("emit 'PersonEmailRegistered' with a new person for an address not registered yet", async () => {

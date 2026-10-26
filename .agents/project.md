@@ -128,8 +128,7 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
   as it is, with no build) gives every BlackBox, server, and gateway storage of
   its own (`@access-desk/testing/storage`) and deletes it afterwards. On
   PostgreSQL that is a new database for each, and one for each tenant of a
-  multitenant context, which must be listed up front. A test restarts a context
-  by opening a new BlackBox over `storageOf(box)`. The application's server
+  multitenant context, which must be listed up front. The application's server
   tests open Resources the way the server does, through `Storage.openResources`,
   for the organizations they work in (`acme` and `globex`).
 - A process that reads a projection, such as the duplicate check of an access

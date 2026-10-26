@@ -103,7 +103,7 @@ export interface Issued {
 export interface SessionsOptions {
   /** The P-256 private key the gateway signs sessions with. */
   readonly key: KeyObject;
-  /** The sessions people ended before they expired. Whoever passes it closes it. */
+  /** The sessions people ended before they expired. */
   readonly ended: EndedSessions;
   /** What is opened under the sessions and must end with them. Nothing when left out. */
   readonly opened?: OpenedUnderSessions;

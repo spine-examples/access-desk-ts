@@ -47,7 +47,7 @@ export interface IdentityContextOptions {
   readonly members: OrganizationMembers;
   /**
    * Where the context keeps the people, their accounts, their email
-   * addresses, and their memberships. Whoever passes it closes it.
+   * addresses, and their memberships.
    */
   readonly storage: StorageFactory;
 }

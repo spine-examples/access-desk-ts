@@ -90,7 +90,6 @@ import { AuditEntryProjection } from "./audit/audit-entry-projection.js";
 export interface ResourcesContextOptions {
   /**
    * Where the context keeps each organization and everything it owns.
-   * Whoever passes it closes it.
    *
    * Each organization is kept apart, so the storage must take an organization
    * it has not seen before, or know every organization from the start.
