@@ -19,11 +19,7 @@ import {
   type ExternalIdentityId,
 } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { IdentityProvider } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
-import {
-  AddSignInAccountSchema,
-  RegisterPersonSchema,
-} from "@access-desk/identity-model/generated/accessdesk/identity/person/commands_pb.js";
-import { RegisterPersonEmailSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/person_email_commands_pb.js";
+import { RegisterPersonSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/commands_pb.js";
 import { LinkExternalIdentitySchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/external_identity_commands_pb.js";
 import {
   ExternalIdentityViewSchema,
@@ -64,45 +60,14 @@ export function linkExternalIdentity(
   );
 }
 
-/** Posts `RegisterPersonEmail` for the email address, on behalf of the account being linked. */
-export function registerPersonEmail(
-  scope: BlackBoxScope,
-  email: string,
-  invoker: ExternalIdentityId,
-) {
-  return scope.post(
-    RegisterPersonEmailSchema,
-    create(RegisterPersonEmailSchema, {
-      emailAddress: { value: email },
-      invoker: { case: "account", value: invoker },
-    }),
-  );
-}
-
-/** Posts `RegisterPerson` for the person with the given identifier and email address. */
+/**
+ * Posts `RegisterPerson` for the person with the given identifier and email
+ * address. It names no invoker, so no process reacts to the person registered.
+ */
 export function registerPerson(scope: BlackBoxScope, person: string, email: string) {
   return scope.post(
     RegisterPersonSchema,
     create(RegisterPersonSchema, { id: { uuid: person }, emailAddress: { value: email } }),
-  );
-}
-
-/**
- * Posts `AddSignInAccount` for the account. The name its provider gives is the
- * person's identifier followed by `(name)`.
- */
-export function addSignInAccount(
-  scope: BlackBoxScope,
-  person: string,
-  identity: ExternalIdentityId,
-) {
-  return scope.post(
-    AddSignInAccountSchema,
-    create(AddSignInAccountSchema, {
-      id: { uuid: person },
-      account: identity,
-      name: `${person} (name)`,
-    }),
   );
 }
 
