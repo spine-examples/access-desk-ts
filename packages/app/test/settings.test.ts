@@ -49,7 +49,7 @@ const inPostgres = {
   ACCESS_DESK_GATEWAY_DATABASE: "accessdesk_gateway",
   ACCESS_DESK_ORGANIZATIONS: "teamdev, codematters",
   ACCESS_DESK_ORGANIZATION_DATABASE: "accessdesk_resources_{organization}",
-  ACCESS_DESK_RESOURCES_DATABASE: "accessdesk_resources",
+  ACCESS_DESK_RESOURCES_SUBSCRIPTIONS_DATABASE: "accessdesk_resources_subscriptions",
 };
 
 describe("The settings should", () => {
@@ -98,7 +98,8 @@ describe("The settings should", () => {
           url: "postgresql://desk:secret@127.0.0.1:5432/accessdesk_resources_codematters",
         },
       ],
-      subscriptionsUrl: "postgresql://desk:secret@127.0.0.1:5432/accessdesk_resources",
+      subscriptionsUrl:
+        "postgresql://desk:secret@127.0.0.1:5432/accessdesk_resources_subscriptions",
     });
   });
 
@@ -113,6 +114,14 @@ describe("The settings should", () => {
         Settings.ofServer({ ...inPostgres, ACCESS_DESK_ORGANIZATION_DATABASE: database }),
       ).toThrow(/ACCESS_DESK_ORGANIZATION_DATABASE must name a database/);
     }
+  });
+
+  it("refuse an organization whose database is the one of what people subscribed to", () => {
+    expect(() =>
+      Settings.ofServer({ ...inPostgres, ACCESS_DESK_ORGANIZATIONS: "teamdev,subscriptions" }),
+    ).toThrow(
+      'ACCESS_DESK_ORGANIZATION_DATABASE gives subscriptions the database ACCESS_DESK_RESOURCES_SUBSCRIPTIONS_DATABASE names, "accessdesk_resources_subscriptions".',
+    );
   });
 
   it("reach the database server where its settings say, with the password written as it is", () => {
@@ -167,11 +176,11 @@ describe("The settings should", () => {
       ACCESS_DESK_GATEWAY_DATABASE: "",
       ACCESS_DESK_ORGANIZATIONS: "",
       ACCESS_DESK_ORGANIZATION_DATABASE: "",
-      ACCESS_DESK_RESOURCES_DATABASE: "",
+      ACCESS_DESK_RESOURCES_SUBSCRIPTIONS_DATABASE: "",
     };
 
     expect(() => Settings.ofServer(withoutDatabases)).toThrow(
-      /ACCESS_DESK_IDENTITY_DATABASE is not set[\s\S]*ACCESS_DESK_DATABASE_HOST is not set[\s\S]*ACCESS_DESK_DATABASE_PORT is not set[\s\S]*ACCESS_DESK_DATABASE_USER is not set[\s\S]*ACCESS_DESK_DATABASE_PASSWORD is not set[\s\S]*ACCESS_DESK_ORGANIZATIONS is not set[\s\S]*ACCESS_DESK_ORGANIZATION_DATABASE is not set[\s\S]*ACCESS_DESK_RESOURCES_DATABASE is not set/,
+      /ACCESS_DESK_IDENTITY_DATABASE is not set[\s\S]*ACCESS_DESK_DATABASE_HOST is not set[\s\S]*ACCESS_DESK_DATABASE_PORT is not set[\s\S]*ACCESS_DESK_DATABASE_USER is not set[\s\S]*ACCESS_DESK_DATABASE_PASSWORD is not set[\s\S]*ACCESS_DESK_ORGANIZATIONS is not set[\s\S]*ACCESS_DESK_ORGANIZATION_DATABASE is not set[\s\S]*ACCESS_DESK_RESOURCES_SUBSCRIPTIONS_DATABASE is not set/,
     );
     expect(() => Settings.ofGateway(withoutDatabases)).toThrow(
       /ACCESS_DESK_GATEWAY_DATABASE is not set[\s\S]*ACCESS_DESK_DATABASE_HOST is not set/,

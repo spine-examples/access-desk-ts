@@ -26,27 +26,27 @@ The file is ignored by Git.
 Every setting is required. Nothing is assumed: a program that misses a
 setting refuses to start and names it.
 
-| Variable                            | Read by             | Meaning                                                 |
-| ----------------------------------- | ------------------- | ------------------------------------------------------- |
-| `ACCESS_DESK_SERVER_HOST`           | server, gateway     | The address the application server listens on.          |
-| `ACCESS_DESK_SERVER_PORT`           | server, gateway     | The port the application server listens on.             |
-| `ACCESS_DESK_GATEWAY_HOST`          | gateway, web client | The address the gateway listens on.                     |
-| `ACCESS_DESK_GATEWAY_PORT`          | gateway, web client | The port the gateway listens on.                        |
-| `ACCESS_DESK_WEB_HOST`              | gateway, web client | The address the web client listens on.                  |
-| `ACCESS_DESK_WEB_PORT`              | gateway, web client | The port the web client listens on.                     |
-| `GOOGLE_CLIENT_ID`                  | gateway             | The client identifier of the Google OAuth application.  |
-| `GOOGLE_CLIENT_SECRET`              | gateway             | The client secret of the Google OAuth application.      |
-| `ACCESS_DESK_STORAGE`               | server, gateway     | `memory`, or `postgresql` to keep data across restarts. |
-| `ACCESS_DESK_DATABASE_HOST`         | server, gateway     | The address of the PostgreSQL server.                   |
-| `ACCESS_DESK_DATABASE_PORT`         | server, gateway     | The port of the PostgreSQL server.                      |
-| `ACCESS_DESK_DATABASE_USER`         | server, gateway     | The account the programs sign in to it with.            |
-| `ACCESS_DESK_DATABASE_PASSWORD`     | server, gateway     | The password of that account, written as it is.         |
-| `ACCESS_DESK_IDENTITY_DATABASE`     | server              | The database of people and their memberships.           |
-| `ACCESS_DESK_ORGANIZATIONS`         | server              | The organizations kept in PostgreSQL, by commas.        |
-| `ACCESS_DESK_ORGANIZATION_DATABASE` | server              | Each one's database, with `{organization}` in it.       |
-| `ACCESS_DESK_RESOURCES_DATABASE`    | server              | The database of subscriptions to the organizations.     |
-| `ACCESS_DESK_GATEWAY_DATABASE`      | gateway             | The database of subscriptions and ended sessions.       |
-| `ACCESS_DESK_SESSION_KEY`           | gateway             | The P-256 key sessions are signed with, in base64.      |
+| Variable                                       | Read by             | Meaning                                                 |
+| ---------------------------------------------- | ------------------- | ------------------------------------------------------- |
+| `ACCESS_DESK_SERVER_HOST`                      | server, gateway     | The address the application server listens on.          |
+| `ACCESS_DESK_SERVER_PORT`                      | server, gateway     | The port the application server listens on.             |
+| `ACCESS_DESK_GATEWAY_HOST`                     | gateway, web client | The address the gateway listens on.                     |
+| `ACCESS_DESK_GATEWAY_PORT`                     | gateway, web client | The port the gateway listens on.                        |
+| `ACCESS_DESK_WEB_HOST`                         | gateway, web client | The address the web client listens on.                  |
+| `ACCESS_DESK_WEB_PORT`                         | gateway, web client | The port the web client listens on.                     |
+| `GOOGLE_CLIENT_ID`                             | gateway             | The client identifier of the Google OAuth application.  |
+| `GOOGLE_CLIENT_SECRET`                         | gateway             | The client secret of the Google OAuth application.      |
+| `ACCESS_DESK_STORAGE`                          | server, gateway     | `memory`, or `postgresql` to keep data across restarts. |
+| `ACCESS_DESK_DATABASE_HOST`                    | server, gateway     | The address of the PostgreSQL server.                   |
+| `ACCESS_DESK_DATABASE_PORT`                    | server, gateway     | The port of the PostgreSQL server.                      |
+| `ACCESS_DESK_DATABASE_USER`                    | server, gateway     | The account the programs sign in to it with.            |
+| `ACCESS_DESK_DATABASE_PASSWORD`                | server, gateway     | The password of that account, written as it is.         |
+| `ACCESS_DESK_IDENTITY_DATABASE`                | server              | The database of people and their memberships.           |
+| `ACCESS_DESK_ORGANIZATIONS`                    | server              | The organizations kept in PostgreSQL, by commas.        |
+| `ACCESS_DESK_ORGANIZATION_DATABASE`            | server              | Each one's database, with `{organization}` in it.       |
+| `ACCESS_DESK_RESOURCES_SUBSCRIPTIONS_DATABASE` | server              | The database of subscriptions to the organizations.     |
+| `ACCESS_DESK_GATEWAY_DATABASE`                 | gateway             | The database of subscriptions and ended sessions.       |
+| `ACCESS_DESK_SESSION_KEY`                      | gateway             | The P-256 key sessions are signed with, in base64.      |
 
 The PostgreSQL server, the databases, and the organizations are needed only
 for `postgresql`. The server and the account are set once, and each program

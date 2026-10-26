@@ -13,6 +13,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { isIP } from "node:net";
 import { StringifierRegistry, type TypeRegistryLookup } from "@spine-event-engine/core";
 import type { TenantId } from "@spine-event-engine/proto";
 import { InMemoryStorageFactory, type StorageFactory } from "@spine-event-engine/storage";
@@ -26,8 +27,9 @@ import { Client } from "pg";
  * The storage a test keeps its contexts' data in, and deletes when it ends.
  *
  * `ACCESS_DESK_TEST_STORAGE` names where: `memory`, or `postgresql`. On
- * PostgreSQL, every storage gets databases of its own, made in the server of
- * `ACCESS_DESK_TEST_DATABASE_URL`.
+ * PostgreSQL, every storage gets databases of its own, made on the server the
+ * programs keep their data on, from the database `ACCESS_DESK_TEST_DATABASE`
+ * names.
  *
  * The tests of every package share it.
  */
@@ -253,14 +255,29 @@ const Databases = {
     return url.toString();
   },
 
-  /** The address of the database the tests make their databases from. */
+  /**
+   * The address of the database the tests make their databases from: the one
+   * `ACCESS_DESK_TEST_DATABASE` names, on the server of
+   * `ACCESS_DESK_DATABASE_HOST`, `_PORT`, `_USER`, and `_PASSWORD`, as the
+   * programs reach it.
+   */
   server(): string {
-    const url = process.env.ACCESS_DESK_TEST_DATABASE_URL;
-    if (url === undefined || url.trim() === "") {
-      throw new Error(
-        "ACCESS_DESK_TEST_DATABASE_URL is not set. The tests on PostgreSQL make their databases there.",
-      );
-    }
-    return url;
+    const setting = (name: string, trimmed = true): string => {
+      const value = process.env[name] ?? "";
+      if (value.trim() === "") {
+        throw new Error(
+          `${name} is not set. The tests on PostgreSQL make their databases on that server.`,
+        );
+      }
+      return trimmed ? value.trim() : value;
+    };
+    const host = setting("ACCESS_DESK_DATABASE_HOST");
+    const user = encodeURIComponent(setting("ACCESS_DESK_DATABASE_USER"));
+    // The password is taken as it is written, as the programs take it.
+    const password = encodeURIComponent(setting("ACCESS_DESK_DATABASE_PASSWORD", false));
+    const address = isIP(host) === 6 ? `[${host}]` : host;
+    const port = setting("ACCESS_DESK_DATABASE_PORT");
+    const database = encodeURIComponent(setting("ACCESS_DESK_TEST_DATABASE"));
+    return `postgresql://${user}:${password}@${address}:${port}/${database}`;
   },
 };

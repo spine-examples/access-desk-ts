@@ -223,9 +223,10 @@ class Reading {
    *
    * In PostgreSQL, `ACCESS_DESK_ORGANIZATIONS` lists the organizations, and
    * `ACCESS_DESK_ORGANIZATION_DATABASE` names each one's database, with
-   * `{organization}` where its identifier goes. `ACCESS_DESK_RESOURCES_DATABASE`
-   * names the database of what people subscribed to. They must be set only when
-   * the data is kept in PostgreSQL.
+   * `{organization}` where its identifier goes.
+   * `ACCESS_DESK_RESOURCES_SUBSCRIPTIONS_DATABASE` names the database of what
+   * people subscribed to, which no organization's database may be. They must be
+   * set only when the data is kept in PostgreSQL.
    */
   resourcesStorage(): ResourcesStorageSettings {
     if (this.#storage() !== "postgresql") {
@@ -253,13 +254,22 @@ class Reading {
           `for ${tooLong.map(({ organization }) => organization).join(", ")}.`,
       );
     }
+    const subscriptionsName = "ACCESS_DESK_RESOURCES_SUBSCRIPTIONS_DATABASE";
+    const subscriptions = this.#databaseName(subscriptionsName);
+    const shared = databases.filter((each) => each.database === subscriptions);
+    if (shared.length > 0) {
+      this.#problems.push(
+        `${name} gives ${shared.map(({ organization }) => organization).join(", ")} ` +
+          `the database ${subscriptionsName} names, "${subscriptions}".`,
+      );
+    }
     return {
       kind: "postgresql",
       organizations: databases.map(({ organization, database: named }) => ({
         organization,
         url: this.#databaseUrl(named),
       })),
-      subscriptionsUrl: this.#databaseUrl(this.#databaseName("ACCESS_DESK_RESOURCES_DATABASE")),
+      subscriptionsUrl: this.#databaseUrl(subscriptions),
     };
   }
 
