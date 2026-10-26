@@ -14,19 +14,27 @@
 
 import { generateKeyPairSync } from "node:crypto";
 import { create } from "@bufbuild/protobuf";
+import { timestampFromMs } from "@bufbuild/protobuf/wkt";
+import { Time } from "@spine-event-engine/core/time";
 import { EmailAddressSchema } from "@spine-event-engine/proto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   OrganizationIdSchema,
   PersonIdSchema,
 } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
+import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
 import { typeRegistry } from "../../generated/model-registry.js";
 import { EndedSessions } from "../../src/gateway/ended-sessions.js";
 import { Sessions, type OpenedUnderSessions } from "../../src/gateway/sessions.js";
-import { TestStorages, type TestStorage } from "../given/storage.js";
 
 /** The key the gateway signs sessions with. */
 const KEY = generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey;
+
+/** How long a session lasts, in milliseconds. */
+const SESSION_MS = 8 * 60 * 60 * 1_000;
+
+/** The order of the P-256 curve, the number every signature's `s` is taken modulo. */
+const P256_ORDER = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551n;
 
 let storage: TestStorage;
 let ended: EndedSessions;
@@ -34,9 +42,7 @@ let sessions: Sessions;
 
 beforeEach(async () => {
   storage = await TestStorages.singleTenant(typeRegistry);
-  ended = await EndedSessions.open(
-    storage.url === undefined ? { kind: "memory" } : { kind: "postgresql", url: storage.url },
-  );
+  ended = await EndedSessions.open(TestStorages.settingsOf(storage));
   sessions = sessionsOfGateway();
 });
 
@@ -65,6 +71,36 @@ function request(token: string): Request {
   return new Request("https://gateway.test/auth/session", {
     headers: { authorization: `Bearer ${token}` },
   });
+}
+
+/**
+ * The same token with its signature written the other way ECDSA allows: `s`
+ * replaced by the curve's order less `s`. It signs the same claims.
+ */
+function withOtherSignature(token: string): string {
+  const [header = "", payload = "", signature = ""] = token.split(".");
+  const bytes = Buffer.from(signature, "base64url");
+  const s = BigInt(`0x${bytes.subarray(32).toString("hex")}`);
+  const otherS = Buffer.from((P256_ORDER - s).toString(16).padStart(64, "0"), "hex");
+  return `${header}.${payload}.${Buffer.concat([bytes.subarray(0, 32), otherS]).toString("base64url")}`;
+}
+
+/**
+ * The ended sessions, kept in the test's store while it can be read and
+ * written, and failing while it cannot.
+ */
+function failingWhenTold(): EndedSessions & { reading: boolean; writing: boolean } {
+  const store = {
+    kind: "supported" as const,
+    reading: true,
+    writing: true,
+    isRevoked: (id: string) =>
+      store.reading ? ended.isRevoked(id) : Promise.reject(new Error("The store is down.")),
+    revoke: (id: string, expiresAt: Parameters<EndedSessions["revoke"]>[1]) =>
+      store.writing ? ended.revoke(id, expiresAt) : Promise.reject(new Error("The store is down.")),
+    close: () => Promise.resolve(),
+  };
+  return store;
 }
 
 describe("Gateway sessions should", () => {
@@ -178,6 +214,112 @@ describe("Gateway sessions should", () => {
 
     expect((await sessions.of(request(kept?.token ?? "")))?.person.name).toBe("Maya Chen");
     expect(await sessions.of(request(ending.credential.value))).toBeUndefined();
+  });
+
+  it("know a session by its token's identifier, however the token's signature is written", async () => {
+    const stopped: string[] = [];
+    const issued = sessionsOfGateway({
+      closeFor: () => Promise.resolve(),
+      stop: (session) => {
+        stopped.push(session);
+        return Promise.resolve();
+      },
+    });
+    const token = (await issued.issue(person))?.token ?? "";
+    const rewritten = withOtherSignature(token);
+    expect(rewritten).not.toBe(token);
+
+    const original = await issued.of(request(token));
+    const same = await issued.of(request(rewritten));
+
+    expect(original).toBeDefined();
+    expect(same?.id).toBe(original?.id);
+    if (same === undefined) {
+      return;
+    }
+    // Signing out with either form stops what the session opened in the other.
+    await issued.end(same);
+    expect(stopped).toEqual([original?.id]);
+    expect(await issued.of(request(token))).toBeUndefined();
+    await issued.close();
+  });
+
+  it("keep an ended session's token refused through the minute it is still taken after it expires", async () => {
+    let nowMs = Date.now();
+    Time.setProvider({ currentTime: () => timestampFromMs(nowMs) });
+    try {
+      const maya = (await sessions.issue(person))?.token ?? "";
+      const ending = await sessions.of(request(maya));
+      if (ending === undefined) {
+        throw new Error("The session did not resolve.");
+      }
+      await sessions.end(ending);
+
+      // Her token has expired, but is still taken for a while. Another person
+      // signs out, and the gateway forgets the sessions no token can be used for.
+      nowMs += SESSION_MS + 30_000;
+      const other = await sessions.of(request((await sessions.issue(person))?.token ?? ""));
+      if (other === undefined) {
+        throw new Error("The other session did not resolve.");
+      }
+      await sessions.end(other);
+
+      expect(await sessions.of(request(maya))).toBeUndefined();
+    } finally {
+      Time.resetProvider();
+    }
+  });
+
+  it("end a session it cannot resolve, once it can remember the end, and stop what it opened", async () => {
+    const store = failingWhenTold();
+    const stopped: string[] = [];
+    const issued = new Sessions({
+      key: KEY,
+      ended: store,
+      opened: {
+        closeFor: () => Promise.resolve(),
+        stop: (session) => {
+          stopped.push(session);
+          return Promise.resolve();
+        },
+      },
+    });
+    const token = (await issued.issue(person))?.token ?? "";
+    const session = await issued.of(request(token));
+    expect(session).toBeDefined();
+
+    // The store cannot be read or written, so no session resolves, and the
+    // end cannot be remembered.
+    store.reading = false;
+    store.writing = false;
+    expect(await issued.of(request(token))).toBeUndefined();
+    await expect(issued.endUnresolved(request(token))).rejects.toThrow(/could not be ended/);
+    expect(stopped).toEqual([]);
+
+    // It can be written again, though not yet read.
+    store.writing = true;
+    await issued.endUnresolved(request(token));
+
+    expect(stopped).toEqual([session?.id]);
+    store.reading = true;
+    expect(await issued.of(request(token))).toBeUndefined();
+    await issued.close();
+  });
+
+  it("end nothing for a token it did not sign", async () => {
+    const stopped: string[] = [];
+    const issued = sessionsOfGateway({
+      closeFor: () => Promise.resolve(),
+      stop: (session) => {
+        stopped.push(session);
+        return Promise.resolve();
+      },
+    });
+
+    await issued.endUnresolved(request("not-a-token"));
+
+    expect(stopped).toEqual([]);
+    await issued.close();
   });
 
   it("refuse a principal without email and use email when no name was supplied", async () => {

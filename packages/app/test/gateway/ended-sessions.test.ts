@@ -14,10 +14,10 @@
 
 import { timestampFromMs } from "@bufbuild/protobuf/wkt";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
 import { typeRegistry } from "../../generated/model-registry.js";
 import { EndedSessions } from "../../src/gateway/ended-sessions.js";
 import type { StorageSettings } from "../../src/settings.js";
-import { TestStorages, type TestStorage } from "../given/storage.js";
 
 /** An hour, in milliseconds. */
 const HOUR_MS = 60 * 60 * 1_000;
@@ -28,8 +28,7 @@ let ended: EndedSessions;
 
 beforeEach(async () => {
   storage = await TestStorages.singleTenant(typeRegistry);
-  settings =
-    storage.url === undefined ? { kind: "memory" } : { kind: "postgresql", url: storage.url };
+  settings = TestStorages.settingsOf(storage);
   ended = await EndedSessions.open(settings);
 });
 

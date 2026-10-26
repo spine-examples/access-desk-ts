@@ -23,8 +23,8 @@ import type { StorageSettings } from "../settings.js";
  *
  * A session's token carries its own signature, so it would keep working
  * until it expires. The gateway remembers the sessions that were ended, and
- * refuses their tokens. A session is forgotten once it would have expired,
- * as its token no longer works anyway.
+ * refuses their tokens. A session is forgotten once its token would no
+ * longer be taken anyway, at the time it is ended with.
  */
 export interface EndedSessions extends SignedTokenRevocation {
   /** Closes the store. Whoever opened it closes it. */
@@ -52,7 +52,7 @@ export const EndedSessions = {
 /** The ended sessions, kept in the gateway's memory. A restart forgets them. */
 class EndedInMemory implements EndedSessions {
   readonly kind = "supported";
-  /** When each ended session would have expired, in milliseconds, by its token's identifier. */
+  /** When each ended session's token would no longer be taken, in milliseconds, by its identifier. */
   readonly #expiring = new Map<string, number>();
 
   isRevoked(token: string): Promise<boolean> {
@@ -93,8 +93,15 @@ class EndedInPostgres implements EndedSessions {
    * @param url The address of the gateway's database.
    */
   static async open(url: string): Promise<EndedInPostgres> {
-    // Signing out is rare, so two connections are plenty.
-    const pool = new Pool({ connectionString: url, max: 2 });
+    // Every request the gateway takes is checked against the ended sessions,
+    // so the pool is as large as the ones Spine opens.
+    const pool = new Pool({ connectionString: url, max: 10 });
+    // The server may drop a connection while it waits in the pool, as when it
+    // restarts. The pool opens another when one is needed, so the failure is
+    // only logged; unheard, it would stop the gateway.
+    pool.on("error", (error) => {
+      console.warn("A waiting connection to the gateway's database failed.", error);
+    });
     try {
       await pool.query(
         `CREATE TABLE IF NOT EXISTS ended_session (

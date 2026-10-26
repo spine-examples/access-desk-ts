@@ -19,6 +19,7 @@ import {
   type ResolvedSession,
 } from "@spine-event-engine/auth";
 import { create } from "@bufbuild/protobuf";
+import { timestampFromMs, timestampMs } from "@bufbuild/protobuf/wkt";
 import { Time } from "@spine-event-engine/core/time";
 import { EmailAddressSchema } from "@spine-event-engine/proto";
 import {
@@ -35,6 +36,12 @@ export const SESSION = "session";
 /** How long a session lasts. */
 const SESSION_SECONDS = 8 * 60 * 60; // 8 hours.
 
+/**
+ * How long after it expires a token is still taken, as clocks may differ a
+ * little.
+ */
+const CLOCK_SKEW_SECONDS = 60;
+
 /** Who signs the sessions, as written in every token. */
 const ISSUER = "access-desk-gateway";
 
@@ -43,7 +50,10 @@ const AUDIENCE = "access-desk";
 
 /** A session a request carries. */
 export interface Session {
-  /** The session's identifier inside the gateway. It is never sent to the browser. */
+  /**
+   * The session's identifier: the one its token carries (`jti`), which stays
+   * the same however the token's signature is written.
+   */
   readonly id: string;
   /** The token the browser sends. */
   readonly credential: { readonly kind: "bearer"; readonly value: string };
@@ -108,8 +118,8 @@ export interface SessionsOptions {
  *
  * A session ends after eight hours, or when it is ended. Its token carries
  * the gateway's signature, so the session stays good when the gateway
- * restarts. The gateway remembers the sessions that were ended, so their
- * tokens stay refused.
+ * restarts. The gateway remembers the sessions that were ended for as long as
+ * their tokens would be taken, so those tokens stay refused.
  */
 export class Sessions {
   /** The sessions that are still good, each known by its signed token. */
@@ -119,13 +129,22 @@ export class Sessions {
 
   /** @param options How the sessions are kept. */
   constructor(options: SessionsOptions) {
+    const { ended } = options;
     this.#sessions = new SignedSessions({
       issuer: ISSUER,
       audience: AUDIENCE,
       activeKey: { kid: Sessions.#keyIdOf(options.key), privateKey: options.key },
-      revocation: options.ended,
+      revocation: {
+        kind: "supported",
+        isRevoked: (id) => ended.isRevoked(id),
+        // A token is taken until a little after it expires, so an ended
+        // session is remembered until then.
+        revoke: (id, expiresAt) =>
+          ended.revoke(id, timestampFromMs(timestampMs(expiresAt) + CLOCK_SKEW_SECONDS * 1_000)),
+      },
       clock: { now: () => Time.currentTimeMillis() },
       ttlSeconds: SESSION_SECONDS,
+      clockSkewSeconds: CLOCK_SKEW_SECONDS,
     });
     this.#opened = options.opened;
   }
@@ -163,26 +182,26 @@ export class Sessions {
   /**
    * The person a token stands for, while its session is valid.
    *
-   * The person's attributes include the session's identifier inside the
-   * gateway. It is worked out from the token, so it is not written in the
-   * token, which the browser can read.
+   * The person's attributes include the session's identifier, which the
+   * token carries.
    */
   async resolve(token: string): Promise<ResolvedSession | undefined> {
     const resolved = await this.#sessions.resolve({ kind: "bearer", value: token });
-    return resolved === undefined
+    const id = resolved === undefined ? undefined : Sessions.#idOf(token);
+    return resolved === undefined || id === undefined
       ? undefined
       : {
           ...resolved,
           principal: {
             ...resolved.principal,
-            attributes: { ...resolved.principal.attributes, [SESSION]: Sessions.#idOf(token) },
+            attributes: { ...resolved.principal.attributes, [SESSION]: id },
           },
         };
   }
 
   /** The session a request carries, when it is still valid. */
   async of(request: Request): Promise<Session | undefined> {
-    const token = /^Bearer (\S+)$/.exec(request.headers.get("authorization") ?? "")?.[1];
+    const token = Sessions.#tokenOf(request);
     if (token === undefined) {
       return undefined;
     }
@@ -224,19 +243,67 @@ export class Sessions {
     }
   }
 
+  /**
+   * Ends the session of a token a request carries but that did not resolve.
+   *
+   * Such a token may still be good, as when the gateway could not tell
+   * whether its session had ended. It is ended all the same, and anything
+   * still open under it is stopped. A token the gateway did not sign, or one
+   * that has expired, ends nothing.
+   *
+   * @param request The request that carries the token.
+   * @throws Error when the gateway could not remember that the session
+   *   ended. Its token then keeps working until it expires.
+   */
+  async endUnresolved(request: Request): Promise<void> {
+    const token = Sessions.#tokenOf(request);
+    if (token === undefined) {
+      return;
+    }
+    const ended = await this.#sessions.logout({ kind: "bearer", value: token });
+    if (ended.kind === "unavailable") {
+      throw new Error("The session could not be ended. Its token works until it expires.");
+    }
+    // Only a token the gateway verified is revoked, so only then does it name a session.
+    const id = ended.kind === "revoked" ? Sessions.#idOf(token) : undefined;
+    if (id !== undefined) {
+      await this.#opened?.stop(id);
+    }
+  }
+
   /** Stops honoring every session in this gateway. The tokens stay good for the next one. */
   async close(): Promise<void> {
     await this.#sessions.close();
   }
 
+  /** The bearer token a request carries, when it carries one. */
+  static #tokenOf(request: Request): string | undefined {
+    return /^Bearer (\S+)$/.exec(request.headers.get("authorization") ?? "")?.[1];
+  }
+
   /**
-   * The identifier of a session inside the gateway, worked out from its token.
+   * The identifier of a session: the one its token carries (`jti`).
    *
-   * Every session has a token of its own, so every session has an identifier
-   * of its own, and the same one whenever its token comes.
+   * The gateway takes the same token with its signature written in more than
+   * one way, so the token's text does not tell one session from another. Its
+   * identifier stays the same however the signature is written, and it is
+   * the one the gateway remembers an ended session by.
+   *
+   * @param token A token the gateway verified.
+   * @returns The identifier, or `undefined` when the token carries none.
    */
-  static #idOf(token: string): string {
-    return createHash("sha256").update(token).digest("base64url");
+  static #idOf(token: string): string | undefined {
+    const payload = token.split(".")[1];
+    if (payload === undefined) {
+      return undefined;
+    }
+    try {
+      const claims: unknown = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+      const id = (claims as { readonly jti?: unknown } | null)?.jti;
+      return typeof id === "string" && id !== "" ? id : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   /**
