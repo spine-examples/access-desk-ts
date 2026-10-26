@@ -24,6 +24,7 @@ The most useful `spine-ts` sources are:
 - `packages/core/{README.md,REFERENCE.md}`
 - `packages/server/{README.md,REFERENCE.md}`
 - `packages/storage-datastore/{README.md,REFERENCE.md}`
+- `packages/storage-postgres/{README.md,REFERENCE.md}`
 - `packages/auth/{README.md,REFERENCE.md}`
 - `packages/client-web/{README.md,REFERENCE.md}`
 - `packages/client-react/{README.md,REFERENCE.md}`
@@ -44,6 +45,7 @@ Use only packages required by the implemented slice. The anticipated family is:
 | Type registry, type URLs, `Any` helpers      | `@spine-event-engine/core`              |
 | Common storage contract                      | `@spine-event-engine/storage`           |
 | Google Cloud Datastore adapter               | `@spine-event-engine/storage-datastore` |
+| PostgreSQL adapter                           | `@spine-event-engine/storage-postgres`  |
 | Gateway authentication primitives            | `@spine-event-engine/auth`              |
 | Same-server command client                   | `@spine-event-engine/client-node`       |
 | Browser client                               | `@spine-event-engine/client-web`        |
@@ -300,21 +302,52 @@ extension" pattern): `getOption` from `@bufbuild/protobuf`,
 local first. Pick an extension field number outside Spine's `73800`–`73971`
 block (Spine leaves `EnumValueOptions` free).
 
+## PostgreSQL
+
+Access Desk keeps its data in PostgreSQL through
+`@spine-event-engine/storage-postgres`. These facts were established on
+`2.0.0-snapshot.23`, from the package and by running against PostgreSQL 18.6:
+
+- `PostgresStorageFactory.newBuilder().setOptions({ url })` serves a
+  single-tenant context. Give it a `StringifierRegistry` set to the complete
+  type registry. `build()` connects to the database first, so it is async.
+  `close()` only starts closing the pools.
+- Pass the factory to a context with `withStorageFactory(factory)`. A context
+  never closes the factory it was given; whoever made it closes it. A factory
+  outlives its context, and a new context over the same factory or database
+  sees everything the earlier one kept.
+- The adapter makes its own tables, with primary keys and nothing else. It
+  makes no databases and no schemas, and no other indexes.
+- **Multitenant storage keeps each tenant in a database of its own, and must be
+  told every tenant when it is built** (`setTenantOptions`). A tenant it was
+  not told about is refused (`PostgresStorageConfigurationError`), an empty
+  list is refused, and two tenants may not share a database. Nothing adds a
+  tenant later. So the application server keeps only the organizations
+  `ACCESS_DESK_ORGANIZATIONS` lists, and a new one needs a restart.
+- **A multitenant context also stores something that belongs to no tenant**:
+  the Stand subscription registry, which a factory configured for tenants
+  refuses ("configured for multiple tenants"). Give such a context its own
+  `StorageSubscriptionRegistry` over single-tenant storage, with
+  `withSubscriptionRegistry`.
+- Each tenant database has its own connection pool, ten connections at most
+  unless `connectionLimit` says otherwise. Idle connections close after ten
+  seconds.
+- Entity Inbox rows are kept in the same storage, so commands accepted before a
+  stop are delivered after the restart.
+- Delivery on PostgreSQL is slower than in memory: a sign-in that settles in a
+  quarter of a second in memory takes about a second. Tests wait with bounded
+  `eventually`, never with sleeps.
+
 ## Datastore
 
 Construct `DatastoreStorageFactory` with an application-owned configured Google
 Datastore client. Multitenant contexts use Datastore native namespaces derived
-reversibly from `TenantId`; a bounded-context name is diagnostic and does not
-itself partition kinds.
-
-When stored framework/application values contain `Any`, build the required
-stringifier registry with the complete application TypeRegistry. Keep query
-values typed; do not pre-stringify them in application code.
+reversibly from `TenantId`, so new tenants need no configuration; a
+bounded-context name is diagnostic and does not itself partition kinds.
 
 The adapter has a finite reconciliation ceiling and does not provide unlimited
 scan semantics. Declare and deploy application composite indexes for actual
-filter/order combinations. Exercise them with the Datastore-mode emulator and
-use a disposable cloud project for any explicitly authorized cloud smoke test.
+filter/order combinations. Access Desk does not use Datastore.
 
 ## Authentication and browser clients
 
@@ -339,11 +372,16 @@ controls defined in the architecture.
 - `BrowserServer.open(undefined, { backend: { baseUrl }, … })` starts a
   standalone gateway in front of an application server in another program.
   Pass `registry` so `authorize` receives each command decoded.
-- A standalone gateway with sessions needs `bindings`:
-  `InMemorySubscriptionBindings` locally, `DurableSubscriptionBindings` in
-  production. The application server needs a `storageFactory` there too, so
-  neither program starts under `NODE_ENV=production` while everything is kept
-  in memory.
+- A standalone gateway with sessions needs `bindings`. Access Desk's
+  `Watching` extends `DurableSubscriptionBindings`, over memory or PostgreSQL.
+  `BrowserServer` recognizes durable bindings only by `instanceof`: only then
+  does it stop an expired subscription on the application server, and it
+  restores the stored ones on the application server when it starts
+  (`recoverActive`). A wrapper around the store would lose both.
+- `DurableSubscriptionBindings` runs the operations on one subscription one at
+  a time, and keeps one more waiting. A second opening of an open subscription
+  waits instead of being refused, and a cancel behind it is refused as
+  `binding-busy`. So `Watching` refuses a second opening itself.
 - Ending a session does not end its streams; Spine stops them only when the
   session's time runs out.
 - Only Spine's own cancel effect clears a subscription everywhere it is kept,
@@ -369,9 +407,37 @@ controls defined in the architecture.
   `POST` with a body, not a provider callback carrying `?code=`. Their
   preflight answers allow no headers, so they serve only pages of the
   gateway's own origin, as through a development proxy.
-- Without `cookies` the session is a bearer token. `OpaqueSessions.resolve`
-  accepts only `kind: "cookie"`, so the resolver passes the bearer value as
-  one.
+- Without `cookies` the session is a bearer token. Access Desk uses
+  `SignedSessions`: `issue` gives `kind: "issued"` with a `bearer` credential,
+  and `resolve` accepts only `kind: "bearer"`. The signing key must be a P-256
+  private key. Signing out needs a `SignedTokenRevocation`, which Access Desk
+  keeps in the gateway's database; without one, `logout` answers
+  `expiryOnly` and the token keeps working. `OpaqueSessions` keeps sessions
+  only in memory.
+- To wait for the event a command causes, use the client's
+  `postAndSubscribe`, as adding a member to an organization does. It opens the
+  subscription, waits for the server's acknowledgement, and then posts. It
+  sees only the events the command causes directly, not those further down
+  the chain. Spine has no call that returns the event: read the first update
+  of the returned subscription, and give `firstUpdateTimeoutMs` with an
+  `onFirstUpdateTimeout` that cancels it, which ends the updates. When the effect
+  comes later in a chain of steps, subscribe to the read model that shows it
+  instead, as `ServerRequests.postAndAwaitView` does: an entity subscription
+  with an authoritative query, opened before the command is posted, and one
+  more read of the read model when no update came in time.
+- When the result of a handler fails validation as it is committed, delivery
+  stops. That is a new state that breaks `(required)`
+  (`TransitionValidationError`), or a command or event the entity produced
+  that is not valid (`ValidationException`). The error is not passed to the
+  `DeliveryMonitor`, because `recordHandlerFailure` records only what the
+  handler method itself throws, and `delivery.ts` `#processAttempt` rethrows
+  the rest. `DeliverySupervisor` swallows it without a log, the Inbox row
+  stays `TO_DELIVER`, and every later run stops at it, so the rows behind it
+  are not delivered. `snapshot.23` let the monitor mark such a row delivered.
+  So a test never makes a process react in a state it cannot be in. It starts
+  the process rather than giving the commands the process gives. It gives
+  such a command itself only after the process has run, as when a delivery is
+  repeated.
 - `OidcFlow` accepts only HTTPS addresses and requires the `openid` scope.
 - `createGoogleProvider` returns `email_verified` as text, and needs
   `clientAuthentication: "client_secret_post"`, or Google refuses the code
@@ -393,7 +459,7 @@ subscriptions. Use bounded `eventually()` only for genuinely asynchronous
 visibility, not for immediate command results.
 
 BlackBox alone does not prove browser behavior, cross-process delivery,
-authentication, Datastore deployment, or multi-context choreography. Those need
+authentication, database deployment, or multi-context choreography. Those need
 separate integration and end-to-end tests listed in
 `references/architecture.md`.
 
