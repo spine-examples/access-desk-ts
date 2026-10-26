@@ -33,7 +33,7 @@ import {
 import { actor, readWhere } from "../../../given/resources-context.js";
 import { ManualClock } from "../../../given/manual-clock.js";
 import {
-  approveAccessRequest,
+  approveAndAwait,
   resourceUuid,
   seed,
   submitAndAssign,
@@ -128,7 +128,7 @@ export async function issueGrant(
       kind: { case: "scheduled", value: { start: minutesIn(start), end: minutesIn(end) } },
     },
   });
-  await approveAccessRequest(box, request, "primary");
+  await approveAndAwait(box, request, "primary");
 }
 
 /**
@@ -153,7 +153,7 @@ export async function approveExtension(
     () => managerHasTask(requester, "primary", request),
     (present) => present,
   );
-  await approveAccessRequest(box, request, "primary");
+  await approveAndAwait(box, request, "primary");
 }
 
 /** Posts `RevokeAccessGrant` on behalf of `manager`, naming them as the revoking person. */
@@ -358,7 +358,7 @@ export async function givenActiveGrant(
   await submitAndAssign(box, requester, request, "primary", {
     period: { kind: { case: "immediateDuration", value: { seconds: BigInt(minutes * 60) } } },
   });
-  await approveAccessRequest(box, request, "primary");
+  await approveAndAwait(box, request, "primary");
   await awaitGrantIssued(box, requester, request);
   return requester;
 }

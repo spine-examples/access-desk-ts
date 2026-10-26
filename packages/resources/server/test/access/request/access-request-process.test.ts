@@ -54,6 +54,7 @@ import {
 } from "../../given/resources-context.js";
 import {
   approveAccessRequest,
+  approveAndAwait,
   cancelAccessRequest,
   denyAccessRequest,
   resourceUuid,
@@ -136,7 +137,7 @@ async function givenScheduledGrant(
       kind: { case: "scheduled", value: { start: minutesIn(start), end: minutesIn(end) } },
     },
   });
-  await approveAccessRequest(box, request, "primary");
+  await approveAndAwait(box, request, "primary");
   await awaitGrantIssued(box, requester, request);
 }
 
@@ -151,15 +152,6 @@ async function expectNotSubmitted(
 ): Promise<void> {
   await expectRejection(box, requester, RequestAlreadyDecidedSchema, () =>
     cancelAccessRequest(requester, id),
-  );
-}
-
-/** Approves a request and waits until it is terminal. */
-async function givenApproved(box: BlackBox, requester: BlackBoxScope, id: string): Promise<void> {
-  await approveAccessRequest(box, id, "primary");
-  await box.eventually(
-    () => statusOf(requester, id),
-    (status) => status === AccessRequestStatus.APPROVED,
   );
 }
 
@@ -768,7 +760,7 @@ describe("AccessRequestProcessManager should", () => {
     it("reject a decision on an already-decided request ('RequestAlreadyDecided')", async () => {
       const box = await resourcesBlackBox();
       const requester = await givenPending(box, "req-twice");
-      await givenApproved(box, requester, "req-twice");
+      await approveAndAwait(box, "req-twice", "primary");
       await expectRejection(box, requester, RequestAlreadyDecidedSchema, () =>
         approveAccessRequest(box, "req-twice", "primary"),
       );
@@ -902,7 +894,7 @@ describe("AccessRequestProcessManager should", () => {
     it("reject a decision on an already-decided request ('RequestAlreadyDecided')", async () => {
       const box = await resourcesBlackBox();
       const requester = await givenPending(box, "req-deny-twice");
-      await givenApproved(box, requester, "req-deny-twice");
+      await approveAndAwait(box, "req-deny-twice", "primary");
       await expectRejection(box, requester, RequestAlreadyDecidedSchema, () =>
         denyAccessRequest(box, "req-deny-twice", "primary", "Too late."),
       );
@@ -929,7 +921,7 @@ describe("AccessRequestProcessManager should", () => {
     it("reject cancelling an already-decided request ('RequestAlreadyDecided')", async () => {
       const box = await resourcesBlackBox();
       const requester = await givenPending(box, "req-cancel-decided");
-      await givenApproved(box, requester, "req-cancel-decided");
+      await approveAndAwait(box, "req-cancel-decided", "primary");
       await expectRejection(box, requester, RequestAlreadyDecidedSchema, () =>
         cancelAccessRequest(requester, "req-cancel-decided"),
       );

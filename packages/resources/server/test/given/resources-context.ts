@@ -28,9 +28,9 @@ import {
   type Target,
 } from "@spine-event-engine/proto/client";
 import { BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
+import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
 
 import { typeRegistry } from "../../generated/model-registry.js";
-import { TestStorages, type TestStorage } from "./storage.js";
 
 // The organization is its own tenant, so its id doubles as the tenant.
 export const organizationId = "acme";
