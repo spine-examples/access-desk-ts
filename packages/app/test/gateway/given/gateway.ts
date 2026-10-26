@@ -37,10 +37,10 @@ import {
   OrganizationRole,
 } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 import { CreateOrganizationSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
+import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
 
 import { give, givenServer, tenant as tenantOf, type Hosted } from "../../server/given/hosted.js";
 import { typeRegistry } from "../../../generated/model-registry.js";
-import { TestStorages, type TestStorage } from "../../given/storage.js";
 
 // Imported from compiled output, like the contexts it assembles: vitest cannot
 // execute the handler classes' standard decorators from raw TypeScript source.
@@ -210,9 +210,7 @@ export async function givenGateway(): Promise<Running> {
   await givenOrganization(hosted, "globex", "olivia@acme.example");
   const storage = await TestStorages.singleTenant(typeRegistry);
   afterwards(() => storage.drop());
-  const endedSessions = await app.EndedSessions.open(
-    storage.url === undefined ? { kind: "memory" } : { kind: "postgresql", url: storage.url },
-  );
+  const endedSessions = await app.EndedSessions.open(TestStorages.settingsOf(storage));
   afterwards(() => endedSessions.close());
   return startGateway({ hosted, storage, endedSessions });
 }

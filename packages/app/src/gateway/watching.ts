@@ -43,16 +43,41 @@ const CANCEL_ATTEMPTS = 3;
 /** How long the gateway waits before it tries to cancel a subscription again. */
 const CANCEL_PAUSE_MS = 100;
 
+/**
+ * How long the leave to open a subscription waits for the opening.
+ *
+ * The opening follows its leave at once, within the same request. Leave that
+ * is not used, because Spine refused the request after the gateway allowed it,
+ * is dropped once this has passed.
+ */
+const LEAVE_MS = 5_000;
+
 /** One subscription a browser holds. */
 interface Watched {
-  /** The subscription, as the gateway handed it to the browser. */
-  readonly subscription: Uint8Array;
+  /**
+   * The subscription, as the gateway handed it to the browser. The gateway
+   * has it once the subscription is made, or, for one made before the
+   * gateway restarted, once it opens.
+   */
+  subscription: Uint8Array | undefined;
   /** The person and the organization the subscription was created for. */
   readonly context: ActorContext;
-  /** The session that opened the subscription, once one has. */
+  /** The session that opened the subscription, while it is open or was last opened. */
   session: string | undefined;
   /** Ends the open stream of changes, while there is one. */
   stream: AbortController | undefined;
+}
+
+/** The leave one session got from the gateway to open one subscription. */
+interface Leave {
+  /** The person the session stands for. */
+  readonly person: string;
+  /** The organization the session works in. */
+  readonly organization: string | undefined;
+  /** The session. */
+  readonly session: string | undefined;
+  /** Until when the leave holds, in milliseconds. */
+  readonly untilMs: number;
 }
 
 /**
@@ -63,17 +88,20 @@ interface Watched {
  *
  * 1. A browser subscribes. The gateway keeps the subscription for the
  *    session's person and organization.
- * 2. The browser opens the subscription. From then on it belongs to that
- *    session.
- * 3. The session ends, because the person signs out. Everything it opened
+ * 2. The gateway allows the browser to open the subscription, and gives that
+ *    one request leave to open it. No other request gets leave while the
+ *    subscription opens or is open.
+ * 3. The request opens the subscription with its leave. From then on the
+ *    subscription belongs to the request's session.
+ * 4. The session ends, because the person signs out. Everything it opened
  *    stops at once.
  *
  * A subscription that was never opened is dropped when its session expires.
  *
  * The gateway keeps the subscriptions in its storage, so they outlast a
- * restart of the gateway until their sessions expire. Which session opened a
- * subscription is kept only in memory. After a restart, the gateway learns it
- * again when a browser opens the subscription again.
+ * restart of the gateway until their sessions expire. A subscription made
+ * before a restart opens the same way, with the leave of the request that
+ * opens it.
  *
  * Ending a session stops its subscriptions in two steps, because Spine fully
  * clears a subscription only when it is cancelled through the gateway:
@@ -82,25 +110,16 @@ interface Watched {
  *    the way its browser would. That clears it in the gateway and on the
  *    application server. A cancel that fails is tried again, three times in
  *    all.
- * 2. Once the session has ended, anything still open is stopped in the
- *    gateway. The browser receives nothing more, though Spine remembers the
- *    subscription until the session would have expired.
+ * 2. Once the session has ended, anything still open or opening is stopped in
+ *    the gateway. The browser receives nothing more. The gateway keeps the
+ *    subscription until the session would have expired, when Spine clears it
+ *    on the application server as well.
  */
 export class Watching extends DurableSubscriptionBindings implements OpenedUnderSessions {
   /** The subscriptions held now, by identifier. */
   readonly #watched: Map<string, Watched>;
-  /**
-   * Who asks to open a subscription the gateway does not know, and in which
-   * session, by the subscription's identifier, until Spine opens it.
-   */
-  readonly #claimed = new Map<
-    string,
-    {
-      readonly person: string;
-      readonly organization: string | undefined;
-      readonly session: string | undefined;
-    }
-  >();
+  /** The leave given to open a subscription and not used yet, by the subscription's identifier. */
+  readonly #leave = new Map<string, Leave>();
   /** Cancels a subscription the way its browser would. */
   readonly #cancelAsBrowser: CancelAsBrowser | undefined;
 
@@ -150,120 +169,109 @@ export class Watching extends DurableSubscriptionBindings implements OpenedUnder
   }
 
   /**
-   * Records which session opens a subscription.
+   * Gives a request leave to open a subscription, for the session it comes in.
    *
-   * The gateway calls this for every request it allows. Only the opening of a
-   * subscription matters, and only by the person and in the organization the
-   * subscription was created for.
+   * The gateway asks for every request it allows, and refuses the request
+   * when this refuses it. Only the opening of a subscription needs leave:
    *
-   * A subscription that is open already stays with the session that opened
-   * it. A second opening is refused, so the attempt changes nothing.
+   * - A subscription that opens or is open already gets no more. Spine would
+   *   keep a second opening waiting until the first stream ends, and then
+   *   open it for whoever asked.
+   * - A subscription the gateway knows gets leave only for the person and in
+   *   the organization it was created for. One made before the gateway
+   *   restarted is checked by Spine when it opens.
    *
-   * The gateway does not know a subscription made before it restarted. It
-   * notes which session asks to open it, and learns the subscription once
-   * Spine opens it for that person, in that organization.
+   * The leave is used by the opening of this request alone, and dropped if
+   * the opening does not come.
    *
    * @param principal The person the session stands for.
-   * @param request The request the gateway allowed.
+   * @param request The request the gateway allows.
+   * @returns Whether the request may go on.
    */
-  claim(principal: AuthenticatedPrincipal, request: IncomingRequest): void {
+  claim(principal: AuthenticatedPrincipal, request: IncomingRequest): boolean {
     if (request.kind !== "activate") {
-      return;
+      return true;
+    }
+    const nowMs = Time.currentTimeMillis();
+    for (const [id, leave] of this.#leave) {
+      if (leave.untilMs <= nowMs) {
+        this.#leave.delete(id);
+      }
     }
     const id = request.subscription.id?.value ?? "";
     const watched = this.#watched.get(id);
-    if (watched === undefined) {
-      this.#claimed.set(id, {
-        person: principal.id,
-        organization: principal.attributes?.organization,
-        session: principal.attributes?.[SESSION],
-      });
-      return;
-    }
+    const person = principal.id;
+    const organization = principal.attributes?.organization;
     if (
-      watched.stream === undefined &&
-      watched.context.actor?.value === principal.id &&
-      this.#organizationOf(watched.context) === principal.attributes?.organization
+      this.#leave.has(id) ||
+      watched?.stream !== undefined ||
+      (watched !== undefined &&
+        (watched.context.actor?.value !== person ||
+          this.#organizationOf(watched.context) !== organization))
     ) {
-      watched.session = principal.attributes?.[SESSION];
+      return false;
     }
+    this.#leave.set(id, {
+      person,
+      organization,
+      session: principal.attributes?.[SESSION],
+      untilMs: nowMs + LEAVE_MS,
+    });
+    return true;
   }
 
   /**
    * Opens a subscription. Its changes are then sent until it is stopped.
    *
-   * It is refused to anybody it was not created for, and while it is open
-   * already.
+   * It opens only with the leave {@link claim} gave the request, for the
+   * person and in the organization the leave was given to. The subscription
+   * then belongs to the session the leave was given in.
    */
   override activate(
     input: Parameters<DurableSubscriptionBindings["activate"]>[0],
   ): ReturnType<DurableSubscriptionBindings["activate"]> {
-    const watched = this.#watched.get(input.id);
-    if (watched === undefined) {
-      return this.#activateUnknown(input);
-    }
+    const leave = this.#leave.get(input.id);
+    this.#leave.delete(input.id);
+    const known = this.#watched.get(input.id);
     if (
-      watched.stream !== undefined ||
-      watched.context.actor?.value !== input.context.actor?.value ||
-      this.#organizationOf(watched.context) !== this.#organizationOf(input.context)
+      leave === undefined ||
+      leave.untilMs <= Time.currentTimeMillis() ||
+      leave.person !== input.context.actor?.value ||
+      leave.organization !== this.#organizationOf(input.context) ||
+      known?.stream !== undefined
     ) {
-      // Spine would keep a second opening waiting until the first stream
-      // ends, and then open it again.
       return Promise.resolve({ kind: "denied" });
     }
+    // A subscription made before the gateway restarted is learned as it
+    // opens. Until Spine hands it over, the gateway knows only who opens it.
+    const watched: Watched = known ?? {
+      subscription: undefined,
+      context: input.context,
+      session: undefined,
+      stream: undefined,
+    };
     const stream = new AbortController();
+    watched.session = leave.session;
     watched.stream = stream;
+    this.#watched.set(input.id, watched);
     return super
-      .activate({ ...input, signal: AbortSignal.any([input.signal, stream.signal]) })
+      .activate({
+        ...input,
+        signal: AbortSignal.any([input.signal, stream.signal]),
+        onDefinition: (definition, signal) => {
+          watched.subscription ??= definition.bytes.slice();
+          return input.onDefinition(definition, signal);
+        },
+      })
       .finally(() => {
         // The stream is over, so there is nothing left to stop. If it failed,
         // Spine lets the subscription be opened again.
         if (watched.stream === stream) {
           watched.stream = undefined;
         }
-      });
-  }
-
-  /**
-   * Opens a subscription the gateway does not know, such as one made before
-   * it restarted.
-   *
-   * Spine opens it only for the person and in the organization it keeps the
-   * subscription for. Once it does, the gateway learns the subscription as
-   * Spine keeps it, with the session that asked to open it.
-   */
-  #activateUnknown(
-    input: Parameters<DurableSubscriptionBindings["activate"]>[0],
-  ): ReturnType<DurableSubscriptionBindings["activate"]> {
-    const claimed = this.#claimed.get(input.id);
-    this.#claimed.delete(input.id);
-    // Only the person who asked, in their organization, opens it in their session.
-    const session =
-      claimed !== undefined &&
-      claimed.person === input.context.actor?.value &&
-      claimed.organization === this.#organizationOf(input.context)
-        ? claimed.session
-        : undefined;
-    const stream = new AbortController();
-    let learned: Watched | undefined;
-    return super
-      .activate({
-        ...input,
-        signal: AbortSignal.any([input.signal, stream.signal]),
-        onDefinition: (definition, signal) => {
-          learned = {
-            subscription: definition.bytes.slice(),
-            context: input.context,
-            session,
-            stream,
-          };
-          this.#watched.set(input.id, learned);
-          return input.onDefinition(definition, signal);
-        },
-      })
-      .finally(() => {
-        if (learned?.stream === stream) {
-          learned.stream = undefined;
+        // A subscription Spine did not open for this person is not one of theirs.
+        if (watched.subscription === undefined && this.#watched.get(input.id) === watched) {
+          this.#watched.delete(input.id);
         }
       });
   }
@@ -292,9 +300,11 @@ export class Watching extends DurableSubscriptionBindings implements OpenedUnder
     if (cancelAsBrowser === undefined) {
       return;
     }
-    const opened = [...this.#watched.values()].filter((watched) => watched.session === session.id);
+    const opened = [...this.#watched.values()].flatMap(({ session: openedIn, subscription }) =>
+      openedIn === session.id && subscription !== undefined ? [subscription] : [],
+    );
     const cancelled = await Promise.allSettled(
-      opened.map(async ({ subscription }) => {
+      opened.map(async (subscription) => {
         for (let attempt = 1; ; attempt++) {
           try {
             await cancelAsBrowser(
@@ -322,35 +332,29 @@ export class Watching extends DurableSubscriptionBindings implements OpenedUnder
   }
 
   /**
-   * Stops everything still open after a session has ended.
+   * Stops everything still open or opening after a session has ended.
+   *
+   * The leave the session got to open a subscription is withdrawn. Each
+   * stream the session opened ends. The gateway keeps the subscriptions until
+   * the session would have expired: Spine then clears them on the application
+   * server, which it does not do for a subscription the gateway forgets
+   * before.
    *
    * @param session The identifier of the session.
    */
-  async stop(session: string): Promise<void> {
-    const opened = [...this.#watched].filter(([, watched]) => watched.session === session);
-    const stopped = await Promise.allSettled(
-      opened.map(async ([id, { context, stream }]) => {
-        const dropped = super.cancel({
-          id,
-          context,
-          nowMs: Time.currentTimeMillis(),
-          onDefinition: () => Promise.resolve(),
-        });
-        // A stream that was only about to open is ended as well, so the
-        // subscription is not left waiting for it.
-        stream?.abort();
-        await dropped;
-        this.#watched.delete(id);
-      }),
-    );
-    for (const outcome of stopped) {
-      if (outcome.status === "rejected") {
-        console.warn(
-          "The gateway could not stop a subscription of an ended session.",
-          outcome.reason,
-        );
+  stop(session: string): Promise<void> {
+    for (const [id, leave] of this.#leave) {
+      if (leave.session === session) {
+        this.#leave.delete(id);
       }
     }
+    for (const watched of this.#watched.values()) {
+      if (watched.session === session) {
+        watched.session = undefined;
+        watched.stream?.abort();
+      }
+    }
+    return Promise.resolve();
   }
 
   /**
@@ -361,7 +365,7 @@ export class Watching extends DurableSubscriptionBindings implements OpenedUnder
   override async close(): Promise<void> {
     await super.close();
     this.#watched.clear();
-    this.#claimed.clear();
+    this.#leave.clear();
   }
 
   /** The organization a subscription was created in, when it was created in one. */
