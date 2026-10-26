@@ -55,6 +55,9 @@ container, changes only `ACCESS_DESK_DATABASE_HOST` and `_PORT`.
 `pnpm --dir packages/app run session-key` prints a new session key. Sessions
 stay good while the key stays the same; a new key signs everybody out.
 
+A session lasts eight hours from sign-in, and then the person signs in again.
+That is fixed in the gateway, not a setting.
+
 People sign in through Google. If the gateway cannot reach Google when it
 starts, it does not start.
 
@@ -206,7 +209,8 @@ Answers `200`:
 ```
 
 `token` is the session. It works in the organization the person belongs to,
-named in `organization`, or in none when that is `null`.
+named in `organization`, or in none when that is `null`. It stops working
+eight hours after sign-in, or when the person signs out.
 
 Answers `403` when the sign-in was never started or was already finished, when
 the secret does not match, or when the provider confirmed no account with a
@@ -248,7 +252,9 @@ Answers `401` when there is no session or it has ended.
 
 Ends the session, so its token stops working, and stops every subscription
 opened under it. Send `{}` with the session to end. Answers `200` with `{}`,
-also when there was no session to end.
+also when there was no session to end, and `503` with
+`{ "error": "try again" }` when the gateway could not remember that the
+session ended: the token then still works, so sign out again.
 
 ### What passes through
 

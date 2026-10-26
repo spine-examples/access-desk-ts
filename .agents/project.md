@@ -38,6 +38,7 @@ packages/
   resources/   { model, server }
   app/                                # composition root: complete registry, organization setup, gateway
   web/                                # React + Vite browser client (later iterations)
+  testing/                            # what the tests of every package share
 ```
 
 - **`<context>/model`** — `@access-desk/<context>-model`, `spine-proto.json` `mode: "model"`.
@@ -96,6 +97,8 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
   databases made where `ACCESS_DESK_TEST_DATABASE_URL` points. Needs the
   database server running.
 - `pnpm run verify` — build → typecheck → typecheck:tests → lint → test. **This is the gate.**
+  It runs the tests in memory only; run `pnpm run test:postgresql` as well after
+  a change to storage, delivery, or anything PostgreSQL keeps.
 - `pnpm run postgres:start` / `postgres:stop` / `postgres:delete` — the
   development PostgreSQL server in Docker (the `postgres` service of
   `deploy/compose.yaml`), configured from the root `.env`. `start` makes the
@@ -116,12 +119,23 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
 - BlackBox tests (`@spine-event-engine/testing`) exercise one built context through a
   local server and the public client. They live under the matching domain path in
   `packages/<ctx>/server/test/`.
-- **Every test runs on both storage profiles.** `ACCESS_DESK_TEST_STORAGE`
-  (`memory` or `postgresql`) picks one; `test/given/storage.ts`, the same file in
-  each package, gives every BlackBox, server, and gateway storage of its own and
-  deletes it afterwards. On PostgreSQL that is a new database for each, and one
-  for each tenant of a multitenant context, which must be listed up front. A
-  test restarts a context by opening a new BlackBox over `storageOf(box)`.
+- **Every test can run on either storage profile.** `ACCESS_DESK_TEST_STORAGE`
+  (`memory` or `postgresql`) picks one: `pnpm run test` and `verify` name
+  `memory`, `pnpm run test:postgresql` names `postgresql`, and a run that names
+  none, such as one from an editor, takes it from `.env`. The
+  `@access-desk/testing` package (`packages/testing`, TypeScript the tests import
+  as it is, with no build) gives every BlackBox, server, and gateway storage of
+  its own (`@access-desk/testing/storage`) and deletes it afterwards. On
+  PostgreSQL that is a new database for each, and one for each tenant of a
+  multitenant context, which must be listed up front. A test restarts a context
+  by opening a new BlackBox over `storageOf(box)`. The application's server
+  tests open Resources the way the server does, through `Storage.openResources`,
+  for the organizations they work in (`acme` and `globex`).
+- A process that reads a projection, such as the duplicate check of an access
+  request, sees what the projection shows so far. A test waits for the view it
+  depends on (`approveAndAwait` waits until a request shows approved) before its
+  next command; PostgreSQL delivers more slowly than memory, so a missing wait
+  shows up there first.
 - **They import the context from compiled `dist/`** (`await import("../dist/src/index.js")`)
   because vitest cannot execute Spine's standard decorators from raw TypeScript source.
 - The **root `vitest.config.ts`** is the only vitest config: it includes all packages'

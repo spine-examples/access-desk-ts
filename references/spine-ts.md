@@ -332,6 +332,17 @@ Access Desk keeps its data in PostgreSQL through
 - Each tenant database has its own connection pool, ten connections at most
   unless `connectionLimit` says otherwise. Idle connections close after ten
   seconds.
+- A `pg` pool emits `error` when the server drops a connection that waits in
+  it, as when PostgreSQL restarts, and an `error` nobody listens to stops the
+  process. Spine's pools have no listener and cannot be reached to add one.
+  Every pool Access Desk opens itself, such as the gateway's ended sessions,
+  listens.
+- The Stand keeps an active subscription with no expiry
+  (`StorageSubscriptionRegistry`), and attaches every stored one again on each
+  reconciliation and after a restart. On PostgreSQL a subscription nobody
+  cancels stays for good, so the gateway never forgets a subscription without
+  Spine's cancel effect: it leaves the row for Spine to clear when the
+  session expires.
 - Entity Inbox rows are kept in the same storage, so commands accepted before a
   stop are delivered after the restart.
 - Delivery on PostgreSQL is slower than in memory: a sign-in that settles in a
@@ -382,14 +393,20 @@ controls defined in the architecture.
   a time, and keeps one more waiting. A second opening of an open subscription
   waits instead of being refused, and a cancel behind it is refused as
   `binding-busy`. So `Watching` refuses a second opening itself.
+- `bindings.activate` receives the trusted context, the person and the
+  tenant, but not the session; `authorize` receives the session's principal.
+  So `Watching` gives leave to open a subscription in `authorize`, to one
+  request at a time, and the opening uses it. Spine may still refuse the
+  request after `authorize`, as when its context does not match, without
+  calling the bindings, so unused leave lapses after a few seconds.
 - Ending a session does not end its streams; Spine stops them only when the
   session's time runs out.
 - Only Spine's own cancel effect clears a subscription everywhere it is kept,
-  and the store receives it only when a browser cancels. So the gateway
-  cancels an ending session's subscriptions through its own address with the
-  session's token. What is left is stopped in the store, which ends the stream
-  but leaves the gateway's forwarding record until the gateway stops. `dispose`
-  of an in-memory store cannot clear that record either.
+  and the store receives it only when a browser cancels, or when a
+  subscription expires (`purgeExpired`). So the gateway cancels an ending
+  session's subscriptions through its own address with the session's token.
+  What is left only has its stream stopped, and stays in the store until the
+  session would have expired, when Spine clears it everywhere.
 - A subscription reports only what happens after it has opened all the way to
   the application server, a moment after the client's `activate` returns. A
   test must first make sure updates arrive.
@@ -414,6 +431,16 @@ controls defined in the architecture.
   keeps in the gateway's database; without one, `logout` answers
   `expiryOnly` and the token keeps working. `OpaqueSessions` keeps sessions
   only in memory.
+- `SignedSessions` takes a token with its ECDSA signature written either way
+  (`s` or the curve's order less `s`), so two different texts stand for one
+  token. Tell sessions apart by the token's `jti`, as the revocation store
+  does, never by the token's text.
+- `SignedSessions` still takes a token `clockSkewSeconds` (60 by default)
+  after it expires, but hands `revoke` the expiry itself. Keep a revoked `jti`
+  through the skew too, or a revoked token works again for that minute.
+- `SignedSessions.resolve` refuses every token while the revocation store
+  cannot be read, but `logout` verifies the token without reading the store.
+  So signing out with a token that no longer resolves can still revoke it.
 - To wait for the event a command causes, use the client's
   `postAndSubscribe`, as adding a member to an organization does. It opens the
   subscription, waits for the server's acknowledgement, and then posts. It
@@ -423,8 +450,9 @@ controls defined in the architecture.
   `onFirstUpdateTimeout` that cancels it, which ends the updates. When the effect
   comes later in a chain of steps, subscribe to the read model that shows it
   instead, as `ServerRequests.postAndAwaitView` does: an entity subscription
-  with an authoritative query, opened before the command is posted, and one
-  more read of the read model when no update came in time.
+  with an authoritative query, opened before the command is posted, a read of
+  the read model as soon as the command is accepted, and one more read when no
+  update came in time.
 - When the result of a handler fails validation as it is committed, delivery
   stops. That is a new state that breaks `(required)`
   (`TransitionValidationError`), or a command or event the entity produced
