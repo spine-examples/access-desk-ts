@@ -17,6 +17,7 @@ import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { SignalEnvelopes } from "@spine-event-engine/core";
 import { TenantIdSchema, UserIdSchema } from "@spine-event-engine/proto";
 import { type BoundedContext, Server, SignalMetadata } from "@spine-event-engine/server";
+import { InMemoryStorageFactory } from "@spine-event-engine/storage";
 import { type OrganizationId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import {
   AuditEntrySchema,
@@ -27,6 +28,9 @@ import {
   OrganizationViewSchema,
   type OrganizationView,
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
+
+import { typeRegistry } from "../../../generated/model-registry.js";
+import { TestStorages, type TestStorage } from "../../given/storage.js";
 
 // Imported from compiled output, like the contexts it assembles: vitest cannot
 // execute the handler classes' standard decorators from raw TypeScript source.
@@ -40,8 +44,20 @@ export interface Hosted {
   readonly identity: BoundedContext;
   /** The organization-scoped Resources context. */
   readonly resources: BoundedContext;
-  /** Stops the server and closes its assembled contexts. */
+  /**
+   * Stops the server and closes its assembled contexts.
+   *
+   * It deletes the data Identity kept, unless the test passed the storage in.
+   */
   stop(): Promise<void>;
+}
+
+/**
+ * The storage Identity keeps its data in, for a test that starts the server
+ * more than once over the same data. The test drops it.
+ */
+export function givenServerStorage(): Promise<TestStorage> {
+  return TestStorages.singleTenant(typeRegistry);
 }
 
 /**
@@ -53,11 +69,25 @@ export function tenant(organization: OrganizationId) {
   return create(TenantIdSchema, { kind: { case: "value", value: organization.uuid } });
 }
 
-/** Starts both application contexts on a free port, without creating an organization. */
-export async function givenServer(): Promise<Hosted> {
+/**
+ * Starts both application contexts on a free port, without creating an organization.
+ *
+ * Identity keeps its data in the storage of the run. Resources keeps it in
+ * memory, where any organization the tests create is kept, as the server does
+ * with `ACCESS_DESK_STORAGE=memory`.
+ *
+ * @param storage The storage Identity keeps its data in, to start the server
+ *   over data an earlier one kept. New, empty storage when left out.
+ */
+export async function givenServer(storage?: TestStorage): Promise<Hosted> {
   const assembly: AccessDeskModule = await import("../../../dist/src/server/access-desk.js");
+  const identityStorage = storage ?? (await givenServerStorage());
+  const resourcesStorage = new InMemoryStorageFactory();
   let url = "";
-  const contexts = await assembly.AccessDesk.assemble({ server: () => url });
+  const contexts = await assembly.AccessDesk.assemble({
+    server: () => url,
+    storage: { identity: await identityStorage.open(), resources: resourcesStorage },
+  });
   const server = await new Server({
     contexts: [contexts.identity, contexts.resources],
     port: 0,
@@ -70,6 +100,10 @@ export async function givenServer(): Promise<Hosted> {
     stop: async () => {
       await server.close();
       await contexts.close();
+      resourcesStorage.close();
+      if (storage === undefined) {
+        await identityStorage.drop();
+      }
     },
   };
 }

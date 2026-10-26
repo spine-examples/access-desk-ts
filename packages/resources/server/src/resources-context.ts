@@ -16,7 +16,12 @@ import type { Message } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { anyIs, anyUnpack } from "@bufbuild/protobuf/wkt";
 import type { EventContext } from "@spine-event-engine/proto";
-import { BoundedContext, EventRouting } from "@spine-event-engine/server";
+import {
+  BoundedContext,
+  EventRouting,
+  StorageSubscriptionRegistry,
+} from "@spine-event-engine/server";
+import type { StorageFactory } from "@spine-event-engine/storage";
 import {
   OrganizationMemberAddedSchema,
   ResourceAddedSchema,
@@ -81,6 +86,28 @@ import { AccessGrantViewProjection } from "./access/grant/access-grant-view-proj
 import { AuditEntryIds } from "./audit/audit-entry-ids.js";
 import { AuditEntryProjection } from "./audit/audit-entry-projection.js";
 
+/** How the Resources context is assembled. */
+export interface ResourcesContextOptions {
+  /**
+   * Where the context keeps each organization and everything it owns.
+   * Whoever passes it closes it.
+   *
+   * Each organization is kept apart, so the storage must take an organization
+   * it has not seen before, or know every organization from the start.
+   */
+  readonly storage: StorageFactory;
+  /**
+   * Where the context keeps what people subscribed to. Whoever passes it
+   * closes it.
+   *
+   * A subscription belongs to no one organization. So storage that keeps
+   * every organization apart, such as Spine's PostgreSQL storage, cannot keep
+   * it, and the subscriptions need storage of their own. Left out, they are
+   * kept in {@link storage}.
+   */
+  readonly subscriptions?: StorageFactory;
+}
+
 /**
  * The Resources bounded context.
  *
@@ -91,9 +118,10 @@ export const ResourcesContext = {
   /**
    * Builds the context.
    *
+   * @param options How to assemble the context.
    * @returns The assembled Resources bounded context.
    */
-  async create(): Promise<BoundedContext> {
+  async create(options: ResourcesContextOptions): Promise<BoundedContext> {
     /**
      * The request an event from a person's access answers.
      *
@@ -198,6 +226,7 @@ export const ResourcesContext = {
     }
     const builder = BoundedContext.multitenant("Resources")
       .withGeneratedRegistryRoot(new URL("..", import.meta.url))
+      .withStorageFactory(options.storage)
       .add(OrganizationAggregate)
       .add(OrganizationViewProjection)
       .add(ResourceRegistrationProcessManager, { eventRouting: resourceRegistrationProcmanRouting })
@@ -209,6 +238,14 @@ export const ResourcesContext = {
       .add(ResourceAccessAggregate)
       .add(AccessGrantViewProjection, { eventRouting: grantViewRouting })
       .add(AuditEntryProjection, { eventRouting: auditTrailRouting });
+    if (options.subscriptions !== undefined) {
+      builder.withSubscriptionRegistry(
+        new StorageSubscriptionRegistry(
+          { name: "Resources:subscriptions", multitenant: false },
+          options.subscriptions,
+        ),
+      );
+    }
     return builder.buildAsync();
   },
 };
