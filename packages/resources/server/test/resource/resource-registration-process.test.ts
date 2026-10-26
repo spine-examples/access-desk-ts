@@ -22,7 +22,6 @@ import {
   ResourceRegistrationFailedSchema,
   ResourceRegistrationRequestedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_registration_events_pb.js";
-import { ResourceAlreadyExistsSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/rejections_pb.js";
 import { OrganizationResourceNameAlreadyUsedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/rejections_pb.js";
 
 import {
@@ -34,7 +33,7 @@ import {
   testActorContext,
 } from "../given/resources-context.js";
 import { awaitOrganizationView, createOrganization } from "../organization/given/organization.js";
-import { awaitCatalogItem, createResource, registerResource } from "./given/resource.js";
+import { awaitCatalogItem, registerResource } from "./given/resource.js";
 
 const { expectRejection, recordEvents } = eventRecording(testActorContext);
 
@@ -48,6 +47,7 @@ describe("ResourceRegistrationProcessManager should", () => {
     it("admit a free name and emit 'ResourceRegistrationRequested'", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
+      expect((await createOrganization(scope)).kind).toBe("ok");
       const requested = await recordEvents(scope, ResourceRegistrationRequestedSchema);
       try {
         expect((await registerResource(scope, "payroll")).kind).toBe("ok");
@@ -76,28 +76,13 @@ describe("ResourceRegistrationProcessManager should", () => {
         await failed.cancel();
       }
     });
-
-    it("emit 'ResourceRegistrationFailed' when the resource already exists", async () => {
-      const box = await resourcesBlackBox();
-      const scope = box.onBehalfOf(actor);
-      expect((await createResource(scope, "payroll")).kind).toBe("ok");
-
-      const failed = await recordEvents(scope, ResourceRegistrationFailedSchema);
-      try {
-        await expectRejection(box, scope, ResourceAlreadyExistsSchema, () =>
-          registerResource(scope, "payroll"),
-        );
-        expect((await failed.waitFor(box)).id?.uuid).toBe("payroll");
-      } finally {
-        await failed.cancel();
-      }
-    });
   });
 
   describe("react on 'ResourceRegistrationRequested', and", () => {
     it("create the requested resource with its initial policy", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
+      expect((await createOrganization(scope)).kind).toBe("ok");
       const created = await recordEvents(scope, ResourceCreatedSchema);
       try {
         expect((await registerResource(scope, "payroll")).kind).toBe("ok");

@@ -43,11 +43,13 @@ import {
   createOrganization,
   readOrganizationViews,
 } from "./given/organization.js";
+import { registerResource } from "../resource/given/resource.js";
 
 const { expectRejection, recordEvents } = eventRecording(testActorContext);
 
 // The Organization aggregate is NONE-visibility, so each command handler is
-// verified through the fact it publishes.
+// verified through the fact it publishes. A resource is added by its
+// registration, so the tests register it.
 beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
 
@@ -138,7 +140,7 @@ describe("OrganizationAggregate should", () => {
       expect((await createOrganization(scope)).kind).toBe("ok");
       const events = await recordEvents(scope, ResourceAddedSchema);
 
-      expect((await addResource(scope, "payroll")).kind).toBe("ok");
+      expect((await registerResource(scope, "payroll")).kind).toBe("ok");
 
       const event = await events.waitFor(box);
       expect(event).toEqual(
@@ -155,13 +157,14 @@ describe("OrganizationAggregate should", () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await createOrganization(scope)).kind).toBe("ok");
-      expect((await addResource(scope, "payroll")).kind).toBe("ok");
+      expect((await registerResource(scope, "payroll")).kind).toBe("ok");
       await awaitOrganizationView(box, scope, (view) =>
         view.resource.some((resource) => resource.id?.uuid === "payroll"),
       );
 
       const events = await recordEvents(scope, ResourceAddedSchema);
       try {
+        // The registration gives the command again, as when its delivery is repeated.
         expect((await addResource(scope, "payroll")).kind).toBe("ok");
         await events.waitFor(box, (event) => event.resourceId?.uuid === "payroll");
 
@@ -184,13 +187,16 @@ describe("OrganizationAggregate should", () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await createOrganization(scope)).kind).toBe("ok");
-      expect((await addResource(scope, "payroll-a", "Payroll")).kind).toBe("ok");
+      expect((await registerResource(scope, "payroll-a", "Payroll")).kind).toBe("ok");
+      await awaitOrganizationView(box, scope, (view) =>
+        view.resource.some((resource) => resource.id?.uuid === "payroll-a"),
+      );
 
       const rejection = await expectRejection(
         box,
         scope,
         OrganizationResourceNameAlreadyUsedSchema,
-        () => addResource(scope, "payroll-b", " payroll "),
+        () => registerResource(scope, "payroll-b", " payroll "),
       );
 
       expect(rejection).toMatchObject({ resourceId: { uuid: "payroll-b" }, name: " payroll " });

@@ -36,8 +36,8 @@ import {
 } from "../../../organization/given/organization.js";
 import {
   awaitCatalogItem,
-  createResource,
   openResource,
+  registerAndAwaitResource,
   type ResourceDraft,
 } from "../../../resource/given/resource.js";
 
@@ -62,7 +62,7 @@ export async function seed(
   for (const member of members) {
     await addOrganizationMember(scope, member);
   }
-  await createResource(scope, resourceUuid, {
+  await registerAndAwaitResource(box, scope, resourceUuid, {
     manager: [{ uuid: "primary" }],
     ...options.policy,
   });

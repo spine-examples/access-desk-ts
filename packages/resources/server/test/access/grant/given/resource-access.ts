@@ -42,8 +42,8 @@ import {
 import { managerHasTask } from "../../request/given/access-decision-assignment.js";
 import {
   awaitCatalogItem,
-  createResource,
   openResource,
+  registerAndAwaitResource,
   type ResourceDraft,
 } from "../../../resource/given/resource.js";
 
@@ -88,8 +88,7 @@ export function seedGrantedResource(box: BlackBox): Promise<void> {
  */
 export async function seedOtherResource(box: BlackBox, resource: string): Promise<void> {
   const scope = box.onBehalfOf(actor);
-  await createResource(scope, resource, {
-    name: resource,
+  await registerAndAwaitResource(box, scope, resource, {
     manager: [{ uuid: "primary" }],
     maximumDuration,
   });

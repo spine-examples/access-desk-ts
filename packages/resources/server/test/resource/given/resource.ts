@@ -18,7 +18,6 @@ import { type BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
 import {
   CloseResourceForRequestsSchema,
   CreateResourceSchema,
-  DeleteResourceSchema,
   OpenResourceForRequestsSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/resource/commands_pb.js";
 import { RegisterResourceSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_registration_commands_pb.js";
@@ -59,23 +58,6 @@ export function resourceDraft(overrides: Partial<ResourceDraft> = {}): ResourceD
   };
 }
 
-/** Posts `CreateResource` directly, bypassing the registration process. */
-export function createResource(
-  scope: BlackBoxScope,
-  resource: string,
-  overrides: Partial<ResourceDraft> = {},
-) {
-  return scope.post(
-    CreateResourceSchema,
-    create(CreateResourceSchema, { id: { uuid: resource }, ...resourceDraft(overrides) }),
-  );
-}
-
-/** Posts `DeleteResource` to remove a resource during compensation. */
-export function deleteResource(scope: BlackBoxScope, resource: string) {
-  return scope.post(DeleteResourceSchema, create(DeleteResourceSchema, { id: { uuid: resource } }));
-}
-
 /**
  * Posts `RegisterResource`, the entry point of the registration process.
  *
@@ -95,6 +77,44 @@ export function registerResource(
       id: { uuid: resource },
       organizationId: { uuid: organizationId },
       ...resourceDraft({ name, ...overrides }),
+    }),
+  );
+}
+
+/**
+ * Registers the resource, and waits until the catalog shows it.
+ *
+ * A resource is created only by its registration, which also records it among
+ * the resources of the organization. So the organization must exist first.
+ * The resource is named after its identifier unless the overrides name it.
+ */
+export async function registerAndAwaitResource(
+  box: BlackBox,
+  scope: BlackBoxScope,
+  resource: string,
+  overrides: Partial<ResourceDraft> = {},
+): Promise<ResourceCatalogItem> {
+  await registerResource(scope, resource, overrides.name ?? resource, overrides);
+  return awaitCatalogItem(box, scope, resource);
+}
+
+/**
+ * Posts `CreateResource` for a registered resource, as its registration gives
+ * it again when its delivery is repeated.
+ *
+ * Register the resource first. Otherwise the registration process reacts to
+ * the creation of a resource it never asked for.
+ */
+export function createResourceAgain(
+  scope: BlackBoxScope,
+  resource: string,
+  overrides: Partial<ResourceDraft> = {},
+) {
+  return scope.post(
+    CreateResourceSchema,
+    create(CreateResourceSchema, {
+      id: { uuid: resource },
+      ...resourceDraft({ name: resource, ...overrides }),
     }),
   );
 }
