@@ -37,6 +37,7 @@
     "pg": "8.23.0"
   },
   "devDependencies": {
+    "@access-desk/testing": "0.0.0",
     "@spine-event-engine/client-web": "2.0.0-snapshot.24",
     "@spine-event-engine/proto-tools": "2.0.0-snapshot.24",
     "@types/node": "24.13.2",

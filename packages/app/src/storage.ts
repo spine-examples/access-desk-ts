@@ -74,11 +74,17 @@ export const Storage = {
       )
       .setStringifierRegistry(Storage.stringifiers())
       .build();
-    const subscriptions = await Storage.open({
-      kind: "postgresql",
-      url: settings.subscriptionsUrl,
-    });
-    return { organizations, subscriptions };
+    try {
+      const subscriptions = await Storage.open({
+        kind: "postgresql",
+        url: settings.subscriptionsUrl,
+      });
+      return { organizations, subscriptions };
+    } catch (error) {
+      // Nobody gets the organizations' storage, so nobody else would close it.
+      organizations.close();
+      throw error;
+    }
   },
 
   /**

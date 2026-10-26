@@ -27,13 +27,11 @@
     "@access-desk/identity-model": "0.0.0"
   },
   "devDependencies": {
+    "@access-desk/testing": "0.0.0",
     "@spine-event-engine/proto-tools": "2.0.0-snapshot.24",
-    "@spine-event-engine/storage-postgres": "2.0.0-snapshot.24",
     "@spine-event-engine/testing": "2.0.0-snapshot.24",
     "@types/node": "24.13.2",
-    "@types/pg": "8.23.1",
     "typescript": "6.0.3",
-    "vitest": "5.0.3",
-    "pg": "8.23.0"
+    "vitest": "5.0.3"
   }
 }

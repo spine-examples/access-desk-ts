@@ -28,6 +28,8 @@ import { Client } from "pg";
  * `ACCESS_DESK_TEST_STORAGE` names where: `memory`, or `postgresql`. On
  * PostgreSQL, every storage gets databases of its own, made in the server of
  * `ACCESS_DESK_TEST_DATABASE_URL`.
+ *
+ * The tests of every package share it.
  */
 export interface TestStorage {
   /**
@@ -49,17 +51,61 @@ export interface TestStorage {
   drop(): Promise<void>;
 }
 
+/** Where a program keeps its data, as the application's settings say it. */
+export type StorageSettingsOfTest =
+  { readonly kind: "memory" } | { readonly kind: "postgresql"; readonly url: string };
+
+/** Throwaway PostgreSQL databases, for a test that opens storage as the application does. */
+export interface TestDatabases {
+  /** The address of each database. */
+  readonly urls: readonly string[];
+  /** Deletes the databases. Whoever opened storage over them closes it first. */
+  drop(): Promise<void>;
+}
+
 /** Makes the storage of the tests. */
 export const TestStorages = {
-  /** Where the tests keep their data in this run. */
+  /**
+   * Where the tests keep their data in this run.
+   *
+   * `pnpm run test` and `pnpm run test:postgresql` name it. A run that names
+   * none, such as one from an editor, takes it from `.env`.
+   */
   profile(): "memory" | "postgresql" {
     const profile = process.env.ACCESS_DESK_TEST_STORAGE;
     if (profile === "memory" || profile === "postgresql") {
       return profile;
     }
     throw new Error(
-      `ACCESS_DESK_TEST_STORAGE must be "memory" or "postgresql", and is "${profile ?? ""}".`,
+      `ACCESS_DESK_TEST_STORAGE must be "memory" or "postgresql", and is "${profile ?? ""}". ` +
+        "Set it in .env, or run `pnpm run test` or `pnpm run test:postgresql`.",
     );
+  },
+
+  /**
+   * The settings that name single-tenant storage, as the application reads them.
+   *
+   * @param storage Storage made by {@link TestStorages.singleTenant}.
+   */
+  settingsOf(storage: TestStorage): StorageSettingsOfTest {
+    if (TestStorages.profile() === "memory") {
+      return { kind: "memory" };
+    }
+    if (storage.url === undefined) {
+      throw new Error("Only single-tenant storage is named by one database.");
+    }
+    return { kind: "postgresql", url: storage.url };
+  },
+
+  /**
+   * New, empty PostgreSQL databases, for a test that opens storage over them
+   * as the application does.
+   *
+   * @param count How many to make.
+   */
+  async databases(count: number): Promise<TestDatabases> {
+    const urls = await Databases.create(count);
+    return { urls, drop: () => Databases.drop(urls) };
   },
 
   /**

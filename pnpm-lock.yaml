@@ -114,6 +114,9 @@ importers:
         specifier: 8.23.0
         version: 8.23.0
     devDependencies:
+      '@access-desk/testing':
+        specifier: 0.0.0
+        version: link:../testing
       '@spine-event-engine/client-web':
         specifier: 2.0.0-snapshot.24
         version: 2.0.0-snapshot.24
@@ -176,10 +179,10 @@ importers:
         specifier: 2.0.0-snapshot.24
         version: 2.0.0-snapshot.24
     devDependencies:
+      '@access-desk/testing':
+        specifier: 0.0.0
+        version: link:../../testing
       '@spine-event-engine/proto-tools':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
-      '@spine-event-engine/storage-postgres':
         specifier: 2.0.0-snapshot.24
         version: 2.0.0-snapshot.24
       '@spine-event-engine/testing':
@@ -188,12 +191,6 @@ importers:
       '@types/node':
         specifier: 24.13.2
         version: 24.13.2
-      '@types/pg':
-        specifier: 8.23.1
-        version: 8.23.1
-      pg:
-        specifier: 8.23.0
-        version: 8.23.0
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -250,10 +247,10 @@ importers:
         specifier: 2.0.0-snapshot.24
         version: 2.0.0-snapshot.24
     devDependencies:
+      '@access-desk/testing':
+        specifier: 0.0.0
+        version: link:../../testing
       '@spine-event-engine/proto-tools':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
-      '@spine-event-engine/storage-postgres':
         specifier: 2.0.0-snapshot.24
         version: 2.0.0-snapshot.24
       '@spine-event-engine/testing':
@@ -262,18 +259,40 @@ importers:
       '@types/node':
         specifier: 24.13.2
         version: 24.13.2
-      '@types/pg':
-        specifier: 8.23.1
-        version: 8.23.1
-      pg:
-        specifier: 8.23.0
-        version: 8.23.0
       typescript:
         specifier: 6.0.3
         version: 6.0.3
       vitest:
         specifier: 5.0.3
         version: 5.0.3(@types/node@24.13.2)(vite@8.2.2(@types/node@24.13.2))
+
+  packages/testing:
+    dependencies:
+      '@spine-event-engine/core':
+        specifier: 2.0.0-snapshot.24
+        version: 2.0.0-snapshot.24
+      '@spine-event-engine/proto':
+        specifier: 2.0.0-snapshot.24
+        version: 2.0.0-snapshot.24
+      '@spine-event-engine/storage':
+        specifier: 2.0.0-snapshot.24
+        version: 2.0.0-snapshot.24
+      '@spine-event-engine/storage-postgres':
+        specifier: 2.0.0-snapshot.24
+        version: 2.0.0-snapshot.24
+      pg:
+        specifier: 8.23.0
+        version: 8.23.0
+    devDependencies:
+      '@types/node':
+        specifier: 24.13.2
+        version: 24.13.2
+      '@types/pg':
+        specifier: 8.23.1
+        version: 8.23.1
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
 
   packages/web:
     dependencies:

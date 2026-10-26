@@ -33,8 +33,8 @@ export default defineConfig({
     // Where the tests keep their data: `memory`, or `postgresql`, in
     // throwaway databases made where ACCESS_DESK_TEST_DATABASE_URL points.
     // `pnpm run test` and `pnpm run test:postgresql` name it. A test run
-    // that does not, such as one from an editor, keeps the data in memory.
-    env: { ACCESS_DESK_TEST_STORAGE: "memory", ...settings },
+    // that does not, such as one from an editor, takes it from `.env`.
+    env: settings,
     // BlackBox tests drive asynchronous cross-entity delivery and use bounded
     // `eventually` waits; multi-hop reconciliation needs headroom over the 5s
     // default.
