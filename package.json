@@ -22,9 +22,9 @@
     "test": "pnpm -r run build && ACCESS_DESK_TEST_STORAGE=memory vitest run --passWithNoTests",
     "test:postgresql": "pnpm -r run build && ACCESS_DESK_TEST_STORAGE=postgresql vitest run --passWithNoTests",
     "verify": "pnpm -r run build && pnpm -r run typecheck && pnpm run typecheck:tests && pnpm -r run lint && pnpm run test",
-    "postgres:start": "docker compose --env-file .env --file deploy/postgres/compose.yaml up --detach --wait",
-    "postgres:stop": "docker compose --env-file .env --file deploy/postgres/compose.yaml down",
-    "postgres:delete": "docker compose --env-file .env --file deploy/postgres/compose.yaml down --volumes"
+    "postgres:start": "docker compose --env-file .env --file deploy/compose.yaml up --detach --wait postgres && docker compose --env-file .env --file deploy/compose.yaml exec postgres /docker-entrypoint-initdb.d/01-databases.sh",
+    "postgres:stop": "docker compose --env-file .env --file deploy/compose.yaml stop postgres",
+    "postgres:delete": "docker compose --env-file .env --file deploy/compose.yaml down --volumes"
   },
   "devDependencies": {
     "@bufbuild/protobuf": "2.12.1",
