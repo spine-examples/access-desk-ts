@@ -26,52 +26,41 @@ import { Client } from "pg";
 /**
  * The storage a test keeps its contexts' data in, and deletes when it ends.
  *
- * `ACCESS_DESK_TEST_STORAGE` names where: `memory`, or `postgresql`. On
- * PostgreSQL, every storage gets databases of its own, made on the server the
- * programs keep their data on, from the database `ACCESS_DESK_TEST_DATABASE`
- * names.
- *
- * The tests of every package share it.
+ * `ACCESS_DESK_TEST_STORAGE` names where: `memory`, or `postgresql`.
+ * On PostgreSQL, each storage gets new databases of its own.
  */
 export interface TestStorage {
-  /**
-   * The address of the database the storage keeps its data in.
-   *
-   * Nothing in memory, and nothing for storage that keeps each tenant in a
-   * database of its own.
-   */
+  /** The address of the storage's database, when it has just one. */
   readonly url: string | undefined;
   /**
-   * Opens the storage over its data.
+   * Opens the storage, as a program does when it starts.
    *
-   * Every call opens it anew over the same data, as a program does when it
-   * restarts. In memory, every call gives the same storage, which is how
-   * memory outlasts a context.
+   * Opening it again keeps the data, so a test can restart a context.
    */
   open(): Promise<StorageFactory>;
-  /** Closes everything opened, and deletes the data. */
+  /** Closes the storage and deletes its data. */
   drop(): Promise<void>;
 }
 
-/** Where a program keeps its data, as the application's settings say it. */
-export type StorageSettingsOfTest =
+/** Where the application keeps its data, as its settings name it. */
+export type StorageSettings =
   { readonly kind: "memory" } | { readonly kind: "postgresql"; readonly url: string };
 
-/** Throwaway PostgreSQL databases, for a test that opens storage as the application does. */
+/** Empty PostgreSQL databases, for a test that opens storage over them itself. */
 export interface TestDatabases {
   /** The address of each database. */
   readonly urls: readonly string[];
-  /** Deletes the databases. Whoever opened storage over them closes it first. */
+  /** Deletes the databases. Close the storage over them first. */
   drop(): Promise<void>;
 }
 
-/** Makes the storage of the tests. */
+/**
+ * Creates storage for the tests, in memory or in new PostgreSQL databases, as
+ * `ACCESS_DESK_TEST_STORAGE` says.
+ */
 export const TestStorages = {
   /**
-   * Where the tests keep their data in this run.
-   *
-   * `pnpm run test` and `pnpm run test:postgresql` name it. A run that names
-   * none, such as one from an editor, takes it from `.env`.
+   * Where this run keeps its data.
    */
   profile(): "memory" | "postgresql" {
     const profile = process.env.ACCESS_DESK_TEST_STORAGE;
@@ -79,17 +68,16 @@ export const TestStorages = {
       return profile;
     }
     throw new Error(
-      `ACCESS_DESK_TEST_STORAGE must be "memory" or "postgresql", and is "${profile ?? ""}". ` +
-        "Set it in .env, or run `pnpm run test` or `pnpm run test:postgresql`.",
+      `ACCESS_DESK_TEST_STORAGE must be "memory" or "postgresql", and is "${profile ?? ""}".`
     );
   },
 
   /**
-   * The settings that name single-tenant storage, as the application reads them.
+   * The application settings that point at the storage.
    *
-   * @param storage Storage made by {@link TestStorages.singleTenant}.
+   * @param storage Storage from {@link TestStorages.singleTenant}.
    */
-  settingsOf(storage: TestStorage): StorageSettingsOfTest {
+  settingsOf(storage: TestStorage): StorageSettings {
     if (TestStorages.profile() === "memory") {
       return { kind: "memory" };
     }
@@ -100,10 +88,9 @@ export const TestStorages = {
   },
 
   /**
-   * New, empty PostgreSQL databases, for a test that opens storage over them
-   * as the application does.
+   * Creates empty PostgreSQL databases.
    *
-   * @param count How many to make.
+   * @param count How many databases to create.
    */
   async databases(count: number): Promise<TestDatabases> {
     const urls = await Databases.create(count);
@@ -113,7 +100,7 @@ export const TestStorages = {
   /**
    * Storage for a single-tenant context.
    *
-   * @param registry Every type the context's messages use.
+   * @param registry The types of the context's messages.
    */
   async singleTenant(registry: TypeRegistryLookup): Promise<TestStorage> {
     if (TestStorages.profile() === "memory") {
@@ -124,11 +111,11 @@ export const TestStorages = {
   },
 
   /**
-   * Storage for a multitenant context, which keeps each tenant apart.
+   * Storage for a multitenant context.
    *
-   * @param registry Every type the context's messages use.
-   * @param tenants Every tenant the context serves. PostgreSQL keeps each in
-   *   a database of its own, and must know them all from the start.
+   * @param registry The types of the context's messages.
+   * @param tenants Every tenant of the context. PostgreSQL gives each a
+   *   database of its own, so it needs them all up front.
    */
   async multitenant(
     registry: TypeRegistryLookup,
@@ -146,7 +133,7 @@ export const TestStorages = {
   },
 };
 
-/** Storage in memory, which lives as long as the test. */
+/** Storage in memory. */
 class InMemoryTestStorage implements TestStorage {
   readonly url = undefined;
   readonly #factory = new InMemoryStorageFactory();
@@ -161,16 +148,16 @@ class InMemoryTestStorage implements TestStorage {
   }
 }
 
-/** Storage in throwaway PostgreSQL databases. */
+/** Storage in PostgreSQL databases made for one test. */
 class PostgresTestStorage implements TestStorage {
   readonly url: string | undefined;
-  /** Every type the context's messages use. */
+  /** The types of the context's messages. */
   readonly #registry: TypeRegistryLookup;
-  /** The databases the storage keeps its data in. */
+  /** The addresses of the storage's databases. */
   readonly #databases: readonly string[];
-  /** Points a new storage at the databases. */
+  /** Points the storage at its databases. */
   readonly #configure: (builder: PostgresStorageFactoryBuilder) => PostgresStorageFactoryBuilder;
-  /** Every storage opened so far. */
+  /** The storage opened so far, closed on drop. */
   readonly #opened: StorageFactory[] = [];
 
   constructor(
@@ -203,13 +190,12 @@ class PostgresTestStorage implements TestStorage {
   }
 }
 
-/** The throwaway databases of the tests on PostgreSQL. */
+/** The tests' PostgreSQL databases. */
 const Databases = {
   /**
-   * Makes new, empty databases.
+   * Creates empty databases, and returns their addresses.
    *
-   * @param count How many to make.
-   * @returns The address of each.
+   * @param count How many databases to create.
    */
   async create(count: number): Promise<string[]> {
     const urls: string[] = [];
@@ -224,9 +210,9 @@ const Databases = {
   },
 
   /**
-   * Deletes databases, even while something is still connected to them.
+   * Deletes databases, even if something is still connected to them.
    *
-   * @param urls The address of each.
+   * @param urls The addresses of the databases.
    */
   async drop(urls: readonly string[]): Promise<void> {
     await Databases.administer(async (client) => {
@@ -237,7 +223,7 @@ const Databases = {
     });
   },
 
-  /** Runs statements against the server the tests make their databases in. */
+  /** Connects to the database server, and runs the statements. */
   async administer(statements: (client: Client) => Promise<void>): Promise<void> {
     const client = new Client({ connectionString: Databases.server() });
     await client.connect();
@@ -248,7 +234,7 @@ const Databases = {
     }
   },
 
-  /** The address of a database of the test server. */
+  /** The address of the named database on the server. */
   urlOf(name: string): string {
     const url = new URL(Databases.server());
     url.pathname = `/${name}`;
@@ -256,10 +242,10 @@ const Databases = {
   },
 
   /**
-   * The address of the database the tests make their databases from: the one
-   * `ACCESS_DESK_TEST_DATABASE` names, on the server of
-   * `ACCESS_DESK_DATABASE_HOST`, `_PORT`, `_USER`, and `_PASSWORD`, as the
-   * programs reach it.
+   * The address of the database the tests connect to when they create theirs.
+   *
+   * The server is the one the programs use, and the database is
+   * `ACCESS_DESK_TEST_DATABASE`.
    */
   server(): string {
     const setting = (name: string, trimmed = true): string => {
@@ -273,7 +259,6 @@ const Databases = {
     };
     const host = setting("ACCESS_DESK_DATABASE_HOST");
     const user = encodeURIComponent(setting("ACCESS_DESK_DATABASE_USER"));
-    // The password is taken as it is written, as the programs take it.
     const password = encodeURIComponent(setting("ACCESS_DESK_DATABASE_PASSWORD", false));
     const address = isIP(host) === 6 ? `[${host}]` : host;
     const port = setting("ACCESS_DESK_DATABASE_PORT");
