@@ -24,11 +24,8 @@ import type { ResourcesStorageSettings, StorageSettings } from "./settings.js";
 export interface ResourcesStorage {
   /** Each organization and everything it owns. */
   readonly organizations: StorageFactory;
-  /**
-   * What people subscribed to, when it is not kept with the organizations.
-   * A subscription belongs to no one organization.
-   */
-  readonly subscriptions?: StorageFactory;
+  /** What people subscribed to, which belongs to no one organization. */
+  readonly subscriptions: StorageFactory;
 }
 
 /** Where a program keeps what it must remember. */
@@ -63,7 +60,10 @@ export const Storage = {
    */
   async openResources(settings: ResourcesStorageSettings): Promise<ResourcesStorage> {
     if (settings.kind === "memory") {
-      return { organizations: new InMemoryStorageFactory() };
+      return {
+        organizations: new InMemoryStorageFactory(),
+        subscriptions: new InMemoryStorageFactory(),
+      };
     }
     const organizations = await PostgresStorageFactory.newBuilder()
       .setTenantOptions(

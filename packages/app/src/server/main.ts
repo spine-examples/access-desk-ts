@@ -44,9 +44,7 @@ const contexts = await AccessDesk.assemble({
   storage: {
     identity: identityStorage,
     resources: resourcesStorage.organizations,
-    ...(resourcesStorage.subscriptions === undefined
-      ? {}
-      : { resourceSubscriptions: resourcesStorage.subscriptions }),
+    resourceSubscriptions: resourcesStorage.subscriptions,
   },
 });
 const server = await new Server({
@@ -91,7 +89,7 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
           } finally {
             identityStorage.close();
             resourcesStorage.organizations.close();
-            resourcesStorage.subscriptions?.close();
+            resourcesStorage.subscriptions.close();
           }
         }
       })().catch((error: unknown) => {

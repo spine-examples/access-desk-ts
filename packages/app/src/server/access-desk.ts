@@ -27,17 +27,17 @@ export interface AccessDeskOptions {
    * administrator adds them.
    */
   readonly server: () => string;
-  /** Where each context keeps its data. Whoever passes the storage closes it. */
+  /** Where the application keeps its data. */
   readonly storage: {
-    /** The people, their accounts, their email addresses, and their memberships. */
+    /** Where Identity keeps people and their accounts. */
     readonly identity: StorageFactory;
-    /** Each organization and everything it owns. */
+    /** Where Resources keeps the organizations and their resources. */
     readonly resources: StorageFactory;
     /**
-     * What people subscribed to in Resources, which belongs to no one
-     * organization. Kept in {@link resources} when left out.
+     * Where Resources keeps subscriptions. They belong to no organization,
+     * so they are kept apart.
      */
-    readonly resourceSubscriptions?: StorageFactory;
+    readonly resourceSubscriptions: StorageFactory;
   };
 }
 
@@ -63,10 +63,7 @@ export const AccessDesk = {
     const members = ReachedOrganizationMembers.through(options.server);
     const identity = await IdentityContext.create({ members, storage: options.storage.identity });
     const { resources: storage, resourceSubscriptions: subscriptions } = options.storage;
-    const resources = await ResourcesContext.create({
-      storage,
-      ...(subscriptions === undefined ? {} : { subscriptions }),
-    });
+    const resources = await ResourcesContext.create({ storage, subscriptions });
     return { identity, resources, close: () => members.close() };
   },
 };

@@ -96,15 +96,12 @@ export interface ResourcesContextOptions {
    */
   readonly storage: StorageFactory;
   /**
-   * Where the context keeps what people subscribed to. Whoever passes it
-   * closes it.
+   * Where the context keeps subscriptions. Whoever passes it closes it.
    *
-   * A subscription belongs to no one organization. So storage that keeps
-   * every organization apart, such as Spine's PostgreSQL storage, cannot keep
-   * it, and the subscriptions need storage of their own. Left out, they are
-   * kept in {@link storage}.
+   * A subscription belongs to no organization, so storage that keeps each
+   * organization apart, such as Spine's PostgreSQL storage, cannot keep it.
    */
-  readonly subscriptions?: StorageFactory;
+  readonly subscriptions: StorageFactory;
 }
 
 /**
@@ -223,7 +220,7 @@ export const ResourcesContext = {
     for (const event of auditTrailEvents) {
       auditTrailRouting.route(event, (_event, context) => entryOf(event, context));
     }
-    const builder = BoundedContext.multitenant("Resources")
+    return BoundedContext.multitenant("Resources")
       .withGeneratedRegistryRoot(new URL("..", import.meta.url))
       .withStorageFactory(options.storage)
       .add(OrganizationAggregate)
@@ -236,15 +233,13 @@ export const ResourcesContext = {
       .add(AccessDecisionAssignmentProjection, { eventRouting: decisionRouting })
       .add(ResourceAccessAggregate)
       .add(AccessGrantViewProjection, { eventRouting: grantViewRouting })
-      .add(AuditEntryProjection, { eventRouting: auditTrailRouting });
-    if (options.subscriptions !== undefined) {
-      builder.withSubscriptionRegistry(
+      .add(AuditEntryProjection, { eventRouting: auditTrailRouting })
+      .withSubscriptionRegistry(
         new StorageSubscriptionRegistry(
           { name: "Resources:subscriptions", multitenant: false },
           options.subscriptions,
         ),
-      );
-    }
-    return builder.buildAsync();
+      )
+      .buildAsync();
   },
 };

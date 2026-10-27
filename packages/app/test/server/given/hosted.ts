@@ -114,9 +114,7 @@ export async function givenServer(storage?: TestStorage): Promise<Hosted> {
     storage: {
       identity: await identityStorage.open(),
       resources: resourcesStorage.organizations,
-      ...(resourcesStorage.subscriptions === undefined
-        ? {}
-        : { resourceSubscriptions: resourcesStorage.subscriptions }),
+      resourceSubscriptions: resourcesStorage.subscriptions,
     },
   });
   const server = await new Server({
@@ -132,7 +130,7 @@ export async function givenServer(storage?: TestStorage): Promise<Hosted> {
       await server.close();
       await contexts.close();
       resourcesStorage.organizations.close();
-      resourcesStorage.subscriptions?.close();
+      resourcesStorage.subscriptions.close();
       await databases?.drop();
       if (storage === undefined) {
         await identityStorage.drop();
