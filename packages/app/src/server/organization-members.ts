@@ -33,7 +33,7 @@ export interface ReachedOrganizationMembers extends OrganizationMembers {
   close(): Promise<void>;
 }
 
-/** Makes the service that adds members to organizations. */
+/** Creates the service that adds members to organizations. */
 export const ReachedOrganizationMembers = {
   /**
    * Adds people to the members of organizations, through the application

@@ -54,7 +54,7 @@ afterEach(async () => {
 });
 
 /**
- * The sessions of a gateway that signs with the test's key and remembers
+ * Creates the sessions of a gateway that signs with the test's key and remembers
  * the revoked tokens in the test's store. Two of them stand for one gateway
  * before and after a restart.
  */
@@ -79,7 +79,7 @@ function request(token: string): Request {
 }
 
 /**
- * The same token with its signature written the other way ECDSA allows: `s`
+ * Rewrites the token's signature the other way ECDSA allows: `s`
  * replaced by the curve's order less `s`. It signs the same claims.
  */
 function withOtherSignature(token: string): string {
@@ -91,8 +91,8 @@ function withOtherSignature(token: string): string {
 }
 
 /**
- * The revoked tokens, kept in the test's store while it can be read and
- * written, and failing while it cannot.
+ * Keeps the revoked tokens in the test's store while it can be read and
+ * written, and fails while it cannot.
  */
 function failingWhenTold(): SignedTokenRevocation & { reading: boolean; writing: boolean } {
   const store = {

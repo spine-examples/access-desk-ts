@@ -175,12 +175,12 @@ export function cancelAccessRequest(scope: BlackBoxScope, id: string) {
   );
 }
 
-/** Every access request visible to the reader. */
+/** Reads every access request visible to the reader. */
 export function readRequests(reader: BlackBoxScope): Promise<AccessRequestView[]> {
   return readAll(reader, AccessRequestViewSchema, "requests");
 }
 
-/** The lifecycle status of one request, or `undefined` when it is absent. */
+/** Reads the lifecycle status of one request, or `undefined` when it is absent. */
 export async function statusOf(
   reader: BlackBoxScope,
   id: string,

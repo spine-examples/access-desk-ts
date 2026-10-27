@@ -64,17 +64,17 @@ export const IdentityContext = {
    * @returns The assembled Identity bounded context.
    */
   async create(options: IdentityContextOptions): Promise<BoundedContext> {
-    /** The account an event about signing in belongs to. */
+    /** Finds the account an event about signing in belongs to. */
     const accountOf = (identity: ExternalIdentityId | undefined): ExternalIdentityId[] =>
       identity === undefined ? [] : [identity];
-    /** The account that asked for an email address to be registered, when an account did. */
+    /** Finds the account that asked to register an email address, when an account did. */
     const askingAccount = (invoker: PersonEmailRegistered["invoker"]): ExternalIdentityId[] =>
       invoker.case === "account" ? [invoker.value] : [];
-    /** The membership that asked for an email address to be registered, when one did. */
+    /** Finds the membership that asked to register an email address, when one did. */
     const askingMembership = (invoker: PersonEmailRegistered["invoker"]): MembershipId[] =>
       invoker.case === "membership" ? [membershipOf(invoker.value.emailAddress)] : [];
     /**
-     * The membership of an email address.
+     * Finds the membership of an email address.
      *
      * Email addresses are kept in lower case. So the address is put in lower
      * case before its membership is looked up, however it was written.

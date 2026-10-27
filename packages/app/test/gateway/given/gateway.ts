@@ -100,8 +100,8 @@ export async function stopGateways(): Promise<void> {
 }
 
 /**
- * An identity provider that confirms `<subject>:<email>:<name>` codes, for the
- * tests. A code without an email address stands for an account the provider
+ * Creates an identity provider that confirms `<subject>:<email>:<name>` codes,
+ * for the tests. A code without an email address stands for an account the provider
  * has verified no address for. The name may be left out.
  *
  * @param kind Which provider it stands for.
@@ -277,7 +277,7 @@ async function startGateway(kept: Kept): Promise<Running> {
 }
 
 /**
- * The identifier of an organization of the tests, which is its name.
+ * Builds the identifier of an organization of the tests, which is its name.
  *
  * @param organization The organization's name.
  */
@@ -286,7 +286,7 @@ export function organizationId(organization: string) {
 }
 
 /**
- * The tenant an organization of the tests keeps its state in.
+ * Builds the tenant an organization of the tests keeps its state in.
  *
  * @param organization The organization's name.
  */
@@ -355,7 +355,7 @@ export async function call(
 }
 
 /**
- * The Spine client a browser sends commands, queries, and subscriptions with.
+ * Creates the Spine client a browser sends commands, queries, and subscriptions with.
  *
  * @param running The running application.
  * @param as Who the browser acts as.
@@ -402,7 +402,7 @@ export type Asking = Parameters<
 >[0];
 
 /**
- * Everything there is of one kind of read model, as a request that names nobody.
+ * Asks for everything there is of one kind of read model, naming nobody.
  *
  * @param schema The kind of read model.
  * @param as Who asks, and in which organization.

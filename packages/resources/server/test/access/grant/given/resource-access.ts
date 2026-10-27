@@ -53,12 +53,12 @@ const requesterAccess = { grantee: { uuid: actor }, resource: { uuid: resourceUu
 /** The moment every grant test starts at, on a whole minute. */
 export const startOfTest = new Date("2030-01-01T10:00:00Z");
 
-/** A clock stopped at {@link startOfTest}. */
+/** Creates a clock stopped at {@link startOfTest}. */
 export function testClock(): ManualClock {
   return new ManualClock(startOfTest);
 }
 
-/** The time a number of minutes after {@link startOfTest}. */
+/** Computes the time a number of minutes after {@link startOfTest}. */
 export function minutesIn(minutes: number): Timestamp {
   return timestampFromDate(new Date(startOfTest.getTime() + minutes * 60_000));
 }
@@ -267,7 +267,7 @@ export function postExtendAccessGrant(
   );
 }
 
-/** The grants a person holds, through the access query by grantee. */
+/** Reads the grants a person holds, through the access query by grantee. */
 export function readAccessHeldBy(
   reader: BlackBoxScope,
   grantee: string = actor,
@@ -282,7 +282,7 @@ export function readAccessHeldBy(
   );
 }
 
-/** The access granted to a resource, through the access query by resource. */
+/** Reads the access granted to a resource, through the access query by resource. */
 export function readAccessTo(
   reader: BlackBoxScope,
   resource: string = resourceUuid,

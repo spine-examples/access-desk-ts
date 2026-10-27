@@ -58,7 +58,7 @@ export class ServerConnection {
   }
 
   /**
-   * The client for one organization, or for what belongs to none.
+   * Returns the client for one organization, or for what belongs to none.
    *
    * @param organization The organization, or nothing for what belongs to none.
    * @throws When an organization has an empty UUID, which cannot name a tenant.
@@ -125,7 +125,7 @@ export interface AwaitedView<
   /** The identifier of the read model. */
   readonly id: MessageShape<IdSchema>;
   /**
-   * What the read model shows once the command has had its effect.
+   * Picks out what the read model shows once the command has had its effect.
    *
    * @returns What it shows, or `undefined` while it does not show it yet.
    */
@@ -135,7 +135,7 @@ export interface AwaitedView<
 /** The read models a program asks the application server about. */
 const Targets = {
   /**
-   * The one read model of a kind with an identifier.
+   * Targets the one read model of a kind with an identifier.
    *
    * @param schema The kind of read model.
    * @param idSchema The kind of its identifier.

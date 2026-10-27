@@ -91,12 +91,12 @@ export class AccessDesk {
     this.#server = server;
   }
 
-  /** The gateway's client for Identity, which belongs to no organization. */
+  /** Returns the gateway's client for Identity, which belongs to no organization. */
   get #identity(): ServerRequest {
     return this.#server.in().onBehalfOf(GATEWAY);
   }
 
-  /** The gateway's client for one organization. */
+  /** Returns the gateway's client for one organization. */
   #in(organization: OrganizationId): ServerRequest {
     return this.#server.in(organization).onBehalfOf(GATEWAY);
   }
@@ -163,7 +163,7 @@ export class AccessDesk {
     });
   }
 
-  /** A signed-in person's accounts, and the organization they belong to. */
+  /** Reads a signed-in person's accounts, and the organization they belong to. */
   async profile(person: SignedIn): Promise<Profile> {
     const view = await ServerRequests.readById(
       this.#identity,
@@ -180,7 +180,7 @@ export class AccessDesk {
     };
   }
 
-  /** An organization with its members and resources, when it exists. */
+  /** Reads an organization with its members and resources, when it exists. */
   organization(organization: OrganizationId): Promise<OrganizationView | undefined> {
     return ServerRequests.readById(
       this.#in(organization),
@@ -190,7 +190,7 @@ export class AccessDesk {
     );
   }
 
-  /** A person's membership in an organization, when they are a member. */
+  /** Finds a person's membership in an organization, when they are a member. */
   async member(
     organization: OrganizationId,
     person: PersonId,

@@ -61,7 +61,7 @@ export interface Hosted {
 }
 
 /**
- * The storage Identity keeps its data in, for a test that starts the server
+ * Creates the storage Identity keeps its data in, for a test that starts the server
  * more than once over the same data. The test drops it.
  */
 export function givenServerStorage(): Promise<TestStorage> {

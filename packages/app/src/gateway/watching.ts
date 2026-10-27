@@ -367,7 +367,7 @@ export class Watching extends DurableSubscriptionBindings implements SessionSubs
     this.#pendingActivations.clear();
   }
 
-  /** The organization a subscription was created in, when it was created in one. */
+  /** Finds the organization a subscription was created in, when it was created in one. */
   #organizationOf(context: ActorContext): string | undefined {
     const tenant = context.tenantId?.kind;
     return tenant?.case === "value" ? tenant.value : undefined;

@@ -19,10 +19,9 @@ import type { Sessions } from "../sessions.js";
 import { UNAUTHENTICATED, type Route } from "./route.js";
 
 /**
- * The endpoints for the session, which tell who is signed in and sign them
- * out.
+ * Creates the endpoints that show who is signed in, and sign them out.
  *
- * @param route Makes an endpoint.
+ * @param route Creates an endpoint.
  * @param desk Looks up people and organizations.
  * @param sessions The sessions of the people who have signed in.
  */

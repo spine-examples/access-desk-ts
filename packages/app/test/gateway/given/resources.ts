@@ -153,13 +153,13 @@ export function readAuditTrailOfActor(
 
 /** Reads the events the entries of the audit trail keep. */
 export const AuditTrail = {
-  /** The name of the event an entry keeps, such as `ResourceRegistered`. */
+  /** Names the event an entry keeps, such as `ResourceRegistered`. */
   eventOf(entry: { readonly event?: Any | undefined }): string {
     const url = entry.event?.typeUrl ?? "";
     return url.slice(url.lastIndexOf(".") + 1);
   },
 
-  /** The person who became a member, in an entry of the organization's audit trail. */
+  /** Finds the person who became a member, in an entry of the organization's audit trail. */
   memberIn(entry: { readonly event?: Any | undefined }): string | undefined {
     return entry.event === undefined
       ? undefined

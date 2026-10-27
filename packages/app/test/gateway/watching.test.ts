@@ -44,7 +44,7 @@ afterEach(async () => {
 });
 
 /**
- * What people watch through a gateway, over the subscriptions the test's
+ * Opens what people watch through a gateway, over the subscriptions the test's
  * storage keeps. A second one stands for the gateway after a restart.
  *
  * @param cancelAsBrowser Cancels a subscription the way its browser would.
@@ -54,7 +54,7 @@ async function watchingAgain(cancelAsBrowser?: CancelAsBrowser): Promise<Watchin
 }
 
 /**
- * Who watches, and in which organization.
+ * Names who watches, and in which organization.
  *
  * @param person The identifier of the person who watches.
  * @param organization The identifier of the organization they watch in.
@@ -67,7 +67,7 @@ function watcher(person: string, organization: string): ActorContext {
 }
 
 /**
- * Whoever a session stands for.
+ * Names whoever a session stands for.
  *
  * @param person The identifier of the signed-in person.
  * @param organization The identifier of the organization the session has entered.
@@ -113,7 +113,7 @@ async function subscription(context: ActorContext): Promise<Subscription> {
 }
 
 /**
- * The gateway's word that it allowed a subscription to be opened.
+ * Returns the gateway's word that it allowed a subscription to be opened.
  *
  * @param id The identifier of the subscription, or the whole subscription as
  *   the browser sends it.

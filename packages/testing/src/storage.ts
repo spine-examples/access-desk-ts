@@ -71,7 +71,7 @@ export interface TestDatabases {
  */
 export const TestStorages = {
   /**
-   * Where this run keeps its data.
+   * Reads where this run keeps its data.
    */
   profile(): "memory" | "postgresql" {
     const profile = process.env.ACCESS_DESK_TEST_STORAGE;
@@ -84,7 +84,7 @@ export const TestStorages = {
   },
 
   /**
-   * The application settings that point at the storage.
+   * Returns the application settings that point at the storage.
    *
    * @param storage Storage from {@link TestStorages.singleTenant}.
    */
@@ -109,7 +109,7 @@ export const TestStorages = {
   },
 
   /**
-   * Storage for a single-tenant context.
+   * Creates storage for a single-tenant context.
    *
    * @param registry The types of the context's messages.
    */
@@ -122,7 +122,7 @@ export const TestStorages = {
   },
 
   /**
-   * Storage for a multitenant context.
+   * Creates storage for a multitenant context.
    *
    * @param registry The types of the context's messages.
    * @param tenants Every tenant of the context. PostgreSQL gives each a
@@ -245,7 +245,7 @@ const Databases = {
     }
   },
 
-  /** The address of the named database on the server. */
+  /** Builds the address of the named database on the server. */
   urlOf(name: string): string {
     const url = new URL(Databases.server());
     url.pathname = `/${name}`;
@@ -253,7 +253,7 @@ const Databases = {
   },
 
   /**
-   * The address of the database the tests connect to when they create theirs.
+   * Builds the address of the database the tests connect to when they create theirs.
    *
    * The server is the one the programs use, and the database is
    * `ACCESS_DESK_TEST_DATABASE`.

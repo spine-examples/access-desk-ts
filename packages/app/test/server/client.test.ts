@@ -52,7 +52,7 @@ function organizationId(uuid: string) {
 }
 
 /**
- * Creating an organization, which shows in its view under its name.
+ * Describes creating an organization, which shows in its view under its name.
  *
  * @param organization The organization, whose name is its identifier.
  * @param name The name the organization is created under.

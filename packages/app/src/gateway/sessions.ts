@@ -156,7 +156,7 @@ export class Sessions {
   }
 
   /**
-   * Gives a signed-in person a session.
+   * Issues a session to a signed-in person.
    *
    * @param person The signed-in person.
    * @param organization The organization they belong to, when they belong to one.
@@ -186,7 +186,7 @@ export class Sessions {
   }
 
   /**
-   * The person a token stands for, while its session is valid.
+   * Finds the person a token stands for, while its session is valid.
    *
    * The person's attributes include the session's identifier, which the
    * token carries.
@@ -205,7 +205,7 @@ export class Sessions {
         };
   }
 
-  /** The session a request carries, when it is still valid. */
+  /** Finds the session a request carries, when it is still valid. */
   async of(request: Request): Promise<Session | undefined> {
     const token = Sessions.#tokenOf(request);
     if (token === undefined) {
@@ -282,13 +282,13 @@ export class Sessions {
     await this.#sessions.close();
   }
 
-  /** The bearer token a request carries, when it carries one. */
+  /** Takes the bearer token a request carries, when it carries one. */
   static #tokenOf(request: Request): string | undefined {
     return /^Bearer (\S+)$/.exec(request.headers.get("authorization") ?? "")?.[1];
   }
 
   /**
-   * The identifier of a session: the one its token carries (`jti`).
+   * Reads the identifier of a session: the one its token carries (`jti`).
    *
    * @param token A token the gateway verified.
    * @returns The identifier, or `undefined` when the token carries none.
@@ -308,9 +308,9 @@ export class Sessions {
   }
 
   /**
-   * The identifier of a signing key, written in every token it signs.
+   * Derives the identifier of a signing key, written in every token it signs.
    *
-   * It is derived from the public half of the key, so the same key always
+   * It comes from the public half of the key, so the same key always
    * has the same identifier, and the identifier tells nothing secret.
    */
   static #keyIdOf(key: KeyObject): string {

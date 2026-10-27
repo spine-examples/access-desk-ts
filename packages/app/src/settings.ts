@@ -163,12 +163,12 @@ class Reading {
     this.#environment = environment;
   }
 
-  /** A setting's value, or an empty string when it is not set. */
+  /** Reads a setting's value, or an empty string when it is not set. */
   #value(name: string): string {
     return this.#environment[name]?.trim() ?? "";
   }
 
-  /** A setting that must be set. */
+  /** Reads a setting that must be set. */
   text(name: string): string {
     const value = this.#value(name);
     if (value === "") {
@@ -178,7 +178,7 @@ class Reading {
   }
 
   /**
-   * A secret that must be set, taken exactly as it is written, with any
+   * Reads a secret that must be set, taken exactly as it is written, with any
    * spaces around it.
    */
   secret(name: string): string {
@@ -189,7 +189,7 @@ class Reading {
     return value;
   }
 
-  /** A port that must be set. */
+  /** Reads a port that must be set. */
   port(name: string): number {
     const text = this.text(name);
     const port = /^\d+$/.test(text) ? Number(text) : Number.NaN;
@@ -199,12 +199,12 @@ class Reading {
     return port;
   }
 
-  /** Where a program listens, from its `_HOST` and `_PORT` settings. */
+  /** Reads where a program listens, from its `_HOST` and `_PORT` settings. */
   listening(prefix: string): Listening {
     return { host: this.text(`${prefix}_HOST`), port: this.port(`${prefix}_PORT`) };
   }
 
-  /** An identity provider, from its `_CLIENT_ID` and `_CLIENT_SECRET` settings. */
+  /** Reads an identity provider, from its `_CLIENT_ID` and `_CLIENT_SECRET` settings. */
   provider(prefix: string): ProviderSettings {
     return {
       clientId: this.text(`${prefix}_CLIENT_ID`),
@@ -213,7 +213,7 @@ class Reading {
   }
 
   /**
-   * Where a program keeps its data, from `ACCESS_DESK_STORAGE`.
+   * Reads where a program keeps its data, from `ACCESS_DESK_STORAGE`.
    *
    * @param database The setting that names the program's database on the
    *   PostgreSQL server. It must be set only when the data is kept in PostgreSQL.
@@ -225,7 +225,7 @@ class Reading {
   }
 
   /**
-   * Where the application server keeps each organization, from
+   * Reads where the application server keeps each organization, from
    * `ACCESS_DESK_STORAGE`.
    *
    * In PostgreSQL, `ACCESS_DESK_ORGANIZATIONS` lists the organizations, and
@@ -280,7 +280,7 @@ class Reading {
     };
   }
 
-  /** Where the programs keep their data, from `ACCESS_DESK_STORAGE`. */
+  /** Reads where the programs keep their data, from `ACCESS_DESK_STORAGE`. */
   #storage(): StorageSettings["kind"] {
     if (this.#storageKind === undefined) {
       const kind = this.text("ACCESS_DESK_STORAGE");
@@ -294,7 +294,7 @@ class Reading {
     return this.#storageKind;
   }
 
-  /** Organizations that must be listed, each once, separated by commas. */
+  /** Reads organizations that must be listed, each once, separated by commas. */
   #organizations(name: string): string[] {
     const text = this.text(name);
     const organizations = text.split(",").map((organization) => organization.trim());
@@ -310,7 +310,7 @@ class Reading {
     return text === "" || !valid ? [] : organizations;
   }
 
-  /** The name of a database on the PostgreSQL server, which must be set. */
+  /** Reads the name of a database on the PostgreSQL server, which must be set. */
   #databaseName(name: string): string {
     const text = this.text(name);
     if (text !== "" && !DATABASE_NAME.test(text)) {
@@ -332,7 +332,7 @@ class Reading {
   }
 
   /**
-   * The address of a database on the PostgreSQL server, from
+   * Builds the address of a database on the PostgreSQL server, from
    * `ACCESS_DESK_DATABASE_HOST`, `_PORT`, `_USER`, and `_PASSWORD`.
    */
   #databaseUrl(database: string): string {
@@ -350,7 +350,7 @@ class Reading {
     );
   }
 
-  /** A P-256 private key that must be set, written in base64 as PKCS #8. */
+  /** Reads a P-256 private key that must be set, written in base64 as PKCS #8. */
   signingKey(name: string): KeyObject {
     const text = this.text(name);
     if (text === "") {
@@ -389,7 +389,7 @@ class Reading {
 /** The settings of the application server and of the gateway. */
 export const Settings = {
   /**
-   * The application server's settings, read from the environment.
+   * Reads the application server's settings from the environment.
    *
    * @param environment The environment the program runs in.
    * @returns The settings of the application server.
@@ -404,7 +404,7 @@ export const Settings = {
   },
 
   /**
-   * The gateway's settings, read from the environment.
+   * Reads the gateway's settings from the environment.
    *
    * @param environment The environment the program runs in.
    * @returns The settings of the gateway.

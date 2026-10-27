@@ -39,14 +39,14 @@ export interface SignInRoutes {
 }
 
 /**
- * The endpoints for signing in through an identity provider, such as Google.
+ * Creates the endpoints for signing in through an identity provider, such as Google.
  *
  * 1. The sign-in page asks which providers it may offer.
  * 2. The browser starts a sign-in with one of them.
  * 3. The provider confirms the person.
  * 4. The browser finishes the sign-in with the provider's answer.
  *
- * @param route Makes an endpoint.
+ * @param route Creates an endpoint.
  * @param desk Signs the confirmed person in.
  * @param sessions The sessions of the people who have signed in.
  * @param external The identity providers to sign people in through, by key.

@@ -38,12 +38,12 @@ export const actor = "resources-user";
 
 const signalMetadata = new SignalMetadata();
 
-/** The tenant the organization keeps its state in. */
+/** Builds the tenant the organization keeps its state in. */
 function tenant() {
   return create(TenantIdSchema, { kind: { case: "value", value: organizationId } });
 }
 
-/** The actor context for reads and subscriptions in the organization's tenant. */
+/** Builds the actor context for reads and subscriptions in the organization's tenant. */
 export function testActorContext(): ActorContext {
   return signalMetadata.actorContext({
     actor: create(UserIdSchema, { value: actor }),
@@ -116,7 +116,7 @@ export async function resourcesBlackBox(
 }
 
 /**
- * The storage a BlackBox keeps its data in, for opening it again.
+ * Finds the storage a BlackBox keeps its data in, for opening it again.
  *
  * @param box A BlackBox opened through {@link resourcesBlackBox}.
  */
@@ -129,7 +129,7 @@ export function storageOf(box: BlackBox): TestStorage {
 }
 
 /**
- * The Resources context behind a BlackBox, for tests that post events
+ * Finds the Resources context behind a BlackBox, for tests that post events
  * directly.
  *
  * @param box A BlackBox opened through {@link resourcesBlackBox}.

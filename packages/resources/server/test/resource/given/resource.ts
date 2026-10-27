@@ -44,7 +44,7 @@ export interface ResourceDraft {
   readonly maximumDuration: { readonly seconds: bigint };
 }
 
-/** A restricted, read-only payroll resource used as the baseline in every spec. */
+/** Drafts a restricted, read-only payroll resource, the baseline in every spec. */
 export function resourceDraft(overrides: Partial<ResourceDraft> = {}): ResourceDraft {
   return {
     name: "payroll",

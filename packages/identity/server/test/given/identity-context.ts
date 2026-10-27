@@ -29,7 +29,7 @@ export const actor = "gateway";
 
 const signalMetadata = new SignalMetadata();
 
-/** The actor context for reads and subscriptions. Signing in has no tenant. */
+/** Builds the actor context for reads and subscriptions. Signing in has no tenant. */
 export function testActorContext(): ActorContext {
   return signalMetadata.actorContext({ actor: create(UserIdSchema, { value: actor }) });
 }
@@ -47,7 +47,7 @@ export async function loadIdentityContext(): Promise<void> {
   identity = await import("../../dist/src/index.js");
 }
 
-/** The compiled Identity package. */
+/** Returns the compiled Identity package. */
 export function identityModule(): IdentityModule {
   if (identity === undefined) {
     throw new Error("Call loadIdentityContext() in beforeAll before opening a BlackBox.");
@@ -123,7 +123,7 @@ export async function identityBlackBox(storage?: TestStorage): Promise<BlackBox>
 }
 
 /**
- * The storage a BlackBox keeps its data in, for opening it again.
+ * Finds the storage a BlackBox keeps its data in, for opening it again.
  *
  * @param box A BlackBox opened through {@link identityBlackBox}.
  */
