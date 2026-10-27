@@ -55,7 +55,7 @@ export interface GatewayOptions {
   readonly external: Readonly<Record<string, ExternalSignIn>>;
   /** The P-256 private key the gateway signs sessions with. */
   readonly sessionKey: KeyObject;
-  /** Where the gateway keeps its data, so it outlasts a restart. Whoever passes it closes it. */
+  /** Where the gateway keeps its data, so it outlasts a restart. */
   readonly storage: {
     /** Where the gateway keeps the subscriptions people hold. */
     readonly subscriptions: StorageFactory;

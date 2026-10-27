@@ -96,7 +96,7 @@ export interface ResourcesContextOptions {
    */
   readonly storage: StorageFactory;
   /**
-   * Where the context keeps subscriptions. Whoever passes it closes it.
+   * Where the context keeps subscriptions.
    *
    * A subscription belongs to no organization, so storage that keeps each
    * organization apart, such as Spine's PostgreSQL storage, cannot keep it.
@@ -223,6 +223,12 @@ export const ResourcesContext = {
     return BoundedContext.multitenant("Resources")
       .withGeneratedRegistryRoot(new URL("..", import.meta.url))
       .withStorageFactory(options.storage)
+      .withSubscriptionRegistry(
+        new StorageSubscriptionRegistry(
+          { name: "Resources:subscriptions", multitenant: false },
+          options.subscriptions,
+        ),
+      )
       .add(OrganizationAggregate)
       .add(OrganizationViewProjection)
       .add(ResourceRegistrationProcessManager, { eventRouting: resourceRegistrationProcmanRouting })
@@ -234,12 +240,6 @@ export const ResourcesContext = {
       .add(ResourceAccessAggregate)
       .add(AccessGrantViewProjection, { eventRouting: grantViewRouting })
       .add(AuditEntryProjection, { eventRouting: auditTrailRouting })
-      .withSubscriptionRegistry(
-        new StorageSubscriptionRegistry(
-          { name: "Resources:subscriptions", multitenant: false },
-          options.subscriptions,
-        ),
-      )
       .buildAsync();
   },
 };
