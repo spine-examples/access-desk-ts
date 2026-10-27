@@ -239,7 +239,7 @@ interface Kept {
   /** Where the gateway keeps the subscriptions people hold. */
   readonly storage: TestStorage;
   /** The tokens of the sessions people ended before they expired. */
-  readonly revokedTokens: Parameters<AppModule["Gateway"]["start"]>[0]["keeping"]["revokedTokens"];
+  readonly revokedTokens: Parameters<AppModule["Gateway"]["start"]>[0]["storage"]["revokedTokens"];
 }
 
 /** The gateway in front of each running application, and what it keeps. */
@@ -262,7 +262,7 @@ async function startGateway(kept: Kept): Promise<Running> {
       ),
     },
     sessionKey: SESSION_KEY,
-    keeping: { subscriptions: await kept.storage.open(), revokedTokens: kept.revokedTokens },
+    storage: { subscriptions: await kept.storage.open(), revokedTokens: kept.revokedTokens },
   });
   // The gateway and the application server are separate, so each is stopped.
   // Closing a gateway twice does nothing more.

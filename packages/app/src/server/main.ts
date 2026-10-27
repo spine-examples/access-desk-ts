@@ -14,6 +14,7 @@
 
 import { Server } from "@spine-event-engine/server";
 import { AccessDesk } from "./access-desk.js";
+import { Closing } from "../closing.js";
 import { Settings } from "../settings.js";
 import { Storage } from "../storage.js";
 
@@ -79,20 +80,13 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
     if (!stopping) {
       stopping = true;
-      // Each is closed even when closing another fails.
-      void (async () => {
-        try {
-          await server.close();
-        } finally {
-          try {
-            await contexts.close();
-          } finally {
-            identityStorage.close();
-            resourcesStorage.organizations.close();
-            resourcesStorage.subscriptions.close();
-          }
-        }
-      })().catch((error: unknown) => {
+      void Closing.inOrder(
+        server,
+        contexts,
+        identityStorage,
+        resourcesStorage.organizations,
+        resourcesStorage.subscriptions,
+      ).catch((error: unknown) => {
         console.error("The application server did not stop cleanly.", error);
         process.exitCode = 1;
       });

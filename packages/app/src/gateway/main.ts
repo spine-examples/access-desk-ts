@@ -13,6 +13,7 @@
  */
 
 import { typeRegistry } from "../../generated/model-registry.js";
+import { Closing } from "../closing.js";
 import { Settings } from "../settings.js";
 import { Storage } from "../storage.js";
 import { RevokedTokens } from "./revoked-tokens.js";
@@ -49,7 +50,7 @@ const gateway = await Gateway.start({
   port: settings.listening.port,
   external,
   sessionKey: settings.sessionKey,
-  keeping: { subscriptions, revokedTokens },
+  storage: { subscriptions, revokedTokens },
 });
 
 console.log(`Access Desk gateway: ${gateway.url}`);
@@ -80,18 +81,7 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
     if (!stopping) {
       stopping = true;
-      // Each is closed even when closing another fails.
-      void (async () => {
-        try {
-          await gateway.close();
-        } finally {
-          try {
-            await revokedTokens.close();
-          } finally {
-            subscriptions.close();
-          }
-        }
-      })().catch((error: unknown) => {
+      void Closing.inOrder(gateway, revokedTokens, subscriptions).catch((error: unknown) => {
         console.error("The gateway did not stop cleanly.", error);
         process.exitCode = 1;
       });

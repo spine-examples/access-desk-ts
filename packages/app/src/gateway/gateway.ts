@@ -55,15 +55,11 @@ export interface GatewayOptions {
   readonly external: Readonly<Record<string, ExternalSignIn>>;
   /** The P-256 private key the gateway signs sessions with. */
   readonly sessionKey: KeyObject;
-  /**
-   * Where the gateway keeps what it must remember across a restart: the
-   * subscriptions people hold, and the sessions they ended. Whoever passes
-   * them closes them.
-   */
-  readonly keeping: {
-    /** The subscriptions people hold. */
+  /** Where the gateway keeps its data, so it outlasts a restart. Whoever passes it closes it. */
+  readonly storage: {
+    /** Where the gateway keeps the subscriptions people hold. */
     readonly subscriptions: StorageFactory;
-    /** The tokens of the sessions people ended before they expired. */
+    /** Where the gateway keeps the tokens of the sessions people ended. */
     readonly revokedTokens: SignedTokenRevocation;
   };
 }
@@ -97,12 +93,12 @@ export const Gateway = {
     const origins = [...options.origins];
     const listening: { address?: string } = {};
     const watching = new Watching(
-      options.keeping.subscriptions,
+      options.storage.subscriptions,
       cancellingThrough(() => listening.address, origins[0]),
     );
     const sessions = new Sessions({
       key: options.sessionKey,
-      revoked: options.keeping.revokedTokens,
+      revoked: options.storage.revokedTokens,
       subscriptions: watching,
     });
     const route = routing(origins, sessions);

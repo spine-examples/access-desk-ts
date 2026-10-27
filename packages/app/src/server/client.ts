@@ -194,8 +194,7 @@ export const ServerRequests = {
    * 2. It posts the command.
    * 3. It waits for an update that shows the effect.
    *
-   * A command that changes nothing, as when an earlier one made the effect
-   * already, brings no update, and so returns nothing.
+   * A command that changes nothing brings no update, and so returns nothing.
    *
    * @param request The client that posts the command.
    * @param awaited The command, and the read model that shows its effect.
@@ -229,7 +228,6 @@ export const ServerRequests = {
           }),
       },
     );
-    /** What a state of the read model shows, when it shows the effect. */
     const shownBy = (state: Parameters<typeof AnyMessages.unpack>[0] | undefined) => {
       const view = state === undefined ? undefined : AnyMessages.unpack(state, awaited.view);
       return view === undefined ? undefined : awaited.shows(view);
