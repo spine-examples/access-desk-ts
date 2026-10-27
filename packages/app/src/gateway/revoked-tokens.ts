@@ -21,14 +21,7 @@ import type { StorageSettings } from "../settings.js";
 // TODO:27-10-2026:mykyta.pimonov: Delete this store once Spine keeps revoked
 //  tokens itself. Spine leaves revocation to the application, so the gateway
 //  keeps its own table and connection pool next to Spine's storage.
-/**
- * The tokens of the sessions people ended before they expired, by signing out.
- *
- * A token carries its own signature, so it would keep working until it
- * expires. The gateway remembers the tokens of the sessions that were ended,
- * and refuses them. A token is forgotten once it would no longer be taken
- * anyway, at the time it is revoked until.
- */
+/** The tokens of the sessions people ended before they expired, by signing out. */
 export const RevokedTokens = {
   /**
    * Opens the store of revoked tokens where the settings name.
@@ -51,7 +44,7 @@ export const RevokedTokens = {
 /** The revoked tokens, kept in the gateway's memory. A restart forgets them. */
 class RevokedInMemory implements SignedTokenRevocation {
   readonly kind = "supported";
-  /** When each revoked token would no longer be taken, in milliseconds, by its identifier. */
+  /** The identifiers of the revoked tokens, each with when it can be forgotten, in milliseconds. */
   readonly #expiring = new Map<string, number>();
 
   isRevoked(token: string): Promise<boolean> {
@@ -92,8 +85,6 @@ class RevokedInPostgres implements SignedTokenRevocation {
    * @param url The address of the gateway's database.
    */
   static async open(url: string): Promise<RevokedInPostgres> {
-    // Every request the gateway takes is checked against the revoked tokens,
-    // so the pool is as large as the ones Spine opens.
     const pool = new Pool({ connectionString: url, max: 10 });
     // The server may drop a connection while it waits in the pool, as when it
     // restarts. The pool opens another when one is needed, so the failure is

@@ -23,7 +23,7 @@ import type { ActorContext } from "@spine-event-engine/proto";
 import { SubscriptionSchema, TopicSchema } from "@spine-event-engine/proto/client";
 import { DurableSubscriptionBindings } from "@spine-event-engine/server/browser";
 import type { StorageFactory } from "@spine-event-engine/storage";
-import { SESSION, type OpenedUnderSessions, type Session } from "./sessions.js";
+import { SESSION, type Session, type SessionSubscriptions } from "./sessions.js";
 
 /**
  * Cancels a subscription the way its browser would, through the gateway's own
@@ -119,7 +119,7 @@ interface Leave {
 //  a session's subscriptions on sign-out. Spine does not tie a subscription
 //  to the session that opened it, so its stream lives until it breaks or the
 //  session expires.
-export class Watching extends DurableSubscriptionBindings implements OpenedUnderSessions {
+export class Watching extends DurableSubscriptionBindings implements SessionSubscriptions {
   /** The subscriptions held now, by identifier. */
   readonly #watched: Map<string, Watched>;
   /** The leave given to open a subscription and not used yet, by the subscription's identifier. */

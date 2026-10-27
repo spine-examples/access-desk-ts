@@ -103,7 +103,7 @@ export const Gateway = {
     const sessions = new Sessions({
       key: options.sessionKey,
       revoked: options.keeping.revokedTokens,
-      opened: watching,
+      subscriptions: watching,
     });
     const route = routing(origins, sessions);
     const signIn = signInRoutes(route, desk, sessions, options.external);

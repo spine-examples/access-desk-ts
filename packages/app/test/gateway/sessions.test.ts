@@ -26,7 +26,7 @@ import {
 import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
 import { typeRegistry } from "../../generated/model-registry.js";
 import { RevokedTokens } from "../../src/gateway/revoked-tokens.js";
-import { Sessions, type OpenedUnderSessions } from "../../src/gateway/sessions.js";
+import { Sessions, type SessionSubscriptions } from "../../src/gateway/sessions.js";
 
 /** The key the gateway signs sessions with. */
 const KEY = generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey;
@@ -58,8 +58,12 @@ afterEach(async () => {
  * the revoked tokens in the test's store. Two of them stand for one gateway
  * before and after a restart.
  */
-function sessionsOfGateway(opened?: OpenedUnderSessions): Sessions {
-  return new Sessions({ key: KEY, revoked, ...(opened === undefined ? {} : { opened }) });
+function sessionsOfGateway(subscriptions?: SessionSubscriptions): Sessions {
+  return new Sessions({
+    key: KEY,
+    revoked,
+    ...(subscriptions === undefined ? {} : { subscriptions }),
+  });
 }
 
 const person = {
@@ -279,7 +283,7 @@ describe("Gateway sessions should", () => {
     const issued = new Sessions({
       key: KEY,
       revoked: store,
-      opened: {
+      subscriptions: {
         closeFor: () => Promise.resolve(),
         stop: (session) => {
           stopped.push(session);

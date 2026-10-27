@@ -63,16 +63,18 @@ export interface Session {
   readonly organization: OrganizationId | undefined;
 }
 
-/** What is opened under a session and must end with it, such as subscriptions. */
-export interface OpenedUnderSessions {
+// TODO:27-10-2026:mykyta.pimonov: Delete this interface together with
+//  `Watching`, once Spine stops a session's subscriptions on sign-out.
+/** The subscriptions people hold under their sessions, which end with them. */
+export interface SessionSubscriptions {
   /**
-   * Closes what a session opened, while the session's token still works.
+   * Cancels the session's subscriptions, while its token still works.
    *
    * @param session The session that is about to end.
    */
   closeFor(session: Session): Promise<void>;
   /**
-   * Stops what is still open after a session has ended.
+   * Stops the session's subscriptions still open after it has ended.
    *
    * @param session The identifier of the session.
    */
@@ -105,8 +107,8 @@ export interface SessionsOptions {
   readonly key: KeyObject;
   /** The tokens of the sessions people ended before they expired. */
   readonly revoked: SignedTokenRevocation;
-  /** What is opened under the sessions and must end with them. Nothing when left out. */
-  readonly opened?: OpenedUnderSessions;
+  /** The subscriptions held under the sessions. None when left out. */
+  readonly subscriptions?: SessionSubscriptions;
 }
 
 /**
@@ -114,7 +116,7 @@ export interface SessionsOptions {
  *
  * A session says who a person is and which organization they work in.
  * The browser holds it as a bearer token. Ending a session also stops
- * everything opened under it.
+ * its subscriptions.
  *
  * A session ends after eight hours, or when it is ended. Its token carries
  * the gateway's signature, so the session stays good when the gateway
@@ -124,8 +126,8 @@ export interface SessionsOptions {
 export class Sessions {
   /** The sessions that are still good, each known by its signed token. */
   readonly #sessions: SignedSessions;
-  /** What is opened under the sessions, when anything is. */
-  readonly #opened: OpenedUnderSessions | undefined;
+  /** The subscriptions held under the sessions, when there are any. */
+  readonly #subscriptions: SessionSubscriptions | undefined;
 
   /** @param options How the sessions are kept. */
   constructor(options: SessionsOptions) {
@@ -150,7 +152,7 @@ export class Sessions {
       ttlSeconds: SESSION_SECONDS,
       clockSkewSeconds: CLOCK_SKEW_SECONDS,
     });
-    this.#opened = options.opened;
+    this.#subscriptions = options.subscriptions;
   }
 
   /**
@@ -229,19 +231,19 @@ export class Sessions {
   }
 
   /**
-   * Ends a session and stops everything opened under it.
+   * Ends a session and stops its subscriptions.
    *
-   * 1. What the session opened is closed, while its token still works.
+   * 1. The session's subscriptions are cancelled, while its token still works.
    * 2. The token stops working.
-   * 3. Anything still open, or opened in the meantime, is stopped.
+   * 3. Any subscription still open, or opened in the meantime, is stopped.
    *
    * @throws Error when the gateway could not remember that the session
    *   ended. Its token then keeps working until it expires.
    */
   async end(session: Session): Promise<void> {
-    await this.#opened?.closeFor(session);
+    await this.#subscriptions?.closeFor(session);
     const ended = await this.#sessions.logout(session.credential);
-    await this.#opened?.stop(session.id);
+    await this.#subscriptions?.stop(session.id);
     if (ended.kind === "unavailable") {
       throw new Error("The session could not be ended. Its token works until it expires.");
     }
@@ -251,8 +253,8 @@ export class Sessions {
    * Ends the session of a token a request carries but that did not resolve.
    *
    * Such a token may still be good, as when the gateway could not tell
-   * whether its session had ended. It is ended all the same, and anything
-   * still open under it is stopped. A token the gateway did not sign, or one
+   * whether its session had ended. It is ended all the same, and its
+   * subscriptions still open are stopped. A token the gateway did not sign, or one
    * that has expired, ends nothing.
    *
    * @param request The request that carries the token.
@@ -271,7 +273,7 @@ export class Sessions {
     // Only a token the gateway verified is revoked, so only then does it name a session.
     const id = ended.kind === "revoked" ? Sessions.#idOf(token) : undefined;
     if (id !== undefined) {
-      await this.#opened?.stop(id);
+      await this.#subscriptions?.stop(id);
     }
   }
 
