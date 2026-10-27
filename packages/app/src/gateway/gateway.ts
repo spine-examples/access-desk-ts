@@ -122,8 +122,8 @@ export const Gateway = {
         // The gateway hands its session out as a bearer token.
         resolve: (credential: RequestCredential) => sessions.resolve(credential.value),
       },
-      // An allowed opening of a subscription also needs leave, given to this
-      // request in its session.
+      // An opening of a subscription is also checked by the subscriptions,
+      // which note the session that opens it.
       authorize: async (principal, request) =>
         (await allows(principal, request)) && watching.claim(principal, request),
       contexts: {

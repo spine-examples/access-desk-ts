@@ -181,7 +181,7 @@ describe("What people watch through the gateway should", () => {
 
     await stream.ending;
     expect(stream.stopped).toBe(true);
-    // Nothing opens it without leave from the gateway.
+    // Nothing opens it unless the gateway allowed it.
     expect(
       await watching.activate({
         id,
@@ -234,12 +234,12 @@ describe("What people watch through the gateway should", () => {
     expect(begun).toBe(false);
   });
 
-  it("not open with the leave of a session that has ended", async () => {
+  it("not open for a session that has ended since the gateway allowed it", async () => {
     const maya = watcher("maya", "acme");
     const id = await subscribed(maya);
     watching.claim(principal("maya", "acme", "session-1"), opening(id));
 
-    // The session ends between the gateway's leave and the opening.
+    // The session ends between the gateway allowing the opening and the opening.
     await watching.stop("session-1");
 
     expect(
@@ -303,7 +303,7 @@ describe("What people watch through the gateway should", () => {
 
     watching.claim(principal("maya", "acme", "session-1"), opening(made));
     const stream = await opened(id, maya);
-    // A second opening, without leave of its own, is refused rather than kept waiting.
+    // A second opening, which the gateway did not allow, is refused rather than kept waiting.
     const second = await watching.activate({
       id,
       context: maya,
@@ -326,13 +326,13 @@ describe("What people watch through the gateway should", () => {
     warned.mockRestore();
   });
 
-  it("drop leave that no opening used, so the subscription can be opened later", async () => {
+  it("drop an allowed opening that did not come, so the subscription can be opened later", async () => {
     let nowMs = Date.now();
     Time.setProvider({ currentTime: () => timestampFromMs(nowMs) });
     try {
       const maya = watcher("maya", "acme");
       const id = await subscribed(maya);
-      // The gateway gives leave, but the request is refused before it opens anything.
+      // The gateway allows it, but the request is refused before it opens anything.
       expect(watching.claim(principal("maya", "acme", "session-1"), opening(id))).toBe(true);
       expect(watching.claim(principal("maya", "acme", "session-1"), opening(id))).toBe(false);
 
@@ -348,7 +348,7 @@ describe("What people watch through the gateway should", () => {
     }
   });
 
-  it("not open with leave that has lapsed", async () => {
+  it("not open once the time to open it has passed", async () => {
     let nowMs = Date.now();
     Time.setProvider({ currentTime: () => timestampFromMs(nowMs) });
     try {
@@ -405,7 +405,7 @@ describe("What people watch through the gateway should", () => {
     expect(streams.map((stream) => stream.stopped)).toEqual([true, true, false]);
   });
 
-  it("belong to the session that got leave to open it, and give no other session leave meanwhile", async () => {
+  it("belong to the session allowed to open it, and allow no other session meanwhile", async () => {
     const maya = watcher("maya", "acme");
     const id = await subscribed(maya);
     expect(watching.claim(principal("maya", "acme", "session-1"), opening(id))).toBe(true);
@@ -426,7 +426,7 @@ describe("What people watch through the gateway should", () => {
     const stream = await opened(id, maya);
 
     // The same person, in a second session, tries to open what is open already.
-    // The gateway gives no leave, and the opening is refused at once.
+    // The gateway does not allow it, and the opening is refused at once.
     expect(watching.claim(principal("maya", "acme", "session-2"), opening(id))).toBe(false);
     const again = watching.activate({
       id,

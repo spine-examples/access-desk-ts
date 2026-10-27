@@ -107,7 +107,7 @@ export interface SessionsOptions {
   readonly key: KeyObject;
   /** The tokens of the sessions people ended before they expired. */
   readonly revoked: SignedTokenRevocation;
-  /** The subscriptions held under the sessions. None when left out. */
+  /** The subscriptions held under the sessions. */
   readonly subscriptions?: SessionSubscriptions;
 }
 
@@ -289,11 +289,6 @@ export class Sessions {
 
   /**
    * The identifier of a session: the one its token carries (`jti`).
-   *
-   * The gateway takes the same token with its signature written in more than
-   * one way, so the token's text does not tell one session from another. Its
-   * identifier stays the same however the signature is written, and it is
-   * the one the gateway remembers an ended session by.
    *
    * @param token A token the gateway verified.
    * @returns The identifier, or `undefined` when the token carries none.
