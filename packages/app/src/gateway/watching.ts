@@ -115,6 +115,9 @@ interface Leave {
  *    subscription until the session would have expired, when Spine clears it
  *    on the application server as well.
  */
+// TODO: Delete this class once Spine stops a session's subscriptions on
+//  sign-out. Spine does not tie a subscription to the session that opened it,
+//  so its stream lives until it breaks or the session expires.
 export class Watching extends DurableSubscriptionBindings implements OpenedUnderSessions {
   /** The subscriptions held now, by identifier. */
   readonly #watched: Map<string, Watched>;

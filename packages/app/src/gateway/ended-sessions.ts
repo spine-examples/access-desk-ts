@@ -18,6 +18,9 @@ import { Time } from "@spine-event-engine/core/time";
 import { Pool } from "pg";
 import type { StorageSettings } from "../settings.js";
 
+// TODO: Delete this store once Spine keeps ended sessions itself.
+//  Spine leaves revocation to the application, so the gateway keeps its own
+//  table and connection pool next to Spine's storage.
 /**
  * The sessions people ended before they expired, by signing out.
  *

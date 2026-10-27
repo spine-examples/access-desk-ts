@@ -139,6 +139,9 @@ export class Sessions {
         isRevoked: (id) => ended.isRevoked(id),
         // A token is taken until a little after it expires, so an ended
         // session is remembered until then.
+        // TODO: Pass `revoke` through once Spine fixes it. Spine's logout
+        //  gives the token's expiry without the clock skew, so a store that
+        //  forgets the session then lets its token work again for a minute.
         revoke: (id, expiresAt) =>
           ended.revoke(id, timestampFromMs(timestampMs(expiresAt) + CLOCK_SKEW_SECONDS * 1_000)),
       },
