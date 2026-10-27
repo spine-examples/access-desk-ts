@@ -68,7 +68,7 @@ export interface PostgresStorageSettings {
   readonly url: string;
 }
 
-/** Where a program keeps what it must remember. */
+/** Where a program keeps its data. */
 export type StorageSettings = MemoryStorageSettings | PostgresStorageSettings;
 
 /** An organization the application server keeps, and the database it keeps it in. */

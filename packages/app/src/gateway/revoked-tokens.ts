@@ -29,7 +29,7 @@ export const RevokedTokens = {
    * In PostgreSQL, the store keeps its table in the gateway's database, and
    * creates the table when it is not there.
    *
-   * @param settings Where the gateway keeps its data.
+   * @param settings The settings of the storage to open.
    * @returns The opened store. Whoever opens it closes it.
    */
   async open(

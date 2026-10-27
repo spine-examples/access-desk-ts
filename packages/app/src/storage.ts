@@ -28,7 +28,7 @@ export interface ResourcesStorage {
   readonly subscriptions: StorageFactory;
 }
 
-/** Where a program keeps what it must remember. */
+/** Opens the storage a program keeps its data in. */
 export const Storage = {
   /**
    * Opens the storage the settings name.
@@ -37,7 +37,7 @@ export const Storage = {
    * the first time they are needed.
    *
    * @param settings Where the program keeps its data.
-   * @returns The opened storage. Whoever opened it closes it.
+   * @returns The opened storage.
    */
   open(settings: StorageSettings): Promise<StorageFactory> {
     if (settings.kind === "memory") {
@@ -56,7 +56,7 @@ export const Storage = {
    * what people subscribed to in one more. The databases must exist already.
    *
    * @param settings Where Resources keeps its data.
-   * @returns The opened storage. Whoever opened it closes it.
+   * @returns The opened storage.
    */
   async openResources(settings: ResourcesStorageSettings): Promise<ResourcesStorage> {
     if (settings.kind === "memory") {
