@@ -15,7 +15,7 @@
 import { typeRegistry } from "../../generated/model-registry.js";
 import { Settings } from "../settings.js";
 import { Storage } from "../storage.js";
-import { EndedSessions } from "./ended-sessions.js";
+import { RevokedTokens } from "./revoked-tokens.js";
 import { Gateway } from "./gateway.js";
 import { SignInProvider } from "./providers.js";
 import type { ExternalSignIn } from "./routes/sign-in-routes.js";
@@ -38,7 +38,7 @@ const external: Record<string, ExternalSignIn> = {
 };
 
 const subscriptions = await Storage.open(settings.storage);
-const endedSessions = await EndedSessions.open(settings.storage);
+const revokedTokens = await RevokedTokens.open(settings.storage);
 
 const gateway = await Gateway.start({
   backend: settings.serverUrl,
@@ -49,7 +49,7 @@ const gateway = await Gateway.start({
   port: settings.listening.port,
   external,
   sessionKey: settings.sessionKey,
-  keeping: { subscriptions, endedSessions },
+  keeping: { subscriptions, revokedTokens },
 });
 
 console.log(`Access Desk gateway: ${gateway.url}`);
@@ -86,7 +86,7 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
           await gateway.close();
         } finally {
           try {
-            await endedSessions.close();
+            await revokedTokens.close();
           } finally {
             subscriptions.close();
           }

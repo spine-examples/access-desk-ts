@@ -17,6 +17,7 @@ import {
   SignedSessions,
   type AuthenticatedPrincipal,
   type ResolvedSession,
+  type SignedTokenRevocation,
 } from "@spine-event-engine/auth";
 import { create } from "@bufbuild/protobuf";
 import { timestampFromMs, timestampMs } from "@bufbuild/protobuf/wkt";
@@ -28,7 +29,6 @@ import {
   type OrganizationId,
 } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import type { SignedIn } from "./access-desk.js";
-import type { EndedSessions } from "./ended-sessions.js";
 
 /** The principal attribute that holds a session's identifier. */
 export const SESSION = "session";
@@ -103,8 +103,8 @@ export interface Issued {
 export interface SessionsOptions {
   /** The P-256 private key the gateway signs sessions with. */
   readonly key: KeyObject;
-  /** The sessions people ended before they expired. */
-  readonly ended: EndedSessions;
+  /** The tokens of the sessions people ended before they expired. */
+  readonly revoked: SignedTokenRevocation;
   /** What is opened under the sessions and must end with them. Nothing when left out. */
   readonly opened?: OpenedUnderSessions;
 }
@@ -129,21 +129,21 @@ export class Sessions {
 
   /** @param options How the sessions are kept. */
   constructor(options: SessionsOptions) {
-    const { ended } = options;
+    const { revoked } = options;
     this.#sessions = new SignedSessions({
       issuer: ISSUER,
       audience: AUDIENCE,
       activeKey: { kid: Sessions.#keyIdOf(options.key), privateKey: options.key },
       revocation: {
         kind: "supported",
-        isRevoked: (id) => ended.isRevoked(id),
+        isRevoked: (id) => revoked.isRevoked(id),
         // A token is taken until a little after it expires, so an ended
         // session is remembered until then.
         // TODO: Pass `revoke` through once Spine fixes it. Spine's logout
         //  gives the token's expiry without the clock skew, so a store that
         //  forgets the session then lets its token work again for a minute.
         revoke: (id, expiresAt) =>
-          ended.revoke(id, timestampFromMs(timestampMs(expiresAt) + CLOCK_SKEW_SECONDS * 1_000)),
+          revoked.revoke(id, timestampFromMs(timestampMs(expiresAt) + CLOCK_SKEW_SECONDS * 1_000)),
       },
       clock: { now: () => Time.currentTimeMillis() },
       ttlSeconds: SESSION_SECONDS,

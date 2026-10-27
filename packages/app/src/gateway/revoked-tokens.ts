@@ -18,44 +18,40 @@ import { Time } from "@spine-event-engine/core/time";
 import { Pool } from "pg";
 import type { StorageSettings } from "../settings.js";
 
-// TODO: Delete this store once Spine keeps ended sessions itself.
+// TODO: Delete this store once Spine keeps revoked tokens itself.
 //  Spine leaves revocation to the application, so the gateway keeps its own
 //  table and connection pool next to Spine's storage.
 /**
- * The sessions people ended before they expired, by signing out.
+ * The tokens of the sessions people ended before they expired, by signing out.
  *
- * A session's token carries its own signature, so it would keep working
- * until it expires. The gateway remembers the sessions that were ended, and
- * refuses their tokens. A session is forgotten once its token would no
- * longer be taken anyway, at the time it is ended with.
+ * A token carries its own signature, so it would keep working until it
+ * expires. The gateway remembers the tokens of the sessions that were ended,
+ * and refuses them. A token is forgotten once it would no longer be taken
+ * anyway, at the time it is revoked until.
  */
-export interface EndedSessions extends SignedTokenRevocation {
-  /** Closes the store. Whoever opened it closes it. */
-  close(): Promise<void>;
-}
-
-/** Opens the store of ended sessions. */
-export const EndedSessions = {
+export const RevokedTokens = {
   /**
-   * Opens the store of ended sessions where the settings name.
+   * Opens the store of revoked tokens where the settings name.
    *
    * In PostgreSQL, the store keeps its table in the gateway's database, and
    * creates the table when it is not there.
    *
    * @param settings Where the gateway keeps its data.
-   * @returns The opened store.
+   * @returns The opened store. Whoever opens it closes it.
    */
-  async open(settings: StorageSettings): Promise<EndedSessions> {
+  async open(
+    settings: StorageSettings,
+  ): Promise<SignedTokenRevocation & { close(): Promise<void> }> {
     return settings.kind === "memory"
-      ? new EndedInMemory()
-      : await EndedInPostgres.open(settings.url);
+      ? new RevokedInMemory()
+      : await RevokedInPostgres.open(settings.url);
   },
 };
 
-/** The ended sessions, kept in the gateway's memory. A restart forgets them. */
-class EndedInMemory implements EndedSessions {
+/** The revoked tokens, kept in the gateway's memory. A restart forgets them. */
+class RevokedInMemory implements SignedTokenRevocation {
   readonly kind = "supported";
-  /** When each ended session's token would no longer be taken, in milliseconds, by its identifier. */
+  /** When each revoked token would no longer be taken, in milliseconds, by its identifier. */
   readonly #expiring = new Map<string, number>();
 
   isRevoked(token: string): Promise<boolean> {
@@ -64,9 +60,9 @@ class EndedInMemory implements EndedSessions {
 
   revoke(token: string, expiresAt: Timestamp): Promise<void> {
     const now = Time.currentTimeMillis();
-    for (const [ended, expiring] of this.#expiring) {
+    for (const [revoked, expiring] of this.#expiring) {
       if (expiring <= now) {
-        this.#expiring.delete(ended);
+        this.#expiring.delete(revoked);
       }
     }
     this.#expiring.set(token, timestampMs(expiresAt));
@@ -79,8 +75,8 @@ class EndedInMemory implements EndedSessions {
   }
 }
 
-/** The ended sessions, kept in the gateway's PostgreSQL database. */
-class EndedInPostgres implements EndedSessions {
+/** The revoked tokens, kept in the gateway's PostgreSQL database. */
+class RevokedInPostgres implements SignedTokenRevocation {
   readonly kind = "supported";
   /** The connections to the gateway's database. */
   readonly #pool: Pool;
@@ -90,13 +86,13 @@ class EndedInPostgres implements EndedSessions {
   }
 
   /**
-   * Connects to the gateway's database, and makes the table of ended sessions
+   * Connects to the gateway's database, and makes the table of revoked tokens
    * when it is not there.
    *
    * @param url The address of the gateway's database.
    */
-  static async open(url: string): Promise<EndedInPostgres> {
-    // Every request the gateway takes is checked against the ended sessions,
+  static async open(url: string): Promise<RevokedInPostgres> {
+    // Every request the gateway takes is checked against the revoked tokens,
     // so the pool is as large as the ones Spine opens.
     const pool = new Pool({ connectionString: url, max: 10 });
     // The server may drop a connection while it waits in the pool, as when it
@@ -107,7 +103,7 @@ class EndedInPostgres implements EndedSessions {
     });
     try {
       await pool.query(
-        `CREATE TABLE IF NOT EXISTS ended_session (
+        `CREATE TABLE IF NOT EXISTS revoked_token (
            token_id   TEXT        PRIMARY KEY,
            expires_at TIMESTAMPTZ NOT NULL
          )`,
@@ -116,22 +112,22 @@ class EndedInPostgres implements EndedSessions {
       await pool.end();
       throw error;
     }
-    return new EndedInPostgres(pool);
+    return new RevokedInPostgres(pool);
   }
 
   async isRevoked(token: string): Promise<boolean> {
-    const found = await this.#pool.query("SELECT 1 FROM ended_session WHERE token_id = $1", [
+    const found = await this.#pool.query("SELECT 1 FROM revoked_token WHERE token_id = $1", [
       token,
     ]);
     return (found.rowCount ?? 0) > 0;
   }
 
   async revoke(token: string, expiresAt: Timestamp): Promise<void> {
-    await this.#pool.query("DELETE FROM ended_session WHERE expires_at <= $1", [
+    await this.#pool.query("DELETE FROM revoked_token WHERE expires_at <= $1", [
       new Date(Time.currentTimeMillis()),
     ]);
     await this.#pool.query(
-      "INSERT INTO ended_session (token_id, expires_at) VALUES ($1, $2) ON CONFLICT (token_id) DO NOTHING",
+      "INSERT INTO revoked_token (token_id, expires_at) VALUES ($1, $2) ON CONFLICT (token_id) DO NOTHING",
       [token, new Date(timestampMs(expiresAt))],
     );
   }

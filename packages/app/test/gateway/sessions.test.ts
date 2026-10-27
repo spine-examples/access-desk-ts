@@ -15,6 +15,7 @@
 import { generateKeyPairSync } from "node:crypto";
 import { create } from "@bufbuild/protobuf";
 import { timestampFromMs } from "@bufbuild/protobuf/wkt";
+import type { SignedTokenRevocation } from "@spine-event-engine/auth";
 import { Time } from "@spine-event-engine/core/time";
 import { EmailAddressSchema } from "@spine-event-engine/proto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -24,7 +25,7 @@ import {
 } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
 import { typeRegistry } from "../../generated/model-registry.js";
-import { EndedSessions } from "../../src/gateway/ended-sessions.js";
+import { RevokedTokens } from "../../src/gateway/revoked-tokens.js";
 import { Sessions, type OpenedUnderSessions } from "../../src/gateway/sessions.js";
 
 /** The key the gateway signs sessions with. */
@@ -37,28 +38,28 @@ const SESSION_MS = 8 * 60 * 60 * 1_000;
 const P256_ORDER = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551n;
 
 let storage: TestStorage;
-let ended: EndedSessions;
+let revoked: Awaited<ReturnType<typeof RevokedTokens.open>>;
 let sessions: Sessions;
 
 beforeEach(async () => {
   storage = await TestStorages.singleTenant(typeRegistry);
-  ended = await EndedSessions.open(TestStorages.settingsOf(storage));
+  revoked = await RevokedTokens.open(TestStorages.settingsOf(storage));
   sessions = sessionsOfGateway();
 });
 
 afterEach(async () => {
   await sessions.close();
-  await ended.close();
+  await revoked.close();
   await storage.drop();
 });
 
 /**
  * The sessions of a gateway that signs with the test's key and remembers
- * ended sessions in the test's store. Two of them stand for one gateway
+ * the revoked tokens in the test's store. Two of them stand for one gateway
  * before and after a restart.
  */
 function sessionsOfGateway(opened?: OpenedUnderSessions): Sessions {
-  return new Sessions({ key: KEY, ended, ...(opened === undefined ? {} : { opened }) });
+  return new Sessions({ key: KEY, revoked, ...(opened === undefined ? {} : { opened }) });
 }
 
 const person = {
@@ -86,18 +87,20 @@ function withOtherSignature(token: string): string {
 }
 
 /**
- * The ended sessions, kept in the test's store while it can be read and
+ * The revoked tokens, kept in the test's store while it can be read and
  * written, and failing while it cannot.
  */
-function failingWhenTold(): EndedSessions & { reading: boolean; writing: boolean } {
+function failingWhenTold(): SignedTokenRevocation & { reading: boolean; writing: boolean } {
   const store = {
     kind: "supported" as const,
     reading: true,
     writing: true,
     isRevoked: (id: string) =>
-      store.reading ? ended.isRevoked(id) : Promise.reject(new Error("The store is down.")),
-    revoke: (id: string, expiresAt: Parameters<EndedSessions["revoke"]>[1]) =>
-      store.writing ? ended.revoke(id, expiresAt) : Promise.reject(new Error("The store is down.")),
+      store.reading ? revoked.isRevoked(id) : Promise.reject(new Error("The store is down.")),
+    revoke: (id: string, expiresAt: Parameters<SignedTokenRevocation["revoke"]>[1]) =>
+      store.writing
+        ? revoked.revoke(id, expiresAt)
+        : Promise.reject(new Error("The store is down.")),
     close: () => Promise.resolve(),
   };
   return store;
@@ -191,7 +194,7 @@ describe("Gateway sessions should", () => {
   it("refuse a token signed with another key", async () => {
     const other = new Sessions({
       key: generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey,
-      ended,
+      revoked,
     });
     const forged = await other.issue(person);
     expect(forged).toBeDefined();
@@ -275,7 +278,7 @@ describe("Gateway sessions should", () => {
     const stopped: string[] = [];
     const issued = new Sessions({
       key: KEY,
-      ended: store,
+      revoked: store,
       opened: {
         closeFor: () => Promise.resolve(),
         stop: (session) => {

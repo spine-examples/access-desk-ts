@@ -15,7 +15,7 @@
 import { generateKeyPairSync } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import type { AccessDesk } from "../../../src/gateway/access-desk.js";
-import { EndedSessions } from "../../../src/gateway/ended-sessions.js";
+import { RevokedTokens } from "../../../src/gateway/revoked-tokens.js";
 import { routing } from "../../../src/gateway/routes/route.js";
 import { signInRoutes } from "../../../src/gateway/routes/sign-in-routes.js";
 import { Sessions } from "../../../src/gateway/sessions.js";
@@ -24,7 +24,7 @@ describe("Gateway sign-in routes should", () => {
   it("offer only the options route when no outside provider is configured", async () => {
     const sessions = new Sessions({
       key: generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey,
-      ended: await EndedSessions.open({ kind: "memory" }),
+      revoked: await RevokedTokens.open({ kind: "memory" }),
     });
     try {
       const signIn = signInRoutes(

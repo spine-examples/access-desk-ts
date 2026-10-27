@@ -14,7 +14,7 @@
 
 import { generateKeyPairSync } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { EndedSessions } from "../../../src/gateway/ended-sessions.js";
+import { RevokedTokens } from "../../../src/gateway/revoked-tokens.js";
 import { routing } from "../../../src/gateway/routes/route.js";
 import { Sessions } from "../../../src/gateway/sessions.js";
 
@@ -22,7 +22,7 @@ let sessions: Sessions;
 beforeEach(async () => {
   sessions = new Sessions({
     key: generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey,
-    ended: await EndedSessions.open({ kind: "memory" }),
+    revoked: await RevokedTokens.open({ kind: "memory" }),
   });
 });
 afterEach(async () => {

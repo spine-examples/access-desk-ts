@@ -20,6 +20,7 @@ import {
   type AuthenticatedPrincipal,
   type AuthorizedRequestContext,
   type RequestCredential,
+  type SignedTokenRevocation,
 } from "@spine-event-engine/auth";
 import type { TypeRegistryLookup } from "@spine-event-engine/core";
 import { Time } from "@spine-event-engine/core/time";
@@ -28,7 +29,6 @@ import { BrowserServer } from "@spine-event-engine/server/browser";
 import type { StorageFactory } from "@spine-event-engine/storage";
 import { ServerConnection } from "../server/client.js";
 import { AccessDesk } from "./access-desk.js";
-import type { EndedSessions } from "./ended-sessions.js";
 import { Policy } from "./policy.js";
 import { routing } from "./routes/route.js";
 import { sessionRoutes } from "./routes/session-routes.js";
@@ -63,8 +63,8 @@ export interface GatewayOptions {
   readonly keeping: {
     /** The subscriptions people hold. */
     readonly subscriptions: StorageFactory;
-    /** The sessions people ended before they expired. */
-    readonly endedSessions: EndedSessions;
+    /** The tokens of the sessions people ended before they expired. */
+    readonly revokedTokens: SignedTokenRevocation;
   };
 }
 
@@ -102,7 +102,7 @@ export const Gateway = {
     );
     const sessions = new Sessions({
       key: options.sessionKey,
-      ended: options.keeping.endedSessions,
+      revoked: options.keeping.revokedTokens,
       opened: watching,
     });
     const route = routing(origins, sessions);
