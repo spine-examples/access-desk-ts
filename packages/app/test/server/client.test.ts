@@ -151,20 +151,20 @@ describe("postAndAwaitView should", () => {
     expect(shown).toBe("acme");
   });
 
-  it("return what the read model shows already, when it showed the effect before the command", async () => {
+  it("return nothing when an earlier command made the effect already", async () => {
     const server = await hosted();
     await givenOrganization(server, organizationId("acme"));
     const connection = connectionTo(() => server.url);
 
     // An organization is created once, so creating it again changes nothing
-    // its view would be updated for. It shows what the earlier one did.
+    // its view would be updated for.
     const shown = await client.ServerRequests.postAndAwaitView(
       connection.in(organizationId("acme")).onBehalfOf("access-desk"),
       creationShown("acme"),
       300,
     );
 
-    expect(shown).toBe("acme");
+    expect(shown).toBeUndefined();
   });
 
   it("return nothing when the read model does not show the effect in time", async () => {

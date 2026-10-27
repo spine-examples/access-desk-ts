@@ -190,16 +190,12 @@ export const ServerRequests = {
    * It suits a command whose effect comes later in a chain of steps, which
    * no single event of the command tells:
    *
-   * 1. It subscribes to the read model, and opens the subscription.
+   * 1. It subscribes to the read model.
    * 2. It posts the command.
-   * 3. It reads the read model. It may show the effect already, from before
-   *    the subscription opened, as when another sign-in of the same account
-   *    linked it first. Any later change comes as an update, since the
-   *    subscription is open.
-   * 4. Otherwise it waits for an update of the read model that shows the
-   *    effect.
-   * 5. When no such update comes in time, it reads the read model once more,
-   *    in case an update was missed.
+   * 3. It waits for an update that shows the effect.
+   *
+   * A command that changes nothing, as when an earlier one made the effect
+   * already, brings no update, and so returns nothing.
    *
    * @param request The client that posts the command.
    * @param awaited The command, and the read model that shows its effect.
@@ -270,16 +266,7 @@ export const ServerRequests = {
       if (given.kind !== "ok") {
         return undefined;
       }
-      const showsNow = async () => {
-        const view = await ServerRequests.readById(
-          request,
-          awaited.view,
-          awaited.idSchema,
-          awaited.id,
-        );
-        return view === undefined ? undefined : awaited.shows(view);
-      };
-      return (await showsNow()) ?? (await Promise.race([shown, tooLate])) ?? (await showsNow());
+      return await Promise.race([shown, tooLate]);
     } finally {
       clearTimeout(giveUp);
       await watching.cancel();

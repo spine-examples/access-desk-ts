@@ -223,11 +223,10 @@ export class Watching extends DurableSubscriptionBindings implements SessionSubs
   }
 
   /**
-   * Opens a subscription. Its changes are then sent until it is stopped.
+   * Opens a subscription.
    *
-   * It opens only as {@link claim} allowed it, for the person and in the
-   * organization it was allowed to. The subscription then belongs to the
-   * session {@link claim} noted.
+   * Only the request {@link claim} allowed may open it. The subscription
+   * then belongs to that request's session.
    */
   override activate(
     input: Parameters<DurableSubscriptionBindings["activate"]>[0],
@@ -244,8 +243,6 @@ export class Watching extends DurableSubscriptionBindings implements SessionSubs
     ) {
       return Promise.resolve({ kind: "denied" });
     }
-    // A subscription made before the gateway restarted is learned as it
-    // opens. Until Spine hands it over, the gateway knows only who opens it.
     const watched: Watched = known ?? {
       subscription: undefined,
       context: input.context,
