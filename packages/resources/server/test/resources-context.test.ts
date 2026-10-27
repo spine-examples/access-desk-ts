@@ -48,7 +48,6 @@ describe("ResourcesContext should", () => {
     expect((await readAccessHeldBy(requester)).map((grant) => grant.id?.uuid)).toEqual([
       "req-kept",
     ]);
-    // The person's access is the one kept from before, so its grant can be revoked.
     expect((await revokeGrant(after, "req-kept", "primary", "No longer needed.")).kind).toBe("ok");
     expect((await awaitGrantRevoked(after, requester, "req-kept")).revoked).toBe(true);
   });

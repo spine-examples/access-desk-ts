@@ -47,8 +47,7 @@ import {
 const { expectRejection, recordEvents } = eventRecording(testActorContext);
 
 // The Resource aggregate is NONE-visibility, so each command handler is verified
-// only through the policy fact it publishes. A resource is created and deleted
-// only by its registration, so the tests register it.
+// only through the policy fact it publishes.
 beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
 
@@ -98,7 +97,6 @@ describe("ResourceAggregate should", () => {
       );
       const events = await recordEvents(scope, ResourceDeletedSchema);
       try {
-        // The name is taken, so the registration deletes the resource it created.
         expect((await registerResource(scope, "payroll-2", "payroll")).kind).toBe("ok");
         expect((await events.waitFor(box)).id?.uuid).toBe("payroll-2");
       } finally {

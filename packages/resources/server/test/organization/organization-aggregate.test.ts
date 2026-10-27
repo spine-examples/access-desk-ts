@@ -48,8 +48,7 @@ import { registerResource } from "../resource/given/resource.js";
 const { expectRejection, recordEvents } = eventRecording(testActorContext);
 
 // The Organization aggregate is NONE-visibility, so each command handler is
-// verified through the fact it publishes. A resource is added by its
-// registration, so the tests register it.
+// verified through the fact it publishes.
 beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
 
@@ -164,7 +163,6 @@ describe("OrganizationAggregate should", () => {
 
       const events = await recordEvents(scope, ResourceAddedSchema);
       try {
-        // The registration gives the command again, as when its delivery is repeated.
         expect((await addResource(scope, "payroll")).kind).toBe("ok");
         await events.waitFor(box, (event) => event.resourceId?.uuid === "payroll");
 

@@ -143,12 +143,7 @@ export function approveAccessRequest(box: BlackBox, id: string, manager: string)
 }
 
 /**
- * Has `manager` approve the request, and waits until the requests show it
- * approved.
- *
- * A new request of the same requester is refused as `RequestAlreadyPending`
- * while the requests still show this one pending, so a test waits for this
- * before it submits the next one.
+ * Approves the request as `manager`, and waits until it shows approved.
  */
 export async function approveAndAwait(box: BlackBox, id: string, manager: string): Promise<void> {
   await approveAccessRequest(box, id, manager);

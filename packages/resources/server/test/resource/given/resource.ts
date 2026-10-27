@@ -81,13 +81,7 @@ export function registerResource(
   );
 }
 
-/**
- * Registers the resource, and waits until the catalog shows it.
- *
- * A resource is created only by its registration, which also records it among
- * the resources of the organization. So the organization must exist first.
- * The resource is named after its identifier unless the overrides name it.
- */
+/** Registers the resource, and waits until the catalog shows it. */
 export async function registerAndAwaitResource(
   box: BlackBox,
   scope: BlackBoxScope,
@@ -102,7 +96,7 @@ export async function registerAndAwaitResource(
  * Posts `CreateResource` for a registered resource, as its registration gives
  * it again when its delivery is repeated.
  *
- * Register the resource first. Otherwise the registration process reacts to
+ * Register the resource first. Otherwise, the registration process reacts to
  * the creation of a resource it never asked for.
  */
 export function createResourceAgain(
