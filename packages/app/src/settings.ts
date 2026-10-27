@@ -56,16 +56,20 @@ export interface ProviderSettings {
   readonly clientSecret: string;
 }
 
+/** Keeps data in the program's memory. Everything is forgotten when the program stops. */
+export interface MemoryStorageSettings {
+  readonly kind: "memory";
+}
+
+/** Keeps data in a PostgreSQL database, so it outlasts restarts. */
+export interface PostgresStorageSettings {
+  readonly kind: "postgresql";
+  /** The address of the database, with the account to sign in to it. */
+  readonly url: string;
+}
+
 /** Where a program keeps what it must remember. */
-export type StorageSettings =
-  /** In the program's memory. Everything is forgotten when the program stops. */
-  | { readonly kind: "memory" }
-  /** In a PostgreSQL database, which keeps everything across restarts. */
-  | {
-      readonly kind: "postgresql";
-      /** The address of the database, with the account to sign in to it. */
-      readonly url: string;
-    };
+export type StorageSettings = MemoryStorageSettings | PostgresStorageSettings;
 
 /** An organization the application server keeps, and the database it keeps it in. */
 export interface OrganizationDatabase {
@@ -75,24 +79,27 @@ export interface OrganizationDatabase {
   readonly url: string;
 }
 
-/** Where the application server keeps each organization and everything it owns. */
-export type ResourcesStorageSettings =
-  /** In the server's memory, for any organization. Everything is forgotten when it stops. */
-  | { readonly kind: "memory" }
+/**
+ * Keeps each organization in a PostgreSQL database of its own. The server
+ * keeps only the organizations listed.
+ */
+export interface PostgresResourcesStorageSettings {
+  readonly kind: "postgresql";
+  /** Each organization the server keeps, with its database. */
+  readonly organizations: readonly OrganizationDatabase[];
   /**
-   * In PostgreSQL, each organization in a database of its own. The server
-   * keeps only the organizations listed.
+   * The address of the database of what people subscribed to, which
+   * belongs to no one organization.
    */
-  | {
-      readonly kind: "postgresql";
-      /** Each organization the server keeps, with its database. */
-      readonly organizations: readonly OrganizationDatabase[];
-      /**
-       * The address of the database of what people subscribed to, which
-       * belongs to no one organization.
-       */
-      readonly subscriptionsUrl: string;
-    };
+  readonly subscriptionsUrl: string;
+}
+
+/**
+ * Where the application server keeps each organization and everything it owns.
+ *
+ * In memory, it keeps any organization.
+ */
+export type ResourcesStorageSettings = MemoryStorageSettings | PostgresResourcesStorageSettings;
 
 /** How the application server is set up. */
 export interface ServerSettings {

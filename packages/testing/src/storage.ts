@@ -42,9 +42,20 @@ export interface TestStorage {
   drop(): Promise<void>;
 }
 
+/** Keeps the application's data in its memory. */
+export interface MemoryStorageSettings {
+  readonly kind: "memory";
+}
+
+/** Keeps the application's data in a PostgreSQL database. */
+export interface PostgresStorageSettings {
+  readonly kind: "postgresql";
+  /** The address of the database. */
+  readonly url: string;
+}
+
 /** Where the application keeps its data, as its settings name it. */
-export type StorageSettings =
-  { readonly kind: "memory" } | { readonly kind: "postgresql"; readonly url: string };
+export type StorageSettings = MemoryStorageSettings | PostgresStorageSettings;
 
 /** Empty PostgreSQL databases, for a test that opens storage over them itself. */
 export interface TestDatabases {
@@ -68,7 +79,7 @@ export const TestStorages = {
       return profile;
     }
     throw new Error(
-      `ACCESS_DESK_TEST_STORAGE must be "memory" or "postgresql", and is "${profile ?? ""}".`
+      `ACCESS_DESK_TEST_STORAGE must be "memory" or "postgresql", and is "${profile ?? ""}".`,
     );
   },
 
