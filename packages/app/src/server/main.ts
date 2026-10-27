@@ -29,9 +29,6 @@ const settings = Settings.ofServer(process.env);
 const { host, port } = settings.listening;
 
 const identityStorage = await Storage.open(settings.identityStorage);
-// In PostgreSQL, Resources keeps every organization in a database of its own.
-// Spine's PostgreSQL storage must be told every one of them when it opens, so
-// the server keeps only the organizations the settings list.
 const resourcesStorage = await Storage.openResources(settings.resourcesStorage);
 
 const listening: { address?: string } = {};

@@ -78,12 +78,7 @@ export const ReachedOrganizationMembers = {
       return held !== undefined;
     };
 
-    /**
-     * Whether the organization confirmed that it added the person.
-     *
-     * The subscription brings only the event the command caused. It ends with
-     * no event when the organization does not confirm in time.
-     */
+    /** Whether the organization confirmed that it added the person. */
     const confirmed = async (subscription: Subscription): Promise<boolean> => {
       try {
         for await (const delivery of subscription.updates) {

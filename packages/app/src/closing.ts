@@ -12,19 +12,19 @@
  * and limitations under the License.
  */
 
-/** Closes what a program opened. */
+/** Closes resources in turn, each even when another fails. */
 export const Closing = {
   /**
    * Closes each in turn, even when an earlier one fails to close.
    *
-   * @param opened What to close, in the order to close it.
-   * @throws AggregateError with every failure, when anything failed to close.
+   * @param resources The resources to close, first to last.
+   * @throws AggregateError if any resource failed to close.
    */
-  async inOrder(...opened: { close(): unknown }[]): Promise<void> {
+  async inOrder(...resources: { close(): unknown }[]): Promise<void> {
     const failures: unknown[] = [];
-    for (const each of opened) {
+    for (const resource of resources) {
       try {
-        await each.close();
+        await resource.close();
       } catch (error) {
         failures.push(error);
       }
