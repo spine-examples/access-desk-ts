@@ -48,39 +48,11 @@ setting refuses to start and names it.
 | `ACCESS_DESK_GATEWAY_DATABASE`                 | gateway             | The database of subscriptions and ended sessions.       |
 | `ACCESS_DESK_SESSION_KEY`                      | gateway             | The P-256 key sessions are signed with, in base64.      |
 
-The PostgreSQL server, the databases, and the organizations are needed only
-for `postgresql`. The server and the account are set once, and each program
-names its databases on that server. A program elsewhere, such as in a
-container, changes only `ACCESS_DESK_DATABASE_HOST` and `_PORT`.
-`pnpm --dir packages/app run session-key` prints a new session key. Sessions
-stay good while the key stays the same; a new key signs everybody out.
-
-A session lasts eight hours from sign-in, and then the person signs in again.
-That is fixed in the gateway, not a setting.
-
 People sign in through Google. If the gateway cannot reach Google when it
 starts, it does not start.
 
-### What survives a restart
-
-With `postgresql`, a restarted application server still knows every person,
-the accounts they sign in with, and their memberships. A restarted gateway
-keeps everybody signed in, keeps ended sessions ended, and keeps the
-subscriptions people hold until their sessions expire. A browser opens its
-subscriptions again after the restart.
-
-With `postgresql`, it also knows the organizations `ACCESS_DESK_ORGANIZATIONS`
-lists, and everything in them. Spine's PostgreSQL storage keeps each
-organization in a database of its own and must know every one when it opens,
-so the server keeps no other organization: a command for one is refused. A
-new organization needs its database, its place in the list, and a restart.
-With `memory`, the server keeps any organization, and forgets them all when it
-stops.
-
-For local development there are two organizations, `teamdev` and
-`codematters`, in the databases `accessdesk_resources_teamdev` and
-`accessdesk_resources_codematters`. Nothing creates the organizations
-themselves yet; their databases are ready for them.
+The PostgreSQL server, the databases, and the organizations are needed only
+for `postgresql`.
 
 ### The database
 
@@ -92,20 +64,6 @@ From the repository root:
 ```sh
 pnpm run postgres:start
 ```
-
-It listens at `ACCESS_DESK_DATABASE_HOST` and `_PORT`, which must be an IP
-address for Docker. Each start makes the databases the settings name that are
-missing: Identity's, one for each organization `ACCESS_DESK_ORGANIZATIONS`
-lists, the one for subscriptions to them, the gateway's, and the one the tests
-make their databases from. So an organization added to the list gets its
-database at the next start. The data is kept across stops.
-`pnpm run postgres:stop` stops it; `pnpm run postgres:delete` removes the
-containers of `deploy/compose.yaml` and deletes the data too.
-
-The development server signs every program in as one administrator of the
-whole server, which also lets the tests make and delete their databases.
-Elsewhere, give each program an account of its own that may create tables in
-its own database and do nothing more.
 
 ## Run it
 

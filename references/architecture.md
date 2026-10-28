@@ -43,11 +43,7 @@ or in memory for development and tests. The application server keeps
 Identity's people, their accounts, their email addresses, and their
 memberships. The gateway keeps the subscriptions people hold and the sessions
 they ended. Resources keeps each organization in a database of its own, and
-what people subscribed to in one more. Spine's PostgreSQL storage must know
-every organization when it opens, so the application server keeps only the
-organizations its settings list; local development has two, `teamdev` and
-`codematters`. Until that storage takes an organization it has not seen
-before, a new organization needs a restart.
+what people subscribed to in one more.
 
 An initial deployment may co-host both contexts in one application server.
 Co-location does not weaken the boundaries: each context must have its own model

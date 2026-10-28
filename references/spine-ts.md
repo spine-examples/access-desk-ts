@@ -304,61 +304,27 @@ block (Spine leaves `EnumValueOptions` free).
 
 ## PostgreSQL
 
-Access Desk keeps its data in PostgreSQL through
-`@spine-event-engine/storage-postgres`. These facts were established on
-`2.0.0-snapshot.23`, from the package and by running against PostgreSQL 18.6:
+Access Desk keeps its data in PostgreSQL through `@spine-event-engine/storage-postgres`.
 
-- `PostgresStorageFactory.newBuilder().setOptions({ url })` serves a
-  single-tenant context. Give it a `StringifierRegistry` set to the complete
-  type registry. `build()` connects to the database first, so it is async.
-  `close()` only starts closing the pools.
-- Pass the factory to a context with `withStorageFactory(factory)`. A context
-  never closes the factory it was given; whoever made it closes it. A factory
-  outlives its context, and a new context over the same factory or database
-  sees everything the earlier one kept.
-- The adapter makes its own tables, with primary keys and nothing else. It
-  makes no databases and no schemas, and no other indexes.
-- **Multitenant storage keeps each tenant in a database of its own, and must be
-  told every tenant when it is built** (`setTenantOptions`). A tenant it was
-  not told about is refused (`PostgresStorageConfigurationError`), an empty
-  list is refused, and two tenants may not share a database. Nothing adds a
-  tenant later. So the application server keeps only the organizations
-  `ACCESS_DESK_ORGANIZATIONS` lists, and a new one needs a restart.
-- **A multitenant context also stores something that belongs to no tenant**:
-  the Stand subscription registry, which a factory configured for tenants
-  refuses ("configured for multiple tenants"). Give such a context its own
-  `StorageSubscriptionRegistry` over single-tenant storage, with
-  `withSubscriptionRegistry`.
-- Each tenant database has its own connection pool, ten connections at most
-  unless `connectionLimit` says otherwise. Idle connections close after ten
-  seconds.
-- A `pg` pool emits `error` when the server drops a connection that waits in
-  it, as when PostgreSQL restarts, and an `error` nobody listens to stops the
-  process. Spine's pools have no listener and cannot be reached to add one.
-  Every pool Access Desk opens itself, such as the gateway's ended sessions,
-  listens.
-- The Stand keeps an active subscription with no expiry
-  (`StorageSubscriptionRegistry`), and attaches every stored one again on each
-  reconciliation and after a restart. On PostgreSQL a subscription nobody
-  cancels stays for good, so the gateway never forgets a subscription without
-  Spine's cancel effect: it leaves the row for Spine to clear when the
-  session expires.
-- Entity Inbox rows are kept in the same storage, so commands accepted before a
-  stop are delivered after the restart.
-- Delivery on PostgreSQL is slower than in memory: a sign-in that settles in a
-  quarter of a second in memory takes about a second. Tests wait with bounded
-  `eventually`, never with sleeps.
-
-## Datastore
-
-Construct `DatastoreStorageFactory` with an application-owned configured Google
-Datastore client. Multitenant contexts use Datastore native namespaces derived
-reversibly from `TenantId`, so new tenants need no configuration; a
-bounded-context name is diagnostic and does not itself partition kinds.
-
-The adapter has a finite reconciliation ceiling and does not provide unlimited
-scan semantics. Declare and deploy application composite indexes for actual
-filter/order combinations. Access Desk does not use Datastore.
+- **Single tenant.** `PostgresStorageFactory.newBuilder().setOptions({ url })`,
+  with a `StringifierRegistry` over the full type registry. `build()` is async.
+- **Ownership.** A context does not close its factory; whoever opened it does.
+  A new context over the same database sees everything kept before.
+- **Schema.** Spine creates its tables (primary keys only). The database must
+  exist already.
+- **Multitenant.** Each tenant gets its own database, and every tenant must be
+  listed at build time (`setTenantOptions`). An unknown tenant is refused. So
+  the server keeps only the organizations in `ACCESS_DESK_ORGANIZATIONS`, and
+  adding one needs a restart.
+- **Subscriptions.** A multitenant factory refuses tenantless data, such as the
+  subscription registry. Give the context a `StorageSubscriptionRegistry` over
+  single-tenant storage (`withSubscriptionRegistry`).
+- **Pools.** One per database, ten connections by default. Spine's pools do not
+  listen for `error`, so a dropped idle connection can stop the process. Pools
+  Access Desk opens itself listen.
+- **Subscriptions outlast restarts.** One nobody cancels stays for good, so the
+  gateway leaves it for Spine to clear when its session expires.
+- **Inbox.** Commands accepted before a stop are delivered after the restart.
 
 ## Authentication and browser clients
 
@@ -383,33 +349,25 @@ controls defined in the architecture.
 - `BrowserServer.open(undefined, { backend: { baseUrl }, … })` starts a
   standalone gateway in front of an application server in another program.
   Pass `registry` so `authorize` receives each command decoded.
-- A standalone gateway with sessions needs `bindings`. Access Desk's
-  `Watching` extends `DurableSubscriptionBindings`, over memory or PostgreSQL.
-  `BrowserServer` recognizes durable bindings only by `instanceof`: only then
-  does it stop an expired subscription on the application server, and it
-  restores the stored ones on the application server when it starts
-  (`recoverActive`). A wrapper around the store would lose both.
-- `DurableSubscriptionBindings` runs the operations on one subscription one at
-  a time, and keeps one more waiting. A second opening of an open subscription
-  waits instead of being refused, and a cancel behind it is refused as
-  `binding-busy`. So `Watching` refuses a second opening itself.
-- `bindings.activate` receives the trusted context, the person and the
-  tenant, but not the session; `authorize` receives the session's principal.
-  So `Watching` gives leave to open a subscription in `authorize`, to one
-  request at a time, and the opening uses it. Spine may still refuse the
-  request after `authorize`, as when its context does not match, without
-  calling the bindings, so unused leave lapses after a few seconds.
+- A standalone gateway with sessions needs `bindings`. `BrowserServer` treats
+  them as durable only if they are a `DurableSubscriptionBindings`. Only then
+  does it stop expired subscriptions on the application server and restore
+  stored ones at start. A wrapper around the store loses both.
+- `DurableSubscriptionBindings` runs operations on one subscription one at a
+  time, and keeps one more waiting. A second activation of an active
+  subscription waits instead of being refused; a cancel behind it is refused
+  as `binding-busy`.
+- `bindings.activate` receives the trusted context, not the session; only
+  `authorize` sees the session's principal. Spine may refuse a
+  request after `authorize` without calling the bindings.
 - Ending a session does not end its streams; Spine stops them only when the
   session's time runs out.
-- Only Spine's own cancel effect clears a subscription everywhere it is kept,
-  and the store receives it only when a browser cancels, or when a
-  subscription expires (`purgeExpired`). So the gateway cancels an ending
-  session's subscriptions through its own address with the session's token.
-  What is left only has its stream stopped, and stays in the store until the
-  session would have expired, when Spine clears it everywhere.
-- A subscription reports only what happens after it has opened all the way to
-  the application server, a moment after the client's `activate` returns. A
-  test must first make sure updates arrive.
+- Only Spine's own cancel effect clears a subscription everywhere it is kept.
+  The store receives it only when a browser cancels, or when a subscription
+  expires.
+- Once the client's `activate` returns, the server has acknowledged the
+  subscription, and every later change arrives. On `2.0.0-snapshot.22`, updates
+  right after `activate` could be lost.
 - A query takes an id filter or `EQUAL` filters on top-level `(column)`
   fields. A subscription to read models takes id filters and `EQUAL` field
   filters, also on nested paths. A subscription to events takes only
@@ -424,48 +382,23 @@ controls defined in the architecture.
   `POST` with a body, not a provider callback carrying `?code=`. Their
   preflight answers allow no headers, so they serve only pages of the
   gateway's own origin, as through a development proxy.
-- Without `cookies` the session is a bearer token. Access Desk uses
-  `SignedSessions`: `issue` gives `kind: "issued"` with a `bearer` credential,
-  and `resolve` accepts only `kind: "bearer"`. The signing key must be a P-256
-  private key. Signing out needs a `SignedTokenRevocation`, which Access Desk
-  keeps in the gateway's database; without one, `logout` answers
-  `expiryOnly` and the token keeps working. `OpaqueSessions` keeps sessions
-  only in memory.
-- `SignedSessions` takes a token with its ECDSA signature written either way
-  (`s` or the curve's order less `s`), so two different texts stand for one
-  token. Tell sessions apart by the token's `jti`, as the revocation store
-  does, never by the token's text.
-- `SignedSessions` still takes a token `clockSkewSeconds` (60 by default)
-  after it expires, but hands `revoke` the expiry itself. Keep a revoked `jti`
-  through the skew too, or a revoked token works again for that minute.
-- `SignedSessions.resolve` refuses every token while the revocation store
-  cannot be read, but `logout` verifies the token without reading the store.
-  So signing out with a token that no longer resolves can still revoke it.
-- To wait for the event a command causes, use the client's
-  `postAndSubscribe`, as adding a member to an organization does. It opens the
-  subscription, waits for the server's acknowledgement, and then posts. It
-  sees only the events the command causes directly, not those further down
-  the chain. Spine has no call that returns the event: read the first update
-  of the returned subscription, and give `firstUpdateTimeoutMs` with an
-  `onFirstUpdateTimeout` that cancels it, which ends the updates. When the effect
-  comes later in a chain of steps, subscribe to the read model that shows it
-  instead, as `ServerRequests.postAndAwaitView` does: an entity subscription
-  with an authoritative query, opened before the command is posted, a read of
-  the read model as soon as the command is accepted, and one more read when no
-  update came in time.
-- When the result of a handler fails validation as it is committed, delivery
-  stops. That is a new state that breaks `(required)`
-  (`TransitionValidationError`), or a command or event the entity produced
-  that is not valid (`ValidationException`). The error is not passed to the
-  `DeliveryMonitor`, because `recordHandlerFailure` records only what the
-  handler method itself throws, and `delivery.ts` `#processAttempt` rethrows
-  the rest. `DeliverySupervisor` swallows it without a log, the Inbox row
-  stays `TO_DELIVER`, and every later run stops at it, so the rows behind it
-  are not delivered. `snapshot.23` let the monitor mark such a row delivered.
-  So a test never makes a process react in a state it cannot be in. It starts
-  the process rather than giving the commands the process gives. It gives
-  such a command itself only after the process has run, as when a delivery is
-  repeated.
+- Without `cookies`, a session is a bearer token. `SignedSessions` needs a
+  P-256 key. Without a `SignedTokenRevocation`, `logout` answers `expiryOnly`
+  and the token works until it expires. `OpaqueSessions` keeps sessions in
+  process memory.
+- `SignedSessions` accepts both ECDSA forms of a signature, so one token has
+  two texts with the same `jti`.
+- `SignedSessions` accepts a token for `clockSkewSeconds` after it expires, but
+  passes `revoke` the token's bare expiry.
+- `resolve` refuses every token while `isRevoked` fails. `logout` does not call
+  `isRevoked`.
+- `postAndSubscribe` subscribes, waits for the server's acknowledgement, then
+  posts. Its subscription brings only the events the command causes directly.
+  Spine has no call that returns the event itself; `firstUpdateTimeoutMs` with
+  `onFirstUpdateTimeout` bounds the wait.
+- When a handler's result fails validation at commit, delivery stops
+  silently. The error never reaches the `DeliveryMonitor`, the Inbox row stays
+  `TO_DELIVER`, and nothing behind it is delivered.
 - `OidcFlow` accepts only HTTPS addresses and requires the `openid` scope.
 - `createGoogleProvider` returns `email_verified` as text, and needs
   `clientAuthentication: "client_secret_post"`, or Google refuses the code
