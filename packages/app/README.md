@@ -65,6 +65,40 @@ From the repository root:
 pnpm run postgres:start
 ```
 
+The programs keep their data in these databases, named as in `.env.example`:
+
+| Database                              | Used by            | What it keeps                                                                               |
+| ------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------- |
+| `accessdesk_identity`                 | application server | People, their accounts, email addresses, and memberships, and the subscriptions to them.    |
+| `accessdesk_resources_{organization}` | application server | One organization: its members, resources, access requests, grants, and audit trail.         |
+| `accessdesk_resources_subscriptions`  | application server | What each subscription to the organizations watches.                                        |
+| `accessdesk_gateway`                  | gateway            | Who owns each subscription, and the identifiers of the sessions people signed out of.       |
+| `accessdesk_test`                     | tests              | Nothing. `pnpm run test:postgresql` makes throwaway databases through it, and deletes them. |
+
+The server never opens the gateway's database. The gateway opens none of the
+server's and reaches the data only through the server.
+
+- **Organizations.** Spine's PostgreSQL storage keeps each organization in a
+  database of its own, `accessdesk_resources_{organization}`, and must know
+  them all when it opens. So the server keeps only the organizations of
+  `ACCESS_DESK_ORGANIZATIONS`, and refuses any other. For `teamdev,codematters`,
+  these are `accessdesk_resources_teamdev` and `accessdesk_resources_codematters`.
+  A new organization needs a new database and a restart.
+- **Subscriptions.** A browser's subscription is kept twice: once by the
+  gateway, and once by the server, in a database of the context it watches.
+  - `accessdesk_gateway` says whose the subscription is and until when, so
+    only its owner may activate or cancel it.
+  - `accessdesk_resources_subscriptions` or `accessdesk_identity` says what the
+    subscription watches, so updates reach it after the server restarts.
+    Spine keeps one registry of subscriptions for all organizations, so
+    Resources keeps it apart from the organizations' databases. Identity
+    belongs to no organization and keeps its registry with the rest of its
+    data.
+- **Sessions.** Sessions themselves are kept nowhere: the gateway signs them
+  with `ACCESS_DESK_SESSION_KEY`. A signed token stays valid until it expires,
+  so the gateway remembers the tokens of sessions people signed out of in
+  `accessdesk_gateway`, and refuses them.
+
 ## Run it
 
 Build once, then start each program in a terminal of its own.
