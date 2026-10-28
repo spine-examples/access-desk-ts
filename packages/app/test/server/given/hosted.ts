@@ -62,7 +62,7 @@ export interface Hosted {
 
 /**
  * Creates the storage Identity keeps its data in, for a test that starts the server
- * more than once over the same data. The test drops it.
+ * more than once over the same data.
  */
 export function givenServerStorage(): Promise<TestStorage> {
   return TestStorages.singleTenant(typeRegistry);
@@ -187,7 +187,6 @@ export async function givenOrganization(
     create(CreateOrganizationSchema, { id: organization, name: organization.uuid }),
     { organization },
   );
-  // Its view shows it a moment later, and a test reads it.
   const shown = await eventually(
     () => organizationView(hosted, organization),
     (view) => view !== undefined,

@@ -140,7 +140,6 @@ describe("Gateway session routes should", () => {
     const alreadyOut = await call("/auth/sign-out");
     expect(alreadyOut.status).toBe(200);
     expect(sessions.end).not.toHaveBeenCalled();
-    // A token that did not resolve is ended all the same, in case it is still good.
     expect(sessions.endUnresolved).toHaveBeenCalledOnce();
   });
 

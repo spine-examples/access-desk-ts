@@ -156,8 +156,6 @@ describe("postAndAwaitView should", () => {
     await givenOrganization(server, organizationId("acme"));
     const connection = connectionTo(() => server.url);
 
-    // An organization is created once, so creating it again changes nothing
-    // its view would be updated for.
     const shown = await client.ServerRequests.postAndAwaitView(
       connection.in(organizationId("acme")).onBehalfOf("access-desk"),
       creationShown("acme"),
@@ -185,7 +183,6 @@ describe("postAndAwaitView should", () => {
     const server = await hosted();
     const connection = connectionTo(() => server.url);
 
-    // An organization needs a name.
     const shown = await client.ServerRequests.postAndAwaitView(
       connection.in(organizationId("acme")).onBehalfOf("access-desk"),
       creationShown("acme", ""),

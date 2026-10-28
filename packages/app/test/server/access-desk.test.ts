@@ -165,7 +165,6 @@ describe("The assembled application should", () => {
       try {
         const kept = await after.identity.stand().read(ExternalIdentityViewSchema, NOAHS_ACCOUNT);
         expect(kept?.person?.uuid).toBe(person);
-        // Signing in again with the same account finds the same person.
         expect(await givenNoahSignedIn(after)).toBe(person);
       } finally {
         await after.stop();

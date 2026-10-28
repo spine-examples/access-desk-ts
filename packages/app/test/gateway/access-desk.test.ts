@@ -127,7 +127,6 @@ describe("AccessDesk should", () => {
       id: { subject: "google-1" },
       emailAddress: { value: "maya@example.com" },
     });
-    // The account's own view tells when it is linked, by naming the person.
     expect(awaited.view).toBe(ExternalIdentityViewSchema);
     expect(awaited.idSchema).toBe(ExternalIdentityIdSchema);
     expect(awaited.id).toEqual(account);

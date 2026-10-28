@@ -15,27 +15,22 @@
 import { generateKeyPairSync } from "node:crypto";
 import { create } from "@bufbuild/protobuf";
 import { timestampFromMs } from "@bufbuild/protobuf/wkt";
-import type { SignedTokenRevocation } from "@spine-event-engine/auth";
 import { Time } from "@spine-event-engine/core/time";
-import { EmailAddressSchema } from "@spine-event-engine/proto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  OrganizationIdSchema,
-  PersonIdSchema,
-} from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
+import { OrganizationIdSchema } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
 import { typeRegistry } from "../../generated/model-registry.js";
 import { RevokedTokens } from "../../src/gateway/revoked-tokens.js";
-import { Sessions, type SessionSubscriptions } from "../../src/gateway/sessions.js";
-
-/** The key the gateway signs sessions with. */
-const KEY = generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey;
-
-/** How long a session lasts, in milliseconds. */
-const SESSION_MS = 8 * 60 * 60 * 1_000;
-
-/** The order of the P-256 curve, the number every signature's `s` is taken modulo. */
-const P256_ORDER = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551n;
+import { Sessions } from "../../src/gateway/sessions.js";
+import {
+  failingWhenTold,
+  notingStops,
+  person,
+  request,
+  SESSION_MS,
+  sessionsOfGateway,
+  withOtherSignature,
+} from "./given/sessions.js";
 
 let storage: TestStorage;
 let revoked: Awaited<ReturnType<typeof RevokedTokens.open>>;
@@ -44,7 +39,7 @@ let sessions: Sessions;
 beforeEach(async () => {
   storage = await TestStorages.singleTenant(typeRegistry);
   revoked = await RevokedTokens.open(TestStorages.settingsOf(storage));
-  sessions = sessionsOfGateway();
+  sessions = sessionsOfGateway(revoked);
 });
 
 afterEach(async () => {
@@ -52,63 +47,6 @@ afterEach(async () => {
   await revoked.close();
   await storage.drop();
 });
-
-/**
- * Creates the sessions of a gateway that signs with the test's key and remembers
- * the revoked tokens in the test's store. Two of them stand for one gateway
- * before and after a restart.
- */
-function sessionsOfGateway(subscriptions?: SessionSubscriptions): Sessions {
-  return new Sessions({
-    key: KEY,
-    revoked,
-    ...(subscriptions === undefined ? {} : { subscriptions }),
-  });
-}
-
-const person = {
-  id: create(PersonIdSchema, { uuid: "person-1" }),
-  email: create(EmailAddressSchema, { value: "maya@example.com" }),
-  name: "Maya Chen",
-};
-
-function request(token: string): Request {
-  return new Request("https://gateway.test/auth/session", {
-    headers: { authorization: `Bearer ${token}` },
-  });
-}
-
-/**
- * Rewrites the token's signature the other way ECDSA allows: `s`
- * replaced by the curve's order less `s`. It signs the same claims.
- */
-function withOtherSignature(token: string): string {
-  const [header = "", payload = "", signature = ""] = token.split(".");
-  const bytes = Buffer.from(signature, "base64url");
-  const s = BigInt(`0x${bytes.subarray(32).toString("hex")}`);
-  const otherS = Buffer.from((P256_ORDER - s).toString(16).padStart(64, "0"), "hex");
-  return `${header}.${payload}.${Buffer.concat([bytes.subarray(0, 32), otherS]).toString("base64url")}`;
-}
-
-/**
- * Keeps the revoked tokens in the test's store while it can be read and
- * written, and fails while it cannot.
- */
-function failingWhenTold(): SignedTokenRevocation & { reading: boolean; writing: boolean } {
-  const store = {
-    kind: "supported" as const,
-    reading: true,
-    writing: true,
-    isRevoked: (id: string) =>
-      store.reading ? revoked.isRevoked(id) : Promise.reject(new Error("The store is down.")),
-    revoke: (id: string, expiresAt: Parameters<SignedTokenRevocation["revoke"]>[1]) =>
-      store.writing
-        ? revoked.revoke(id, expiresAt)
-        : Promise.reject(new Error("The store is down.")),
-    close: () => Promise.resolve(),
-  };
-  return store;
-}
 
 describe("Gateway sessions should", () => {
   it("serialize typed person and organization values only in the issued HTTP shape", async () => {
@@ -147,7 +85,7 @@ describe("Gateway sessions should", () => {
 
   it("stop what was opened under a session when it ends, and keep sessions apart", async () => {
     const closed: string[] = [];
-    const issued = sessionsOfGateway({
+    const issued = sessionsOfGateway(revoked, {
       closeFor: async (session) => {
         // What is opened is closed in the session's name, so its token must still work.
         closed.push(`closing ${session.id}`);
@@ -217,7 +155,7 @@ describe("Gateway sessions should", () => {
     await sessions.end(ending);
 
     await sessions.close();
-    sessions = sessionsOfGateway();
+    sessions = sessionsOfGateway(revoked);
 
     expect((await sessions.of(request(kept?.token ?? "")))?.person.name).toBe("Maya Chen");
     expect(await sessions.of(request(ending.credential.value))).toBeUndefined();
@@ -225,13 +163,7 @@ describe("Gateway sessions should", () => {
 
   it("know a session by its token's identifier, however the token's signature is written", async () => {
     const stopped: string[] = [];
-    const issued = sessionsOfGateway({
-      closeFor: () => Promise.resolve(),
-      stop: (session) => {
-        stopped.push(session);
-        return Promise.resolve();
-      },
-    });
+    const issued = sessionsOfGateway(revoked, notingStops(stopped));
     const token = (await issued.issue(person))?.token ?? "";
     const rewritten = withOtherSignature(token);
     expect(rewritten).not.toBe(token);
@@ -244,7 +176,6 @@ describe("Gateway sessions should", () => {
     if (same === undefined) {
       return;
     }
-    // Signing out with either form stops what the session opened in the other.
     await issued.end(same);
     expect(stopped).toEqual([original?.id]);
     expect(await issued.of(request(token))).toBeUndefined();
@@ -262,8 +193,6 @@ describe("Gateway sessions should", () => {
       }
       await sessions.end(ending);
 
-      // Her token has expired, but is still taken for a while. Another person
-      // signs out, and the gateway forgets the sessions no token can be used for.
       nowMs += SESSION_MS + 30_000;
       const other = await sessions.of(request((await sessions.issue(person))?.token ?? ""));
       if (other === undefined) {
@@ -278,32 +207,19 @@ describe("Gateway sessions should", () => {
   });
 
   it("end a session it cannot resolve, once it can remember the end, and stop what it opened", async () => {
-    const store = failingWhenTold();
+    const store = failingWhenTold(revoked);
     const stopped: string[] = [];
-    const issued = new Sessions({
-      key: KEY,
-      revoked: store,
-      subscriptions: {
-        closeFor: () => Promise.resolve(),
-        stop: (session) => {
-          stopped.push(session);
-          return Promise.resolve();
-        },
-      },
-    });
+    const issued = sessionsOfGateway(store, notingStops(stopped));
     const token = (await issued.issue(person))?.token ?? "";
     const session = await issued.of(request(token));
     expect(session).toBeDefined();
 
-    // The store cannot be read or written, so no session resolves, and the
-    // end cannot be remembered.
     store.reading = false;
     store.writing = false;
     expect(await issued.of(request(token))).toBeUndefined();
     await expect(issued.endUnresolved(request(token))).rejects.toThrow(/could not be ended/);
     expect(stopped).toEqual([]);
 
-    // It can be written again, though not yet read.
     store.writing = true;
     await issued.endUnresolved(request(token));
 
@@ -315,13 +231,7 @@ describe("Gateway sessions should", () => {
 
   it("end nothing for a token it did not sign", async () => {
     const stopped: string[] = [];
-    const issued = sessionsOfGateway({
-      closeFor: () => Promise.resolve(),
-      stop: (session) => {
-        stopped.push(session);
-        return Promise.resolve();
-      },
-    });
+    const issued = sessionsOfGateway(revoked, notingStops(stopped));
 
     await issued.endUnresolved(request("not-a-token"));
 
