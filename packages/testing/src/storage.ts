@@ -255,8 +255,8 @@ const Databases = {
   /**
    * Builds the address of the database the tests connect to when they create theirs.
    *
-   * The server is the one the programs use, and the database is
-   * `ACCESS_DESK_TEST_DATABASE`.
+   * The server is the one the programs use, and the database is `postgres`,
+   * which every PostgreSQL server has.
    */
   server(): string {
     const setting = (name: string, trimmed = true): string => {
@@ -273,7 +273,6 @@ const Databases = {
     const password = encodeURIComponent(setting("ACCESS_DESK_DATABASE_PASSWORD", false));
     const address = isIP(host) === 6 ? `[${host}]` : host;
     const port = setting("ACCESS_DESK_DATABASE_PORT");
-    const database = encodeURIComponent(setting("ACCESS_DESK_TEST_DATABASE"));
-    return `postgresql://${user}:${password}@${address}:${port}/${database}`;
+    return `postgresql://${user}:${password}@${address}:${port}/postgres`;
   },
 };

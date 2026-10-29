@@ -67,13 +67,12 @@ pnpm run postgres:start
 
 The programs keep their data in these databases, named as in `.env.example`:
 
-| Database                              | Used by            | What it keeps                                                                               |
-| ------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------- |
-| `accessdesk_identity`                 | application server | People, their accounts, email addresses, and memberships, and the subscriptions to them.    |
-| `accessdesk_resources_{organization}` | application server | One organization: its members, resources, access requests, grants, and audit trail.         |
-| `accessdesk_resources_subscriptions`  | application server | What each subscription to the organizations watches.                                        |
-| `accessdesk_gateway`                  | gateway            | Who owns each subscription, and the identifiers of the sessions people signed out of.       |
-| `accessdesk_test`                     | tests              | Nothing. `pnpm run test:postgresql` makes throwaway databases through it, and deletes them. |
+| Database                              | Used by            | What it keeps                                                                            |
+| ------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------- |
+| `accessdesk_identity`                 | application server | People, their accounts, email addresses, and memberships, and the subscriptions to them. |
+| `accessdesk_resources_{organization}` | application server | One organization: its members, resources, access requests, grants, and audit trail.      |
+| `accessdesk_resources_subscriptions`  | application server | What each subscription to the organizations watches.                                     |
+| `accessdesk_gateway`                  | gateway            | Who owns each subscription, and the identifiers of the sessions people signed out of.    |
 
 The server never opens the gateway's database. The gateway opens none of the
 server's and reaches the data only through the server.

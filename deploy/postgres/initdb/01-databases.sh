@@ -55,7 +55,3 @@ create "$ACCESS_DESK_RESOURCES_SUBSCRIPTIONS_DATABASE"
 # The subscriptions people hold and the sessions they ended. The gateway
 # keeps them.
 create "$ACCESS_DESK_GATEWAY_DATABASE"
-
-# The tests on PostgreSQL connect to it to make their throwaway databases, and
-# delete them when they finish.
-create "$ACCESS_DESK_TEST_DATABASE"
