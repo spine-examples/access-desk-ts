@@ -16,12 +16,7 @@ import type { Message } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { anyIs, anyUnpack } from "@bufbuild/protobuf/wkt";
 import type { EventContext } from "@spine-event-engine/proto";
-import {
-  BoundedContext,
-  EventRouting,
-  StorageSubscriptionRegistry,
-} from "@spine-event-engine/server";
-import type { StorageFactory } from "@spine-event-engine/storage";
+import { BoundedContext, EventRouting } from "@spine-event-engine/server";
 import {
   OrganizationMemberAddedSchema,
   ResourceAddedSchema,
@@ -86,38 +81,21 @@ import { AccessGrantViewProjection } from "./access/grant/access-grant-view-proj
 import { AuditEntryIds } from "./audit/audit-entry-ids.js";
 import { AuditEntryProjection } from "./audit/audit-entry-projection.js";
 
-/** How the Resources context is assembled. */
-export interface ResourcesContextOptions {
-  /**
-   * Where the context keeps each organization and everything it owns.
-   *
-   * Each organization is kept apart, so the storage must take an organization
-   * it has not seen before, or know every organization from the start.
-   */
-  readonly storage: StorageFactory;
-  /**
-   * Where the context keeps subscriptions.
-   *
-   * A subscription belongs to no organization, so storage that keeps each
-   * organization apart, such as Spine's PostgreSQL storage, cannot keep it.
-   */
-  readonly subscriptions: StorageFactory;
-}
-
 /**
  * The Resources bounded context.
  *
  * It is multitenant, and each organization is its own tenant. So
  * `CreateOrganization` is given in the tenant of the organization it creates.
+ * Spine takes an organization's commands only once the organization is kept in
+ * the server environment's tenant index.
  */
 export const ResourcesContext = {
   /**
    * Builds the context.
    *
-   * @param options How to assemble the context.
    * @returns The assembled Resources bounded context.
    */
-  async create(options: ResourcesContextOptions): Promise<BoundedContext> {
+  async create(): Promise<BoundedContext> {
     /**
      * Finds the request an event from a person's access answers.
      *
@@ -222,13 +200,6 @@ export const ResourcesContext = {
     }
     return BoundedContext.multitenant("Resources")
       .withGeneratedRegistryRoot(new URL("..", import.meta.url))
-      .withStorageFactory(options.storage)
-      .withSubscriptionRegistry(
-        new StorageSubscriptionRegistry(
-          { name: "Resources:subscriptions", multitenant: false },
-          options.subscriptions,
-        ),
-      )
       .add(OrganizationAggregate)
       .add(OrganizationViewProjection)
       .add(ResourceRegistrationProcessManager, { eventRouting: resourceRegistrationProcmanRouting })
@@ -240,6 +211,6 @@ export const ResourcesContext = {
       .add(ResourceAccessAggregate)
       .add(AccessGrantViewProjection, { eventRouting: grantViewRouting })
       .add(AuditEntryProjection, { eventRouting: auditTrailRouting })
-      .buildAsync();
+      .build();
   },
 };

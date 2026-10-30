@@ -15,7 +15,6 @@
 import { create } from "@bufbuild/protobuf";
 import type { EmailAddress } from "@spine-event-engine/proto";
 import { BoundedContext, CommandRouting, EventRouting } from "@spine-event-engine/server";
-import type { StorageFactory } from "@spine-event-engine/storage";
 import {
   MembershipIdSchema,
   type ExternalIdentityId,
@@ -45,11 +44,6 @@ import { PersonViewProjection } from "./person/person-view-projection.js";
 export interface IdentityContextOptions {
   /** The service that adds a person to the members of an organization. */
   readonly members: OrganizationMembers;
-  /**
-   * Where the context keeps the people, their accounts, their email
-   * addresses, and their memberships.
-   */
-  readonly storage: StorageFactory;
 }
 
 /**
@@ -102,7 +96,6 @@ export const IdentityContext = {
       );
     return BoundedContext.singleTenant("Identity")
       .withGeneratedRegistryRoot(new URL("..", import.meta.url))
-      .withStorageFactory(options.storage)
       .add(ExternalIdentityProcessManager, { eventRouting: accountRouting })
       .add(ExternalIdentityViewProjection)
       .add(PersonEmailAggregate)
@@ -114,6 +107,6 @@ export const IdentityContext = {
         onCreate: (entity) => new MembershipProcessManager(entity, options.members),
       })
       .add(MembershipViewProjection)
-      .buildAsync();
+      .build();
   },
 };
