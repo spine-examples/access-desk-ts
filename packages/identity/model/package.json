@@ -24,11 +24,11 @@
   },
   "dependencies": {
     "@bufbuild/protobuf": "2.12.1",
-    "@spine-event-engine/core": "2.0.0-snapshot.24",
-    "@spine-event-engine/proto": "2.0.0-snapshot.24"
+    "@spine-event-engine/core": "2.0.0-snapshot.25",
+    "@spine-event-engine/proto": "2.0.0-snapshot.25"
   },
   "devDependencies": {
-    "@spine-event-engine/proto-tools": "2.0.0-snapshot.24",
+    "@spine-event-engine/proto-tools": "2.0.0-snapshot.25",
     "typescript": "6.0.3",
     "vitest": "5.0.3"
   }

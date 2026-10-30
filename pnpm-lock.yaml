@@ -15,38 +15,38 @@ importers:
         specifier: 9.39.1
         version: 9.39.1
       '@spine-event-engine/auth':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       '@spine-event-engine/client-node':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       '@spine-event-engine/client-react':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24(@types/react@19.2.18)(react@19.2.8)
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25(@types/react@19.2.18)(react@19.2.8)
       '@spine-event-engine/client-web':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       '@spine-event-engine/core':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       '@spine-event-engine/proto':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       '@spine-event-engine/proto-tools':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       '@spine-event-engine/server':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24(@spine-event-engine/auth@2.0.0-snapshot.24)
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25(@spine-event-engine/auth@2.0.0-snapshot.25)
       '@spine-event-engine/storage':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       '@spine-event-engine/storage-postgres':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       '@spine-event-engine/testing':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24(@spine-event-engine/auth@2.0.0-snapshot.24)
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25(@spine-event-engine/auth@2.0.0-snapshot.25)
       '@types/node':
         specifier: 24.13.2
         version: 24.13.2
@@ -90,26 +90,26 @@ importers:
         specifier: 2.1.2
         version: 2.1.2(@bufbuild/protobuf@2.12.1)(@connectrpc/connect@2.1.2(@bufbuild/protobuf@2.12.1))
       '@spine-event-engine/auth':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       '@spine-event-engine/client-node':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       '@spine-event-engine/core':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       '@spine-event-engine/proto':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       '@spine-event-engine/server':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24(@spine-event-engine/auth@2.0.0-snapshot.24)
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25(@spine-event-engine/auth@2.0.0-snapshot.25)
       '@spine-event-engine/storage':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       '@spine-event-engine/storage-postgres':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       pg:
         specifier: 8.23.0
         version: 8.23.0
@@ -118,11 +118,11 @@ importers:
         specifier: 0.0.0
         version: link:../testing
       '@spine-event-engine/client-web':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       '@spine-event-engine/proto-tools':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       '@types/node':
         specifier: 24.13.2
         version: 24.13.2
@@ -142,15 +142,15 @@ importers:
         specifier: 2.12.1
         version: 2.12.1
       '@spine-event-engine/core':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       '@spine-event-engine/proto':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
     devDependencies:
       '@spine-event-engine/proto-tools':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -167,27 +167,27 @@ importers:
         specifier: 2.12.1
         version: 2.12.1
       '@spine-event-engine/core':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       '@spine-event-engine/proto':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       '@spine-event-engine/server':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24(@spine-event-engine/auth@2.0.0-snapshot.24)
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25(@spine-event-engine/auth@2.0.0-snapshot.25)
       '@spine-event-engine/storage':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
     devDependencies:
       '@access-desk/testing':
         specifier: 0.0.0
         version: link:../../testing
       '@spine-event-engine/proto-tools':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       '@spine-event-engine/testing':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24(@spine-event-engine/auth@2.0.0-snapshot.24)
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25(@spine-event-engine/auth@2.0.0-snapshot.25)
       '@types/node':
         specifier: 24.13.2
         version: 24.13.2
@@ -207,15 +207,15 @@ importers:
         specifier: 2.12.1
         version: 2.12.1
       '@spine-event-engine/core':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       '@spine-event-engine/proto':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
     devDependencies:
       '@spine-event-engine/proto-tools':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -235,27 +235,27 @@ importers:
         specifier: 2.12.1
         version: 2.12.1
       '@spine-event-engine/core':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       '@spine-event-engine/proto':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       '@spine-event-engine/server':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24(@spine-event-engine/auth@2.0.0-snapshot.24)
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25(@spine-event-engine/auth@2.0.0-snapshot.25)
       '@spine-event-engine/storage':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
     devDependencies:
       '@access-desk/testing':
         specifier: 0.0.0
         version: link:../../testing
       '@spine-event-engine/proto-tools':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       '@spine-event-engine/testing':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24(@spine-event-engine/auth@2.0.0-snapshot.24)
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25(@spine-event-engine/auth@2.0.0-snapshot.25)
       '@types/node':
         specifier: 24.13.2
         version: 24.13.2
@@ -269,17 +269,20 @@ importers:
   packages/testing:
     dependencies:
       '@spine-event-engine/core':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       '@spine-event-engine/proto':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
+      '@spine-event-engine/server':
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25(@spine-event-engine/auth@2.0.0-snapshot.25)
       '@spine-event-engine/storage':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       '@spine-event-engine/storage-postgres':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
       pg:
         specifier: 8.23.0
         version: 8.23.0
@@ -300,11 +303,11 @@ importers:
         specifier: 2.12.1
         version: 2.12.1
       '@spine-event-engine/client-react':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24(@types/react@19.2.18)(react@19.2.8)
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25(@types/react@19.2.18)(react@19.2.8)
       '@spine-event-engine/client-web':
-        specifier: 2.0.0-snapshot.24
-        version: 2.0.0-snapshot.24
+        specifier: 2.0.0-snapshot.25
+        version: 2.0.0-snapshot.25
     devDependencies:
       typescript:
         specifier: 6.0.3
@@ -586,57 +589,57 @@ packages:
   '@rolldown/pluginutils@1.0.1':
     resolution: {integrity: sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==}
 
-  '@spine-event-engine/ai@2.0.0-snapshot.24':
-    resolution: {integrity: sha512-n1Uw/pPM1BV9oPrHBcrNLjPn5EvO8yY7pfoSTtDod9ajSSGzwLi0lTh3IXT3J77EpdAdjamIaOLVThTRzYCPpQ==}
+  '@spine-event-engine/ai@2.0.0-snapshot.25':
+    resolution: {integrity: sha512-l6ucqdFT1R9AGMOktQKzOMFZhQ6iP5Tfy78HUhEVF9/leeDt+lgrP4WFBHCnpxY3R35oXYlEJFIYJoMUEDjWzg==}
 
-  '@spine-event-engine/auth@2.0.0-snapshot.24':
-    resolution: {integrity: sha512-WKLvUY9/cxcyOEjAwGVtsOukJj6xGJ22STAQblxVnchZgF44YA4BzLLw0u0YA57vQKB8QIEYi/VA7MfIEI9hIw==}
+  '@spine-event-engine/auth@2.0.0-snapshot.25':
+    resolution: {integrity: sha512-4mI8mmZ1b+hdg56zWl/s07C8drgfgO60DEVn2jmLt98kZqlpfrAJ5gIdOIFEk6ycy+ZE6Qhj8mTLdG0acBcMwA==}
 
-  '@spine-event-engine/client-node@2.0.0-snapshot.24':
-    resolution: {integrity: sha512-OI51im468ngZFV6JNO7prUcjyTt6x1jx0LpKwZbLoSi4xJZ0v/EDQb0ghCVarjibHUkhwr+wALtqXKwm07vOQA==}
+  '@spine-event-engine/client-node@2.0.0-snapshot.25':
+    resolution: {integrity: sha512-1bSVNJbqPHey3Vv3he8NqJcSyT+4fp2zvVYR0XxtBQcjgWlIuAB2c3sVyqUDNY7Af8NAxjz9EHw9VmXNKFGeyw==}
     hasBin: true
 
-  '@spine-event-engine/client-react@2.0.0-snapshot.24':
-    resolution: {integrity: sha512-bon4f4Q48Ksgxe8Nad5cT9JQMPxoKvDPyy1njvrN2Y9BedQa0TKsGLOrF0V1Z20EWHG24hfvrQFRBt65bcmxMw==}
+  '@spine-event-engine/client-react@2.0.0-snapshot.25':
+    resolution: {integrity: sha512-0IGX66th2jjFlb+xT637m6Jy3KTEy0fsbS6OjYwmXAtmfYLL4i2Zg8VT0/8nMTinzc1uEVIQuqpVptFMmawaMA==}
     peerDependencies:
       '@types/react': ^19.2.7
       react: ^19.2.8
 
-  '@spine-event-engine/client-web@2.0.0-snapshot.24':
-    resolution: {integrity: sha512-WyB4ZgBPyyZ2FUWK0lHZM6ef1kxOewrUBYI6R7i7UHiQxNmz8KulB8hSNjPUMma8uFJHXqz/3bzqWkD1xVvjYA==}
+  '@spine-event-engine/client-web@2.0.0-snapshot.25':
+    resolution: {integrity: sha512-CBbpMQlEwoMiiuye2sAgeILGRQ1oRJOgtXg36Znsr72vmDixWoTewzgvGmFQtZVAVpfDAdFNxbIXlphc2KTu8g==}
 
-  '@spine-event-engine/core@2.0.0-snapshot.24':
-    resolution: {integrity: sha512-tXddpw8jMcdIvAWzy2n4mioy78QyblSwId6Xn+3AnPmuVzc9iMpQzhR4cJQZQsWB/fnlvFI+tWk0FuL20Pqgkw==}
+  '@spine-event-engine/core@2.0.0-snapshot.25':
+    resolution: {integrity: sha512-zbmbD4FC8tOnmNZfxo/b3C6WJYtF69rrGokAw1MXO5fhuWSjQBm2x0szm1K5B4Qt+RRHuuGhCBLIi8699Rjq8w==}
 
-  '@spine-event-engine/deployment@2.0.0-snapshot.24':
-    resolution: {integrity: sha512-1H3t0XfwtiZJqfiB76J0B865syUrpT0IhRKnyWVa6K3QlcBp8quu1HNuRimXwaQGwG+ksuptwNPVz1dfYZ/H0g==}
+  '@spine-event-engine/deployment@2.0.0-snapshot.25':
+    resolution: {integrity: sha512-8xkA8QyGx6Cc9tS2iNwbzMkVdWznAgLG+AuEr+s4j/RIvYW3wfaNg4h2IeTL6+hBrdNtyI4HXVYOPJKZrYrucA==}
 
-  '@spine-event-engine/proto-tools@2.0.0-snapshot.24':
-    resolution: {integrity: sha512-5EdJtyCws7/o/YkgrNNeCByI8lBQ7ark8RE0qqNldgKdDQKFJAv70HYIHP3jXZReaMAgHjMOWySgdUBiVJH0Vw==}
+  '@spine-event-engine/proto-tools@2.0.0-snapshot.25':
+    resolution: {integrity: sha512-WhqjH0cdQgdIXvzHhW7Por9cGTp99ee8WkvmgP+VQyxz8t3xuvy1LNmQw+fEmGpMiTtO9RlE/IKKJn99/B1mYA==}
     hasBin: true
 
-  '@spine-event-engine/proto@2.0.0-snapshot.24':
-    resolution: {integrity: sha512-iHVv6EMNOougM/ZsXzFQoDATl/3ZSDixXJ4BPeRi8BXceG3Iv589PokX3aQhTTcpxKWuuszKvLVocmeflHPAFA==}
+  '@spine-event-engine/proto@2.0.0-snapshot.25':
+    resolution: {integrity: sha512-eMBBu81NHouw5Pkw4e63OrKwuNCsyIu1GUC00ZPWnmWibMIbpA/wSbyM+nrzKPqjRkW1yfuMK//2aOhoT3U1ww==}
 
-  '@spine-event-engine/server@2.0.0-snapshot.24':
-    resolution: {integrity: sha512-5tXbfowk4zYywY6wo6NddiyATqQ3P+DEVL4521xHckThsO+4LoCW3reCJvA28Uy3RUXgiJaga7KlOoHxIr3rdQ==}
+  '@spine-event-engine/server@2.0.0-snapshot.25':
+    resolution: {integrity: sha512-Sk2juoS3H7+rJ9wBku6MNUmHov62kc7pr3ymjb57s7Mqvk/tJOGDQ6s/PCrv7H+3uMCoZDOPLaCPbuT52Q1qug==}
     peerDependencies:
-      '@spine-event-engine/auth': 2.0.0-snapshot.24
+      '@spine-event-engine/auth': 2.0.0-snapshot.25
     peerDependenciesMeta:
       '@spine-event-engine/auth':
         optional: true
 
-  '@spine-event-engine/storage-postgres@2.0.0-snapshot.24':
-    resolution: {integrity: sha512-nW1RNhLbGR93PE4uxVf2xkldpNN/HNTRiDf5ulnJ//43JYLuTJnpwfv3zuaT7BH41H89JO9VNUiw8uDobdx8zQ==}
+  '@spine-event-engine/storage-postgres@2.0.0-snapshot.25':
+    resolution: {integrity: sha512-RL5skYU0t8+7Q26MXVLd9WsFgAwd8xfEjkYqBFwMBn/6qoHsRzRyA3qF3zHq0WpSGwHX9FeLjX0xLkYj0zJQJw==}
 
-  '@spine-event-engine/storage@2.0.0-snapshot.24':
-    resolution: {integrity: sha512-fMIxSslqanApMWRrOb1GrJI1iMziQnnJ3487eoTi/dy4RE35zT/pqCQgEAiIaK8nw0ERdUBE2YpjnXIewtn2GA==}
+  '@spine-event-engine/storage@2.0.0-snapshot.25':
+    resolution: {integrity: sha512-YQLPASxCc1pa+UTAAdOuN4ZwQljbjUjnAgCcUMv/bm/zOEXr8BJLU6Rlhs8UXsrNZPwcB4ItCvhns0S4Xaey/w==}
 
-  '@spine-event-engine/testing@2.0.0-snapshot.24':
-    resolution: {integrity: sha512-JLC0CpVv1cKli+/sM+WYcvHbLyesArLUXmKmg7iCa5YaN3Egnjuc9Fo06pxC5zj0ej/PSwtVUbElsgqzE17eQA==}
+  '@spine-event-engine/testing@2.0.0-snapshot.25':
+    resolution: {integrity: sha512-uVv5F3+uOoB1fOKpoR3+rvrQJ92DYxgiZbSQXzD21H4W2Zv+PzmtsEZ0nV7xDiDaCYLA1QCX4jeXulcLlbcZ3w==}
 
-  '@spine-event-engine/transport@2.0.0-snapshot.24':
-    resolution: {integrity: sha512-NuxJP/11HGosEdh+gVCj1BpVDaapbSM0sh/vH0Z0RxDagd8GqDIdrrYElhlGf9nRlcDbwF++g7dcbfEi+ox6Rw==}
+  '@spine-event-engine/transport@2.0.0-snapshot.25':
+    resolution: {integrity: sha512-iWzbTuN8YXyc7SZfVSHjlvCDO+Dhq9CxXT5asXUtFNJJubhhsZzBRQJuZ06wT2lyKeuZGr3MMb+yNbNkQjIgfg==}
 
   '@spine-event-engine/validation@2.0.0-snapshot.7':
     resolution: {integrity: sha512-axp84tc+rE3c0Z3lbC6sHBt5irGiBAdix9rbrSMZrogNVJCuePtMqxlbRR5NDK1jRGzXMwm2MWcwwOLRQSJ3tg==}
@@ -1615,127 +1618,127 @@ snapshots:
 
   '@rolldown/pluginutils@1.0.1': {}
 
-  '@spine-event-engine/ai@2.0.0-snapshot.24':
+  '@spine-event-engine/ai@2.0.0-snapshot.25':
     dependencies:
       '@bufbuild/protobuf': 2.12.1
-      '@spine-event-engine/core': 2.0.0-snapshot.24
-      '@spine-event-engine/proto': 2.0.0-snapshot.24
+      '@spine-event-engine/core': 2.0.0-snapshot.25
+      '@spine-event-engine/proto': 2.0.0-snapshot.25
 
-  '@spine-event-engine/auth@2.0.0-snapshot.24':
+  '@spine-event-engine/auth@2.0.0-snapshot.25':
     dependencies:
       '@bufbuild/protobuf': 2.12.1
       '@connectrpc/connect': 2.1.2(@bufbuild/protobuf@2.12.1)
-      '@spine-event-engine/core': 2.0.0-snapshot.24
-      '@spine-event-engine/deployment': 2.0.0-snapshot.24
-      '@spine-event-engine/proto': 2.0.0-snapshot.24
+      '@spine-event-engine/core': 2.0.0-snapshot.25
+      '@spine-event-engine/deployment': 2.0.0-snapshot.25
+      '@spine-event-engine/proto': 2.0.0-snapshot.25
       jose: 6.2.4
       loglayer: 9.4.0
 
-  '@spine-event-engine/client-node@2.0.0-snapshot.24':
+  '@spine-event-engine/client-node@2.0.0-snapshot.25':
     dependencies:
       '@bufbuild/protobuf': 2.12.1
       '@bufbuild/protoplugin': 2.12.1
       '@connectrpc/connect': 2.1.2(@bufbuild/protobuf@2.12.1)
       '@connectrpc/connect-node': 2.1.2(@bufbuild/protobuf@2.12.1)(@connectrpc/connect@2.1.2(@bufbuild/protobuf@2.12.1))
-      '@spine-event-engine/client-web': 2.0.0-snapshot.24
-      '@spine-event-engine/core': 2.0.0-snapshot.24
-      '@spine-event-engine/proto': 2.0.0-snapshot.24
+      '@spine-event-engine/client-web': 2.0.0-snapshot.25
+      '@spine-event-engine/core': 2.0.0-snapshot.25
+      '@spine-event-engine/proto': 2.0.0-snapshot.25
     transitivePeerDependencies:
       - supports-color
 
-  '@spine-event-engine/client-react@2.0.0-snapshot.24(@types/react@19.2.18)(react@19.2.8)':
+  '@spine-event-engine/client-react@2.0.0-snapshot.25(@types/react@19.2.18)(react@19.2.8)':
     dependencies:
-      '@spine-event-engine/client-web': 2.0.0-snapshot.24
-      '@spine-event-engine/proto': 2.0.0-snapshot.24
+      '@spine-event-engine/client-web': 2.0.0-snapshot.25
+      '@spine-event-engine/proto': 2.0.0-snapshot.25
       '@types/react': 19.2.18
       react: 19.2.8
 
-  '@spine-event-engine/client-web@2.0.0-snapshot.24':
+  '@spine-event-engine/client-web@2.0.0-snapshot.25':
     dependencies:
       '@bufbuild/protobuf': 2.12.1
       '@connectrpc/connect': 2.1.2(@bufbuild/protobuf@2.12.1)
       '@connectrpc/connect-web': 2.1.2(@bufbuild/protobuf@2.12.1)(@connectrpc/connect@2.1.2(@bufbuild/protobuf@2.12.1))
-      '@spine-event-engine/core': 2.0.0-snapshot.24
-      '@spine-event-engine/proto': 2.0.0-snapshot.24
+      '@spine-event-engine/core': 2.0.0-snapshot.25
+      '@spine-event-engine/proto': 2.0.0-snapshot.25
 
-  '@spine-event-engine/core@2.0.0-snapshot.24':
+  '@spine-event-engine/core@2.0.0-snapshot.25':
     dependencies:
       '@bufbuild/protobuf': 2.12.1
-      '@spine-event-engine/proto': 2.0.0-snapshot.24
+      '@spine-event-engine/proto': 2.0.0-snapshot.25
       '@spine-event-engine/validation': 2.0.0-snapshot.7(@bufbuild/protobuf@2.12.1)
 
-  '@spine-event-engine/deployment@2.0.0-snapshot.24':
+  '@spine-event-engine/deployment@2.0.0-snapshot.25':
     dependencies:
       '@bufbuild/protobuf': 2.12.1
-      '@spine-event-engine/proto': 2.0.0-snapshot.24
-      '@spine-event-engine/storage': 2.0.0-snapshot.24
+      '@spine-event-engine/proto': 2.0.0-snapshot.25
+      '@spine-event-engine/storage': 2.0.0-snapshot.25
       loglayer: 9.4.0
 
-  '@spine-event-engine/proto-tools@2.0.0-snapshot.24':
+  '@spine-event-engine/proto-tools@2.0.0-snapshot.25':
     dependencies:
       '@bufbuild/buf': 1.71.0
       '@bufbuild/protobuf': 2.12.1
       '@bufbuild/protoc-gen-es': 2.12.1(@bufbuild/protobuf@2.12.1)
       '@bufbuild/protoplugin': 2.12.1
-      '@spine-event-engine/proto': 2.0.0-snapshot.24
+      '@spine-event-engine/proto': 2.0.0-snapshot.25
       semver: 7.8.5
       typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
-  '@spine-event-engine/proto@2.0.0-snapshot.24':
+  '@spine-event-engine/proto@2.0.0-snapshot.25':
     dependencies:
       '@bufbuild/protobuf': 2.12.1
 
-  '@spine-event-engine/server@2.0.0-snapshot.24(@spine-event-engine/auth@2.0.0-snapshot.24)':
+  '@spine-event-engine/server@2.0.0-snapshot.25(@spine-event-engine/auth@2.0.0-snapshot.25)':
     dependencies:
       '@bufbuild/protobuf': 2.12.1
       '@connectrpc/connect': 2.1.2(@bufbuild/protobuf@2.12.1)
       '@connectrpc/connect-node': 2.1.2(@bufbuild/protobuf@2.12.1)(@connectrpc/connect@2.1.2(@bufbuild/protobuf@2.12.1))
-      '@spine-event-engine/ai': 2.0.0-snapshot.24
-      '@spine-event-engine/core': 2.0.0-snapshot.24
-      '@spine-event-engine/deployment': 2.0.0-snapshot.24
-      '@spine-event-engine/proto': 2.0.0-snapshot.24
-      '@spine-event-engine/storage': 2.0.0-snapshot.24
-      '@spine-event-engine/transport': 2.0.0-snapshot.24
+      '@spine-event-engine/ai': 2.0.0-snapshot.25
+      '@spine-event-engine/core': 2.0.0-snapshot.25
+      '@spine-event-engine/deployment': 2.0.0-snapshot.25
+      '@spine-event-engine/proto': 2.0.0-snapshot.25
+      '@spine-event-engine/storage': 2.0.0-snapshot.25
+      '@spine-event-engine/transport': 2.0.0-snapshot.25
       loglayer: 9.4.0
     optionalDependencies:
-      '@spine-event-engine/auth': 2.0.0-snapshot.24
+      '@spine-event-engine/auth': 2.0.0-snapshot.25
 
-  '@spine-event-engine/storage-postgres@2.0.0-snapshot.24':
+  '@spine-event-engine/storage-postgres@2.0.0-snapshot.25':
     dependencies:
       '@bufbuild/protobuf': 2.12.1
-      '@spine-event-engine/core': 2.0.0-snapshot.24
-      '@spine-event-engine/proto': 2.0.0-snapshot.24
-      '@spine-event-engine/storage': 2.0.0-snapshot.24
+      '@spine-event-engine/core': 2.0.0-snapshot.25
+      '@spine-event-engine/proto': 2.0.0-snapshot.25
+      '@spine-event-engine/storage': 2.0.0-snapshot.25
       '@types/pg': 8.23.1
       pg: 8.23.0
     transitivePeerDependencies:
       - pg-native
 
-  '@spine-event-engine/storage@2.0.0-snapshot.24':
+  '@spine-event-engine/storage@2.0.0-snapshot.25':
     dependencies:
       '@bufbuild/protobuf': 2.12.1
-      '@spine-event-engine/core': 2.0.0-snapshot.24
-      '@spine-event-engine/proto': 2.0.0-snapshot.24
+      '@spine-event-engine/core': 2.0.0-snapshot.25
+      '@spine-event-engine/proto': 2.0.0-snapshot.25
 
-  '@spine-event-engine/testing@2.0.0-snapshot.24(@spine-event-engine/auth@2.0.0-snapshot.24)':
+  '@spine-event-engine/testing@2.0.0-snapshot.25(@spine-event-engine/auth@2.0.0-snapshot.25)':
     dependencies:
       '@bufbuild/protobuf': 2.12.1
-      '@spine-event-engine/ai': 2.0.0-snapshot.24
-      '@spine-event-engine/client-node': 2.0.0-snapshot.24
-      '@spine-event-engine/core': 2.0.0-snapshot.24
-      '@spine-event-engine/proto': 2.0.0-snapshot.24
-      '@spine-event-engine/server': 2.0.0-snapshot.24(@spine-event-engine/auth@2.0.0-snapshot.24)
-      '@spine-event-engine/storage': 2.0.0-snapshot.24
+      '@spine-event-engine/ai': 2.0.0-snapshot.25
+      '@spine-event-engine/client-node': 2.0.0-snapshot.25
+      '@spine-event-engine/core': 2.0.0-snapshot.25
+      '@spine-event-engine/proto': 2.0.0-snapshot.25
+      '@spine-event-engine/server': 2.0.0-snapshot.25(@spine-event-engine/auth@2.0.0-snapshot.25)
+      '@spine-event-engine/storage': 2.0.0-snapshot.25
     transitivePeerDependencies:
       - '@spine-event-engine/auth'
       - supports-color
 
-  '@spine-event-engine/transport@2.0.0-snapshot.24':
+  '@spine-event-engine/transport@2.0.0-snapshot.25':
     dependencies:
       '@bufbuild/protobuf': 2.12.1
-      '@spine-event-engine/proto': 2.0.0-snapshot.24
+      '@spine-event-engine/proto': 2.0.0-snapshot.25
 
   '@spine-event-engine/validation@2.0.0-snapshot.7(@bufbuild/protobuf@2.12.1)':
     dependencies:
