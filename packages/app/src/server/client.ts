@@ -17,7 +17,7 @@ import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { Http2SessionManager, createGrpcTransport } from "@connectrpc/connect-node";
 import { Client } from "@spine-event-engine/client-node";
 import type { OrganizationId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
-import { AnyMessages, TypeUrls } from "@spine-event-engine/core";
+import { AnyPacker, TypeUrls } from "@spine-event-engine/core";
 import {
   QueryIdSchema,
   QuerySchema,
@@ -150,7 +150,7 @@ const Targets = {
       type: TypeUrls.derive(schema),
       criterion: {
         case: "filters",
-        value: { idFilter: { id: [AnyMessages.pack(idSchema, id)] } },
+        value: { idFilter: { id: [AnyPacker.pack(idSchema, id)] } },
       },
     });
   },
@@ -181,7 +181,7 @@ export const ServerRequests = {
       }),
     );
     const state = response.message[0]?.state;
-    return state === undefined ? undefined : AnyMessages.unpack(state, schema);
+    return state === undefined ? undefined : AnyPacker.tryUnpack(state, schema);
   },
 
   /**
@@ -228,8 +228,8 @@ export const ServerRequests = {
           }),
       },
     );
-    const shownBy = (state: Parameters<typeof AnyMessages.unpack>[0] | undefined) => {
-      const view = state === undefined ? undefined : AnyMessages.unpack(state, awaited.view);
+    const shownBy = (state: Parameters<typeof AnyPacker.tryUnpack>[0] | undefined) => {
+      const view = state === undefined ? undefined : AnyPacker.tryUnpack(state, awaited.view);
       return view === undefined ? undefined : awaited.shows(view);
     };
     const shown = (async (): Promise<Shown | undefined> => {
@@ -286,7 +286,7 @@ export const ServerRequests = {
   ): Promise<MessageShape<Schema>[]> {
     const response = await request.send(query);
     return response.message.flatMap(({ state }) => {
-      const item = state === undefined ? undefined : AnyMessages.unpack(state, schema);
+      const item = state === undefined ? undefined : AnyPacker.tryUnpack(state, schema);
       return item === undefined ? [] : [item];
     });
   },

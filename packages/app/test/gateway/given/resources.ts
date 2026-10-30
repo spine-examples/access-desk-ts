@@ -14,7 +14,7 @@
 
 import { create } from "@bufbuild/protobuf";
 import type { Any } from "@bufbuild/protobuf/wkt";
-import { AnyMessages, TypeUrls } from "@spine-event-engine/core";
+import { AnyPacker, TypeUrls } from "@spine-event-engine/core";
 import { TopicSchema } from "@spine-event-engine/proto/client";
 import { expect } from "vitest";
 import { PersonIdSchema } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
@@ -163,7 +163,7 @@ export const AuditTrail = {
   memberIn(entry: { readonly event?: Any | undefined }): string | undefined {
     return entry.event === undefined
       ? undefined
-      : AnyMessages.unpack(entry.event, OrganizationMemberAddedSchema)?.person?.uuid;
+      : AnyPacker.tryUnpack(entry.event, OrganizationMemberAddedSchema)?.person?.uuid;
   },
 };
 
@@ -357,7 +357,7 @@ export async function watchCatalog(
         for (const { kind } of delivery.update.update.value.update) {
           const item =
             kind.case === "state"
-              ? AnyMessages.unpack(kind.value, ResourceCatalogItemSchema)
+              ? AnyPacker.tryUnpack(kind.value, ResourceCatalogItemSchema)
               : undefined;
           if (item?.id !== undefined) {
             received.push(item.id.uuid);

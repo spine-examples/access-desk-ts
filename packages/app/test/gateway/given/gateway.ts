@@ -16,7 +16,7 @@ import { generateKeyPairSync } from "node:crypto";
 import { create, type Message, type MessageShape } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { Client } from "@spine-event-engine/client-web";
-import { AnyMessages, TypeUrls } from "@spine-event-engine/core";
+import { AnyPacker, TypeUrls } from "@spine-event-engine/core";
 import { UserIdSchema } from "@spine-event-engine/proto";
 import {
   QueryIdSchema,
@@ -445,7 +445,7 @@ export async function read<Schema extends GenMessage<Message>>(
   try {
     const response = await client.onBehalfOf(as.person).send(asking);
     return response.message.flatMap(({ state }) => {
-      const view = state === undefined ? undefined : AnyMessages.unpack(state, schema);
+      const view = state === undefined ? undefined : AnyPacker.tryUnpack(state, schema);
       return view === undefined ? [] : [view];
     });
   } catch {

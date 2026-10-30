@@ -13,7 +13,7 @@
  */
 
 import { create } from "@bufbuild/protobuf";
-import { AnyMessages } from "@spine-event-engine/core";
+import { AnyPacker } from "@spine-event-engine/core";
 import { VersionSchema, type Version } from "@spine-event-engine/proto";
 import { describe, expect, it } from "vitest";
 import {
@@ -25,7 +25,7 @@ import { ResourceRegisteredSchema } from "@access-desk/resources-model/generated
 
 import { AuditEntryIds } from "../../src/audit/audit-entry-ids.js";
 
-const payroll = AnyMessages.pack(ResourceIdSchema, create(ResourceIdSchema, { uuid: "payroll" }));
+const payroll = AnyPacker.pack(ResourceIdSchema, create(ResourceIdSchema, { uuid: "payroll" }));
 
 /** A version of what recorded an action, by its number. */
 const version = (number: number): Version => create(VersionSchema, { number });
@@ -56,8 +56,8 @@ describe("AuditEntryIds should", () => {
 
   it("give a different ID to any other action", () => {
     const id = AuditEntryIds.of(payroll, version(1), ResourceRegisteredSchema).uuid;
-    const ledger = AnyMessages.pack(ResourceIdSchema, create(ResourceIdSchema, { uuid: "ledger" }));
-    const request = AnyMessages.pack(
+    const ledger = AnyPacker.pack(ResourceIdSchema, create(ResourceIdSchema, { uuid: "ledger" }));
+    const request = AnyPacker.pack(
       AccessRequestIdSchema,
       create(AccessRequestIdSchema, { uuid: "payroll" }),
     );

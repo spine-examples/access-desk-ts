@@ -15,7 +15,7 @@
 import { create, type Message, type MessageShape } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { AnySchema } from "@bufbuild/protobuf/wkt";
-import { AnyMessages } from "@spine-event-engine/core";
+import { AnyPacker } from "@spine-event-engine/core";
 import type { EventContext } from "@spine-event-engine/proto";
 import { Projection, Subscribe } from "@spine-event-engine/server";
 import {
@@ -271,7 +271,7 @@ export class AuditEntryProjection extends Projection<AuditEntryId, typeof AuditE
     context: EventContext,
     entry: Partial<Pick<AuditEntry, "actor" | "resource" | "when">>,
   ): void {
-    const packed = AnyMessages.pack(schema, event);
+    const packed = AnyPacker.pack(schema, event);
     const recorded = this.state.event;
     if (recorded !== undefined) {
       if (equals(AnySchema, recorded, packed)) {

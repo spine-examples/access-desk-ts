@@ -14,7 +14,7 @@
 
 import { create, type Message, type MessageShape } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
-import { AnyMessages, SignalEnvelopes, TypeUrls } from "@spine-event-engine/core";
+import { AnyPacker, SignalEnvelopes, TypeUrls } from "@spine-event-engine/core";
 import { Time } from "@spine-event-engine/core/time";
 import {
   CommandIdSchema,
@@ -92,7 +92,7 @@ function recordedOf<Schema extends GenMessage<Message>>(
   schema: Schema,
 ): Recorded<Schema>[] {
   return rows.flatMap((entry) => {
-    const event = entry.event === undefined ? undefined : AnyMessages.unpack(entry.event, schema);
+    const event = entry.event === undefined ? undefined : AnyPacker.tryUnpack(entry.event, schema);
     return event === undefined ? [] : [{ entry, event }];
   });
 }
@@ -158,7 +158,7 @@ export async function awaitEntries(
  */
 export function registrationCommand(uuid: string): MessageId {
   return create(MessageIdSchema, {
-    id: AnyMessages.pack(CommandIdSchema, create(CommandIdSchema, { uuid })),
+    id: AnyPacker.pack(CommandIdSchema, create(CommandIdSchema, { uuid })),
     typeUrl: TypeUrls.derive(RegisterResourceSchema),
   });
 }
@@ -195,7 +195,7 @@ export async function recordRegistered(
       SignalEnvelopes.event({
         context: create(EventContextSchema, {
           timestamp: Time.currentTime(),
-          producerId: AnyMessages.pack(ResourceIdSchema, producer),
+          producerId: AnyPacker.pack(ResourceIdSchema, producer),
           version: { number: recording.version },
           origin: {
             case: "pastMessage",
