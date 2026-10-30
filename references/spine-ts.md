@@ -24,6 +24,7 @@ The most useful `spine-ts` sources are:
 - `packages/core/{README.md,REFERENCE.md}`
 - `packages/server/{README.md,REFERENCE.md}`
 - `packages/storage-datastore/{README.md,REFERENCE.md}`
+- `packages/storage-postgres/{README.md,REFERENCE.md}`
 - `packages/auth/{README.md,REFERENCE.md}`
 - `packages/client-web/{README.md,REFERENCE.md}`
 - `packages/client-react/{README.md,REFERENCE.md}`
@@ -44,6 +45,7 @@ Use only packages required by the implemented slice. The anticipated family is:
 | Type registry, type URLs, `Any` helpers      | `@spine-event-engine/core`              |
 | Common storage contract                      | `@spine-event-engine/storage`           |
 | Google Cloud Datastore adapter               | `@spine-event-engine/storage-datastore` |
+| PostgreSQL adapter                           | `@spine-event-engine/storage-postgres`  |
 | Gateway authentication primitives            | `@spine-event-engine/auth`              |
 | Same-server command client                   | `@spine-event-engine/client-node`       |
 | Browser client                               | `@spine-event-engine/client-web`        |
@@ -300,21 +302,29 @@ extension" pattern): `getOption` from `@bufbuild/protobuf`,
 local first. Pick an extension field number outside Spine's `73800`–`73971`
 block (Spine leaves `EnumValueOptions` free).
 
-## Datastore
+## PostgreSQL
 
-Construct `DatastoreStorageFactory` with an application-owned configured Google
-Datastore client. Multitenant contexts use Datastore native namespaces derived
-reversibly from `TenantId`; a bounded-context name is diagnostic and does not
-itself partition kinds.
+Access Desk keeps its data in PostgreSQL through `@spine-event-engine/storage-postgres`.
 
-When stored framework/application values contain `Any`, build the required
-stringifier registry with the complete application TypeRegistry. Keep query
-values typed; do not pre-stringify them in application code.
-
-The adapter has a finite reconciliation ceiling and does not provide unlimited
-scan semantics. Declare and deploy application composite indexes for actual
-filter/order combinations. Exercise them with the Datastore-mode emulator and
-use a disposable cloud project for any explicitly authorized cloud smoke test.
+- **Single tenant.** `PostgresStorageFactory.newBuilder().setOptions({ url })`,
+  with a `StringifierRegistry` over the full type registry. `build()` is async.
+- **Ownership.** A context does not close its factory; whoever opened it does.
+  A new context over the same database sees everything kept before.
+- **Schema.** Spine creates its tables (primary keys only). The database must
+  exist already.
+- **Multitenant.** Each tenant gets its own database, and every tenant must be
+  listed at build time (`setTenantOptions`). An unknown tenant is refused. So
+  the server keeps only the organizations in `ACCESS_DESK_ORGANIZATIONS`, and
+  adding one needs a restart.
+- **Subscriptions.** A multitenant factory refuses tenantless data, such as the
+  subscription registry. Give the context a `StorageSubscriptionRegistry` over
+  single-tenant storage (`withSubscriptionRegistry`).
+- **Pools.** One per database, ten connections by default. Spine's pools do not
+  listen for `error`, so a dropped idle connection can stop the process. Pools
+  Access Desk opens itself listen.
+- **Subscriptions outlast restarts.** One nobody cancels stays for good, so the
+  gateway leaves it for Spine to clear when its session expires.
+- **Inbox.** Commands accepted before a stop are delivered after the restart.
 
 ## Authentication and browser clients
 
@@ -339,22 +349,25 @@ controls defined in the architecture.
 - `BrowserServer.open(undefined, { backend: { baseUrl }, … })` starts a
   standalone gateway in front of an application server in another program.
   Pass `registry` so `authorize` receives each command decoded.
-- A standalone gateway with sessions needs `bindings`:
-  `InMemorySubscriptionBindings` locally, `DurableSubscriptionBindings` in
-  production. The application server needs a `storageFactory` there too, so
-  neither program starts under `NODE_ENV=production` while everything is kept
-  in memory.
+- A standalone gateway with sessions needs `bindings`. `BrowserServer` treats
+  them as durable only if they are a `DurableSubscriptionBindings`. Only then
+  does it stop expired subscriptions on the application server and restore
+  stored ones at start. A wrapper around the store loses both.
+- `DurableSubscriptionBindings` runs operations on one subscription one at a
+  time, and keeps one more waiting. A second activation of an active
+  subscription waits instead of being refused; a cancel behind it is refused
+  as `binding-busy`.
+- `bindings.activate` receives the trusted context, not the session; only
+  `authorize` sees the session's principal. Spine may refuse a
+  request after `authorize` without calling the bindings.
 - Ending a session does not end its streams; Spine stops them only when the
   session's time runs out.
-- Only Spine's own cancel effect clears a subscription everywhere it is kept,
-  and the store receives it only when a browser cancels. So the gateway
-  cancels an ending session's subscriptions through its own address with the
-  session's token. What is left is stopped in the store, which ends the stream
-  but leaves the gateway's forwarding record until the gateway stops. `dispose`
-  of an in-memory store cannot clear that record either.
-- A subscription reports only what happens after it has opened all the way to
-  the application server, a moment after the client's `activate` returns. A
-  test must first make sure updates arrive.
+- Only Spine's own cancel effect clears a subscription everywhere it is kept.
+  The store receives it only when a browser cancels, or when a subscription
+  expires.
+- Once the client's `activate` returns, the server has acknowledged the
+  subscription, and every later change arrives. On `2.0.0-snapshot.22`, updates
+  right after `activate` could be lost.
 - A query takes an id filter or `EQUAL` filters on top-level `(column)`
   fields. A subscription to read models takes id filters and `EQUAL` field
   filters, also on nested paths. A subscription to events takes only
@@ -369,9 +382,23 @@ controls defined in the architecture.
   `POST` with a body, not a provider callback carrying `?code=`. Their
   preflight answers allow no headers, so they serve only pages of the
   gateway's own origin, as through a development proxy.
-- Without `cookies` the session is a bearer token. `OpaqueSessions.resolve`
-  accepts only `kind: "cookie"`, so the resolver passes the bearer value as
-  one.
+- Without `cookies`, a session is a bearer token. `SignedSessions` needs a
+  P-256 key. Without a `SignedTokenRevocation`, `logout` answers `expiryOnly`
+  and the token works until it expires. `OpaqueSessions` keeps sessions in
+  process memory.
+- `SignedSessions` accepts both ECDSA forms of a signature, so one token has
+  two texts with the same `jti`.
+- `SignedSessions` accepts a token for `clockSkewSeconds` after it expires, but
+  passes `revoke` the token's bare expiry.
+- `resolve` refuses every token while `isRevoked` fails. `logout` does not call
+  `isRevoked`.
+- `postAndSubscribe` subscribes, waits for the server's acknowledgement, then
+  posts. Its subscription brings only the events the command causes directly.
+  Spine has no call that returns the event itself; `firstUpdateTimeoutMs` with
+  `onFirstUpdateTimeout` bounds the wait.
+- When a handler's result fails validation at commit, delivery stops
+  silently. The error never reaches the `DeliveryMonitor`, the Inbox row stays
+  `TO_DELIVER`, and nothing behind it is delivered.
 - `OidcFlow` accepts only HTTPS addresses and requires the `openid` scope.
 - `createGoogleProvider` returns `email_verified` as text, and needs
   `clientAuthentication: "client_secret_post"`, or Google refuses the code
@@ -393,7 +420,7 @@ subscriptions. Use bounded `eventually()` only for genuinely asynchronous
 visibility, not for immediate command results.
 
 BlackBox alone does not prove browser behavior, cross-process delivery,
-authentication, Datastore deployment, or multi-context choreography. Those need
+authentication, database deployment, or multi-context choreography. Those need
 separate integration and end-to-end tests listed in
 `references/architecture.md`.
 

@@ -1,0 +1,33 @@
+{
+  "name": "@access-desk/testing",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./environment": {
+      "types": "./src/environment.ts",
+      "default": "./src/environment.ts"
+    },
+    "./storage": {
+      "types": "./src/storage.ts",
+      "default": "./src/storage.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit --pretty false -p .",
+    "lint": "eslint src --no-error-on-unmatched-pattern"
+  },
+  "dependencies": {
+    "@spine-event-engine/core": "2.0.0-snapshot.25",
+    "@spine-event-engine/proto": "2.0.0-snapshot.25",
+    "@spine-event-engine/server": "2.0.0-snapshot.25",
+    "@spine-event-engine/storage": "2.0.0-snapshot.25",
+    "@spine-event-engine/storage-postgres": "2.0.0-snapshot.25",
+    "pg": "8.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.2",
+    "@types/pg": "8.23.1",
+    "typescript": "6.0.3"
+  }
+}

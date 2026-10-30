@@ -12,140 +12,50 @@
  * and limitations under the License.
  */
 
-import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
-import type { AuthenticatedPrincipal, IncomingRequest } from "@spine-event-engine/auth";
-import { TypeUrls } from "@spine-event-engine/core";
-import { ActorContextSchema, type ActorContext } from "@spine-event-engine/proto";
-import { SubscriptionSchema, TopicSchema } from "@spine-event-engine/proto/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { OrganizationViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
-import type { Session } from "../../src/gateway/sessions.js";
-import { Watching } from "../../src/gateway/watching.js";
+import { fromBinary } from "@bufbuild/protobuf";
+import { timestampFromMs } from "@bufbuild/protobuf/wkt";
+import { Time } from "@spine-event-engine/core/time";
+import { SubscriptionSchema } from "@spine-event-engine/proto/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
+import { typeRegistry } from "../../generated/model-registry.js";
+import type { Watching } from "../../src/gateway/watching.js";
+import {
+  ending,
+  opened,
+  opening,
+  principal,
+  subscribed,
+  subscription,
+  watcher,
+  watchingOver,
+} from "./given/watching.js";
 
-let watching = new Watching();
-afterEach(async () => {
-  await watching.close();
-  watching = new Watching();
+let storage: TestStorage;
+let watching: Watching;
+
+beforeEach(async () => {
+  storage = await TestStorages.singleTenant(typeRegistry);
+  watching = await watchingOver(storage);
 });
 
-/**
- * Who watches, and in which organization.
- *
- * @param person The identifier of the person who watches.
- * @param organization The identifier of the organization they watch in.
- */
-function watcher(person: string, organization: string): ActorContext {
-  return create(ActorContextSchema, {
-    actor: { value: person },
-    tenantId: { kind: { case: "value", value: organization } },
-  });
-}
-
-/**
- * Whoever a session stands for.
- *
- * @param person The identifier of the signed-in person.
- * @param organization The identifier of the organization the session has entered.
- * @param session What the gateway knows the session by.
- */
-function principal(person: string, organization: string, session: string): AuthenticatedPrincipal {
-  return {
-    id: person,
-    attributes: { email: `${person}@example.com`, organization, session },
-  };
-}
-
-/**
- * Has a person subscribe to their organization.
- *
- * @param context Who subscribes, and in which organization.
- * @returns The identifier of the subscription.
- */
-async function subscribed(context: ActorContext): Promise<string> {
-  const topic = create(TopicSchema, {
-    id: { value: crypto.randomUUID() },
-    target: {
-      type: TypeUrls.derive(OrganizationViewSchema),
-      criterion: { case: "includeAll", value: true },
-    },
-    context,
-  });
-  const kept = await watching.create({
-    topic: { kind: "subscription-topic", bytes: toBinary(TopicSchema, topic) },
-    whenExpires: Date.now() + 60_000,
-  });
-  return fromBinary(SubscriptionSchema, kept.bytes).id?.value ?? "";
-}
-
-/**
- * The gateway's word that it allowed a subscription to be opened.
- *
- * @param id The identifier of the subscription.
- */
-function opening(id: string): IncomingRequest {
-  return {
-    kind: "activate",
-    subscription: create(SubscriptionSchema, { id: { value: id } }),
-  } as IncomingRequest;
-}
-
-/** A subscription that was opened, with whether it has stopped since. */
-interface Opened {
-  /** Whether the stream of changes has ended. */
-  stopped: boolean;
-  /** How the opening ended, once the stream of changes has ended. */
-  readonly ending: Promise<{ readonly kind: string } | "failed">;
-}
-
-/**
- * Opens a subscription, so it streams until it is stopped.
- *
- * @param id The identifier of the subscription.
- * @param context Who opens it, and in which organization.
- * @returns The opened subscription, once its stream of changes has begun.
- */
-async function opened(id: string, context: ActorContext): Promise<Opened> {
-  let begun = (): void => undefined;
-  const beginning = new Promise<void>((resolve) => {
-    begun = resolve;
-  });
-  const stream: { stopped: boolean; ending: Opened["ending"] } = {
-    stopped: false,
-    ending: Promise.resolve("failed"),
-  };
-  stream.ending = watching
-    .activate({
-      id,
-      context,
-      nowMs: Date.now(),
-      signal: new AbortController().signal,
-      onDefinition: (_definition, signal) =>
-        new Promise<void>((resolve) => {
-          signal.addEventListener("abort", () => {
-            stream.stopped = true;
-            resolve();
-          });
-          begun();
-        }),
-    })
-    // A stream still open when the gateway stops ends as a failure.
-    .catch(() => "failed" as const);
-  await beginning;
-  return stream;
-}
+afterEach(async () => {
+  await watching.close();
+  await storage.drop();
+});
 
 describe("What people watch through the gateway should", () => {
   it("stop when the session it was opened under ends", async () => {
     const maya = watcher("maya", "acme");
-    const id = await subscribed(maya);
+    const id = await subscribed(watching, maya);
     watching.claim(principal("maya", "acme", "session-1"), opening(id));
-    const stream = await opened(id, maya);
+    const stream = await opened(watching, id, maya);
 
     await watching.stop("session-1");
 
     await stream.ending;
     expect(stream.stopped).toBe(true);
-    // The subscription is gone, so it cannot be opened again.
+    // Nothing opens it unless the gateway allowed it.
     expect(
       await watching.activate({
         id,
@@ -157,9 +67,25 @@ describe("What people watch through the gateway should", () => {
     ).toEqual({ kind: "denied" });
   });
 
+  it("stay once its session ends, so its person can open it again in another session", async () => {
+    const maya = watcher("maya", "acme");
+    const id = await subscribed(watching, maya);
+    watching.claim(principal("maya", "acme", "session-1"), opening(id));
+    const first = await opened(watching, id, maya);
+    await watching.stop("session-1");
+    await first.ending;
+
+    expect(watching.claim(principal("maya", "acme", "session-2"), opening(id))).toBe(true);
+    const again = await opened(watching, id, maya);
+    await watching.stop("session-2");
+
+    await again.ending;
+    expect(again.stopped).toBe(true);
+  });
+
   it("stop a subscription that was only about to open", async () => {
     const maya = watcher("maya", "acme");
-    const id = await subscribed(maya);
+    const id = await subscribed(watching, maya);
     watching.claim(principal("maya", "acme", "session-1"), opening(id));
     let begun = false;
     const beginning = watching.activate({
@@ -176,15 +102,143 @@ describe("What people watch through the gateway should", () => {
     // The session ends before the stream has begun.
     await watching.stop("session-1");
 
-    expect(await beginning).toEqual({ kind: "denied" });
+    await beginning;
     expect(begun).toBe(false);
+  });
+
+  it("not open for a session that has ended since the gateway allowed it", async () => {
+    const maya = watcher("maya", "acme");
+    const id = await subscribed(watching, maya);
+    watching.claim(principal("maya", "acme", "session-1"), opening(id));
+
+    await watching.stop("session-1");
+
+    expect(
+      await watching.activate({
+        id,
+        context: maya,
+        nowMs: Date.now(),
+        signal: new AbortController().signal,
+        onDefinition: () => Promise.resolve(),
+      }),
+    ).toEqual({ kind: "denied" });
+  });
+
+  it("outlast a restart of the gateway, and stop when the session that opens it again ends", async () => {
+    const maya = watcher("maya", "acme");
+    const made = await subscription(watching, maya);
+    const id = made.id?.value ?? "";
+    await watching.close();
+    watching = await watchingOver(storage);
+
+    watching.claim(principal("maya", "acme", "session-1"), opening(made));
+    const stream = await opened(watching, id, maya);
+    await watching.stop("session-1");
+
+    await stream.ending;
+    expect(stream.stopped).toBe(true);
+  });
+
+  it("after a restart, belong to the session whose request opens it, when two sessions ask at once", async () => {
+    const maya = watcher("maya", "acme");
+    const made = await subscription(watching, maya);
+    const id = made.id?.value ?? "";
+    await watching.close();
+    watching = await watchingOver(storage);
+
+    expect(watching.claim(principal("maya", "acme", "session-1"), opening(made))).toBe(true);
+    expect(watching.claim(principal("maya", "acme", "session-2"), opening(made))).toBe(false);
+    const stream = await opened(watching, id, maya);
+
+    await watching.stop("session-2");
+    expect(stream.stopped).toBe(false);
+    await watching.stop("session-1");
+    await stream.ending;
+    expect(stream.stopped).toBe(true);
+  });
+
+  it("after a restart, refuse a second opening while the first opens, and leave nothing open once the session ends", async () => {
+    let tries = 0;
+    const maya = watcher("maya", "acme");
+    const made = await subscription(watching, maya);
+    const id = made.id?.value ?? "";
+    await watching.close();
+    watching = await watchingOver(storage, () => {
+      tries += 1;
+      return Promise.reject(new Error("The gateway cannot be called."));
+    });
+    const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    watching.claim(principal("maya", "acme", "session-1"), opening(made));
+    const stream = await opened(watching, id, maya);
+    const second = await watching.activate({
+      id,
+      context: maya,
+      nowMs: Date.now(),
+      signal: new AbortController().signal,
+      onDefinition: () => Promise.resolve(),
+    });
+    await watching.closeFor(ending("session-1", "token-1"));
+    await watching.stop("session-1");
+
+    expect(second).toEqual({ kind: "denied" });
+    expect(tries).toBe(3);
+    await stream.ending;
+    expect(stream.stopped).toBe(true);
+    expect(watching.claim(principal("maya", "acme", "session-2"), opening(made))).toBe(true);
+    warned.mockRestore();
+  });
+
+  it("drop an allowed opening that did not come, so the subscription can be opened later", async () => {
+    let nowMs = Date.now();
+    Time.setProvider({ currentTime: () => timestampFromMs(nowMs) });
+    try {
+      const maya = watcher("maya", "acme");
+      const id = await subscribed(watching, maya);
+      expect(watching.claim(principal("maya", "acme", "session-1"), opening(id))).toBe(true);
+      expect(watching.claim(principal("maya", "acme", "session-1"), opening(id))).toBe(false);
+
+      nowMs += 5_001;
+
+      expect(watching.claim(principal("maya", "acme", "session-1"), opening(id))).toBe(true);
+      const stream = await opened(watching, id, maya);
+      await watching.stop("session-1");
+      await stream.ending;
+      expect(stream.stopped).toBe(true);
+    } finally {
+      Time.resetProvider();
+    }
+  });
+
+  it("not open once the time to open it has passed", async () => {
+    let nowMs = Date.now();
+    Time.setProvider({ currentTime: () => timestampFromMs(nowMs) });
+    try {
+      const maya = watcher("maya", "acme");
+      const id = await subscribed(watching, maya);
+      watching.claim(principal("maya", "acme", "session-1"), opening(id));
+
+      nowMs += 5_001;
+
+      expect(
+        await watching.activate({
+          id,
+          context: maya,
+          nowMs,
+          signal: new AbortController().signal,
+          onDefinition: () => Promise.resolve(),
+        }),
+      ).toEqual({ kind: "denied" });
+    } finally {
+      Time.resetProvider();
+    }
   });
 
   it("go on when another session of the same person ends", async () => {
     const maya = watcher("maya", "acme");
-    const id = await subscribed(maya);
+    const id = await subscribed(watching, maya);
     watching.claim(principal("maya", "acme", "session-1"), opening(id));
-    const stream = await opened(id, maya);
+    const stream = await opened(watching, id, maya);
 
     await watching.stop("session-2");
 
@@ -195,17 +249,17 @@ describe("What people watch through the gateway should", () => {
     const maya = watcher("maya", "acme");
     const noah = watcher("noah", "acme");
     const [first, second, others] = [
-      await subscribed(maya),
-      await subscribed(maya),
-      await subscribed(noah),
+      await subscribed(watching, maya),
+      await subscribed(watching, maya),
+      await subscribed(watching, noah),
     ];
     watching.claim(principal("maya", "acme", "session-1"), opening(first));
     watching.claim(principal("maya", "acme", "session-1"), opening(second));
     watching.claim(principal("noah", "acme", "session-9"), opening(others));
     const streams = [
-      await opened(first, maya),
-      await opened(second, maya),
-      await opened(others, noah),
+      await opened(watching, first, maya),
+      await opened(watching, second, maya),
+      await opened(watching, others, noah),
     ];
 
     await watching.stop("session-1");
@@ -213,29 +267,29 @@ describe("What people watch through the gateway should", () => {
     expect(streams.map((stream) => stream.stopped)).toEqual([true, true, false]);
   });
 
-  it("belong to the session that opened it last", async () => {
+  it("belong to the session allowed to open it, and allow no other session meanwhile", async () => {
     const maya = watcher("maya", "acme");
-    const id = await subscribed(maya);
-    watching.claim(principal("maya", "acme", "session-1"), opening(id));
-    watching.claim(principal("maya", "acme", "session-2"), opening(id));
-    const stream = await opened(id, maya);
-
-    await watching.stop("session-1");
-    expect(stream.stopped).toBe(false);
+    const id = await subscribed(watching, maya);
+    expect(watching.claim(principal("maya", "acme", "session-1"), opening(id))).toBe(true);
+    expect(watching.claim(principal("maya", "acme", "session-2"), opening(id))).toBe(false);
+    const stream = await opened(watching, id, maya);
 
     await watching.stop("session-2");
+    expect(stream.stopped).toBe(false);
+
+    await watching.stop("session-1");
     expect(stream.stopped).toBe(true);
   });
 
   it("stay with the session that opened it, when another session tries to open it again", async () => {
     const maya = watcher("maya", "acme");
-    const id = await subscribed(maya);
+    const id = await subscribed(watching, maya);
     watching.claim(principal("maya", "acme", "session-1"), opening(id));
-    const stream = await opened(id, maya);
+    const stream = await opened(watching, id, maya);
 
     // The same person, in a second session, tries to open what is open already.
-    // Spine keeps the attempt waiting while the stream runs, then refuses it.
-    watching.claim(principal("maya", "acme", "session-2"), opening(id));
+    // The gateway does not allow it, and the opening is refused at once.
+    expect(watching.claim(principal("maya", "acme", "session-2"), opening(id))).toBe(false);
     const again = watching.activate({
       id,
       context: maya,
@@ -244,23 +298,23 @@ describe("What people watch through the gateway should", () => {
       onDefinition: () => Promise.resolve(),
     });
 
+    expect(await again).toEqual({ kind: "denied" });
     await watching.stop("session-2");
     expect(stream.stopped).toBe(false);
 
     await watching.stop("session-1");
     expect(stream.stopped).toBe(true);
-    expect(await again).toEqual({ kind: "denied" });
   });
 
   it("not be taken over by somebody it was not made for", async () => {
     const maya = watcher("maya", "acme");
-    const id = await subscribed(maya);
+    const id = await subscribed(watching, maya);
     watching.claim(principal("maya", "acme", "session-1"), opening(id));
-    const stream = await opened(id, maya);
+    const stream = await opened(watching, id, maya);
 
     // Another person, and the same person in another organization, try to open it.
-    watching.claim(principal("noah", "acme", "session-9"), opening(id));
-    watching.claim(principal("maya", "globex", "session-8"), opening(id));
+    expect(watching.claim(principal("noah", "acme", "session-9"), opening(id))).toBe(false);
+    expect(watching.claim(principal("maya", "globex", "session-8"), opening(id))).toBe(false);
     await watching.stop("session-9");
     await watching.stop("session-8");
 
@@ -272,21 +326,22 @@ describe("What people watch through the gateway should", () => {
   it("be cancelled in the name of a session about to end, as its browser would", async () => {
     const cancelled: { readonly id: string | undefined; readonly token: string }[] = [];
     await watching.close();
-    watching = new Watching((subscription, token) => {
+    watching = await watchingOver(storage, (subscription, token) => {
       cancelled.push({ id: fromBinary(SubscriptionSchema, subscription.bytes).id?.value, token });
       return Promise.resolve();
     });
     const maya = watcher("maya", "acme");
     const [hers, alsoHers, unopened] = [
-      await subscribed(maya),
-      await subscribed(maya),
-      await subscribed(maya),
+      await subscribed(watching, maya),
+      await subscribed(watching, maya),
+      await subscribed(watching, maya),
     ];
     watching.claim(principal("maya", "acme", "session-1"), opening(hers));
+    await opened(watching, hers, maya);
     watching.claim(principal("maya", "acme", "session-2"), opening(alsoHers));
-    const ending = { id: "session-1", credential: { kind: "cookie", value: "token-1" } };
+    await opened(watching, alsoHers, maya);
 
-    await watching.closeFor(ending as Session);
+    await watching.closeFor(ending("session-1", "token-1"));
 
     // Only what the session opened is cancelled, with the session's own token.
     expect(cancelled).toEqual([{ id: hers, token: "token-1" }]);
@@ -296,19 +351,17 @@ describe("What people watch through the gateway should", () => {
   it("be cancelled on a later try, when the first one fails", async () => {
     let tries = 0;
     await watching.close();
-    watching = new Watching(() => {
+    watching = await watchingOver(storage, () => {
       tries += 1;
       return tries < 3 ? Promise.reject(new Error("Not this time.")) : Promise.resolve();
     });
     const maya = watcher("maya", "acme");
-    const id = await subscribed(maya);
+    const id = await subscribed(watching, maya);
     watching.claim(principal("maya", "acme", "session-1"), opening(id));
+    await opened(watching, id, maya);
     const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
-    await watching.closeFor({
-      id: "session-1",
-      credential: { kind: "cookie", value: "token-1" },
-    } as Session);
+    await watching.closeFor(ending("session-1", "token-1"));
 
     expect(tries).toBe(3);
     expect(warned).not.toHaveBeenCalled();
@@ -318,20 +371,17 @@ describe("What people watch through the gateway should", () => {
   it("leave a session's subscriptions to be stopped when they cannot be cancelled", async () => {
     let tries = 0;
     await watching.close();
-    watching = new Watching(() => {
+    watching = await watchingOver(storage, () => {
       tries += 1;
       return Promise.reject(new Error("The gateway cannot be called."));
     });
     const maya = watcher("maya", "acme");
-    const id = await subscribed(maya);
+    const id = await subscribed(watching, maya);
     watching.claim(principal("maya", "acme", "session-1"), opening(id));
-    const stream = await opened(id, maya);
+    const stream = await opened(watching, id, maya);
     const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
-    await watching.closeFor({
-      id: "session-1",
-      credential: { kind: "cookie", value: "token-1" },
-    } as Session);
+    await watching.closeFor(ending("session-1", "token-1"));
     expect(stream.stopped).toBe(false);
     await watching.stop("session-1");
 
@@ -344,9 +394,9 @@ describe("What people watch through the gateway should", () => {
 
   it("stop when its browser cancels it, and forget it", async () => {
     const maya = watcher("maya", "acme");
-    const id = await subscribed(maya);
+    const id = await subscribed(watching, maya);
     watching.claim(principal("maya", "acme", "session-1"), opening(id));
-    const stream = await opened(id, maya);
+    const stream = await opened(watching, id, maya);
     let cancelledAtServer = 0;
 
     const outcome = await watching.cancel({

@@ -14,7 +14,7 @@
 
 import { create, type Message } from "@bufbuild/protobuf";
 import type { AuthenticatedPrincipal, IncomingRequest } from "@spine-event-engine/auth";
-import { AnyMessages, TypeUrls } from "@spine-event-engine/core";
+import { AnyPacker, TypeUrls } from "@spine-event-engine/core";
 import { Filter_Operator, TargetSchema } from "@spine-event-engine/proto/client";
 import { describe, expect, it, vi } from "vitest";
 import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
@@ -68,7 +68,7 @@ function target(schema: typeof MembershipViewSchema | typeof OrganizationViewSch
 function where(
   schema: Parameters<typeof TypeUrls.derive>[0],
   column: string,
-  value: ReturnType<typeof AnyMessages.pack>,
+  value: ReturnType<typeof AnyPacker.pack>,
   operator = Filter_Operator.EQUAL,
 ) {
   return create(TargetSchema, {
@@ -88,7 +88,7 @@ function where(
  */
 function byId(
   schema: Parameters<typeof TypeUrls.derive>[0],
-  ...ids: ReturnType<typeof AnyMessages.pack>[]
+  ...ids: ReturnType<typeof AnyPacker.pack>[]
 ) {
   return create(TargetSchema, {
     type: TypeUrls.derive(schema),
@@ -96,9 +96,9 @@ function byId(
   });
 }
 
-const me = AnyMessages.pack(PersonIdSchema, create(PersonIdSchema, { uuid: "person-1" }));
-const somebodyElse = AnyMessages.pack(PersonIdSchema, create(PersonIdSchema, { uuid: "person-2" }));
-const payroll = AnyMessages.pack(ResourceIdSchema, create(ResourceIdSchema, { uuid: "payroll" }));
+const me = AnyPacker.pack(PersonIdSchema, create(PersonIdSchema, { uuid: "person-1" }));
+const somebodyElse = AnyPacker.pack(PersonIdSchema, create(PersonIdSchema, { uuid: "person-2" }));
+const payroll = AnyPacker.pack(ResourceIdSchema, create(ResourceIdSchema, { uuid: "payroll" }));
 
 function desk(role: OrganizationRole = OrganizationRole.MEMBER) {
   const member = vi
@@ -235,7 +235,7 @@ describe("Gateway policy should", () => {
                 filter: [
                   {
                     fieldPath: { fieldName: ["organization"] },
-                    value: AnyMessages.pack(OrganizationIdSchema, id),
+                    value: AnyPacker.pack(OrganizationIdSchema, id),
                     operator: Filter_Operator.EQUAL,
                   },
                 ],

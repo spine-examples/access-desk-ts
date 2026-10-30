@@ -13,7 +13,10 @@
  */
 
 import { typeRegistry } from "../../generated/model-registry.js";
+import { Closing } from "../closing.js";
 import { Settings } from "../settings.js";
+import { Storage } from "../storage.js";
+import { RevokedTokens } from "./revoked-tokens.js";
 import { Gateway } from "./gateway.js";
 import { SignInProvider } from "./providers.js";
 import type { ExternalSignIn } from "./routes/sign-in-routes.js";
@@ -35,6 +38,9 @@ const external: Record<string, ExternalSignIn> = {
   google: { provider: google, callbackUri: settings.webUrl },
 };
 
+const subscriptions = await Storage.open(settings.storage);
+const revokedTokens = await RevokedTokens.open(settings.storage);
+
 const gateway = await Gateway.start({
   backend: settings.serverUrl,
   registry: typeRegistry,
@@ -43,11 +49,18 @@ const gateway = await Gateway.start({
   host: settings.listening.host,
   port: settings.listening.port,
   external,
+  sessionKey: settings.sessionKey,
+  storage: { subscriptions, revokedTokens },
 });
 
 console.log(`Access Desk gateway: ${gateway.url}`);
 console.log(`Application server it reaches: ${settings.serverUrl}`);
 console.log(`People open the application at: ${settings.webUrl}`);
+console.log(
+  settings.storage.kind === "postgresql"
+    ? "Subscriptions and ended sessions are kept in PostgreSQL."
+    : "Subscriptions and ended sessions are kept in memory, and are forgotten when the gateway stops.",
+);
 // A browser that leaves or reloads a page cancels its pending requests.
 // That must not stop the gateway. Any other unhandled failure still does.
 const CANCELLED = 1;
@@ -68,7 +81,10 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
     if (!stopping) {
       stopping = true;
-      void gateway.close();
+      void Closing.inOrder(gateway, revokedTokens, subscriptions).catch((error: unknown) => {
+        console.error("The gateway did not stop cleanly.", error);
+        process.exitCode = 1;
+      });
     }
   });
 }

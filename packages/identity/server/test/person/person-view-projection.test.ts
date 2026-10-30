@@ -20,7 +20,14 @@ import {
   identityBlackBox,
   loadIdentityContext,
 } from "../given/identity-context.js";
-import { account, addSignInAccount, awaitPerson, google, registerPerson } from "./given/person.js";
+import {
+  account,
+  awaitLinked,
+  awaitPerson,
+  google,
+  linkExternalIdentity,
+  registerPerson,
+} from "./given/person.js";
 import { addMember, awaitMembership } from "../membership/given/membership.js";
 import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 
@@ -47,15 +54,15 @@ describe("PersonViewProjection should", () => {
     it("show every account the person signs in with, and the name the first one gave", async () => {
       const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
-      await registerPerson(scope, "noah", "noah@acme.example");
-      await addSignInAccount(scope, "noah", account(google, "1001"));
-      await awaitPerson(box, scope, "noah", (view) => view.account.length === 1);
+      await linkExternalIdentity(scope, account(google, "1001"), "noah@acme.example");
+      const person = (await awaitLinked(box, scope, account(google, "1001"))).person?.uuid ?? "";
+      await awaitPerson(box, scope, person, (view) => view.account.length === 1);
 
-      await addSignInAccount(scope, "noah", account(google, "g-7"));
+      await linkExternalIdentity(scope, account(google, "g-7"), "noah@acme.example");
 
-      const person = await awaitPerson(box, scope, "noah", (view) => view.account.length === 2);
-      expect(person.account.map((held) => held.subject)).toEqual(["1001", "g-7"]);
-      expect(person.name).toBe("noah (name)");
+      const shown = await awaitPerson(box, scope, person, (view) => view.account.length === 2);
+      expect(shown.account.map((held) => held.subject)).toEqual(["1001", "g-7"]);
+      expect(shown.name).toBe("1001 (name)");
     });
   });
 

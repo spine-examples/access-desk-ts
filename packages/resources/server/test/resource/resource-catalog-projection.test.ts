@@ -20,7 +20,14 @@ import {
   loadResourcesContext,
   resourcesBlackBox,
 } from "../given/resources-context.js";
-import { awaitCatalogItem, closeResource, createResource, openResource } from "./given/resource.js";
+import { createOrganization } from "../organization/given/organization.js";
+import {
+  awaitCatalogItem,
+  closeResource,
+  openResource,
+  registerAndAwaitResource,
+  registerResource,
+} from "./given/resource.js";
 
 beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
@@ -30,8 +37,9 @@ describe("ResourceCatalogProjection should", () => {
     it("start a catalog entry from the resource's creation fact", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
+      expect((await createOrganization(scope)).kind).toBe("ok");
 
-      expect((await createResource(scope, "payroll")).kind).toBe("ok");
+      expect((await registerResource(scope, "payroll")).kind).toBe("ok");
 
       const item = await awaitCatalogItem(box, scope, "payroll");
       expect(item.id?.uuid).toBe("payroll");
@@ -47,7 +55,8 @@ describe("ResourceCatalogProjection should", () => {
     it("show the resource open", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
-      expect((await createResource(scope, "payroll")).kind).toBe("ok");
+      expect((await createOrganization(scope)).kind).toBe("ok");
+      await registerAndAwaitResource(box, scope, "payroll");
 
       expect((await openResource(scope, "payroll")).kind).toBe("ok");
 
@@ -65,7 +74,8 @@ describe("ResourceCatalogProjection should", () => {
     it("show the resource closed", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
-      expect((await createResource(scope, "payroll")).kind).toBe("ok");
+      expect((await createOrganization(scope)).kind).toBe("ok");
+      await registerAndAwaitResource(box, scope, "payroll");
       expect((await openResource(scope, "payroll")).kind).toBe("ok");
       await awaitCatalogItem(box, scope, "payroll", (i) => i.policy?.openForRequests === true);
 
@@ -84,7 +94,8 @@ describe("ResourceCatalogProjection should", () => {
   it("retain immutable fields across policy changes", async () => {
     const box = await resourcesBlackBox();
     const scope = box.onBehalfOf(actor);
-    expect((await createResource(scope, "payroll")).kind).toBe("ok");
+    expect((await createOrganization(scope)).kind).toBe("ok");
+    await registerAndAwaitResource(box, scope, "payroll");
 
     expect((await openResource(scope, "payroll")).kind).toBe("ok");
     expect((await closeResource(scope, "payroll")).kind).toBe("ok");

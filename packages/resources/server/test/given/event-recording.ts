@@ -14,7 +14,7 @@
 
 import { create, type Message, type MessageShape } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
-import { AnyMessages, TypeUrls } from "@spine-event-engine/core";
+import { AnyPacker, TypeUrls } from "@spine-event-engine/core";
 import type { ActorContext } from "@spine-event-engine/proto";
 import { TopicIdSchema, TopicSchema, TargetSchema } from "@spine-event-engine/proto/client";
 import { type BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
@@ -106,7 +106,7 @@ export function eventRecording(actorContext: () => ActorContext): EventRecording
         }
         for (const event of delivery.update.update.value.event) {
           const message =
-            event.message === undefined ? undefined : AnyMessages.unpack(event.message, schema);
+            event.message === undefined ? undefined : AnyPacker.tryUnpack(event.message, schema);
           if (message !== undefined) {
             received.push(message);
           }

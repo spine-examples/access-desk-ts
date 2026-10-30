@@ -24,7 +24,7 @@ import {
   loadIdentityContext,
   recordEvents,
 } from "../given/identity-context.js";
-import { account, google, registerPersonEmail } from "./given/person.js";
+import { account, google, linkExternalIdentity } from "./given/person.js";
 
 beforeAll(loadIdentityContext, 30_000);
 afterEach(closeIdentityBlackBoxes);
@@ -36,7 +36,7 @@ describe("PersonEmailAggregate should", () => {
       const scope = box.onBehalfOf(actor);
       const registered = await recordEvents(scope, PersonEmailRegisteredSchema);
 
-      const sent = await registerPersonEmail(scope, "noah@acme.example", account(google, "1001"));
+      const sent = await linkExternalIdentity(scope, account(google, "1001"), "noah@acme.example");
 
       expect(sent.kind).toBe("ok");
       const event = await registered.waitFor(box);
@@ -52,11 +52,11 @@ describe("PersonEmailAggregate should", () => {
       const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
       const registered = await recordEvents(scope, PersonEmailRegisteredSchema);
-      await registerPersonEmail(scope, "noah@acme.example", account(google, "1001"));
+      await linkExternalIdentity(scope, account(google, "1001"), "noah@acme.example");
       const first = (await registered.waitFor(box)).person;
 
       const rejection = await expectRejection(box, scope, PersonEmailAlreadyRegisteredSchema, () =>
-        registerPersonEmail(scope, "noah@acme.example", account(google, "g-7")),
+        linkExternalIdentity(scope, account(google, "g-7"), "noah@acme.example"),
       );
 
       expect(rejection.person).toEqual(first);

@@ -16,7 +16,7 @@ import { create, isMessage, type Message, type MessageShape } from "@bufbuild/pr
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import type { Any } from "@bufbuild/protobuf/wkt";
 import type { AuthenticatedPrincipal, IncomingRequest } from "@spine-event-engine/auth";
-import { AnyMessages, TypeUrls } from "@spine-event-engine/core";
+import { AnyPacker, TypeUrls } from "@spine-event-engine/core";
 import { Filter_Operator, type Target } from "@spine-event-engine/proto/client";
 import { AccessGrantViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/resource_access_pb.js";
 import { RevokeAccessGrantSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/commands_pb.js";
@@ -191,7 +191,7 @@ function asksForOwn(target: Target, column: string, person: PersonId): boolean {
   const condition = onlyCondition(target);
   return (
     condition?.column === column &&
-    AnyMessages.unpack(condition.value, PersonIdSchema)?.uuid === person.uuid
+    AnyPacker.tryUnpack(condition.value, PersonIdSchema)?.uuid === person.uuid
   );
 }
 
@@ -204,7 +204,7 @@ function asksForManaged(
   const condition = onlyCondition(target);
   const resource =
     condition?.column === "resource"
-      ? AnyMessages.unpack(condition.value, ResourceIdSchema)
+      ? AnyPacker.tryUnpack(condition.value, ResourceIdSchema)
       : undefined;
   return (
     resource !== undefined &&
@@ -224,7 +224,7 @@ function asksForOwnById(target: Target, person: PersonId): boolean {
     conditions.length === 0 &&
     id !== undefined &&
     others.length === 0 &&
-    AnyMessages.unpack(id, PersonIdSchema)?.uuid === person.uuid
+    AnyPacker.tryUnpack(id, PersonIdSchema)?.uuid === person.uuid
   );
 }
 
@@ -293,7 +293,7 @@ function asksForMembershipsOf(target: Target, organization: OrganizationId): boo
   const condition = target.type === MEMBERSHIPS ? onlyCondition(target) : undefined;
   return (
     condition?.column === "organization" &&
-    AnyMessages.unpack(condition.value, OrganizationIdSchema)?.uuid === organization.uuid
+    AnyPacker.tryUnpack(condition.value, OrganizationIdSchema)?.uuid === organization.uuid
   );
 }
 

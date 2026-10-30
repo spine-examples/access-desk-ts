@@ -36,8 +36,8 @@ import {
 } from "../../../organization/given/organization.js";
 import {
   awaitCatalogItem,
-  createResource,
   openResource,
+  registerAndAwaitResource,
   type ResourceDraft,
 } from "../../../resource/given/resource.js";
 
@@ -62,7 +62,7 @@ export async function seed(
   for (const member of members) {
     await addOrganizationMember(scope, member);
   }
-  await createResource(scope, resourceUuid, {
+  await registerAndAwaitResource(box, scope, resourceUuid, {
     manager: [{ uuid: "primary" }],
     ...options.policy,
   });
@@ -143,6 +143,18 @@ export function approveAccessRequest(box: BlackBox, id: string, manager: string)
 }
 
 /**
+ * Approves the request as `manager`, and waits until it shows approved.
+ */
+export async function approveAndAwait(box: BlackBox, id: string, manager: string): Promise<void> {
+  await approveAccessRequest(box, id, manager);
+  const reader = box.onBehalfOf(actor);
+  await box.eventually(
+    () => statusOf(reader, id),
+    (status) => status === AccessRequestStatus.APPROVED,
+  );
+}
+
+/**
  * Posts `DenyAccessRequest` with a reason, naming `manager` as the deciding
  * manager, on behalf of that manager.
  */
@@ -163,12 +175,12 @@ export function cancelAccessRequest(scope: BlackBoxScope, id: string) {
   );
 }
 
-/** Every access request visible to the reader. */
+/** Reads every access request visible to the reader. */
 export function readRequests(reader: BlackBoxScope): Promise<AccessRequestView[]> {
   return readAll(reader, AccessRequestViewSchema, "requests");
 }
 
-/** The lifecycle status of one request, or `undefined` when it is absent. */
+/** Reads the lifecycle status of one request, or `undefined` when it is absent. */
 export async function statusOf(
   reader: BlackBoxScope,
   id: string,

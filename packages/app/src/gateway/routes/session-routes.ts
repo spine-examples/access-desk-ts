@@ -19,10 +19,9 @@ import type { Sessions } from "../sessions.js";
 import { UNAUTHENTICATED, type Route } from "./route.js";
 
 /**
- * The endpoints for the session, which tell who is signed in and sign them
- * out.
+ * Creates the endpoints that show who is signed in, and sign them out.
  *
- * @param route Makes an endpoint.
+ * @param route Creates an endpoint.
  * @param desk Looks up people and organizations.
  * @param sessions The sessions of the people who have signed in.
  */
@@ -85,10 +84,16 @@ export function sessionRoutes(
      * Signs the person out. Everything they watch stops, and the session no
      * longer works.
      *
-     * Send `{}`. Answers `200` with `{}`, with or without a session.
+     * A token that does not resolve is ended as well. It may still be good,
+     * as when the gateway could not tell whether its session had ended.
+     *
+     * Send `{}`. Answers `200` with `{}`, with or without a session, and `503`
+     * when the gateway could not remember that the session ended.
      */
-    route("/auth/sign-out", async (_body, session) => {
-      if (session !== undefined) {
+    route("/auth/sign-out", async (_body, session, request) => {
+      if (session === undefined) {
+        await sessions.endUnresolved(request);
+      } else {
         await sessions.end(session);
       }
       return [200, {}];

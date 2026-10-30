@@ -17,6 +17,7 @@ import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { SignalEnvelopes } from "@spine-event-engine/core";
 import { TenantIdSchema, UserIdSchema } from "@spine-event-engine/proto";
 import { type BoundedContext, Server, SignalMetadata } from "@spine-event-engine/server";
+import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
 import { type OrganizationId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import {
   AuditEntrySchema,
@@ -28,9 +29,19 @@ import {
   type OrganizationView,
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
 
+import { typeRegistry } from "../../../generated/model-registry.js";
+
 // Imported from compiled output, like the contexts it assembles: vitest cannot
 // execute the handler classes' standard decorators from raw TypeScript source.
-type AccessDeskModule = typeof import("../../../dist/src/server/access-desk.js");
+type AppModule = typeof import("../../../dist/src/index.js");
+
+/**
+ * The organizations the tests of the application work in.
+ *
+ * Resources on PostgreSQL keeps only the organizations it is told when it
+ * opens, as the server keeps only those `ACCESS_DESK_ORGANIZATIONS` lists.
+ */
+const ORGANIZATIONS = ["acme", "globex"] as const;
 
 /** A running application server and its contexts, owned by a test. */
 export interface Hosted {
@@ -40,8 +51,21 @@ export interface Hosted {
   readonly identity: BoundedContext;
   /** The organization-scoped Resources context. */
   readonly resources: BoundedContext;
-  /** Stops the server and closes its assembled contexts. */
+  /**
+   * Stops the server and closes its assembled contexts.
+   *
+   * It deletes the data Resources kept, and the data Identity kept unless
+   * the test passed its storage in.
+   */
   stop(): Promise<void>;
+}
+
+/**
+ * Creates the storage Identity keeps its data in, for a test that starts the server
+ * more than once over the same data.
+ */
+export function givenServerStorage(): Promise<TestStorage> {
+  return TestStorages.singleTenant(typeRegistry);
 }
 
 /**
@@ -53,11 +77,46 @@ export function tenant(organization: OrganizationId) {
   return create(TenantIdSchema, { kind: { case: "value", value: organization.uuid } });
 }
 
-/** Starts both application contexts on a free port, without creating an organization. */
-export async function givenServer(): Promise<Hosted> {
-  const assembly: AccessDeskModule = await import("../../../dist/src/server/access-desk.js");
+/**
+ * Starts both application contexts on a free port, without creating an organization.
+ *
+ * Both contexts keep their data in the storage of the run. Resources opens its
+ * storage as the application server does, from its settings: on PostgreSQL, a
+ * new database for each organization the tests work in, and one for what
+ * people subscribe to.
+ *
+ * @param storage The storage Identity keeps its data in, to start the server
+ *   over data an earlier one kept. New, empty storage when left out.
+ */
+export async function givenServer(storage?: TestStorage): Promise<Hosted> {
+  const app: AppModule = await import("../../../dist/src/index.js");
+  const identityStorage = storage ?? (await givenServerStorage());
+  const databases =
+    TestStorages.profile() === "memory"
+      ? undefined
+      : await TestStorages.databases(ORGANIZATIONS.length + 1);
+  const [subscriptionsUrl = "", ...organizationUrls] = databases?.urls ?? [];
+  const resourcesStorage = await app.Storage.openResources(
+    databases === undefined
+      ? { kind: "memory" }
+      : {
+          kind: "postgresql",
+          organizations: ORGANIZATIONS.map((organization, index) => ({
+            organization,
+            url: organizationUrls[index] ?? "",
+          })),
+          subscriptionsUrl,
+        },
+  );
   let url = "";
-  const contexts = await assembly.AccessDesk.assemble({ server: () => url });
+  const contexts = await app.AccessDesk.assemble({
+    server: () => url,
+    storage: {
+      identity: await identityStorage.open(),
+      resources: resourcesStorage.organizations,
+      resourceSubscriptions: resourcesStorage.subscriptions,
+    },
+  });
   const server = await new Server({
     contexts: [contexts.identity, contexts.resources],
     port: 0,
@@ -70,6 +129,12 @@ export async function givenServer(): Promise<Hosted> {
     stop: async () => {
       await server.close();
       await contexts.close();
+      resourcesStorage.organizations.close();
+      resourcesStorage.subscriptions.close();
+      await databases?.drop();
+      if (storage === undefined) {
+        await identityStorage.drop();
+      }
     },
   };
 }
@@ -106,18 +171,29 @@ export async function give<Schema extends GenMessage<Message>>(
 }
 
 /**
- * Creates an organization in its own tenant, using its UUID as the display name.
+ * Creates an organization in its own tenant, using its UUID as the display name,
+ * and waits until its view shows it.
  *
  * @param hosted The running server whose Resources context receives the command.
  * @param organization The new organization's value ID; its UUID also becomes the display name.
  */
-export function givenOrganization(hosted: Hosted, organization: OrganizationId): Promise<void> {
-  return give(
+export async function givenOrganization(
+  hosted: Hosted,
+  organization: OrganizationId,
+): Promise<void> {
+  await give(
     hosted.resources,
     CreateOrganizationSchema,
     create(CreateOrganizationSchema, { id: organization, name: organization.uuid }),
     { organization },
   );
+  const shown = await eventually(
+    () => organizationView(hosted, organization),
+    (view) => view !== undefined,
+  );
+  if (shown === undefined) {
+    throw new Error(`Organization ${organization.uuid} does not show in its view.`);
+  }
 }
 
 /**

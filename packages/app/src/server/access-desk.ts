@@ -13,6 +13,7 @@
  */
 
 import type { BoundedContext } from "@spine-event-engine/server";
+import type { StorageFactory } from "@spine-event-engine/storage";
 import { IdentityContext } from "@access-desk/identity-server";
 import { ResourcesContext } from "@access-desk/resources-server";
 import { ReachedOrganizationMembers } from "./organization-members.js";
@@ -26,6 +27,18 @@ export interface AccessDeskOptions {
    * administrator adds them.
    */
   readonly server: () => string;
+  /** Where the application keeps its data. */
+  readonly storage: {
+    /** Where Identity keeps people and their accounts. */
+    readonly identity: StorageFactory;
+    /** Where Resources keeps the organizations and their resources. */
+    readonly resources: StorageFactory;
+    /**
+     * Where Resources keeps subscriptions. They belong to no organization,
+     * so they are kept apart.
+     */
+    readonly resourceSubscriptions: StorageFactory;
+  };
 }
 
 /** The assembled application. */
@@ -48,8 +61,9 @@ export const AccessDesk = {
    */
   async assemble(options: AccessDeskOptions): Promise<AccessDesk> {
     const members = ReachedOrganizationMembers.through(options.server);
-    const identity = await IdentityContext.create({ members });
-    const resources = await ResourcesContext.create();
+    const identity = await IdentityContext.create({ members, storage: options.storage.identity });
+    const { resources: storage, resourceSubscriptions: subscriptions } = options.storage;
+    const resources = await ResourcesContext.create({ storage, subscriptions });
     return { identity, resources, close: () => members.close() };
   },
 };

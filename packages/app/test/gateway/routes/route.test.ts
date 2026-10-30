@@ -12,14 +12,21 @@
  * and limitations under the License.
  */
 
-import { afterEach, describe, expect, it } from "vitest";
+import { generateKeyPairSync } from "node:crypto";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { RevokedTokens } from "../../../src/gateway/revoked-tokens.js";
 import { routing } from "../../../src/gateway/routes/route.js";
 import { Sessions } from "../../../src/gateway/sessions.js";
 
-let sessions = new Sessions();
+let sessions: Sessions;
+beforeEach(async () => {
+  sessions = new Sessions({
+    key: generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey,
+    revoked: await RevokedTokens.open({ kind: "memory" }),
+  });
+});
 afterEach(async () => {
   await sessions.close();
-  sessions = new Sessions();
 });
 
 function incoming(body: string, authorization?: string): Request {
@@ -53,8 +60,8 @@ describe("Gateway route construction should", () => {
       id: "p-1",
       attributes: { email: "maya@example.com", name: "Maya" },
     });
-    expect(created.kind).toBe("created");
-    if (created.kind !== "created") {
+    expect(created.kind).toBe("issued");
+    if (created.kind !== "issued") {
       return;
     }
     const route = routing(["https://app.test"], sessions)("/sample", (body, session) =>

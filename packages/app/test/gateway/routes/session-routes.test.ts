@@ -34,7 +34,7 @@ const person = {
 const organization = create(OrganizationIdSchema, { uuid: "acme" });
 const session: Session = {
   id: "session-1",
-  credential: { kind: "cookie", value: "token" },
+  credential: { kind: "bearer", value: "token" },
   person,
   organization,
 };
@@ -43,6 +43,7 @@ function fixture() {
   const sessions = {
     of: vi.fn().mockResolvedValue(session),
     end: vi.fn().mockResolvedValue(undefined),
+    endUnresolved: vi.fn().mockResolvedValue(undefined),
   };
   const desk = {
     profile: vi.fn().mockResolvedValue({
@@ -139,5 +140,19 @@ describe("Gateway session routes should", () => {
     const alreadyOut = await call("/auth/sign-out");
     expect(alreadyOut.status).toBe(200);
     expect(sessions.end).not.toHaveBeenCalled();
+    expect(sessions.endUnresolved).toHaveBeenCalledOnce();
+  });
+
+  it("ask to sign out again when the gateway could not remember that the session ended", async () => {
+    const { call, sessions } = fixture();
+    const silenced = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    sessions.of.mockResolvedValueOnce(undefined);
+    sessions.endUnresolved.mockRejectedValueOnce(new Error("The session could not be ended."));
+
+    const response = await call("/auth/sign-out");
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "try again" });
+    silenced.mockRestore();
   });
 });

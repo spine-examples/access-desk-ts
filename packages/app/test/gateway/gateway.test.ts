@@ -16,7 +16,14 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { MembershipView } from "@access-desk/identity-model/generated/accessdesk/identity/membership/membership_pb.js";
 import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 
-import { call, eventually, givenGateway, request, stopGateways } from "./given/gateway.js";
+import {
+  call,
+  eventually,
+  givenGateway,
+  request,
+  restartGateway,
+  stopGateways,
+} from "./given/gateway.js";
 import {
   addMember,
   addOrganizationMember,
@@ -172,6 +179,29 @@ describe("The gateway should", () => {
       expect(await signOut(running)).toEqual({ status: 200, body: {} });
       expect((await session(running, `not-${noah.token}`)).status).toBe(401);
       expect((await session(running, noah.token)).status).toBe(200);
+    });
+  });
+
+  describe("restart, and", () => {
+    it("keep a signed-in person signed in, in their organization", async () => {
+      const running = await givenGateway();
+      const noah = await signIn(running, "noah");
+      const before = await session(running, noah.token);
+
+      const restarted = await restartGateway(running);
+
+      expect(before.status).toBe(200);
+      expect(await session(restarted, noah.token)).toEqual(before);
+    });
+
+    it("keep refusing a session that was ended before the restart", async () => {
+      const running = await givenGateway();
+      const noah = await signIn(running, "noah");
+      expect((await signOut(running, noah.token)).status).toBe(200);
+
+      const restarted = await restartGateway(running);
+
+      expect((await session(restarted, noah.token)).status).toBe(401);
     });
   });
 

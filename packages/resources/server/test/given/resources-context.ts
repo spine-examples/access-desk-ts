@@ -28,6 +28,9 @@ import {
   type Target,
 } from "@spine-event-engine/proto/client";
 import { BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
+import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
+
+import { typeRegistry } from "../../generated/model-registry.js";
 
 // The organization is its own tenant, so its id doubles as the tenant.
 export const organizationId = "acme";
@@ -35,11 +38,16 @@ export const actor = "resources-user";
 
 const signalMetadata = new SignalMetadata();
 
-/** The actor context for reads and subscriptions in the organization's tenant. */
+/** Builds the tenant the organization keeps its state in. */
+function tenant() {
+  return create(TenantIdSchema, { kind: { case: "value", value: organizationId } });
+}
+
+/** Builds the actor context for reads and subscriptions in the organization's tenant. */
 export function testActorContext(): ActorContext {
   return signalMetadata.actorContext({
     actor: create(UserIdSchema, { value: actor }),
-    tenantId: create(TenantIdSchema, { kind: { case: "value", value: organizationId } }),
+    tenantId: tenant(),
   });
 }
 
@@ -63,24 +71,39 @@ function loaded(): ResourcesModule {
 }
 
 const ownedBlackBoxes = new Set<BlackBox>();
+const ownedStorages = new Set<TestStorage>();
 const contexts = new WeakMap<BlackBox, BoundedContext>();
+const storages = new WeakMap<BlackBox, TestStorage>();
 
 /**
  * Starts one Resources BlackBox bound to the organization's tenant.
  *
  * Every box is tracked so a suite's `afterEach` can close them with
- * {@link closeResourcesBlackBoxes}.
+ * {@link closeResourcesBlackBoxes}. So is the storage it keeps its data in.
  *
  * @param clock Tells what time it is until the boxes are closed; the system
  *   clock by default.
+ * @param storage The storage of an earlier box to open again, as a restarted
+ *   server would. New, empty storage when left out.
  */
-export async function resourcesBlackBox(clock?: TimeProvider): Promise<BlackBox> {
+export async function resourcesBlackBox(
+  clock?: TimeProvider,
+  storage?: TestStorage,
+): Promise<BlackBox> {
   if (clock !== undefined) {
     Time.setProvider(clock);
   }
+  const kept = storage ?? (await TestStorages.multitenant(typeRegistry, [tenant()]));
+  ownedStorages.add(kept);
+  // Subscriptions belong to no organization, so they need storage of their own.
+  const subscriptions = await TestStorages.singleTenant(typeRegistry);
+  ownedStorages.add(subscriptions);
   // Grant flows cross several entities before a read model settles, so waits
   // get generous headroom; they still return as soon as the outcome is visible.
-  const context = await loaded().ResourcesContext.create();
+  const context = await loaded().ResourcesContext.create({
+    storage: await kept.open(),
+    subscriptions: await subscriptions.open(),
+  });
   const box = await BlackBox.from(context, {
     tenant: organizationId,
     timeoutMs: 20_000,
@@ -88,11 +111,25 @@ export async function resourcesBlackBox(clock?: TimeProvider): Promise<BlackBox>
   });
   ownedBlackBoxes.add(box);
   contexts.set(box, context);
+  storages.set(box, kept);
   return box;
 }
 
 /**
- * The Resources context behind a BlackBox, for tests that post events
+ * Finds the storage a BlackBox keeps its data in, for opening it again.
+ *
+ * @param box A BlackBox opened through {@link resourcesBlackBox}.
+ */
+export function storageOf(box: BlackBox): TestStorage {
+  const storage = storages.get(box);
+  if (storage === undefined) {
+    throw new Error("Open the BlackBox through resourcesBlackBox() to reach its storage.");
+  }
+  return storage;
+}
+
+/**
+ * Finds the Resources context behind a BlackBox, for tests that post events
  * directly.
  *
  * @param box A BlackBox opened through {@link resourcesBlackBox}.
@@ -107,11 +144,13 @@ export function contextOf(box: BlackBox): BoundedContext {
 
 /**
  * Closes and forgets every BlackBox opened through {@link resourcesBlackBox},
- * and puts the system clock back.
+ * deletes the data they kept, and puts the system clock back.
  */
 export async function closeResourcesBlackBoxes(): Promise<void> {
   await Promise.all([...ownedBlackBoxes].map((box) => box.close()));
   ownedBlackBoxes.clear();
+  await Promise.all([...ownedStorages].map((storage) => storage.drop()));
+  ownedStorages.clear();
   Time.resetProvider();
 }
 

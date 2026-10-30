@@ -12,6 +12,7 @@
  * and limitations under the License.
  */
 
+import type { KeyObject } from "node:crypto";
 import { create } from "@bufbuild/protobuf";
 import { createGrpcWebTransport } from "@connectrpc/connect-node";
 import {
@@ -19,11 +20,13 @@ import {
   type AuthenticatedPrincipal,
   type AuthorizedRequestContext,
   type RequestCredential,
+  type SignedTokenRevocation,
 } from "@spine-event-engine/auth";
 import type { TypeRegistryLookup } from "@spine-event-engine/core";
 import { Time } from "@spine-event-engine/core/time";
 import { TenantIdSchema, UserIdSchema } from "@spine-event-engine/proto";
 import { BrowserServer } from "@spine-event-engine/server/browser";
+import type { StorageFactory } from "@spine-event-engine/storage";
 import { ServerConnection } from "../server/client.js";
 import { AccessDesk } from "./access-desk.js";
 import { Policy } from "./policy.js";
@@ -50,6 +53,15 @@ export interface GatewayOptions {
   readonly port: number;
   /** The identity providers people sign in through, such as Google, by key. */
   readonly external: Readonly<Record<string, ExternalSignIn>>;
+  /** The P-256 private key the gateway signs sessions with. */
+  readonly sessionKey: KeyObject;
+  /** Where the gateway keeps its data, so it outlasts a restart. */
+  readonly storage: {
+    /** Where the gateway keeps the subscriptions people hold. */
+    readonly subscriptions: StorageFactory;
+    /** Where the gateway keeps the tokens of the sessions people ended. */
+    readonly revokedTokens: SignedTokenRevocation;
+  };
 }
 
 /** A running gateway. */
@@ -80,8 +92,15 @@ export const Gateway = {
     const desk = new AccessDesk(server);
     const origins = [...options.origins];
     const listening: { address?: string } = {};
-    const watching = new Watching(cancellingThrough(() => listening.address, origins[0]));
-    const sessions = new Sessions(watching);
+    const watching = new Watching(
+      options.storage.subscriptions,
+      cancellingThrough(() => listening.address, origins[0]),
+    );
+    const sessions = new Sessions({
+      key: options.sessionKey,
+      revoked: options.storage.revokedTokens,
+      subscriptions: watching,
+    });
     const route = routing(origins, sessions);
     const signIn = signInRoutes(route, desk, sessions, options.external);
     const allows = Policy.authorization(desk);
@@ -99,13 +118,8 @@ export const Gateway = {
         // The gateway hands its session out as a bearer token.
         resolve: (credential: RequestCredential) => sessions.resolve(credential.value),
       },
-      authorize: async (principal, request) => {
-        const allowed = await allows(principal, request);
-        if (allowed) {
-          watching.claim(principal, request);
-        }
-        return allowed;
-      },
+      authorize: async (principal, request) =>
+        (await allows(principal, request)) && watching.claim(principal, request),
       contexts: {
         resolve: (principal, request, clock) =>
           Promise.resolve(trusted(principal, clock.now(), !Policy.concernsNoOrganization(request))),

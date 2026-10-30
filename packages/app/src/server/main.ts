@@ -14,7 +14,9 @@
 
 import { Server } from "@spine-event-engine/server";
 import { AccessDesk } from "./access-desk.js";
+import { Closing } from "../closing.js";
 import { Settings } from "../settings.js";
+import { Storage } from "../storage.js";
 
 /**
  * The application server.
@@ -23,7 +25,11 @@ import { Settings } from "../settings.js";
  * sessions, or identity providers.
  */
 
-const { host, port } = Settings.ofServer(process.env).listening;
+const settings = Settings.ofServer(process.env);
+const { host, port } = settings.listening;
+
+const identityStorage = await Storage.open(settings.identityStorage);
+const resourcesStorage = await Storage.openResources(settings.resourcesStorage);
 
 const listening: { address?: string } = {};
 const contexts = await AccessDesk.assemble({
@@ -32,6 +38,11 @@ const contexts = await AccessDesk.assemble({
       throw new Error("The application server does not listen yet.");
     }
     return listening.address;
+  },
+  storage: {
+    identity: identityStorage,
+    resources: resourcesStorage.organizations,
+    resourceSubscriptions: resourcesStorage.subscriptions,
   },
 });
 const server = await new Server({
@@ -42,6 +53,18 @@ const server = await new Server({
 listening.address = server.baseUrl;
 
 console.log(`Access Desk application server: ${server.baseUrl}`);
+console.log(
+  settings.identityStorage.kind === "postgresql"
+    ? "People and their memberships are kept in PostgreSQL."
+    : "People and their memberships are kept in memory, and are forgotten when the server stops.",
+);
+const { resourcesStorage: kept } = settings;
+console.log(
+  kept.kind === "postgresql"
+    ? `Organizations ${kept.organizations.map(({ organization }) => organization).join(", ")} ` +
+        "are kept in PostgreSQL, and no other organization is."
+    : "Organizations are kept in memory, and are forgotten when the server stops.",
+);
 if (!Settings.onlyThisMachine(host)) {
   console.warn(
     `The application server listens on ${host}, so other machines can reach it. ` +
@@ -54,7 +77,16 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
     if (!stopping) {
       stopping = true;
-      void server.close().then(() => contexts.close());
+      void Closing.inOrder(
+        server,
+        contexts,
+        identityStorage,
+        resourcesStorage.organizations,
+        resourcesStorage.subscriptions,
+      ).catch((error: unknown) => {
+        console.error("The application server did not stop cleanly.", error);
+        process.exitCode = 1;
+      });
     }
   });
 }

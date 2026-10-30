@@ -35,6 +35,7 @@ import {
   give,
   givenOrganization,
   givenServer,
+  givenServerStorage,
   organizationView,
   type Hosted,
 } from "./given/hosted.js";
@@ -151,6 +152,26 @@ describe("The assembled application should", () => {
 
     const organization = await organizationView(hosted, acme);
     expect(organization?.member.map((member) => member.person?.uuid)).toEqual([person]);
+  });
+
+  it("know the people it registered once it is restarted over their storage", async () => {
+    const storage = await givenServerStorage();
+    try {
+      const before = await givenServer(storage);
+      const person = await givenNoahSignedIn(before);
+      await before.stop();
+
+      const after = await givenServer(storage);
+      try {
+        const kept = await after.identity.stand().read(ExternalIdentityViewSchema, NOAHS_ACCOUNT);
+        expect(kept?.person?.uuid).toBe(person);
+        expect(await givenNoahSignedIn(after)).toBe(person);
+      } finally {
+        await after.stop();
+      }
+    } finally {
+      await storage.drop();
+    }
   });
 
   it("add a person the organization already lists", async () => {

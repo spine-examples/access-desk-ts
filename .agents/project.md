@@ -38,6 +38,7 @@ packages/
   resources/   { model, server }
   app/                                # composition root: complete registry, organization setup, gateway
   web/                                # React + Vite browser client (later iterations)
+  testing/                            # what the tests of every package share
 ```
 
 - **`<context>/model`** — `@access-desk/<context>-model`, `spine-proto.json` `mode: "model"`.
@@ -90,8 +91,21 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
 - `pnpm run build` — `pnpm -r run build` (each package generates then `tsc -b`).
 - `pnpm run typecheck` — per-package `tsc -b`.
 - `pnpm run lint` — per-package `eslint src test` (type-aware).
-- `pnpm run test` — builds, then a single central `vitest run` from the root.
+- `pnpm run test` — builds, then a single central `vitest run` from the root, with
+  every test keeping its data in memory.
+- `pnpm run test:postgresql` — the same tests, each in throwaway PostgreSQL
+  databases made on the server of `ACCESS_DESK_DATABASE_HOST` and the rest.
+  Needs the database server running.
 - `pnpm run verify` — build → typecheck → typecheck:tests → lint → test. **This is the gate.**
+  It runs the tests in memory only; run `pnpm run test:postgresql` as well after
+  a change to storage, delivery, or anything PostgreSQL keeps.
+- `pnpm run postgres:start` / `postgres:stop` / `postgres:delete` — the
+  development PostgreSQL server in Docker (the `postgres` service of
+  `deploy/compose.yaml`), configured from the root `.env`. `start` makes the
+  databases the settings name that are missing, with
+  `deploy/postgres/initdb/01-databases.sh`. `delete` also deletes its data.
+- `pnpm --dir packages/app run session-key` — prints a new key for
+  `ACCESS_DESK_SESSION_KEY`.
 - `pnpm run format` / `format:check`.
 
 > After changing a `model` package's contracts, `tsc -b` (incremental) will **not**
@@ -105,6 +119,22 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
 - BlackBox tests (`@spine-event-engine/testing`) exercise one built context through a
   local server and the public client. They live under the matching domain path in
   `packages/<ctx>/server/test/`.
+- **Every test can run on either storage profile.** `ACCESS_DESK_TEST_STORAGE`
+  (`memory` or `postgresql`) picks one: `pnpm run test` and `verify` name
+  `memory`, `pnpm run test:postgresql` names `postgresql`, and a run that names
+  none, such as one from an editor, takes it from `.env`. The
+  `@access-desk/testing` package (`packages/testing`, TypeScript the tests import
+  as it is, with no build) gives every BlackBox, server, and gateway storage of
+  its own (`@access-desk/testing/storage`) and deletes it afterwards. On
+  PostgreSQL that is a new database for each, and one for each tenant of a
+  multitenant context, which must be listed up front. The application's server
+  tests open Resources the way the server does, through `Storage.openResources`,
+  for the organizations they work in (`acme` and `globex`).
+- A process that reads a projection, such as the duplicate check of an access
+  request, sees what the projection shows so far. A test waits for the view it
+  depends on (`approveAndAwait` waits until a request shows approved) before its
+  next command; PostgreSQL delivers more slowly than memory, so a missing wait
+  shows up there first.
 - **They import the context from compiled `dist/`** (`await import("../dist/src/index.js")`)
   because vitest cannot execute Spine's standard decorators from raw TypeScript source.
 - The **root `vitest.config.ts`** is the only vitest config: it includes all packages'
@@ -125,8 +155,10 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
 
 ## Dependencies
 
-- One exact Spine family pinned at **`@spine-event-engine/* 2.0.0-snapshot.22`** with
-  `@bufbuild/protobuf 2.12.1`. Never invent an API. Keep the whole family on one
+- One exact Spine family pinned at **`@spine-event-engine/* 2.0.0-snapshot.24`** with
+  `@bufbuild/protobuf 2.12.1`. PostgreSQL storage is
+  `@spine-event-engine/storage-postgres`, which brings `pg 8.23.0`; the gateway
+  and the tests use the same `pg`. Never invent an API. Keep the whole family on one
   version; upgrade it together in a dedicated task.
 
 ## Conventions

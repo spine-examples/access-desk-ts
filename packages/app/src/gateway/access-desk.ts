@@ -24,7 +24,6 @@ import {
 } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { IdentityProvider } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 import { LinkExternalIdentitySchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/external_identity_commands_pb.js";
-import { ExternalIdentityLinkedSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/external_identity_events_pb.js";
 import { ExternalIdentityViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/external_identity_pb.js";
 import { PersonViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/person_pb.js";
 import {
@@ -92,12 +91,12 @@ export class AccessDesk {
     this.#server = server;
   }
 
-  /** The gateway's client for Identity, which belongs to no organization. */
+  /** Returns the gateway's client for Identity, which belongs to no organization. */
   get #identity(): ServerRequest {
     return this.#server.in().onBehalfOf(GATEWAY);
   }
 
-  /** The gateway's client for one organization. */
+  /** Returns the gateway's client for one organization. */
   #in(organization: OrganizationId): ServerRequest {
     return this.#server.in(organization).onBehalfOf(GATEWAY);
   }
@@ -153,21 +152,18 @@ export class AccessDesk {
    *
    * @returns The person, or `undefined` when Identity did not link the account in time.
    */
-  async #link(
-    id: ExternalIdentityId,
-    email: EmailAddress,
-    name: string,
-  ): Promise<PersonId | undefined> {
-    const linked = await ServerRequests.postAndAwait(this.#identity, {
+  #link(id: ExternalIdentityId, email: EmailAddress, name: string): Promise<PersonId | undefined> {
+    return ServerRequests.postAndAwaitView(this.#identity, {
       command: LinkExternalIdentitySchema,
       message: create(LinkExternalIdentitySchema, { id, emailAddress: email, name }),
-      event: ExternalIdentityLinkedSchema,
-      answers: (event) => event.id?.provider === id.provider && event.id.subject === id.subject,
+      view: ExternalIdentityViewSchema,
+      idSchema: ExternalIdentityIdSchema,
+      id,
+      shows: (view) => view.person,
     });
-    return linked?.person;
   }
 
-  /** A signed-in person's accounts, and the organization they belong to. */
+  /** Reads a signed-in person's accounts, and the organization they belong to. */
   async profile(person: SignedIn): Promise<Profile> {
     const view = await ServerRequests.readById(
       this.#identity,
@@ -184,7 +180,7 @@ export class AccessDesk {
     };
   }
 
-  /** An organization with its members and resources, when it exists. */
+  /** Reads an organization with its members and resources, when it exists. */
   organization(organization: OrganizationId): Promise<OrganizationView | undefined> {
     return ServerRequests.readById(
       this.#in(organization),
@@ -194,7 +190,7 @@ export class AccessDesk {
     );
   }
 
-  /** A person's membership in an organization, when they are a member. */
+  /** Finds a person's membership in an organization, when they are a member. */
   async member(
     organization: OrganizationId,
     person: PersonId,

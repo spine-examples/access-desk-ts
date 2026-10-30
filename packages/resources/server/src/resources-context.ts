@@ -86,6 +86,8 @@ import { AuditEntryProjection } from "./audit/audit-entry-projection.js";
  *
  * It is multitenant, and each organization is its own tenant. So
  * `CreateOrganization` is given in the tenant of the organization it creates.
+ * Spine takes an organization's commands only once the organization is kept in
+ * the server environment's tenant index.
  */
 export const ResourcesContext = {
   /**
@@ -95,7 +97,7 @@ export const ResourcesContext = {
    */
   async create(): Promise<BoundedContext> {
     /**
-     * The request an event from a person's access answers.
+     * Finds the request an event from a person's access answers.
      *
      * That is the request that asked for a check when it was submitted, or for a
      * grant when it was approved.
@@ -111,7 +113,7 @@ export const ResourcesContext = {
       ExtendAccessGrantSchema,
     ] as const;
     /**
-     * The request whose command a person's access rejected.
+     * Finds the request whose command a person's access rejected.
      *
      * A rejection of anything else, such as a revocation, belongs to no request.
      */
@@ -125,7 +127,7 @@ export const ResourcesContext = {
         ? []
         : requestOf(anyUnpack(rejected, asked) ?? {});
     };
-    /** The grant an event is about. */
+    /** Finds the grant an event is about. */
     const grantOf = (event: { readonly id?: AccessGrantId | undefined }): AccessGrantId[] =>
       event.id === undefined ? [] : [event.id];
     const resourceRegistrationProcmanRouting = EventRouting.create<ResourceId>()
@@ -180,7 +182,7 @@ export const ResourcesContext = {
       AccessGrantRevokedSchema,
     ] as const;
 
-    /** The entry of the audit trail an action makes. */
+    /** Finds the entry of the audit trail an action makes. */
     const entryOf = (kind: GenMessage<Message>, context: EventContext): AuditEntryId[] => {
       const { producerId: producer, version } = context;
       if (producer === undefined || version === undefined) {
@@ -196,7 +198,7 @@ export const ResourcesContext = {
     for (const event of auditTrailEvents) {
       auditTrailRouting.route(event, (_event, context) => entryOf(event, context));
     }
-    const builder = BoundedContext.multitenant("Resources")
+    return BoundedContext.multitenant("Resources")
       .withGeneratedRegistryRoot(new URL("..", import.meta.url))
       .add(OrganizationAggregate)
       .add(OrganizationViewProjection)
@@ -208,7 +210,7 @@ export const ResourcesContext = {
       .add(AccessDecisionAssignmentProjection, { eventRouting: decisionRouting })
       .add(ResourceAccessAggregate)
       .add(AccessGrantViewProjection, { eventRouting: grantViewRouting })
-      .add(AuditEntryProjection, { eventRouting: auditTrailRouting });
-    return builder.buildAsync();
+      .add(AuditEntryProjection, { eventRouting: auditTrailRouting })
+      .build();
   },
 };

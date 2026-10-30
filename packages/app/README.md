@@ -26,19 +26,77 @@ The file is ignored by Git.
 Every setting is required. Nothing is assumed: a program that misses a
 setting refuses to start and names it.
 
-| Variable                   | Read by             | Meaning                                                |
-| -------------------------- | ------------------- | ------------------------------------------------------ |
-| `ACCESS_DESK_SERVER_HOST`  | server, gateway     | The address the application server listens on.         |
-| `ACCESS_DESK_SERVER_PORT`  | server, gateway     | The port the application server listens on.            |
-| `ACCESS_DESK_GATEWAY_HOST` | gateway, web client | The address the gateway listens on.                    |
-| `ACCESS_DESK_GATEWAY_PORT` | gateway, web client | The port the gateway listens on.                       |
-| `ACCESS_DESK_WEB_HOST`     | gateway, web client | The address the web client listens on.                 |
-| `ACCESS_DESK_WEB_PORT`     | gateway, web client | The port the web client listens on.                    |
-| `GOOGLE_CLIENT_ID`         | gateway             | The client identifier of the Google OAuth application. |
-| `GOOGLE_CLIENT_SECRET`     | gateway             | The client secret of the Google OAuth application.     |
+| Variable                                       | Read by             | Meaning                                                 |
+| ---------------------------------------------- | ------------------- | ------------------------------------------------------- |
+| `ACCESS_DESK_SERVER_HOST`                      | server, gateway     | The address the application server listens on.          |
+| `ACCESS_DESK_SERVER_PORT`                      | server, gateway     | The port the application server listens on.             |
+| `ACCESS_DESK_GATEWAY_HOST`                     | gateway, web client | The address the gateway listens on.                     |
+| `ACCESS_DESK_GATEWAY_PORT`                     | gateway, web client | The port the gateway listens on.                        |
+| `ACCESS_DESK_WEB_HOST`                         | gateway, web client | The address the web client listens on.                  |
+| `ACCESS_DESK_WEB_PORT`                         | gateway, web client | The port the web client listens on.                     |
+| `GOOGLE_CLIENT_ID`                             | gateway             | The client identifier of the Google OAuth application.  |
+| `GOOGLE_CLIENT_SECRET`                         | gateway             | The client secret of the Google OAuth application.      |
+| `ACCESS_DESK_STORAGE`                          | server, gateway     | `memory`, or `postgresql` to keep data across restarts. |
+| `ACCESS_DESK_DATABASE_HOST`                    | server, gateway     | The address of the PostgreSQL server.                   |
+| `ACCESS_DESK_DATABASE_PORT`                    | server, gateway     | The port of the PostgreSQL server.                      |
+| `ACCESS_DESK_DATABASE_USER`                    | server, gateway     | The account the programs sign in to it with.            |
+| `ACCESS_DESK_DATABASE_PASSWORD`                | server, gateway     | The password of that account, written as it is.         |
+| `ACCESS_DESK_IDENTITY_DATABASE`                | server              | The database of people and their memberships.           |
+| `ACCESS_DESK_ORGANIZATIONS`                    | server              | The organizations kept in PostgreSQL, by commas.        |
+| `ACCESS_DESK_ORGANIZATION_DATABASE`            | server              | Each one's database, with `{organization}` in it.       |
+| `ACCESS_DESK_RESOURCES_SUBSCRIPTIONS_DATABASE` | server              | The database of subscriptions to the organizations.     |
+| `ACCESS_DESK_GATEWAY_DATABASE`                 | gateway             | The database of subscriptions and ended sessions.       |
+| `ACCESS_DESK_SESSION_KEY`                      | gateway             | The P-256 key sessions are signed with, in base64.      |
 
 People sign in through Google. If the gateway cannot reach Google when it
 starts, it does not start.
+
+The PostgreSQL server, the databases, and the organizations are needed only
+for `postgresql`.
+
+### The database
+
+`ACCESS_DESK_STORAGE=postgresql` needs a PostgreSQL server. For development,
+[`deploy/compose.yaml`](../../deploy/compose.yaml) runs one in Docker, with the
+port and the account of `ACCESS_DESK_DATABASE_PORT`, `_USER`, and `_PASSWORD`.
+From the repository root:
+
+```sh
+pnpm run postgres:start
+```
+
+The programs keep their data in these databases, named as in `.env.example`:
+
+| Database                              | Used by            | What it keeps                                                                            |
+| ------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------- |
+| `accessdesk_identity`                 | application server | People, their accounts, email addresses, and memberships, and the subscriptions to them. |
+| `accessdesk_resources_{organization}` | application server | One organization: its members, resources, access requests, grants, and audit trail.      |
+| `accessdesk_resources_subscriptions`  | application server | What each subscription to the organizations watches.                                     |
+| `accessdesk_gateway`                  | gateway            | Who owns each subscription, and the identifiers of the sessions people signed out of.    |
+
+The server never opens the gateway's database. The gateway opens none of the
+server's and reaches the data only through the server.
+
+- **Organizations.** Spine's PostgreSQL storage keeps each organization in a
+  database of its own, `accessdesk_resources_{organization}`, and must know
+  them all when it opens. So the server keeps only the organizations of
+  `ACCESS_DESK_ORGANIZATIONS`, and refuses any other. For `teamdev,codematters`,
+  these are `accessdesk_resources_teamdev` and `accessdesk_resources_codematters`.
+  A new organization needs a new database and a restart.
+- **Subscriptions.** A browser's subscription is kept twice: once by the
+  gateway, and once by the server, in a database of the context it watches.
+  - `accessdesk_gateway` says whose the subscription is and until when, so
+    only its owner may activate or cancel it.
+  - `accessdesk_resources_subscriptions` or `accessdesk_identity` says what the
+    subscription watches, so updates reach it after the server restarts.
+    Spine keeps one registry of subscriptions for all organizations, so
+    Resources keeps it apart from the organizations' databases. Identity
+    belongs to no organization and keeps its registry with the rest of its
+    data.
+- **Sessions.** Sessions themselves are kept nowhere: the gateway signs them
+  with `ACCESS_DESK_SESSION_KEY`. A signed token stays valid until it expires,
+  so the gateway remembers the tokens of sessions people signed out of in
+  `accessdesk_gateway`, and refuses them.
 
 ## Run it
 
@@ -142,7 +200,8 @@ Answers `200`:
 ```
 
 `token` is the session. It works in the organization the person belongs to,
-named in `organization`, or in none when that is `null`.
+named in `organization`, or in none when that is `null`. It stops working
+eight hours after sign-in, or when the person signs out.
 
 Answers `403` when the sign-in was never started or was already finished, when
 the secret does not match, or when the provider confirmed no account with a
@@ -184,7 +243,9 @@ Answers `401` when there is no session or it has ended.
 
 Ends the session, so its token stops working, and stops every subscription
 opened under it. Send `{}` with the session to end. Answers `200` with `{}`,
-also when there was no session to end.
+also when there was no session to end, and `503` with
+`{ "error": "try again" }` when the gateway could not remember that the
+session ended: the token then still works, so sign out again.
 
 ### What passes through
 
@@ -198,7 +259,7 @@ belongs to. A request to Identity, such as adding a member, names no
 organization.
 
 | Request                                                          | Who may send it                                                            |
-| ---------------------------------------------------------------- |----------------------------------------------------------------------------|
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | `AddMember`                                                      | An administrator, for their own organization.                              |
 | Query on `MembershipView`, filtered by `organization` alone      | An administrator, for their own organization.                              |
 | `SubmitAccessRequest`, `SubmitAccessExtensionRequest`            | A member, as the requester.                                                |

@@ -12,11 +12,34 @@
  * and limitations under the License.
  */
 
+import { existsSync, readFileSync } from "node:fs";
+import { parseEnv } from "node:util";
 import { defineConfig } from "vitest/config";
+
+/**
+ * The settings of the tests, and the PostgreSQL server the programs keep their
+ * data on: those `.env` holds, overridden by those the run sets.
+ */
+const settings = Object.fromEntries(
+  Object.entries({
+    ...(existsSync(".env") ? parseEnv(readFileSync(".env", "utf8")) : {}),
+    ...process.env,
+  }).filter(
+    (setting): setting is [string, string] =>
+      (setting[0].startsWith("ACCESS_DESK_TEST_") ||
+        setting[0].startsWith("ACCESS_DESK_DATABASE_")) &&
+      setting[1] !== undefined,
+  ),
+);
 
 export default defineConfig({
   test: {
     include: ["packages/*/test/**/*.test.ts", "packages/*/*/test/**/*.test.ts"],
+    // Where the tests keep their data: `memory`, or `postgresql`, in
+    // throwaway databases made on the server of ACCESS_DESK_DATABASE_HOST.
+    // `pnpm run test` and `pnpm run test:postgresql` name it. A test run
+    // that does not, such as one from an editor, takes it from `.env`.
+    env: settings,
     // BlackBox tests drive asynchronous cross-entity delivery and use bounded
     // `eventually` waits; multi-hop reconciliation needs headroom over the 5s
     // default.

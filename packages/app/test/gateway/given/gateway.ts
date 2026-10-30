@@ -12,10 +12,11 @@
  * and limitations under the License.
  */
 
+import { generateKeyPairSync } from "node:crypto";
 import { create, type Message, type MessageShape } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { Client } from "@spine-event-engine/client-web";
-import { AnyMessages, TypeUrls } from "@spine-event-engine/core";
+import { AnyPacker, TypeUrls } from "@spine-event-engine/core";
 import { UserIdSchema } from "@spine-event-engine/proto";
 import {
   QueryIdSchema,
@@ -24,15 +25,22 @@ import {
   type Query,
 } from "@spine-event-engine/proto/client";
 import { type BoundedContext, SignalMetadata } from "@spine-event-engine/server";
-import { OrganizationIdSchema } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
+import {
+  MembershipIdSchema,
+  OrganizationIdSchema,
+} from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
+import { MembershipViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/membership/membership_pb.js";
+import { PersonViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/person/person_pb.js";
 import { AddMemberSchema } from "@access-desk/identity-model/generated/accessdesk/identity/membership/commands_pb.js";
 import {
   IdentityProvider,
   OrganizationRole,
 } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 import { CreateOrganizationSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
+import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
 
 import { give, givenServer, tenant as tenantOf, type Hosted } from "../../server/given/hosted.js";
+import { typeRegistry } from "../../../generated/model-registry.js";
 
 // Imported from compiled output, like the contexts it assembles: vitest cannot
 // execute the handler classes' standard decorators from raw TypeScript source.
@@ -44,6 +52,9 @@ type External = NonNullable<Parameters<AppModule["Gateway"]["start"]>[0]["extern
 export const ORIGIN = "http://app.test";
 /** The page an outside identity provider sends people back to. */
 export const CALLBACK = "https://app.test/signed-in";
+
+/** The key the gateways of the tests sign sessions with. */
+export const SESSION_KEY = generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey;
 
 /** The running application behind its gateway. */
 export interface Running {
@@ -89,8 +100,8 @@ export async function stopGateways(): Promise<void> {
 }
 
 /**
- * An identity provider that confirms `<subject>:<email>:<name>` codes, for the
- * tests. A code without an email address stands for an account the provider
+ * Creates an identity provider that confirms `<subject>:<email>:<name>` codes,
+ * for the tests. A code without an email address stands for an account the provider
  * has verified no address for. The name may be left out.
  *
  * @param kind Which provider it stands for.
@@ -126,7 +137,8 @@ function fakeProvider(
 }
 
 /**
- * Creates an organization and adds its first administrator.
+ * Creates an organization and adds its first administrator, and waits until
+ * Identity shows the administrator in the organization.
  *
  * The application has no way of creating an organization yet, so the tests
  * give the two commands themselves, in the application's own name.
@@ -155,6 +167,27 @@ async function givenOrganization(
       role: OrganizationRole.ADMINISTRATOR,
     }),
   );
+  const added = await eventually(
+    () =>
+      hosted.identity
+        .stand()
+        .read(
+          MembershipViewSchema,
+          create(MembershipIdSchema, { emailAddress: { value: administrator } }),
+        ),
+    (view) => view?.person !== undefined,
+  );
+  const person = added?.person;
+  if (person === undefined) {
+    throw new Error(`${administrator} was not added to ${name}.`);
+  }
+  const joined = await eventually(
+    () => hosted.identity.stand().read(PersonViewSchema, person),
+    (view) => view?.organization?.uuid === name,
+  );
+  if (joined?.organization?.uuid !== name) {
+    throw new Error(`${administrator} did not join ${name}.`);
+  }
 }
 
 /**
@@ -171,13 +204,53 @@ async function givenOrganization(
  */
 export async function givenGateway(): Promise<Running> {
   const app: AppModule = await import("../../../dist/src/index.js");
-  const providers: ProvidersModule = await import("../../../dist/src/gateway/providers.js");
   const hosted = await givenServer();
   afterwards(() => hosted.stop());
   await givenOrganization(hosted, "acme", "noah@acme.example");
   await givenOrganization(hosted, "globex", "olivia@acme.example");
+  const storage = await TestStorages.singleTenant(typeRegistry);
+  afterwards(() => storage.drop());
+  const revokedTokens = await app.RevokedTokens.open(TestStorages.settingsOf(storage));
+  afterwards(() => revokedTokens.close());
+  return startGateway({ hosted, storage, revokedTokens });
+}
+
+/**
+ * Stops the gateway of a running application, and starts it again over what
+ * it kept: the subscriptions people hold, and the sessions they ended. It
+ * signs sessions with the same key. The application server keeps running.
+ *
+ * @param running The application whose gateway restarts.
+ * @returns The application behind the restarted gateway.
+ */
+export async function restartGateway(running: Running): Promise<Running> {
+  const gateway = gateways.get(running);
+  if (gateway === undefined) {
+    throw new Error("Start the gateway through givenGateway() to restart it.");
+  }
+  await gateway.close();
+  return startGateway(gateway.kept);
+}
+
+/** What a gateway of the tests keeps across its restarts. */
+interface Kept {
+  /** The application server behind the gateway. */
+  readonly hosted: Hosted;
+  /** Where the gateway keeps the subscriptions people hold. */
+  readonly storage: TestStorage;
+  /** The tokens of the sessions people ended before they expired. */
+  readonly revokedTokens: Parameters<AppModule["Gateway"]["start"]>[0]["storage"]["revokedTokens"];
+}
+
+/** The gateway in front of each running application, and what it keeps. */
+const gateways = new WeakMap<Running, { readonly kept: Kept; close(): Promise<void> }>();
+
+/** Starts a gateway in front of the application server, over what it keeps. */
+async function startGateway(kept: Kept): Promise<Running> {
+  const app: AppModule = await import("../../../dist/src/index.js");
+  const providers: ProvidersModule = await import("../../../dist/src/gateway/providers.js");
   const gateway = await app.Gateway.start({
-    backend: hosted.url,
+    backend: kept.hosted.url,
     registry: app.typeRegistry,
     origins: [ORIGIN],
     port: 0,
@@ -188,14 +261,23 @@ export async function givenGateway(): Promise<Running> {
         providers.ConfirmedIdentity,
       ),
     },
+    sessionKey: SESSION_KEY,
+    storage: { subscriptions: await kept.storage.open(), revokedTokens: kept.revokedTokens },
   });
   // The gateway and the application server are separate, so each is stopped.
+  // Closing a gateway twice does nothing more.
   afterwards(() => gateway.close());
-  return { url: gateway.url, resources: hosted.resources, identity: hosted.identity };
+  const running = {
+    url: gateway.url,
+    resources: kept.hosted.resources,
+    identity: kept.hosted.identity,
+  };
+  gateways.set(running, { kept, close: () => gateway.close() });
+  return running;
 }
 
 /**
- * The identifier of an organization of the tests, which is its name.
+ * Builds the identifier of an organization of the tests, which is its name.
  *
  * @param organization The organization's name.
  */
@@ -204,7 +286,7 @@ export function organizationId(organization: string) {
 }
 
 /**
- * The tenant an organization of the tests keeps its state in.
+ * Builds the tenant an organization of the tests keeps its state in.
  *
  * @param organization The organization's name.
  */
@@ -273,7 +355,7 @@ export async function call(
 }
 
 /**
- * The Spine client a browser sends commands, queries, and subscriptions with.
+ * Creates the Spine client a browser sends commands, queries, and subscriptions with.
  *
  * @param running The running application.
  * @param as Who the browser acts as.
@@ -320,7 +402,7 @@ export type Asking = Parameters<
 >[0];
 
 /**
- * Everything there is of one kind of read model, as a request that names nobody.
+ * Asks for everything there is of one kind of read model, naming nobody.
  *
  * @param schema The kind of read model.
  * @param as Who asks, and in which organization.
@@ -363,7 +445,7 @@ export async function read<Schema extends GenMessage<Message>>(
   try {
     const response = await client.onBehalfOf(as.person).send(asking);
     return response.message.flatMap(({ state }) => {
-      const view = state === undefined ? undefined : AnyMessages.unpack(state, schema);
+      const view = state === undefined ? undefined : AnyPacker.tryUnpack(state, schema);
       return view === undefined ? [] : [view];
     });
   } catch {

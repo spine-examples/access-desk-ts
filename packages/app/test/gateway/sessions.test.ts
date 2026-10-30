@@ -12,32 +12,41 @@
  * and limitations under the License.
  */
 
+import { generateKeyPairSync } from "node:crypto";
 import { create } from "@bufbuild/protobuf";
-import { EmailAddressSchema } from "@spine-event-engine/proto";
-import { afterEach, describe, expect, it } from "vitest";
-import {
-  OrganizationIdSchema,
-  PersonIdSchema,
-} from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
+import { timestampFromMs } from "@bufbuild/protobuf/wkt";
+import { Time } from "@spine-event-engine/core/time";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { OrganizationIdSchema } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
+import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
+import { typeRegistry } from "../../generated/model-registry.js";
+import { RevokedTokens } from "../../src/gateway/revoked-tokens.js";
 import { Sessions } from "../../src/gateway/sessions.js";
+import {
+  failingWhenTold,
+  notingStops,
+  person,
+  request,
+  SESSION_MS,
+  sessionsOfGateway,
+  withOtherSignature,
+} from "./given/sessions.js";
 
-let sessions = new Sessions();
-afterEach(async () => {
-  await sessions.close();
-  sessions = new Sessions();
+let storage: TestStorage;
+let revoked: Awaited<ReturnType<typeof RevokedTokens.open>>;
+let sessions: Sessions;
+
+beforeEach(async () => {
+  storage = await TestStorages.singleTenant(typeRegistry);
+  revoked = await RevokedTokens.open(TestStorages.settingsOf(storage));
+  sessions = sessionsOfGateway(revoked);
 });
 
-const person = {
-  id: create(PersonIdSchema, { uuid: "person-1" }),
-  email: create(EmailAddressSchema, { value: "maya@example.com" }),
-  name: "Maya Chen",
-};
-
-function request(token: string): Request {
-  return new Request("https://gateway.test/auth/session", {
-    headers: { authorization: `Bearer ${token}` },
-  });
-}
+afterEach(async () => {
+  await sessions.close();
+  await revoked.close();
+  await storage.drop();
+});
 
 describe("Gateway sessions should", () => {
   it("serialize typed person and organization values only in the issued HTTP shape", async () => {
@@ -75,15 +84,15 @@ describe("Gateway sessions should", () => {
   });
 
   it("stop what was opened under a session when it ends, and keep sessions apart", async () => {
-    const ended: string[] = [];
-    const issued = new Sessions({
+    const closed: string[] = [];
+    const issued = sessionsOfGateway(revoked, {
       closeFor: async (session) => {
         // What is opened is closed in the session's name, so its token must still work.
-        ended.push(`closing ${session.id}`);
+        closed.push(`closing ${session.id}`);
         expect(await issued.of(request(session.credential.value))).toBeDefined();
       },
       stop: async (session) => {
-        ended.push(`stopped ${session}`);
+        closed.push(`stopped ${session}`);
         expect(await issued.of(request(first?.credential.value ?? ""))).toBeUndefined();
       },
     });
@@ -99,7 +108,7 @@ describe("Gateway sessions should", () => {
 
     await issued.end(first);
 
-    expect(ended).toEqual([`closing ${first.id}`, `stopped ${first.id}`]);
+    expect(closed).toEqual([`closing ${first.id}`, `stopped ${first.id}`]);
     expect(await issued.of(request(first.credential.value))).toBeUndefined();
     expect(await issued.of(request(second.credential.value))).toBeDefined();
     await issued.close();
@@ -124,10 +133,116 @@ describe("Gateway sessions should", () => {
     expect(await sessions.of(request(issued?.token ?? ""))).toBeDefined();
   });
 
+  it("refuse a token signed with another key", async () => {
+    const other = new Sessions({
+      key: generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey,
+      revoked,
+    });
+    const forged = await other.issue(person);
+    expect(forged).toBeDefined();
+
+    expect(await sessions.of(request(forged?.token ?? ""))).toBeUndefined();
+    await other.close();
+  });
+
+  it("keep a session good when the gateway restarts, and an ended one refused", async () => {
+    const kept = await sessions.issue(person);
+    const ending = await sessions.of(request((await sessions.issue(person))?.token ?? ""));
+    expect(ending).toBeDefined();
+    if (ending === undefined) {
+      return;
+    }
+    await sessions.end(ending);
+
+    await sessions.close();
+    sessions = sessionsOfGateway(revoked);
+
+    expect((await sessions.of(request(kept?.token ?? "")))?.person.name).toBe("Maya Chen");
+    expect(await sessions.of(request(ending.credential.value))).toBeUndefined();
+  });
+
+  it("know a session by its token's identifier, however the token's signature is written", async () => {
+    const stopped: string[] = [];
+    const issued = sessionsOfGateway(revoked, notingStops(stopped));
+    const token = (await issued.issue(person))?.token ?? "";
+    const rewritten = withOtherSignature(token);
+    expect(rewritten).not.toBe(token);
+
+    const original = await issued.of(request(token));
+    const same = await issued.of(request(rewritten));
+
+    expect(original).toBeDefined();
+    expect(same?.id).toBe(original?.id);
+    if (same === undefined) {
+      return;
+    }
+    await issued.end(same);
+    expect(stopped).toEqual([original?.id]);
+    expect(await issued.of(request(token))).toBeUndefined();
+    await issued.close();
+  });
+
+  it("keep an ended session's token refused through the minute it is still taken after it expires", async () => {
+    let nowMs = Date.now();
+    Time.setProvider({ currentTime: () => timestampFromMs(nowMs) });
+    try {
+      const maya = (await sessions.issue(person))?.token ?? "";
+      const ending = await sessions.of(request(maya));
+      if (ending === undefined) {
+        throw new Error("The session did not resolve.");
+      }
+      await sessions.end(ending);
+
+      nowMs += SESSION_MS + 30_000;
+      const other = await sessions.of(request((await sessions.issue(person))?.token ?? ""));
+      if (other === undefined) {
+        throw new Error("The other session did not resolve.");
+      }
+      await sessions.end(other);
+
+      expect(await sessions.of(request(maya))).toBeUndefined();
+    } finally {
+      Time.resetProvider();
+    }
+  });
+
+  it("end a session it cannot resolve, once it can remember the end, and stop what it opened", async () => {
+    const store = failingWhenTold(revoked);
+    const stopped: string[] = [];
+    const issued = sessionsOfGateway(store, notingStops(stopped));
+    const token = (await issued.issue(person))?.token ?? "";
+    const session = await issued.of(request(token));
+    expect(session).toBeDefined();
+
+    store.reading = false;
+    store.writing = false;
+    expect(await issued.of(request(token))).toBeUndefined();
+    await expect(issued.endUnresolved(request(token))).rejects.toThrow(/could not be ended/);
+    expect(stopped).toEqual([]);
+
+    store.writing = true;
+    await issued.endUnresolved(request(token));
+
+    expect(stopped).toEqual([session?.id]);
+    store.reading = true;
+    expect(await issued.of(request(token))).toBeUndefined();
+    await issued.close();
+  });
+
+  it("end nothing for a token it did not sign", async () => {
+    const stopped: string[] = [];
+    const issued = sessionsOfGateway(revoked, notingStops(stopped));
+
+    await issued.endUnresolved(request("not-a-token"));
+
+    expect(stopped).toEqual([]);
+    await issued.close();
+  });
+
   it("refuse a principal without email and use email when no name was supplied", async () => {
     const missingEmail = await sessions.create({ id: "missing", attributes: {} });
-    expect(missingEmail.kind).toBe("created");
-    if (missingEmail.kind === "created") {
+    expect(missingEmail.kind).toBe("issued");
+    if (missingEmail.kind === "issued") {
       expect(await sessions.of(request(missingEmail.credential.value))).toBeUndefined();
     }
 
@@ -135,15 +250,15 @@ describe("Gateway sessions should", () => {
       id: "unnamed",
       attributes: { email: "unnamed@example.com" },
     });
-    expect(unnamed.kind).toBe("created");
-    if (unnamed.kind === "created") {
+    expect(unnamed.kind).toBe("issued");
+    if (unnamed.kind === "issued") {
       expect((await sessions.of(request(unnamed.credential.value)))?.person.name).toBe(
         "unnamed@example.com",
       );
     }
   });
 
-  it("invalidate issued credentials when closed", async () => {
+  it("refuse every token once closed", async () => {
     const issued = await sessions.issue(person);
     expect(await sessions.of(request(issued?.token ?? ""))).toBeDefined();
 
