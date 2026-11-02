@@ -14,7 +14,6 @@
 
 import { Server } from "@spine-event-engine/server";
 import { AccessDesk } from "./access-desk.js";
-import { Closing } from "../closing.js";
 import { Settings } from "../settings.js";
 import { Storage } from "../storage.js";
 
@@ -28,8 +27,7 @@ import { Storage } from "../storage.js";
 const settings = Settings.ofServer(process.env);
 const { host, port } = settings.listening;
 
-const identityStorage = await Storage.open(settings.identityStorage);
-const resourcesStorage = await Storage.openResources(settings.resourcesStorage);
+const storage = await Storage.openServer(settings.storage, settings.organizations);
 
 const listening: { address?: string } = {};
 const contexts = await AccessDesk.assemble({
@@ -39,54 +37,30 @@ const contexts = await AccessDesk.assemble({
     }
     return listening.address;
   },
-  storage: {
-    identity: identityStorage,
-    resources: resourcesStorage.organizations,
-    resourceSubscriptions: resourcesStorage.subscriptions,
-  },
+  storage,
+  organizations: settings.organizations,
 });
 const server = await new Server({
   contexts: [contexts.identity, contexts.resources],
+  resources: [contexts.members],
   host,
   port,
-}).start();
+}).run();
 listening.address = server.baseUrl;
 
 console.log(`Access Desk application server: ${server.baseUrl}`);
 console.log(
-  settings.identityStorage.kind === "postgresql"
-    ? "People and their memberships are kept in PostgreSQL."
-    : "People and their memberships are kept in memory, and are forgotten when the server stops.",
+  settings.storage.kind === "postgresql"
+    ? "People, organizations, and everything they own are kept in PostgreSQL."
+    : "People, organizations, and everything they own are kept in memory, " +
+        "and are forgotten when the server stops.",
 );
-const { resourcesStorage: kept } = settings;
 console.log(
-  kept.kind === "postgresql"
-    ? `Organizations ${kept.organizations.map(({ organization }) => organization).join(", ")} ` +
-        "are kept in PostgreSQL, and no other organization is."
-    : "Organizations are kept in memory, and are forgotten when the server stops.",
+  `Organizations ${settings.organizations.join(", ")} are kept, and no other organization is.`,
 );
 if (!Settings.onlyThisMachine(host)) {
   console.warn(
     `The application server listens on ${host}, so other machines can reach it. ` +
       "Make sure only the gateway can reach it.",
   );
-}
-
-let stopping = false;
-for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  process.once(signal, () => {
-    if (!stopping) {
-      stopping = true;
-      void Closing.inOrder(
-        server,
-        contexts,
-        identityStorage,
-        resourcesStorage.organizations,
-        resourcesStorage.subscriptions,
-      ).catch((error: unknown) => {
-        console.error("The application server did not stop cleanly.", error);
-        process.exitCode = 1;
-      });
-    }
-  });
 }
