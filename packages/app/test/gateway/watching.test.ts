@@ -343,7 +343,7 @@ describe("What people watch through the gateway should", () => {
 
     await watching.closeFor(ending("session-1", "token-1"));
 
-    // Only what the session opened is cancelled, with the session's own token.
+    // Only what the session opened is cancelled, with the session's token.
     expect(cancelled).toEqual([{ id: hers, token: "token-1" }]);
     expect(unopened).not.toBe(hers);
   });

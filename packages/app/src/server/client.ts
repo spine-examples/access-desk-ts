@@ -32,7 +32,7 @@ export type ServerClient = ReturnType<typeof Client.usingTransport>;
 /**
  * The one connection a program keeps to the application server.
  *
- * Each organization has a client of its own, and all clients share this
+ * Each organization has a separate client, and all clients share this
  * connection.
  */
 export class ServerConnection {

@@ -39,7 +39,7 @@ export const ReachedOrganizationMembers = {
    * Adds people to the members of organizations, through the application
    * server.
    *
-   * An organization keeps its members itself, as its own tenant in Resources.
+   * An organization keeps its members itself, as a separate tenant in Resources.
    * So Identity adds a person the way any client of the server would:
    *
    * 1. It checks whether the person is a member already. If so, nothing more

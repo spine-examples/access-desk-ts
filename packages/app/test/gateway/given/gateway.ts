@@ -106,7 +106,7 @@ export async function stopGateways(): Promise<void> {
  *
  * @param kind Which provider it stands for.
  * @param issuer The address it vouches under.
- * @param identities Describes a confirmed account, as the gateway's own providers do.
+ * @param identities Describes a confirmed account, as the gateway's providers do.
  */
 function fakeProvider(
   kind: IdentityProvider,
@@ -141,7 +141,7 @@ function fakeProvider(
  * Identity shows the administrator in the organization.
  *
  * The application has no way of creating an organization yet, so the tests
- * give the two commands themselves, in the application's own name.
+ * give the two commands themselves, in the application's name.
  *
  * @param hosted The running application server.
  * @param name The organization's name, which is also its identifier.
@@ -309,7 +309,7 @@ export interface Answered {
  * @param path The endpoint's path.
  * @param body The body, which need not be JSON.
  * @param by The session's token, when the call carries one, and the page the
- *   call comes from. The application's own page when left out.
+ *   call comes from. The application's page when left out.
  * @returns The gateway's answer, as it came.
  */
 export function request(
@@ -336,7 +336,7 @@ export function request(
  * @param path The endpoint's path.
  * @param body What to send. An empty object when left out.
  * @param token The session's token, when the call carries one.
- * @param origin The page the call comes from. The application's own when left out.
+ * @param origin The page the call comes from. The application's when left out.
  * @returns The status and the JSON the gateway answered with.
  */
 export async function call(

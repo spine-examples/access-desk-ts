@@ -42,7 +42,7 @@ export type Route = (
 ) => BrowserAuthRoute;
 
 /**
- * Creates the gateway's own endpoints, which all work the same way.
+ * Creates the gateway's endpoints, which all work the same way.
  *
  * - An endpoint takes `POST` with a JSON object of at most 16 KiB. Send `{}`
  *   when there is nothing to send. Anything else is refused.

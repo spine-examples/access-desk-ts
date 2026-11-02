@@ -26,7 +26,7 @@ import type { StorageFactory } from "@spine-event-engine/storage";
 import { SESSION, type Session, type SessionSubscriptions } from "./sessions.js";
 
 /**
- * Cancels a subscription the way its browser would, through the gateway's own
+ * Cancels a subscription the way its browser would, through the gateway's
  * address.
  *
  * @param subscription The subscription, as the gateway handed it to the browser.

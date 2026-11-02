@@ -144,7 +144,7 @@ export const Gateway = {
  * Cancels a subscription the way its browser would.
  *
  * Spine fully clears a subscription only when it is canceled through the
- * gateway's own address. So the gateway calls itself there, with the
+ * gateway's address. So the gateway calls itself there, with the
  * session's token.
  *
  * @param address Returns the address the gateway listens at, once it listens.

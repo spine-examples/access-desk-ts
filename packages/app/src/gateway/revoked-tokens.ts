@@ -20,7 +20,7 @@ import type { StorageSettings } from "../settings.js";
 
 // TODO:27-10-2026:mykyta.pimonov: Delete this store once Spine keeps revoked
 //  tokens itself. Spine leaves revocation to the application, so the gateway
-//  keeps its own table and connection pool next to Spine's storage.
+//  keeps a separate table and connection pool next to Spine's storage.
 /** The tokens of the sessions people ended before they expired, by signing out. */
 export const RevokedTokens = {
   /**

@@ -184,7 +184,7 @@ function onlyCondition(
 }
 
 /**
- * Whether a query is filtered to the person's own records, such as the
+ * Whether a query is filtered to the person's records, such as the
  * requests they made or the grants they hold.
  */
 function asksForOwn(target: Target, column: string, person: PersonId): boolean {
@@ -213,7 +213,7 @@ function asksForManaged(
   );
 }
 
-/** Whether a query asks only for the record kept under the person's own identifier. */
+/** Whether a query asks only for the record kept under the person's identifier. */
 function asksForOwnById(target: Target, person: PersonId): boolean {
   if (target.criterion.case !== "filters") {
     return false;
@@ -239,13 +239,13 @@ type ReadRule = (target: Target, asking: Asking, desk: AccessDesk) => boolean | 
  *
  * - the requests they made, and those for a resource they manage;
  * - the grants they hold, and those to a resource they manage;
- * - their own queue of requests to decide;
+ * - their queue of requests to decide;
  * - the audit trail of a resource they manage.
  *
  * So a query for requests, grants, or audit trail must filter by the person or by
  * the resource. An administrator sees the audit trail of the whole organization,
  * and need not filter it. The decision queue is asked for by its identifier,
- * which is the manager's own. Anything not listed here cannot be read.
+ * which is the manager's identifier. Anything not listed here cannot be read.
  */
 const MEMBER_READS: ReadonlyMap<string, ReadRule> = new Map<string, ReadRule>([
   [TypeUrls.derive(OrganizationViewSchema), () => true],

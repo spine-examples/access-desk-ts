@@ -84,7 +84,7 @@ import { AuditEntryProjection } from "./audit/audit-entry-projection.js";
 /**
  * The Resources bounded context.
  *
- * It is multitenant, and each organization is its own tenant. So
+ * It is multitenant, and each organization is a separate tenant. So
  * `CreateOrganization` is given in the tenant of the organization it creates.
  * Spine takes an organization's commands only once the organization is kept in
  * the server environment's tenant index.
