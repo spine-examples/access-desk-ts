@@ -24,7 +24,9 @@
     "verify": "pnpm -r run build && pnpm -r run typecheck && pnpm run typecheck:tests && pnpm -r run lint && pnpm run test",
     "postgres:start": "docker compose --env-file .env --file deploy/compose.yaml up --detach --wait postgres && docker compose --env-file .env --file deploy/compose.yaml exec postgres /docker-entrypoint-initdb.d/01-databases.sh",
     "postgres:stop": "docker compose --env-file .env --file deploy/compose.yaml stop postgres",
-    "postgres:delete": "docker compose --env-file .env --file deploy/compose.yaml down --volumes"
+    "postgres:delete": "docker compose --env-file .env --file deploy/compose.yaml down --volumes",
+    "containers:start": "docker compose --env-file .env --file deploy/compose.yaml up --build --detach --wait",
+    "containers:stop": "docker compose --env-file .env --file deploy/compose.yaml stop"
   },
   "devDependencies": {
     "@bufbuild/protobuf": "2.12.1",
@@ -43,6 +45,7 @@
     "@types/node": "24.13.2",
     "eslint": "9.39.1",
     "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-react-hooks": "7.1.1",
     "prettier": "3.9.0",
     "typescript": "6.0.3",
     "typescript-eslint": "8.62.0",
