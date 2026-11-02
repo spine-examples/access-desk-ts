@@ -14,7 +14,7 @@
 
 import { create, type Message, type MessageShape } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
-import { AnyMessages, TypeUrls } from "@spine-event-engine/core";
+import { AnyPacker, TypeUrls } from "@spine-event-engine/core";
 import { Time, type TimeProvider } from "@spine-event-engine/core/time";
 import { SignalMetadata, type BoundedContext } from "@spine-event-engine/server";
 import { type ActorContext, TenantIdSchema, UserIdSchema } from "@spine-event-engine/proto";
@@ -28,11 +28,12 @@ import {
   type Target,
 } from "@spine-event-engine/proto/client";
 import { BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
+import { TestEnvironment } from "@access-desk/testing/environment";
 import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
 
 import { typeRegistry } from "../../generated/model-registry.js";
 
-// The organization is its own tenant, so its id doubles as the tenant.
+// The organization is a separate tenant, so its id doubles as the tenant.
 export const organizationId = "acme";
 export const actor = "resources-user";
 
@@ -95,15 +96,10 @@ export async function resourcesBlackBox(
   }
   const kept = storage ?? (await TestStorages.multitenant(typeRegistry, [tenant()]));
   ownedStorages.add(kept);
-  // Subscriptions belong to no organization, so they need storage of their own.
-  const subscriptions = await TestStorages.singleTenant(typeRegistry);
-  ownedStorages.add(subscriptions);
+  await TestEnvironment.start(await kept.open(), [tenant()]);
+  const context = await loaded().ResourcesContext.create();
   // Grant flows cross several entities before a read model settles, so waits
   // get generous headroom; they still return as soon as the outcome is visible.
-  const context = await loaded().ResourcesContext.create({
-    storage: await kept.open(),
-    subscriptions: await subscriptions.open(),
-  });
   const box = await BlackBox.from(context, {
     tenant: organizationId,
     timeoutMs: 20_000,
@@ -149,6 +145,7 @@ export function contextOf(box: BlackBox): BoundedContext {
 export async function closeResourcesBlackBoxes(): Promise<void> {
   await Promise.all([...ownedBlackBoxes].map((box) => box.close()));
   ownedBlackBoxes.clear();
+  await TestEnvironment.reset();
   await Promise.all([...ownedStorages].map((storage) => storage.drop()));
   ownedStorages.clear();
   Time.resetProvider();
@@ -177,10 +174,10 @@ function includeAll(schema: GenMessage<Message>, queryId: string): Query {
 // Unpacks the entity states a query returned.
 function statesOf<Schema extends GenMessage<Message>>(
   schema: Schema,
-  states: readonly { state?: Parameters<typeof AnyMessages.unpack>[0] | undefined }[],
+  states: readonly { state?: Parameters<typeof AnyPacker.tryUnpack>[0] | undefined }[],
 ): MessageShape<Schema>[] {
   return states.map(({ state }) => {
-    const value = state === undefined ? undefined : AnyMessages.unpack(state, schema);
+    const value = state === undefined ? undefined : AnyPacker.tryUnpack(state, schema);
     if (value === undefined) {
       throw new Error(`Expected a ${schema.typeName} query state.`);
     }
@@ -238,7 +235,7 @@ export async function readWhere<
             filter: [
               {
                 fieldPath: { fieldName: [column] },
-                value: AnyMessages.pack(valueSchema, value),
+                value: AnyPacker.pack(valueSchema, value),
                 operator: Filter_Operator.EQUAL,
               },
             ],

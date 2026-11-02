@@ -17,7 +17,8 @@ import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { SignalEnvelopes } from "@spine-event-engine/core";
 import { TenantIdSchema, UserIdSchema } from "@spine-event-engine/proto";
 import { type BoundedContext, Server, SignalMetadata } from "@spine-event-engine/server";
-import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
+import { TestEnvironment } from "@access-desk/testing/environment";
+import { TestStorages } from "@access-desk/testing/storage";
 import { type OrganizationId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import {
   AuditEntrySchema,
@@ -29,17 +30,16 @@ import {
   type OrganizationView,
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
 
-import { typeRegistry } from "../../../generated/model-registry.js";
-
 // Imported from compiled output, like the contexts it assembles: vitest cannot
 // execute the handler classes' standard decorators from raw TypeScript source.
 type AppModule = typeof import("../../../dist/src/index.js");
+type ServerStorageSettings = import("../../../dist/src/index.js").ServerStorageSettings;
 
 /**
  * The organizations the tests of the application work in.
  *
- * Resources on PostgreSQL keeps only the organizations it is told when it
- * opens, as the server keeps only those `ACCESS_DESK_ORGANIZATIONS` lists.
+ * The server keeps only these, as it keeps only those `ACCESS_DESK_ORGANIZATIONS`
+ * lists, and refuses everything given in any other organization.
  */
 const ORGANIZATIONS = ["acme", "globex"] as const;
 
@@ -54,18 +54,60 @@ export interface Hosted {
   /**
    * Stops the server and closes its assembled contexts.
    *
-   * It deletes the data Resources kept, and the data Identity kept unless
-   * the test passed its storage in.
+   * It deletes the data the server kept, unless the test passed its storage in.
    */
   stop(): Promise<void>;
 }
 
+/** The storage of an application server, which a test can start a server over again. */
+export interface ServerStorage {
+  /** Where the server keeps its data, as its settings name it. */
+  readonly settings: ServerStorageSettings;
+  /** Deletes the data the storage kept. */
+  drop(): Promise<void>;
+}
+
 /**
- * Creates the storage Identity keeps its data in, for a test that starts the server
- * more than once over the same data.
+ * Creates the storage of an application server.
+ *
+ * On PostgreSQL, it is a new shared database. The database of each
+ * organization is named after the shared one, and deleted with it. In
+ * memory, every opening starts empty, as a restarted server does.
  */
-export function givenServerStorage(): Promise<TestStorage> {
-  return TestStorages.singleTenant(typeRegistry);
+export async function givenServerStorage(): Promise<ServerStorage> {
+  if (TestStorages.profile() === "memory") {
+    return { settings: { kind: "memory" }, drop: () => Promise.resolve() };
+  }
+  const shared = await TestStorages.databases(1);
+  const [url = ""] = shared.urls;
+  const name = new URL(url).pathname.slice(1);
+  return {
+    settings: { kind: "postgresql", url, organizationDatabase: `${name}_{organization}` },
+    drop: async () => {
+      await TestStorages.dropDatabasesStartingWith(`${name}_`);
+      await shared.drop();
+    },
+  };
+}
+
+/**
+ * Creates the database of an organization, as a developer does, unless it is
+ * there already.
+ *
+ * In memory, there is nothing to create.
+ *
+ * @param settings Where the application server keeps its data.
+ * @param organization The organization's identifier.
+ */
+async function givenOrganizationDatabase(
+  settings: ServerStorageSettings,
+  organization: string,
+): Promise<void> {
+  if (settings.kind === "postgresql") {
+    const app: AppModule = await import("../../../dist/src/index.js");
+    const url = new URL(app.Settings.organizationDatabase(settings, organization));
+    await TestStorages.createDatabases([url.pathname.slice(1)]);
+  }
 }
 
 /**
@@ -80,45 +122,28 @@ export function tenant(organization: OrganizationId) {
 /**
  * Starts both application contexts on a free port, without creating an organization.
  *
- * Both contexts keep their data in the storage of the run. Resources opens its
- * storage as the application server does, from its settings: on PostgreSQL, a
- * new database for each organization the tests work in, and one for what
- * people subscribe to.
+ * The server keeps the organizations the tests work in, and its data in the
+ * storage of the run.
  *
- * @param storage The storage Identity keeps its data in, to start the server
- *   over data an earlier one kept. New, empty storage when left out.
+ * @param storage The storage to start the server over, to keep the data an
+ *   earlier server kept. New, empty storage when left out.
  */
-export async function givenServer(storage?: TestStorage): Promise<Hosted> {
+export async function givenServer(storage?: ServerStorage): Promise<Hosted> {
   const app: AppModule = await import("../../../dist/src/index.js");
-  const identityStorage = storage ?? (await givenServerStorage());
-  const databases =
-    TestStorages.profile() === "memory"
-      ? undefined
-      : await TestStorages.databases(ORGANIZATIONS.length + 1);
-  const [subscriptionsUrl = "", ...organizationUrls] = databases?.urls ?? [];
-  const resourcesStorage = await app.Storage.openResources(
-    databases === undefined
-      ? { kind: "memory" }
-      : {
-          kind: "postgresql",
-          organizations: ORGANIZATIONS.map((organization, index) => ({
-            organization,
-            url: organizationUrls[index] ?? "",
-          })),
-          subscriptionsUrl,
-        },
-  );
+  const kept = storage ?? (await givenServerStorage());
   let url = "";
+  await TestEnvironment.reset();
+  for (const organization of ORGANIZATIONS) {
+    await givenOrganizationDatabase(kept.settings, organization);
+  }
   const contexts = await app.AccessDesk.assemble({
     server: () => url,
-    storage: {
-      identity: await identityStorage.open(),
-      resources: resourcesStorage.organizations,
-      resourceSubscriptions: resourcesStorage.subscriptions,
-    },
+    storage: await app.Storage.openServer(kept.settings, ORGANIZATIONS),
+    organizations: ORGANIZATIONS,
   });
   const server = await new Server({
     contexts: [contexts.identity, contexts.resources],
+    resources: [contexts.members],
     port: 0,
   }).start();
   url = server.baseUrl;
@@ -128,12 +153,9 @@ export async function givenServer(storage?: TestStorage): Promise<Hosted> {
     resources: contexts.resources,
     stop: async () => {
       await server.close();
-      await contexts.close();
-      resourcesStorage.organizations.close();
-      resourcesStorage.subscriptions.close();
-      await databases?.drop();
+      await TestEnvironment.reset();
       if (storage === undefined) {
-        await identityStorage.drop();
+        await kept.drop();
       }
     },
   };
@@ -171,7 +193,7 @@ export async function give<Schema extends GenMessage<Message>>(
 }
 
 /**
- * Creates an organization in its own tenant, using its UUID as the display name,
+ * Creates an organization in a separate tenant, using its UUID as the display name,
  * and waits until its view shows it.
  *
  * @param hosted The running server whose Resources context receives the command.
@@ -197,7 +219,7 @@ export async function givenOrganization(
 }
 
 /**
- * Reads an organization's view from its own tenant; returns undefined before it appears.
+ * Reads an organization's view from the organization's tenant; returns undefined before it appears.
  *
  * @param hosted The running server whose Resources context holds the view.
  * @param organization The organization's value ID, used for both lookup and tenant.
@@ -212,7 +234,7 @@ export function organizationView(
 }
 
 /**
- * Reads the whole audit trail of an organization from its own tenant.
+ * Reads the whole audit trail of an organization from the organization's tenant.
  *
  * @param hosted The running server whose Resources context keeps the audit trail.
  * @param organization The organization's value ID, used as the tenant.
