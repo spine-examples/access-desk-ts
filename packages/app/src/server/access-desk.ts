@@ -12,11 +12,20 @@
  * and limitations under the License.
  */
 
-import type { BoundedContext } from "@spine-event-engine/server";
+import type { Any } from "@bufbuild/protobuf/wkt";
+import {
+  Environment,
+  ServerEnvironment,
+  ShardIndex,
+  type BoundedContext,
+  type DeliveryStrategy,
+} from "@spine-event-engine/server";
 import type { StorageFactory } from "@spine-event-engine/storage";
 import { IdentityContext } from "@access-desk/identity-server";
 import { ResourcesContext } from "@access-desk/resources-server";
+import { typeRegistry } from "../../generated/model-registry.js";
 import { ReachedOrganizationMembers } from "./organization-members.js";
+import type { OrganizationIndex } from "./organizations.js";
 
 /** How the application is assembled. */
 export interface AccessDeskOptions {
@@ -27,18 +36,15 @@ export interface AccessDeskOptions {
    * administrator adds them.
    */
   readonly server: () => string;
-  /** Where the application keeps its data. */
-  readonly storage: {
-    /** Where Identity keeps people and their accounts. */
-    readonly identity: StorageFactory;
-    /** Where Resources keeps the organizations and their resources. */
-    readonly resources: StorageFactory;
-    /**
-     * Where Resources keeps subscriptions. They belong to no organization,
-     * so they are kept apart.
-     */
-    readonly resourceSubscriptions: StorageFactory;
-  };
+  /**
+   * Where the application keeps its data: each organization apart, and
+   * everything that belongs to no organization together.
+   */
+  readonly storage: StorageFactory;
+  /**
+   * The organizations the application keeps.
+   */
+  readonly organizations: OrganizationIndex;
 }
 
 /** The assembled application. */
@@ -47,23 +53,47 @@ export interface AccessDesk {
   readonly identity: BoundedContext;
   /** The Resources context, which holds each organization, its members, and what it owns. */
   readonly resources: BoundedContext;
-  /** Closes Identity's connection to the organizations. */
-  close(): Promise<void>;
+  /**
+   * The service through which Identity adds people to organizations' members.
+   *
+   * It holds a connection to the application server, which the server closes
+   * after the contexts.
+   */
+  readonly members: ReachedOrganizationMembers;
 }
+
+/**
+ * Delivers the messages of each context in a separate shard.
+ */
+const SHARD_PER_CONTEXT: DeliveryStrategy = {
+  shardCount: 2,
+  shardFor(_targetId: Any, targetType: string): ShardIndex {
+    return new ShardIndex(targetType.includes("/accessdesk.identity.") ? 0 : 1, 2);
+  },
+};
 
 /** Assembles the application. */
 export const AccessDesk = {
   /**
    * Assembles Access Desk from its contexts.
    *
+   * 1. Sets up the server environment of this process over the storage.
+   * 2. Builds the contexts.
+   *
    * @param options How to assemble the application.
    * @returns The contexts, ready to be hosted by a server.
    */
   async assemble(options: AccessDeskOptions): Promise<AccessDesk> {
+    ServerEnvironment.when(Environment.instance().type).use({
+      storageFactory: options.storage,
+      typeRegistry,
+      deliveryStrategy: SHARD_PER_CONTEXT,
+      tenantIndex: options.organizations,
+    });
+    await ServerEnvironment.instance().completeSetup();
     const members = ReachedOrganizationMembers.through(options.server);
-    const identity = await IdentityContext.create({ members, storage: options.storage.identity });
-    const { resources: storage, resourceSubscriptions: subscriptions } = options.storage;
-    const resources = await ResourcesContext.create({ storage, subscriptions });
-    return { identity, resources, close: () => members.close() };
+    const identity = await IdentityContext.create({ members });
+    const resources = await ResourcesContext.create();
+    return { identity, resources, members };
   },
 };

@@ -12,21 +12,12 @@
  * and limitations under the License.
  */
 
-import { create } from "@bufbuild/protobuf";
 import { StringifierRegistry } from "@spine-event-engine/core";
-import { TenantIdSchema } from "@spine-event-engine/proto";
 import { InMemoryStorageFactory, type StorageFactory } from "@spine-event-engine/storage";
 import { PostgresStorageFactory } from "@spine-event-engine/storage-postgres";
 import { typeRegistry } from "../generated/model-registry.js";
-import type { ResourcesStorageSettings, StorageSettings } from "./settings.js";
-
-/** Where Resources keeps each organization, and what people subscribed to. */
-export interface ResourcesStorage {
-  /** Each organization and everything it owns. */
-  readonly organizations: StorageFactory;
-  /** What people subscribed to, which belongs to no one organization. */
-  readonly subscriptions: StorageFactory;
-}
+import { Organizations } from "./server/organizations.js";
+import { Settings, type ServerStorageSettings, type StorageSettings } from "./settings.js";
 
 /** Opens the storage a program keeps its data in. */
 export const Storage = {
@@ -50,41 +41,30 @@ export const Storage = {
   },
 
   /**
-   * Opens the storage of Resources the settings name.
+   * Opens the storage of the application server the settings name.
    *
-   * In PostgreSQL, each organization is kept in a database of its own, and
-   * what people subscribed to in one more. The databases must exist already.
+   * In PostgreSQL, each organization has a separate database; other data shares
+   * one database. Spine finds each organization's database when needed. All
+   * databases must exist already.
    *
-   * @param settings Where Resources keeps its data.
+   * @param settings Where the application server keeps its data.
    * @returns The opened storage.
    */
-  async openResources(settings: ResourcesStorageSettings): Promise<ResourcesStorage> {
+  openServer(settings: ServerStorageSettings): Promise<StorageFactory> {
     if (settings.kind === "memory") {
-      return {
-        organizations: new InMemoryStorageFactory(),
-        subscriptions: new InMemoryStorageFactory(),
-      };
+      return Promise.resolve(new InMemoryStorageFactory());
     }
-    const organizations = await PostgresStorageFactory.newBuilder()
-      .setTenantOptions(
-        settings.organizations.map(({ organization, url }) => ({
-          tenantId: create(TenantIdSchema, { kind: { case: "value", value: organization } }),
-          options: { url },
-        })),
-      )
+    return PostgresStorageFactory.newBuilder()
+      .setOptions({ url: settings.url })
+      .setTenantResolver((tenant) => {
+        const organization = Organizations.organizationOf(tenant);
+        if (organization === undefined) {
+          throw new Error("Only an organization's tenant has a database.");
+        }
+        return { url: Settings.organizationDatabase(settings, organization) };
+      })
       .setStringifierRegistry(Storage.stringifiers())
       .build();
-    try {
-      const subscriptions = await Storage.open({
-        kind: "postgresql",
-        url: settings.subscriptionsUrl,
-      });
-      return { organizations, subscriptions };
-    } catch (error) {
-      // Nobody gets the organizations' storage, so nobody else would close it.
-      organizations.close();
-      throw error;
-    }
   },
 
   /**
