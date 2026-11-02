@@ -12,7 +12,9 @@
  * and limitations under the License.
  */
 
+import { create } from "@bufbuild/protobuf";
 import type { Any } from "@bufbuild/protobuf/wkt";
+import { TenantIdSchema, type TenantId } from "@spine-event-engine/proto";
 import {
   Environment,
   ServerEnvironment,
@@ -25,7 +27,6 @@ import { IdentityContext } from "@access-desk/identity-server";
 import { ResourcesContext } from "@access-desk/resources-server";
 import { typeRegistry } from "../../generated/model-registry.js";
 import { ReachedOrganizationMembers } from "./organization-members.js";
-import type { OrganizationIndex } from "./organizations.js";
 
 /** How the application is assembled. */
 export interface AccessDeskOptions {
@@ -42,9 +43,9 @@ export interface AccessDeskOptions {
    */
   readonly storage: StorageFactory;
   /**
-   * The organizations the application keeps.
+   * The organizations the application keeps, by their identifiers.
    */
-  readonly organizations: OrganizationIndex;
+  readonly organizations: readonly string[];
 }
 
 /** The assembled application. */
@@ -78,7 +79,9 @@ export const AccessDesk = {
    * Assembles Access Desk from its contexts.
    *
    * 1. Sets up the server environment of this process over the storage.
-   * 2. Builds the contexts.
+   * 2. Adds the organizations to the environment's tenant index, so Resources
+   *    takes what is given in them.
+   * 3. Builds the contexts.
    *
    * @param options How to assemble the application.
    * @returns The contexts, ready to be hosted by a server.
@@ -88,12 +91,20 @@ export const AccessDesk = {
       storageFactory: options.storage,
       typeRegistry,
       deliveryStrategy: SHARD_PER_CONTEXT,
-      tenantIndex: options.organizations,
     });
-    await ServerEnvironment.instance().completeSetup();
+    const environment = ServerEnvironment.instance();
+    await environment.completeSetup();
+    for (const organization of options.organizations) {
+      await environment.tenantIndex.keep(AccessDesk.tenantOf(organization));
+    }
     const members = ReachedOrganizationMembers.through(options.server);
     const identity = await IdentityContext.create({ members });
     const resources = await ResourcesContext.create();
     return { identity, resources, members };
+  },
+
+  /** Returns the tenant of an organization. */
+  tenantOf(organization: string): TenantId {
+    return create(TenantIdSchema, { kind: { case: "value", value: organization } });
   },
 };

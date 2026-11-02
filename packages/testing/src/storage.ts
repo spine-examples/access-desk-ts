@@ -292,12 +292,12 @@ const Databases = {
    */
   async dropStartingWith(prefix: string): Promise<void> {
     await Databases.administer(async (client) => {
-      const found = await client.query<{ dbname: string }>(
-        "SELECT dbname FROM pg_database WHERE starts_with(dbname, $1)",
+      const found = await client.query<{ datname: string }>(
+        "SELECT datname FROM pg_database WHERE starts_with(datname, $1)",
         [prefix],
       );
-      for (const { dbname } of found.rows) {
-        await client.query(`DROP DATABASE IF EXISTS "${dbname}" WITH (FORCE)`);
+      for (const { datname } of found.rows) {
+        await client.query(`DROP DATABASE IF EXISTS "${datname}" WITH (FORCE)`);
       }
     });
   },

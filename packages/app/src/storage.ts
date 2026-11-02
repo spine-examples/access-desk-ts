@@ -12,11 +12,12 @@
  * and limitations under the License.
  */
 
+import { create } from "@bufbuild/protobuf";
 import { StringifierRegistry } from "@spine-event-engine/core";
+import { TenantIdSchema } from "@spine-event-engine/proto";
 import { InMemoryStorageFactory, type StorageFactory } from "@spine-event-engine/storage";
 import { PostgresStorageFactory } from "@spine-event-engine/storage-postgres";
 import { typeRegistry } from "../generated/model-registry.js";
-import { Organizations } from "./server/organizations.js";
 import { Settings, type ServerStorageSettings, type StorageSettings } from "./settings.js";
 
 /** Opens the storage a program keeps its data in. */
@@ -44,25 +45,27 @@ export const Storage = {
    * Opens the storage of the application server the settings name.
    *
    * In PostgreSQL, each organization has a separate database; other data shares
-   * one database. Spine finds each organization's database when needed. All
-   * databases must exist already.
+   * one database. All databases must exist already.
    *
    * @param settings Where the application server keeps its data.
+   * @param organizations The organizations the server keeps.
    * @returns The opened storage.
    */
-  openServer(settings: ServerStorageSettings): Promise<StorageFactory> {
+  openServer(
+    settings: ServerStorageSettings,
+    organizations: readonly string[],
+  ): Promise<StorageFactory> {
     if (settings.kind === "memory") {
       return Promise.resolve(new InMemoryStorageFactory());
     }
     return PostgresStorageFactory.newBuilder()
       .setOptions({ url: settings.url })
-      .setTenantResolver((tenant) => {
-        const organization = Organizations.organizationOf(tenant);
-        if (organization === undefined) {
-          throw new Error("Only an organization's tenant has a database.");
-        }
-        return { url: Settings.organizationDatabase(settings, organization) };
-      })
+      .setTenantOptions(
+        organizations.map((organization) => ({
+          tenantId: create(TenantIdSchema, { kind: { case: "value", value: organization } }),
+          options: { url: Settings.organizationDatabase(settings, organization) },
+        })),
+      )
       .setStringifierRegistry(Storage.stringifiers())
       .build();
   },
