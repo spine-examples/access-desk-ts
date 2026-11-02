@@ -12,7 +12,8 @@
  * and limitations under the License.
  */
 
-/**
- * Web package foundation. Browser behavior is introduced in a later iteration.
- */
-export {};
+/** The settings the page is built with. */
+export const Config = {
+  /** The address the page calls the application at. */
+  apiUrl: import.meta.env.VITE_API_URL,
+};
