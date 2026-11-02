@@ -76,12 +76,12 @@ message CreateOrganization {
 - Split contracts by role **and by aggregate/purpose**, not one file per role.
   The framework classifies by the `_commands`, `_events`, and `_rejections`
   suffixes, so those suffixes are load-bearing.
-- **Drop the directory's own prefix from its main entity's files.** Each entity
+- **Drop the directory's prefix from its main entity's files.** Each entity
   lives in a directory named for it (`organization/`, `resource/`,
   `access/request/`); for that directory's main entity, omit the redundant
   prefix. In `resource/`, the Resource aggregate's files are `resource.proto`,
   `commands.proto`, `events.proto`, and `rejections.proto`. The state/aggregate
-  file keeps the entity's own name (`resource.proto`, `organization.proto`,
+  file keeps the entity's name (`resource.proto`, `organization.proto`,
   `access_request.proto`); its role files are the bare `commands.proto` /
   `events.proto` / `rejections.proto`.
 - **A non-main entity in the same directory keeps its full prefix.**
@@ -93,9 +93,9 @@ message CreateOrganization {
   `commands.proto` and `events.proto`). Shared `identifiers.proto` and
   `values.proto` at the package root are the only unprefixed top-level files.
 - **Where an enum lives.** A plain enum goes in the general shared file with the
-  value objects it serves (`values.proto`). Give an enum its own file only when
+  value objects it serves (`values.proto`). Give an enum a separate file only when
   it is _special_ — carrying custom options and helper logic. Rule of
-  thumb: options → own file; optionless → the general file.
+  thumb: options → separate file; optionless → the general file.
 - **Nested messages.** A value message used only as the repeated element of one
   entity's state (a queue's task, a list's row) is declared **inside** that state
   message, not at package top level. Generated TS names it `Parent_Child` with

@@ -74,7 +74,7 @@ Each bounded context is two packages. Its `model` package owns canonical
 `server` package holds the decorated handlers and the `BoundedContext` factory
 and is in `mode: "application"`, because `spine-proto handlers` discovers
 decorated classes only in the package that runs it; each context therefore
-composes its own model subset and generates its own handler registry. The
+composes a separate model subset and generates a handler registry. The
 top-level `app` package is also `mode: "application"`: it composes the complete
 application TypeRegistry from every context model and assembles the server. The
 accompanying `spine-proto-manifest.json` is generated output, not an authored
@@ -108,7 +108,7 @@ For one model to import another's `.proto` (e.g. Resources using Identity's
 `PersonId`), add the producer package to the consumer model's `spine-proto.json`
 `dependencies` **and** to its `package.json` `dependencies`, then `pnpm install`;
 declare transitive proto deps too. Reference cross-package types by full proto path
-(`accessdesk.identity.PersonId`). Spine's own value types are imported the same way:
+(`accessdesk.identity.PersonId`). Spine value types are imported the same way:
 `import "spine/net/email_address.proto";` gives `spine.net.EmailAddress`, whose
 schema `EmailAddressSchema` comes from `@spine-event-engine/proto`.
 Authored helper TS (e.g. enum-option accessors) lives in a model's `src/`; add
@@ -290,8 +290,8 @@ and the gateway carries the signed-in person to Resources as the actor.
 
 ## Protobuf Any and type registries
 
-Use the Spine core `Any`/TypeRegistry helpers verified against this exact
-snapshot. The server application composes the complete generated TypeRegistry;
+Pack and unpack `Any` with `AnyPacker`: `tryUnpack` returns nothing for another
+type, `unpack` throws. The server application composes the complete generated TypeRegistry;
 do not depend on runtime package scanning or mutable global schema registration.
 
 **Reading Protobuf enum custom options** (the "enum with `EnumValueOptions`
@@ -302,23 +302,58 @@ extension" pattern): `getOption` from `@bufbuild/protobuf`,
 local first. Pick an extension field number outside Spine's `73800`–`73971`
 block (Spine leaves `EnumValueOptions` free).
 
+## Server environment
+
+- **One environment per process.** `ServerEnvironment.when(type).use(settings)`
+  sets it up once, before the first `ServerEnvironment.instance()`, and
+  `completeSetup()` must finish before a context is built. Every context of
+  the process keeps its data in the environment's one `storageFactory`; a
+  context builder takes no separate storage.
+- **The environment closes the storage.** Closing the environment closes its
+  `storageFactory`. It refuses to close while a context is open.
+- **The server closes its contexts.** `Server.close()` stops taking requests,
+  waits for the work already accepted, closes the server's contexts, and then
+  each of its `resources` in order. A server begun with `start()` never closes
+  the environment. A server begun with `run()` closes itself on `SIGINT` or
+  `SIGTERM`, and then the environment, when no other such server runs.
+- **Tests.** `ServerTests.resetEnvironment()` from
+  `@spine-event-engine/server/testing` closes the environment, so the next
+  test can set up a new one. It refuses while a context is open.
+- **One Delivery for all contexts.** By default, all messages of all contexts
+  go through one shard, one after another. A handler that waits for another
+  context of the same process waits forever, since that context's messages
+  queue behind it. A `deliveryStrategy` that gives each context a separate shard avoids it.
+- **Tenant index.** A multitenant context takes what is given in a tenant
+  only once the environment's `tenantIndex` keeps the tenant, and refuses
+  anything else as `TENANT_UNKNOWN`. In memory, `keep()` adds any tenant, and a
+  new process starts with none. Spine never calls `keep()` itself. It asks
+  `contains()` on every request in a tenant and before delivering each
+  message from the Inbox, and reads `page()` to prepare the tables of every
+  tenant when a context is built and on `createStorageStructures()`.
+- **Restart.** Spine keeps no tenant list beyond a fixed
+  `setTenantOptions` list. After a restart, the tenants are whatever the
+  `tenantIndex` lists. The Inbox and the subscriptions are kept in the shared
+  database, each with its tenant inside the message, and are delivered only
+  once the index admits that tenant.
+
 ## PostgreSQL
 
 Access Desk keeps its data in PostgreSQL through `@spine-event-engine/storage-postgres`.
 
-- **Single tenant.** `PostgresStorageFactory.newBuilder().setOptions({ url })`,
-  with a `StringifierRegistry` over the full type registry. `build()` is async.
-- **Ownership.** A context does not close its factory; whoever opened it does.
-  A new context over the same database sees everything kept before.
-- **Schema.** Spine creates its tables (primary keys only). The database must
-  exist already.
-- **Multitenant.** Each tenant gets its own database, and every tenant must be
-  listed at build time (`setTenantOptions`). An unknown tenant is refused. So
-  the server keeps only the organizations in `ACCESS_DESK_ORGANIZATIONS`, and
-  adding one needs a restart.
-- **Subscriptions.** A multitenant factory refuses tenantless data, such as the
-  subscription registry. Give the context a `StorageSubscriptionRegistry` over
-  single-tenant storage (`withSubscriptionRegistry`).
+- **Shared and tenant databases.** `setOptions({ url })` names the shared
+  database. It keeps every single-tenant context, the subscription registry,
+  the Inbox, and the delivery shards. Each tenant of a multitenant context
+  keeps its entities and events in a separate database, which
+  `setTenantOptions` or `setTenantResolver` names.
+- **Tenant catalog.** With `setTenantOptions`, the tenants listed are the
+  catalog of the default `tenantIndex`, and `keep()` refuses any other. With
+  `setTenantResolver`, the catalog is empty, so the application must supply a
+  `tenantIndex`.
+- **Connections.** Building the factory opens no connection, and neither does
+  creating storage. `checkConnection()` checks the shared database.
+  `close()` is async.
+- **Schema.** Spine creates its tables, with primary keys only. The databases
+  must exist already.
 - **Pools.** One per database, ten connections by default. Spine's pools do not
   listen for `error`, so a dropped idle connection can stop the process. Pools
   Access Desk opens itself listen.
@@ -362,7 +397,7 @@ controls defined in the architecture.
   request after `authorize` without calling the bindings.
 - Ending a session does not end its streams; Spine stops them only when the
   session's time runs out.
-- Only Spine's own cancel effect clears a subscription everywhere it is kept.
+- Only Spine's cancel effect clears a subscription everywhere it is kept.
   The store receives it only when a browser cancels, or when a subscription
   expires.
 - Once the client's `activate` returns, the server has acknowledged the
@@ -381,7 +416,7 @@ controls defined in the architecture.
 - `authRoutes` match the whole address, query string included, so they suit
   `POST` with a body, not a provider callback carrying `?code=`. Their
   preflight answers allow no headers, so they serve only pages of the
-  gateway's own origin, as through a development proxy.
+  gateway's origin, as through a development proxy.
 - Without `cookies`, a session is a bearer token. `SignedSessions` needs a
   P-256 key. Without a `SignedTokenRevocation`, `logout` answers `expiryOnly`
   and the token works until it expires. `OpaqueSessions` keeps sessions in
@@ -396,9 +431,6 @@ controls defined in the architecture.
   posts. Its subscription brings only the events the command causes directly.
   Spine has no call that returns the event itself; `firstUpdateTimeoutMs` with
   `onFirstUpdateTimeout` bounds the wait.
-- When a handler's result fails validation at commit, delivery stops
-  silently. The error never reaches the `DeliveryMonitor`, the Inbox row stays
-  `TO_DELIVER`, and nothing behind it is delivered.
 - `OidcFlow` accepts only HTTPS addresses and requires the `openid` scope.
 - `createGoogleProvider` returns `email_verified` as text, and needs
   `clientAuthentication: "client_secret_post"`, or Google refuses the code
