@@ -38,19 +38,15 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = :'name')\gexec
 SQL
 }
 
-# The people, the accounts they sign in with, their email addresses, and
-# their memberships. The application server keeps them for Identity.
-create "$ACCESS_DESK_IDENTITY_DATABASE"
+# Everything of the application server that belongs to no organization:
+# people, their accounts and memberships, subscriptions, and the messages
+# waiting for delivery.
+create "$ACCESS_DESK_SERVER_DATABASE"
 
-# Each organization, in a database of its own, as Resources keeps every
-# organization apart.
+# Each organization has a separate database.
 for organization in $(echo "$ACCESS_DESK_ORGANIZATIONS" | tr ',' ' '); do
     create "$(echo "$ACCESS_DESK_ORGANIZATION_DATABASE" | sed "s/{organization}/$organization/g")"
 done
-
-# What people subscribed to in Resources, which belongs to no one
-# organization.
-create "$ACCESS_DESK_RESOURCES_SUBSCRIPTIONS_DATABASE"
 
 # The subscriptions people hold and the sessions they ended. The gateway
 # keeps them.
