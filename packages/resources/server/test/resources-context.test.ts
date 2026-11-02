@@ -13,6 +13,7 @@
  */
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { TestStorages } from "@access-desk/testing/storage";
 import { AccessRequestStatus } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 
 import {
@@ -35,20 +36,25 @@ beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
 
 describe("ResourcesContext should", () => {
-  it("know every request and grant again once it starts over its storage, and act on them", async () => {
-    const clock = testClock();
-    const before = await resourcesBlackBox(clock);
-    await givenActiveGrant(before, "req-kept");
-    await before.close();
+  it.runIf(TestStorages.durable())(
+    "know every request and grant again once it starts over its storage, and act on them",
+    async () => {
+      const clock = testClock();
+      const before = await resourcesBlackBox(clock);
+      await givenActiveGrant(before, "req-kept");
+      await before.close();
 
-    const after = await resourcesBlackBox(clock, storageOf(before));
-    const requester = after.onBehalfOf(actor);
+      const after = await resourcesBlackBox(clock, storageOf(before));
+      const requester = after.onBehalfOf(actor);
 
-    expect(await statusOf(requester, "req-kept")).toBe(AccessRequestStatus.APPROVED);
-    expect((await readAccessHeldBy(requester)).map((grant) => grant.id?.uuid)).toEqual([
-      "req-kept",
-    ]);
-    expect((await revokeGrant(after, "req-kept", "primary", "No longer needed.")).kind).toBe("ok");
-    expect((await awaitGrantRevoked(after, requester, "req-kept")).revoked).toBe(true);
-  });
+      expect(await statusOf(requester, "req-kept")).toBe(AccessRequestStatus.APPROVED);
+      expect((await readAccessHeldBy(requester)).map((grant) => grant.id?.uuid)).toEqual([
+        "req-kept",
+      ]);
+      expect((await revokeGrant(after, "req-kept", "primary", "No longer needed.")).kind).toBe(
+        "ok",
+      );
+      expect((await awaitGrantRevoked(after, requester, "req-kept")).revoked).toBe(true);
+    },
+  );
 });

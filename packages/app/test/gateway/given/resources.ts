@@ -257,7 +257,7 @@ export function accessRequest(running: Running, organization: string, id: string
 }
 
 /**
- * Which requests a browser asks for: the person's own, everything of the
+ * Which requests a browser asks for: the person's requests, everything of the
  * organization, those a given person made, or those for a given resource.
  */
 export type RequestsAsked =
@@ -268,7 +268,7 @@ export type RequestsAsked =
  *
  * @param running The running application.
  * @param as The signed-in person who reads.
- * @param asked Which requests to ask for. The person's own when left out.
+ * @param asked Which requests to ask for. The person's requests when left out.
  * @param organization The organization the request names.
  * @returns The requests, or `"refused"` when the gateway or the application
  *   server did not answer the request.

@@ -14,11 +14,12 @@
 
 import { create, type Message, type MessageShape } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
-import { AnyMessages, TypeUrls } from "@spine-event-engine/core";
+import { AnyPacker, TypeUrls } from "@spine-event-engine/core";
 import { SignalMetadata } from "@spine-event-engine/server";
 import { type ActorContext, UserIdSchema } from "@spine-event-engine/proto";
 import { QueryIdSchema, QuerySchema, TargetSchema } from "@spine-event-engine/proto/client";
 import { BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
+import { TestEnvironment } from "@access-desk/testing/environment";
 import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
 
 import { typeRegistry } from "../../generated/model-registry.js";
@@ -94,8 +95,8 @@ const storages = new WeakMap<BlackBox, TestStorage>();
 export async function identityBlackBox(storage?: TestStorage): Promise<BlackBox> {
   const kept = storage ?? (await TestStorages.singleTenant(typeRegistry));
   ownedStorages.add(kept);
+  await TestEnvironment.start(await kept.open());
   const context = await identityModule().IdentityContext.create({
-    storage: await kept.open(),
     members: {
       add: (member) => {
         if (organizations.refusing) {
@@ -142,6 +143,7 @@ export function storageOf(box: BlackBox): TestStorage {
 export async function closeIdentityBlackBoxes(): Promise<void> {
   await Promise.all([...ownedBlackBoxes].map((box) => box.close()));
   ownedBlackBoxes.clear();
+  await TestEnvironment.reset();
   await Promise.all([...ownedStorages].map((storage) => storage.drop()));
   ownedStorages.clear();
   organizations.added = [];
@@ -173,7 +175,7 @@ export async function readAll<Schema extends GenMessage<Message>>(
     }),
   );
   return response.message.map(({ state }) => {
-    const value = state === undefined ? undefined : AnyMessages.unpack(state, schema);
+    const value = state === undefined ? undefined : AnyPacker.tryUnpack(state, schema);
     if (value === undefined) {
       throw new Error(`Expected a ${schema.typeName} query state.`);
     }

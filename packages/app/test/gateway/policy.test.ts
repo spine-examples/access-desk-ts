@@ -413,7 +413,7 @@ describe("Gateway policy should", () => {
         asking({ filter: [{ filter: [own], compositeFilter: [{ filter: [other] }] }] }),
       ),
     ).toBe(false);
-    // The person's own, narrowed by identifiers the gateway cannot judge.
+    // The person's, narrowed by identifiers the gateway cannot judge.
     expect(
       await authorize(principal, asking({ idFilter: { id: [me] }, filter: [{ filter: [own] }] })),
     ).toBe(false);

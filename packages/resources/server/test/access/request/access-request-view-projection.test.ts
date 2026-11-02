@@ -35,7 +35,7 @@ import {
 } from "./given/access-request.js";
 import { givenActiveGrant, minutesIn, testClock } from "../grant/given/resource-access.js";
 
-// The view reacts to the request's own lifecycle facts, produced here through
+// The view reacts to the request's lifecycle facts, produced here through
 // the real submission-and-decision path.
 beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);

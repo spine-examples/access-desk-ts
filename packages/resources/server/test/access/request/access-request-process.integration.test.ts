@@ -76,7 +76,7 @@ describe("AccessRequestProcessManager should", () => {
       expect(event.manager.map((manager) => manager.uuid)).toEqual(["primary", "second"]);
       expect(event.snapshot?.requester?.uuid).toBe(actor);
 
-      // The request is retrievable through its own query.
+      // The request is retrievable through a query.
       const requests = await box.eventually(
         () => readRequests(requester),
         (rows) =>

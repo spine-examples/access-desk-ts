@@ -57,7 +57,7 @@ import {
 
 const { expectRejection, recordEvents } = eventRecording(testActorContext);
 
-// The aggregate's own commands are posted directly, so each handler is
+// The aggregate's commands are posted directly, so each handler is
 // exercised alone. All of them address the requester's access to the payroll
 // resource, on a clock that stands at the start of the test until moved.
 beforeAll(loadResourcesContext, 30_000);

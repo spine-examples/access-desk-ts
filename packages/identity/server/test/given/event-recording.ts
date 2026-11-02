@@ -24,7 +24,7 @@ import { expect } from "vitest";
  * A live recording of one event type, delivered to a client subscription.
  *
  * A rejection is an event too. A rejection a command handler declares with
- * `@Throws` is a first-class produced signal, so it is subscribable on its own
+ * `@Throws` is a first-class produced signal, so it is subscribable independently
  * without a read-side consumer, just like any domain event.
  */
 export interface EventRecorder<Event> {
@@ -78,7 +78,7 @@ export interface EventRecording {
 /**
  * Builds event-recording test helpers bound to a bounded context's actor context.
  *
- * Each bounded context runs its subscriptions in its own actor and tenant scope,
+ * Each bounded context runs its subscriptions in a separate actor and tenant scope,
  * so the caller supplies that context; everything else is shared.
  *
  * @param actorContext Supplies the actor/tenant context each subscription uses.

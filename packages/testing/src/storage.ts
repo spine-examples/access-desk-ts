@@ -27,7 +27,7 @@ import { Client } from "pg";
  * The storage a test keeps its contexts' data in, and deletes when it ends.
  *
  * `ACCESS_DESK_TEST_STORAGE` names where: `memory`, or `postgresql`.
- * On PostgreSQL, each storage gets new databases of its own.
+ * On PostgreSQL, each storage gets separate new databases.
  */
 export interface TestStorage {
   /** The address of the storage's database, when it has just one. */
@@ -35,7 +35,7 @@ export interface TestStorage {
   /**
    * Opens the storage, as a program does when it starts.
    *
-   * Opening it again keeps the data, so a test can restart a context.
+   * PostgreSQL keeps the data across restarts; memory does not.
    */
   open(): Promise<StorageFactory>;
   /** Closes the storage and deletes its data. */
@@ -99,6 +99,14 @@ export const TestStorages = {
   },
 
   /**
+   * Whether the tests keep their data in PostgreSQL, so it outlasts a restart
+   * of a context.
+   */
+  durable(): boolean {
+    return TestStorages.profile() === "postgresql";
+  },
+
+  /**
    * Creates empty PostgreSQL databases.
    *
    * @param count How many databases to create.
@@ -106,6 +114,26 @@ export const TestStorages = {
   async databases(count: number): Promise<TestDatabases> {
     const urls = await Databases.create(count);
     return { urls, drop: () => Databases.drop(urls) };
+  },
+
+  /**
+   * Creates PostgreSQL databases under the names given, unless they are there
+   * already.
+   *
+   * @param names The names of the databases, of letters, digits, "-", and "_".
+   */
+  createDatabases(names: readonly string[]): Promise<void> {
+    return Databases.createNamed(names);
+  },
+
+  /**
+   * Deletes the PostgreSQL databases whose names start with the prefix, even
+   * if something is still connected to them.
+   *
+   * @param prefix The start of the databases' names.
+   */
+  dropDatabasesStartingWith(prefix: string): Promise<void> {
+    return Databases.dropStartingWith(prefix);
   },
 
   /**
@@ -124,9 +152,12 @@ export const TestStorages = {
   /**
    * Creates storage for a multitenant context.
    *
+   * PostgreSQL keeps each tenant in a separate database, and what belongs to
+   * no tenant, such as subscriptions, in one more shared database.
+   *
    * @param registry The types of the context's messages.
    * @param tenants Every tenant of the context. PostgreSQL gives each a
-   *   database of its own, so it needs them all up front.
+   *   separate database, so it needs them all up front.
    */
   async multitenant(
     registry: TypeRegistryLookup,
@@ -135,10 +166,14 @@ export const TestStorages = {
     if (TestStorages.profile() === "memory") {
       return new InMemoryTestStorage();
     }
-    const urls = await Databases.create(tenants.length);
+    const urls = await Databases.create(tenants.length + 1);
+    const [shared = "", ...tenantUrls] = urls;
     return new PostgresTestStorage(registry, urls, undefined, (builder) =>
-      builder.setTenantOptions(
-        tenants.map((tenantId, index) => ({ tenantId, options: { url: urls[index] ?? "" } })),
+      builder.setOptions({ url: shared }).setTenantOptions(
+        tenants.map((tenantId, index) => ({
+          tenantId,
+          options: { url: tenantUrls[index] ?? "" },
+        })),
       ),
     );
   },
@@ -154,8 +189,7 @@ class InMemoryTestStorage implements TestStorage {
   }
 
   drop(): Promise<void> {
-    this.#factory.close();
-    return Promise.resolve();
+    return this.#factory.close();
   }
 }
 
@@ -195,7 +229,7 @@ class PostgresTestStorage implements TestStorage {
 
   async drop(): Promise<void> {
     for (const factory of this.#opened.splice(0)) {
-      factory.close();
+      await factory.close();
     }
     await Databases.drop(this.#databases);
   }
@@ -230,6 +264,40 @@ const Databases = {
       for (const url of urls) {
         const name = new URL(url).pathname.slice(1);
         await client.query(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
+      }
+    });
+  },
+
+  /**
+   * Creates databases under the names given, unless they are there already.
+   *
+   * @param names The names of the databases.
+   */
+  async createNamed(names: readonly string[]): Promise<void> {
+    await Databases.administer(async (client) => {
+      for (const name of names) {
+        const found = await client.query("SELECT 1 FROM pg_database WHERE datname = $1", [name]);
+        if ((found.rowCount ?? 0) === 0) {
+          await client.query(`CREATE DATABASE "${name}"`);
+        }
+      }
+    });
+  },
+
+  /**
+   * Deletes the databases whose names start with the prefix, even if
+   * something is still connected to them.
+   *
+   * @param prefix The start of the databases' names.
+   */
+  async dropStartingWith(prefix: string): Promise<void> {
+    await Databases.administer(async (client) => {
+      const found = await client.query<{ dbname: string }>(
+        "SELECT dbname FROM pg_database WHERE starts_with(dbname, $1)",
+        [prefix],
+      );
+      for (const { dbname } of found.rows) {
+        await client.query(`DROP DATABASE IF EXISTS "${dbname}" WITH (FORCE)`);
       }
     });
   },
