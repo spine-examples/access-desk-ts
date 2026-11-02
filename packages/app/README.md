@@ -54,56 +54,104 @@ The PostgreSQL server and the databases are needed only for `postgresql`.
 
 ### The database
 
-`ACCESS_DESK_STORAGE=postgresql` needs a PostgreSQL server. For development,
-[`deploy/compose.yaml`](../../deploy/compose.yaml) runs one in Docker, with the
-port and the account of `ACCESS_DESK_DATABASE_PORT`, `_USER`, and `_PASSWORD`.
-From the repository root:
+`ACCESS_DESK_STORAGE` chooses where the programs keep their data. `memory`
+forgets everything when a program stops; `postgresql` keeps it in the
+databases below, so people, organizations, subscriptions, and sessions outlast
+a restart.
+
+All the databases live on one PostgreSQL server, which
+`ACCESS_DESK_DATABASE_HOST`, `_PORT`, `_USER`, and `_PASSWORD` name. For
+development, [`deploy/compose.yaml`](../../deploy/compose.yaml) runs one in
+Docker. From the repository root:
 
 ```sh
 pnpm run postgres:start
 ```
 
-The programs keep their data in these databases, named as in `.env.example`:
+Each start creates the databases the settings name that are missing:
+the shared one, one for each organization of `ACCESS_DESK_ORGANIZATIONS`, and
+the gateway's. Spine creates the tables in them, but never a database.
+`pnpm run postgres:stop` stops the server, and `pnpm run postgres:delete`
+deletes it with all its data.
 
-| Database                              | Used by            | What it keeps                                                                                                                    |
-| ------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| `accessdesk_server`                   | application server | People, their accounts, email addresses, and memberships, what each subscription watches, and the messages waiting for delivery. |
-| `accessdesk_resources_{organization}` | application server | One organization: its members, resources, access requests, grants, and audit trail.                                              |
-| `accessdesk_gateway`                  | gateway            | Who owns each subscription, and the identifiers of the sessions people signed out of.                                            |
+| Database                              | Setting                             | Used by            | What it keeps                                                                                                                    |
+| ------------------------------------- | ----------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `accessdesk_server`                   | `ACCESS_DESK_SERVER_DATABASE`       | application server | People, their accounts, email addresses, and memberships, what each subscription watches, and the messages waiting for delivery. |
+| `accessdesk_resources_{organization}` | `ACCESS_DESK_ORGANIZATION_DATABASE` | application server | One organization: its members, resources, access requests, grants, and audit trail.                                              |
+| `accessdesk_gateway`                  | `ACCESS_DESK_GATEWAY_DATABASE`      | gateway            | Whose each subscription is, and the identifiers of the sessions people signed out of.                                            |
 
 The server never opens the gateway's database. The gateway opens none of the
 server's and reaches the data only through the server.
 
-- **Organizations.** The server keeps only the organizations of
-  `ACCESS_DESK_ORGANIZATIONS`, and refuses everything given in any other. A new
-  organization needs a restart. In PostgreSQL, each organization has a
-  separate database, `accessdesk_resources_{organization}`: for `teamdev`, it
-  is `accessdesk_resources_teamdev`. The PostgreSQL container creates the listed
-  databases on its first start; Spine creates the tables in them. For a new
-  organization on an existing container, create its database before restarting
-  the application server:
+#### The shared database
 
-  ```sh
-  docker compose -f deploy/compose.yaml exec postgres createdb -U accessdesk accessdesk_resources_teamdev
-  ```
+Spine gives each process one server environment, and all the contexts of the
+process keep their data in its one storage. What belongs to no organization
+goes to the shared database, `accessdesk_server`:
 
-  In memory, there is no database to create.
+- Identity, which has no organizations: people, the accounts they sign in
+  with, their email addresses, and their memberships.
+- What each subscription to either context watches.
+- The messages waiting for delivery to either context.
 
-- **The shared database.** Spine keeps everything that belongs to no
-  organization in one database, `accessdesk_server`: Identity, which has no
-  organizations, the subscriptions to both contexts, and the messages waiting
-  for delivery.
-- **Subscriptions.** A browser's subscription is kept twice: once by the
-  gateway, and once by the server.
-  - `accessdesk_gateway` says whose the subscription is and until when, so
-    only its owner may activate or cancel it.
-  - `accessdesk_server` says what the subscription watches, so updates reach
-    it after the server restarts. A subscription keeps its organization, so
-    it gets the updates of that organization only.
-- **Sessions.** Sessions themselves are kept nowhere: the gateway signs them
-  with `ACCESS_DESK_SESSION_KEY`. A signed token stays valid until it expires,
-  so the gateway remembers the tokens of sessions people signed out of in
-  `accessdesk_gateway`, and refuses them.
+#### Organizations
+
+Resources keeps each organization in a separate database, named after
+`ACCESS_DESK_ORGANIZATION_DATABASE`, with the organization's identifier where
+`{organization}` stands:
+
+```dotenv
+ACCESS_DESK_ORGANIZATIONS=teamdev,codematters
+ACCESS_DESK_ORGANIZATION_DATABASE=accessdesk_resources_{organization}
+```
+
+These settings give `accessdesk_resources_teamdev` and
+`accessdesk_resources_codematters`.
+
+The server keeps only the organizations `ACCESS_DESK_ORGANIZATIONS` lists, and
+refuses everything given in any other. Spine keeps no list of organizations
+across restarts, so the server reads it from the settings each time it starts.
+A new organization needs its database, a new entry in the list, and a restart
+of the server: add it to the list, run `pnpm run postgres:start` to create its
+database, and restart the server.
+
+In memory, there is no database to create, but the list applies all the same.
+
+#### Subscriptions
+
+A browser's subscription is kept twice, once by each program, for different
+purposes.
+
+- The gateway keeps whose the subscription is and until when, in
+  `accessdesk_gateway`. It lets only the person who opened the subscription
+  activate or cancel it, and opens the active subscriptions again after the
+  gateway restarts.
+- The server keeps what the subscription watches and whether it is active, in
+  `accessdesk_server`. It sends updates to the active subscriptions, and keeps
+  them after the server restarts. A subscription to Resources carries its
+  organization, so it gets the updates of that organization only.
+
+#### Sessions
+
+Sessions themselves are kept nowhere: the gateway signs them with
+`ACCESS_DESK_SESSION_KEY`. So a restart signs nobody out, and replacing the key
+signs everybody out. A new key comes from:
+
+```sh
+pnpm --dir packages/app run session-key
+```
+
+A signed token stays valid until it expires. So when a person signs out, the
+gateway records the token's identifier in `accessdesk_gateway` and refuses the
+token from then on. It forgets the identifier once the token would have
+expired anyway.
+
+#### Tests
+
+The tests never open the programs' databases. On PostgreSQL, each test creates
+new, empty databases on the same server, named `accessdesk_test_<random>`,
+laid out the way the programs lay out theirs, and drops them when it ends. See
+[Testing model](../../.agents/project.md#testing-model).
 
 ## Run it
 
