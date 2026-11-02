@@ -25,6 +25,7 @@ const SESSION_KEY = generateKeyPairSync("ec", { namedCurve: "P-256" })
 const server = {
   ACCESS_DESK_SERVER_HOST: "127.0.0.1",
   ACCESS_DESK_SERVER_PORT: "8090",
+  ACCESS_DESK_ORGANIZATIONS: "teamdev, codematters",
   ACCESS_DESK_STORAGE: "memory",
 };
 const gateway = {
@@ -45,19 +46,17 @@ const inPostgres = {
   ACCESS_DESK_DATABASE_PORT: "5432",
   ACCESS_DESK_DATABASE_USER: "desk",
   ACCESS_DESK_DATABASE_PASSWORD: "secret",
-  ACCESS_DESK_IDENTITY_DATABASE: "accessdesk_identity",
+  ACCESS_DESK_SERVER_DATABASE: "accessdesk_server",
   ACCESS_DESK_GATEWAY_DATABASE: "accessdesk_gateway",
-  ACCESS_DESK_ORGANIZATIONS: "teamdev, codematters",
   ACCESS_DESK_ORGANIZATION_DATABASE: "accessdesk_resources_{organization}",
-  ACCESS_DESK_RESOURCES_SUBSCRIPTIONS_DATABASE: "accessdesk_resources_subscriptions",
 };
 
 describe("The settings should", () => {
-  it("give where the application server listens, and where it keeps people", () => {
+  it("give where the application server listens, which organizations it keeps, and where it keeps its data", () => {
     expect(Settings.ofServer(server)).toEqual({
       listening: { host: "127.0.0.1", port: 8090 },
-      identityStorage: { kind: "memory" },
-      resourcesStorage: { kind: "memory" },
+      organizations: ["teamdev", "codematters"],
+      storage: { kind: "memory" },
     });
   });
 
@@ -75,9 +74,9 @@ describe("The settings should", () => {
   });
 
   it("keep each program's data in its own PostgreSQL database, when asked to", () => {
-    expect(Settings.ofServer(inPostgres).identityStorage).toEqual({
+    expect(Settings.ofServer(inPostgres).storage).toMatchObject({
       kind: "postgresql",
-      url: "postgresql://desk:secret@127.0.0.1:5432/accessdesk_identity",
+      url: "postgresql://desk:secret@127.0.0.1:5432/accessdesk_server",
     });
     expect(Settings.ofGateway(inPostgres).storage).toEqual({
       kind: "postgresql",
@@ -85,30 +84,30 @@ describe("The settings should", () => {
     });
   });
 
-  it("keep each organization listed in a database of its own, when asked to", () => {
-    expect(Settings.ofServer(inPostgres).resourcesStorage).toEqual({
+  it("keep each organization in a database of its own, when asked to", () => {
+    const storage = Settings.ofServer(inPostgres).storage;
+
+    expect(storage).toEqual({
       kind: "postgresql",
-      organizations: [
-        {
-          organization: "teamdev",
-          url: "postgresql://desk:secret@127.0.0.1:5432/accessdesk_resources_teamdev",
-        },
-        {
-          organization: "codematters",
-          url: "postgresql://desk:secret@127.0.0.1:5432/accessdesk_resources_codematters",
-        },
-      ],
-      subscriptionsUrl:
-        "postgresql://desk:secret@127.0.0.1:5432/accessdesk_resources_subscriptions",
+      url: "postgresql://desk:secret@127.0.0.1:5432/accessdesk_server",
+      organizationDatabase: "accessdesk_resources_{organization}",
     });
+    if (storage.kind === "postgresql") {
+      expect(Settings.organizationDatabase(storage, "teamdev")).toBe(
+        "postgresql://desk:secret@127.0.0.1:5432/accessdesk_resources_teamdev",
+      );
+    }
   });
 
-  it("refuse organizations that are not listed one by one, or a database without a place for them", () => {
+  it("refuse organizations that are not listed one by one", () => {
     for (const organizations of ["teamdev,,codematters", "teamdev,teamdev", "team dev"]) {
       expect(() =>
-        Settings.ofServer({ ...inPostgres, ACCESS_DESK_ORGANIZATIONS: organizations }),
+        Settings.ofServer({ ...server, ACCESS_DESK_ORGANIZATIONS: organizations }),
       ).toThrow(/ACCESS_DESK_ORGANIZATIONS must list organizations/);
     }
+  });
+
+  it("refuse a database without a place for the organization", () => {
     for (const database of ["accessdesk_resources", "accessdesk resources {organization}"]) {
       expect(() =>
         Settings.ofServer({ ...inPostgres, ACCESS_DESK_ORGANIZATION_DATABASE: database }),
@@ -116,12 +115,25 @@ describe("The settings should", () => {
     }
   });
 
-  it("refuse an organization whose database is the one of what people subscribed to", () => {
-    expect(() =>
-      Settings.ofServer({ ...inPostgres, ACCESS_DESK_ORGANIZATIONS: "teamdev,subscriptions" }),
-    ).toThrow(
-      'ACCESS_DESK_ORGANIZATION_DATABASE gives subscriptions the database ACCESS_DESK_RESOURCES_SUBSCRIPTIONS_DATABASE names, "accessdesk_resources_subscriptions".',
+  it("refuse an organization that cannot have a database of its own", () => {
+    const storage = Settings.ofServer({
+      ...inPostgres,
+      ACCESS_DESK_SERVER_DATABASE: "accessdesk_resources_teamdev",
+    }).storage;
+    if (storage.kind !== "postgresql") {
+      throw new Error("The settings keep the data in PostgreSQL.");
+    }
+
+    expect(() => Settings.organizationDatabase(storage, "team dev")).toThrow(
+      /An organization's identifier must be of letters, digits/,
     );
+    expect(() => Settings.organizationDatabase(storage, "o".repeat(43))).toThrow(
+      /is longer than 63 characters/,
+    );
+    expect(() => Settings.organizationDatabase(storage, "teamdev")).toThrow(
+      'The database of organization teamdev, "accessdesk_resources_teamdev", is the shared one.',
+    );
+    expect(Settings.organizationDatabase(storage, "o".repeat(42))).toMatch(/o{42}$/);
   });
 
   it("reach the database server where its settings say, with the password written as it is", () => {
@@ -133,32 +145,30 @@ describe("The settings should", () => {
     });
 
     // The spaces around the password are part of it.
-    expect(settings.identityStorage).toEqual({
+    expect(settings.storage).toMatchObject({
       kind: "postgresql",
-      url: "postgresql://desk:%20p%40ss%3Aw%2Frd%25%20@[::1]:6543/accessdesk_identity",
+      url: "postgresql://desk:%20p%40ss%3Aw%2Frd%25%20@[::1]:6543/accessdesk_server",
     });
   });
 
   it("refuse a database name PostgreSQL would cut short", () => {
     expect(() =>
-      Settings.ofServer({ ...inPostgres, ACCESS_DESK_IDENTITY_DATABASE: "a".repeat(64) }),
-    ).toThrow(/ACCESS_DESK_IDENTITY_DATABASE must name a database of at most 63 characters/);
-    const long = "o".repeat(45);
+      Settings.ofServer({ ...inPostgres, ACCESS_DESK_SERVER_DATABASE: "a".repeat(64) }),
+    ).toThrow(/ACCESS_DESK_SERVER_DATABASE must name a database of at most 63 characters/);
     expect(() =>
-      Settings.ofServer({ ...inPostgres, ACCESS_DESK_ORGANIZATIONS: `teamdev, ${long}` }),
-    ).toThrow(
-      new RegExp(
-        `ACCESS_DESK_ORGANIZATION_DATABASE names databases longer than 63 characters for ${long}\\.`,
-      ),
-    );
+      Settings.ofServer({
+        ...inPostgres,
+        ACCESS_DESK_ORGANIZATION_DATABASE: `${"a".repeat(63)}{organization}`,
+      }),
+    ).toThrow(/ACCESS_DESK_ORGANIZATION_DATABASE leaves no room for the organization/);
     expect(() =>
-      Settings.ofServer({ ...inPostgres, ACCESS_DESK_IDENTITY_DATABASE: "a".repeat(63) }),
+      Settings.ofServer({ ...inPostgres, ACCESS_DESK_SERVER_DATABASE: "a".repeat(63) }),
     ).not.toThrow();
   });
 
   it("refuse to assume anything, and name every setting that is missing", () => {
     expect(() => Settings.ofServer({})).toThrow(
-      /ACCESS_DESK_SERVER_HOST is not set[\s\S]*ACCESS_DESK_SERVER_PORT is not set[\s\S]*ACCESS_DESK_STORAGE is not set/,
+      /ACCESS_DESK_SERVER_HOST is not set[\s\S]*ACCESS_DESK_SERVER_PORT is not set[\s\S]*ACCESS_DESK_ORGANIZATIONS is not set[\s\S]*ACCESS_DESK_STORAGE is not set/,
     );
     expect(() => Settings.ofGateway({})).toThrow(
       /ACCESS_DESK_GATEWAY_HOST[\s\S]*ACCESS_DESK_GATEWAY_PORT[\s\S]*ACCESS_DESK_SERVER_HOST[\s\S]*ACCESS_DESK_SERVER_PORT[\s\S]*ACCESS_DESK_WEB_HOST[\s\S]*ACCESS_DESK_WEB_PORT[\s\S]*GOOGLE_CLIENT_ID is not set[\s\S]*GOOGLE_CLIENT_SECRET is not set[\s\S]*ACCESS_DESK_STORAGE is not set[\s\S]*ACCESS_DESK_SESSION_KEY is not set/,
@@ -172,15 +182,13 @@ describe("The settings should", () => {
       ACCESS_DESK_DATABASE_PORT: "",
       ACCESS_DESK_DATABASE_USER: "",
       ACCESS_DESK_DATABASE_PASSWORD: "",
-      ACCESS_DESK_IDENTITY_DATABASE: "",
+      ACCESS_DESK_SERVER_DATABASE: "",
       ACCESS_DESK_GATEWAY_DATABASE: "",
-      ACCESS_DESK_ORGANIZATIONS: "",
       ACCESS_DESK_ORGANIZATION_DATABASE: "",
-      ACCESS_DESK_RESOURCES_SUBSCRIPTIONS_DATABASE: "",
     };
 
     expect(() => Settings.ofServer(withoutDatabases)).toThrow(
-      /ACCESS_DESK_IDENTITY_DATABASE is not set[\s\S]*ACCESS_DESK_DATABASE_HOST is not set[\s\S]*ACCESS_DESK_DATABASE_PORT is not set[\s\S]*ACCESS_DESK_DATABASE_USER is not set[\s\S]*ACCESS_DESK_DATABASE_PASSWORD is not set[\s\S]*ACCESS_DESK_ORGANIZATIONS is not set[\s\S]*ACCESS_DESK_ORGANIZATION_DATABASE is not set[\s\S]*ACCESS_DESK_RESOURCES_SUBSCRIPTIONS_DATABASE is not set/,
+      /ACCESS_DESK_ORGANIZATION_DATABASE is not set[\s\S]*ACCESS_DESK_SERVER_DATABASE is not set[\s\S]*ACCESS_DESK_DATABASE_HOST is not set[\s\S]*ACCESS_DESK_DATABASE_PORT is not set[\s\S]*ACCESS_DESK_DATABASE_USER is not set[\s\S]*ACCESS_DESK_DATABASE_PASSWORD is not set/,
     );
     expect(() => Settings.ofGateway(withoutDatabases)).toThrow(
       /ACCESS_DESK_GATEWAY_DATABASE is not set[\s\S]*ACCESS_DESK_DATABASE_HOST is not set/,
@@ -194,10 +202,10 @@ describe("The settings should", () => {
     expect(() => Settings.ofServer({ ...server, ACCESS_DESK_STORAGE: "datastore" })).toThrow(
       'ACCESS_DESK_STORAGE must be "memory" or "postgresql", and is "datastore".',
     );
-    for (const database of ["accessdesk identity", "postgresql://desk@127.0.0.1/accessdesk"]) {
+    for (const database of ["accessdesk server", "postgresql://desk@127.0.0.1/accessdesk"]) {
       expect(() =>
-        Settings.ofServer({ ...inPostgres, ACCESS_DESK_IDENTITY_DATABASE: database }),
-      ).toThrow(/ACCESS_DESK_IDENTITY_DATABASE must name a database/);
+        Settings.ofServer({ ...inPostgres, ACCESS_DESK_SERVER_DATABASE: database }),
+      ).toThrow(/ACCESS_DESK_SERVER_DATABASE must name a database/);
     }
     expect(() => Settings.ofGateway({ ...inPostgres, ACCESS_DESK_DATABASE_PORT: "five" })).toThrow(
       /ACCESS_DESK_DATABASE_PORT must be a port/,

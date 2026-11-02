@@ -71,47 +71,41 @@ export interface PostgresStorageSettings {
 /** Where a program keeps its data. */
 export type StorageSettings = MemoryStorageSettings | PostgresStorageSettings;
 
-/** An organization the application server keeps, and the database it keeps it in. */
-export interface OrganizationDatabase {
-  /** The organization's identifier. */
-  readonly organization: string;
-  /** The address of its database, with the account to sign in to it. */
-  readonly url: string;
-}
-
 /**
- * Keeps each organization in a PostgreSQL database of its own. The server
- * keeps only the organizations listed.
+ * Keeps the application server's data in PostgreSQL.
  */
-export interface PostgresResourcesStorageSettings {
+export interface PostgresServerStorageSettings {
   readonly kind: "postgresql";
-  /** Each organization the server keeps, with its database. */
-  readonly organizations: readonly OrganizationDatabase[];
   /**
-   * The address of the database of what people subscribed to, which
-   * belongs to no one organization.
+   * The address of the shared database.
+   *
+   * It keeps what belongs to no organization: people, their accounts and memberships,
+   * subscriptions, and the messages waiting for delivery.
    */
-  readonly subscriptionsUrl: string;
+  readonly url: string;
+  /**
+   * The name of each organization's database, with `{organization}` where the
+   * organization's identifier goes.
+   */
+  readonly organizationDatabase: string;
 }
 
-/**
- * Where the application server keeps each organization and everything it owns.
- *
- * In memory, it keeps any organization.
- */
-export type ResourcesStorageSettings = MemoryStorageSettings | PostgresResourcesStorageSettings;
+/** Where the application server keeps its data. */
+export type ServerStorageSettings = MemoryStorageSettings | PostgresServerStorageSettings;
 
 /** How the application server is set up. */
 export interface ServerSettings {
   /** Where the application server listens. */
   readonly listening: Listening;
   /**
-   * Where the application server keeps the people, the accounts they sign in
-   * with, their email addresses, and their memberships.
+   * The organizations the application server keeps, by their identifiers.
    */
-  readonly identityStorage: StorageSettings;
-  /** Where the application server keeps each organization and everything it owns. */
-  readonly resourcesStorage: ResourcesStorageSettings;
+  // TODO:02-11-2026:mykyta.pimonov: Register organizations while the server
+  //  runs, instead of listing them here, once Spine keeps the tenants given to
+  //  its index across restarts.
+  readonly organizations: readonly string[];
+  /** Where the application server keeps its data. */
+  readonly storage: ServerStorageSettings;
 }
 
 /** How the gateway is set up. */
@@ -225,58 +219,35 @@ class Reading {
   }
 
   /**
-   * Reads where the application server keeps each organization, from
-   * `ACCESS_DESK_STORAGE`.
+   * Reads where the application server keeps its data, from `ACCESS_DESK_STORAGE`.
    *
-   * In PostgreSQL, `ACCESS_DESK_ORGANIZATIONS` lists the organizations, and
-   * `ACCESS_DESK_ORGANIZATION_DATABASE` names each one's database, with
-   * `{organization}` where its identifier goes.
-   * `ACCESS_DESK_RESOURCES_SUBSCRIPTIONS_DATABASE` names the database of what
-   * people subscribed to, which no organization's database may be. They must be
-   * set only when the data is kept in PostgreSQL.
+   * In PostgreSQL, `ACCESS_DESK_SERVER_DATABASE` names the shared database, and
+   * `ACCESS_DESK_ORGANIZATION_DATABASE` names each organization's database,
+   * with `{organization}` where its identifier goes. They must be set only
+   * when the data is kept in PostgreSQL.
    */
-  resourcesStorage(): ResourcesStorageSettings {
+  serverStorage(): ServerStorageSettings {
     if (this.#storage() !== "postgresql") {
       return { kind: "memory" };
     }
-    const organizations = this.#organizations("ACCESS_DESK_ORGANIZATIONS");
     const name = "ACCESS_DESK_ORGANIZATION_DATABASE";
     const database = this.text(name);
-    const valid =
-      database.includes(ORGANIZATION) && DATABASE_NAME.test(database.replaceAll(ORGANIZATION, ""));
-    if (database !== "" && !valid) {
+    const fixed = database.replaceAll(ORGANIZATION, "");
+    if (database !== "" && !(database.includes(ORGANIZATION) && DATABASE_NAME.test(fixed))) {
       this.#problems.push(
         `${name} must name a database of letters, digits, "-", and "_", ` +
           `with ${ORGANIZATION} where the organization goes, and is "${database}".`,
       );
-    }
-    const databases = organizations.map((organization) => ({
-      organization,
-      database: database.replaceAll(ORGANIZATION, organization),
-    }));
-    const tooLong = valid ? databases.filter((each) => !this.#short(each.database)) : [];
-    if (tooLong.length > 0) {
+    } else if (database !== "" && !this.#short(`${fixed}x`)) {
       this.#problems.push(
-        `${name} names databases longer than ${DATABASE_NAME_LENGTH.toString()} characters ` +
-          `for ${tooLong.map(({ organization }) => organization).join(", ")}.`,
-      );
-    }
-    const subscriptionsName = "ACCESS_DESK_RESOURCES_SUBSCRIPTIONS_DATABASE";
-    const subscriptions = this.#databaseName(subscriptionsName);
-    const shared = databases.filter((each) => each.database === subscriptions);
-    if (shared.length > 0) {
-      this.#problems.push(
-        `${name} gives ${shared.map(({ organization }) => organization).join(", ")} ` +
-          `the database ${subscriptionsName} names, "${subscriptions}".`,
+        `${name} leaves no room for the organization in a name of at most ` +
+          `${DATABASE_NAME_LENGTH.toString()} characters, and is "${database}".`,
       );
     }
     return {
       kind: "postgresql",
-      organizations: databases.map(({ organization, database: named }) => ({
-        organization,
-        url: this.#databaseUrl(named),
-      })),
-      subscriptionsUrl: this.#databaseUrl(subscriptions),
+      url: this.#databaseUrl(this.#databaseName("ACCESS_DESK_SERVER_DATABASE")),
+      organizationDatabase: database,
     };
   }
 
@@ -295,7 +266,7 @@ class Reading {
   }
 
   /** Reads organizations that must be listed, each once, separated by commas. */
-  #organizations(name: string): string[] {
+  organizations(name: string): string[] {
     const text = this.text(name);
     const organizations = text.split(",").map((organization) => organization.trim());
     const valid =
@@ -398,9 +369,46 @@ export const Settings = {
     const reading = new Reading(environment);
     return reading.done({
       listening: reading.listening("ACCESS_DESK_SERVER"),
-      identityStorage: reading.storage("ACCESS_DESK_IDENTITY_DATABASE"),
-      resourcesStorage: reading.resourcesStorage(),
+      organizations: reading.organizations("ACCESS_DESK_ORGANIZATIONS"),
+      storage: reading.serverStorage(),
     });
+  },
+
+  /**
+   * Builds the address of an organization's database.
+   *
+   * The organization's identifier goes where `ACCESS_DESK_ORGANIZATION_DATABASE`
+   * has `{organization}`.
+   *
+   * @param storage Where the application server keeps its data.
+   * @param organization The organization's identifier.
+   * @returns The address of the database, with the account to sign in to it.
+   * @throws Error when the identifier is not of letters, digits, "-", and "_",
+   *   when the name it makes is too long for PostgreSQL, or when it makes the
+   *   name of the shared database.
+   */
+  organizationDatabase(storage: PostgresServerStorageSettings, organization: string): string {
+    if (!DATABASE_NAME.test(organization)) {
+      throw new Error(
+        `An organization's identifier must be of letters, digits, "-", and "_", ` +
+          `and is "${organization}".`,
+      );
+    }
+    const database = storage.organizationDatabase.replaceAll(ORGANIZATION, organization);
+    if (Buffer.byteLength(database, "utf8") > DATABASE_NAME_LENGTH) {
+      throw new Error(
+        `The database of organization ${organization}, "${database}", is longer than ` +
+          `${DATABASE_NAME_LENGTH.toString()} characters.`,
+      );
+    }
+    const url = new URL(storage.url);
+    if (decodeURIComponent(url.pathname.slice(1)) === database) {
+      throw new Error(
+        `The database of organization ${organization}, "${database}", is the shared one.`,
+      );
+    }
+    url.pathname = `/${encodeURIComponent(database)}`;
+    return url.toString();
   },
 
   /**
