@@ -21,10 +21,10 @@ import { Session } from "../session/session.js";
 /** The Access Desk sign-in page. */
 export const SignIn = {
   /**
-   * Renders sign-in options for the available identity providers.
+   * Renders sign-in buttons for the available identity providers.
    *
-   * Shows loading and error states, and redirects signed-in users to `/`.
-    */
+   * Shows loading and error states and redirects signed-in users to `/`.
+   */
   Page: (): ReactElement => {
     const { state } = Session.useSession();
     const providers = useRequest(() => Authentication.providers(), []);
