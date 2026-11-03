@@ -27,7 +27,10 @@ import { Storage } from "../storage.js";
 const settings = Settings.ofServer(process.env);
 const { host, port } = settings.listening;
 
-const storage = await Storage.openServer(settings.storage, settings.organizations);
+const storage = await Storage.openServer(
+  Storage.serverDatabases(settings.database),
+  settings.organizations,
+);
 
 const listening: { address?: string } = {};
 const contexts = await AccessDesk.assemble({

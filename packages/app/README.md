@@ -26,25 +26,22 @@ The file is ignored by Git.
 Every setting is required. Nothing is assumed: a program that misses a
 setting refuses to start and names it.
 
-| Variable                            | Read by             | Meaning                                                |
-| ----------------------------------- | ------------------- | ------------------------------------------------------ |
-| `ACCESS_DESK_SERVER_HOST`           | server, gateway     | The address the application server listens on.         |
-| `ACCESS_DESK_SERVER_PORT`           | server, gateway     | The port the application server listens on.            |
-| `ACCESS_DESK_ORGANIZATIONS`         | server              | The organizations the server keeps, by commas.         |
-| `ACCESS_DESK_GATEWAY_HOST`          | gateway, web client | The address the gateway listens on.                    |
-| `ACCESS_DESK_GATEWAY_PORT`          | gateway, web client | The port the gateway listens on.                       |
-| `ACCESS_DESK_WEB_HOST`              | gateway, web client | The address the web client listens on.                 |
-| `ACCESS_DESK_WEB_PORT`              | gateway, web client | The port the web client listens on.                    |
-| `GOOGLE_CLIENT_ID`                  | gateway             | The client identifier of the Google OAuth application. |
-| `GOOGLE_CLIENT_SECRET`              | gateway             | The client secret of the Google OAuth application.     |
-| `ACCESS_DESK_DATABASE_HOST`         | server, gateway     | The address of the PostgreSQL server.                  |
-| `ACCESS_DESK_DATABASE_PORT`         | server, gateway     | The port of the PostgreSQL server.                     |
-| `ACCESS_DESK_DATABASE_USER`         | server, gateway     | The account to connect to it with.                     |
-| `ACCESS_DESK_DATABASE_PASSWORD`     | server, gateway     | The password of that account, written as it is.        |
-| `ACCESS_DESK_ORGANIZATION_DATABASE` | server              | Each organization's database, with `{organization}`.   |
-| `ACCESS_DESK_SERVER_DATABASE`       | server              | The database of everything that is no organization's.  |
-| `ACCESS_DESK_GATEWAY_DATABASE`      | gateway             | The database of subscriptions and ended sessions.      |
-| `ACCESS_DESK_SESSION_KEY`           | gateway             | The P-256 key sessions are signed with, in base64.     |
+| Variable                        | Read by             | Meaning                                                |
+| ------------------------------- | ------------------- | ------------------------------------------------------ |
+| `ACCESS_DESK_SERVER_HOST`       | server, gateway     | The address the application server listens on.         |
+| `ACCESS_DESK_SERVER_PORT`       | server, gateway     | The port the application server listens on.            |
+| `ACCESS_DESK_ORGANIZATIONS`     | server              | The organizations the server keeps, by commas.         |
+| `ACCESS_DESK_GATEWAY_HOST`      | gateway, web client | The address the gateway listens on.                    |
+| `ACCESS_DESK_GATEWAY_PORT`      | gateway, web client | The port the gateway listens on.                       |
+| `ACCESS_DESK_WEB_HOST`          | gateway, web client | The address the web client listens on.                 |
+| `ACCESS_DESK_WEB_PORT`          | gateway, web client | The port the web client listens on.                    |
+| `GOOGLE_CLIENT_ID`              | gateway             | The client identifier of the Google OAuth application. |
+| `GOOGLE_CLIENT_SECRET`          | gateway             | The client secret of the Google OAuth application.     |
+| `ACCESS_DESK_DATABASE_HOST`     | server, gateway     | The address of the PostgreSQL server.                  |
+| `ACCESS_DESK_DATABASE_PORT`     | server, gateway     | The port of the PostgreSQL server.                     |
+| `ACCESS_DESK_DATABASE_USER`     | server, gateway     | The account to connect to it with.                     |
+| `ACCESS_DESK_DATABASE_PASSWORD` | server, gateway     | The password of that account, written as it is.        |
+| `ACCESS_DESK_SESSION_KEY`       | gateway             | The P-256 key sessions are signed with, in base64.     |
 
 People sign in through Google. If the gateway cannot reach Google when it
 starts, it does not start.
@@ -61,16 +58,16 @@ Docker. From the repository root:
 pnpm run postgres:start
 ```
 
-The command also creates any databases from the settings that are missing.
+The command also creates any of the databases below that are missing.
 Spine creates the tables itself, but not the databases. `pnpm run postgres:stop` stops
 the PostgreSQL server, and `pnpm run postgres:delete` removes it along with
 all its data.
 
-| Database                              | Setting                             | Used by            | What it stores                                                                                       |
-| ------------------------------------- | ----------------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------- |
-| `accessdesk_server`                   | `ACCESS_DESK_SERVER_DATABASE`       | application server | People and their accounts, subscriptions to updates, and messages that are not delivered yet.        |
-| `accessdesk_resources_{organization}` | `ACCESS_DESK_ORGANIZATION_DATABASE` | application server | The data of a single organization: its members, resources, access requests, grants, and audit trail. |
-| `accessdesk_gateway`                  | `ACCESS_DESK_GATEWAY_DATABASE`      | gateway            | Who opened each subscription, and the sessions people signed out of.                                 |
+| Database                              | Used by            | What it stores                                                                                       |
+| ------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------- |
+| `accessdesk_server`                   | application server | People and their accounts, subscriptions to updates, and messages that are not delivered yet.        |
+| `accessdesk_resources_<organization>` | application server | The data of a single organization: its members, resources, access requests, grants, and audit trail. |
+| `accessdesk_gateway`                  | gateway            | Who opened each subscription, and the sessions people signed out of.                                 |
 
 The application server and the gateway never share a database. The gateway
 gets the application's data only by asking the application server.
@@ -89,17 +86,15 @@ doesn't belong to a particular organization goes into the shared database,
 
 #### Organizations
 
-Each organization gets a separate database. Its name comes from
-`ACCESS_DESK_ORGANIZATION_DATABASE`, with the organization's identifier in
-place of `{organization}`:
+Each organization gets a separate database, named after its identifier:
 
 ```dotenv
 ACCESS_DESK_ORGANIZATIONS=teamdev,codematters
-ACCESS_DESK_ORGANIZATION_DATABASE=accessdesk_resources_{organization}
 ```
 
-With these settings, the databases are `accessdesk_resources_teamdev` and
-`accessdesk_resources_codematters`.
+With this setting, the databases are `accessdesk_resources_teamdev` and
+`accessdesk_resources_codematters`. PostgreSQL limits a database name to 63
+characters, so an identifier can be at most 42 characters long.
 
 The application server works only with the organizations listed in
 `ACCESS_DESK_ORGANIZATIONS`, and rejects requests for any other. The list is

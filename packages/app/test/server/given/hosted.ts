@@ -34,7 +34,7 @@ import {
 // Imported from compiled output, like the contexts it assembles: vitest cannot
 // execute the handler classes' standard decorators from raw TypeScript source.
 type AppModule = typeof import("../../../dist/src/index.js");
-type ServerStorageSettings = import("../../../dist/src/index.js").ServerStorageSettings;
+type ServerDatabases = import("../../../dist/src/index.js").ServerDatabases;
 
 /**
  * The organizations the tests of the application work in.
@@ -63,7 +63,7 @@ export interface Hosted {
 /** The storage of an application server, which a test can start a server over again. */
 export interface ServerStorage {
   /** The databases the server keeps its data in, as its settings name them. */
-  readonly settings: ServerStorageSettings;
+  readonly settings: ServerDatabases;
   /** Deletes the data the storage kept. */
   drop(): Promise<void>;
 }
@@ -100,7 +100,7 @@ async function openServerStorage(storage: ServerStorage): Promise<StorageFactory
   const settings = storage.settings;
   const app: AppModule = await import("../../../dist/src/index.js");
   for (const organization of ORGANIZATIONS) {
-    const url = new URL(app.Settings.organizationDatabase(settings, organization));
+    const url = new URL(app.Storage.organizationDatabase(settings, organization));
     await TestStorages.createDatabases([url.pathname.slice(1)]);
   }
   return app.Storage.openServer(settings, ORGANIZATIONS);

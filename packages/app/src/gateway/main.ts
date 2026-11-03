@@ -38,8 +38,9 @@ const external: Record<string, ExternalSignIn> = {
   google: { provider: google, callbackUri: settings.webUrl },
 };
 
-const subscriptions = await Storage.open(settings.storage);
-const revokedTokens = await RevokedTokens.open(settings.storage);
+const database = Storage.gatewayDatabase(settings.database);
+const subscriptions = await Storage.open(database);
+const revokedTokens = await RevokedTokens.open(database);
 
 const gateway = await Gateway.start({
   backend: settings.serverUrl,

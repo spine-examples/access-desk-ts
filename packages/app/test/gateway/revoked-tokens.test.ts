@@ -26,7 +26,7 @@ let revoked: Awaited<ReturnType<typeof RevokedTokens.open>>;
 
 beforeEach(async () => {
   storage = await TestStorages.singleTenant(typeRegistry);
-  revoked = await RevokedTokens.open({ url: storage.url });
+  revoked = await RevokedTokens.open(storage.url);
 });
 
 afterEach(async () => {
@@ -61,7 +61,7 @@ describe("The revoked tokens should", () => {
     await revoked.revoke("token-1", timestampFromMs(Date.now() + HOUR_MS));
     await revoked.close();
 
-    revoked = await RevokedTokens.open({ url: storage.url });
+    revoked = await RevokedTokens.open(storage.url);
 
     expect(await revoked.isRevoked("token-1")).toBe(true);
   });

@@ -16,7 +16,6 @@ import { timestampMs, type Timestamp } from "@bufbuild/protobuf/wkt";
 import type { SignedTokenRevocation } from "@spine-event-engine/auth";
 import { Time } from "@spine-event-engine/core/time";
 import { Pool } from "pg";
-import type { StorageSettings } from "../settings.js";
 
 // TODO:27-10-2026:mykyta.pimonov: Delete this store once Spine keeps revoked
 //  tokens itself. Spine leaves revocation to the application, so the gateway
@@ -28,11 +27,11 @@ export const RevokedTokens = {
    *
    * The store keeps its table there, and creates the table when it is not there.
    *
-   * @param settings The gateway's database.
+   * @param url The address of the gateway's database.
    * @returns The opened store. Whoever opens it closes it.
    */
-  open(settings: StorageSettings): Promise<SignedTokenRevocation & { close(): Promise<void> }> {
-    return RevokedInPostgres.open(settings.url);
+  open(url: string): Promise<SignedTokenRevocation & { close(): Promise<void> }> {
+    return RevokedInPostgres.open(url);
   },
 };
 

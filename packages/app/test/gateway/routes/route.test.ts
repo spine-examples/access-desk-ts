@@ -25,7 +25,7 @@ let revoked: Awaited<ReturnType<typeof RevokedTokens.open>>;
 let sessions: Sessions;
 beforeEach(async () => {
   storage = await TestStorages.singleTenant(typeRegistry);
-  revoked = await RevokedTokens.open({ url: storage.url });
+  revoked = await RevokedTokens.open(storage.url);
   sessions = new Sessions({
     key: generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey,
     revoked,

@@ -25,7 +25,7 @@ import { Sessions } from "../../../src/gateway/sessions.js";
 describe("Gateway sign-in routes should", () => {
   it("offer only the options route when no outside provider is configured", async () => {
     const storage = await TestStorages.singleTenant(typeRegistry);
-    const revoked = await RevokedTokens.open({ url: storage.url });
+    const revoked = await RevokedTokens.open(storage.url);
     const sessions = new Sessions({
       key: generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey,
       revoked,
