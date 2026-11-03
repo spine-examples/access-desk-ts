@@ -38,16 +38,15 @@ The application runs as two programs. The application server hosts the
 contexts. The gateway is a separate program that reaches the server over the
 network, and it is the only one a browser talks to.
 
-Each program keeps what it must remember in PostgreSQL, or in memory for
-development and tests. The application server keeps each organization of
-Resources in a separate database, and everything that belongs to no
-organization in one shared database: Identity's people, their accounts, their
-email addresses, and their memberships, the subscriptions to both contexts,
-and the messages waiting for delivery. The server keeps only the
-organizations its settings list, and each needs a database. Local PostgreSQL
-creates these databases on first start; a new organization needs a restart.
-The gateway keeps the subscriptions people hold and the sessions they ended
-in a separate database.
+Both programs store their data in PostgreSQL, or in memory for development
+and tests. The application server stores each organization in a separate
+database. Everything that belongs to no single organization goes into one
+shared database: people, their accounts, email addresses, and memberships,
+subscriptions to both contexts, and messages waiting to be delivered. The
+server works only with the organizations listed in its settings, and each of
+them needs a database; adding one takes a restart. The gateway stores who
+opened each subscription and the sessions people signed out of in a separate
+database.
 
 An initial deployment may co-host both contexts in one application server.
 Co-location does not weaken the boundaries: each context must have a separate model
