@@ -73,11 +73,11 @@ Spine creates the tables itself, but not the databases. `pnpm run postgres:stop`
 the PostgreSQL server, and `pnpm run postgres:delete` removes it along with
 all its data.
 
-| Database                              | Setting                             | Used by            | What it stores                                                                                |
-| ------------------------------------- | ----------------------------------- | ------------------ | --------------------------------------------------------------------------------------------- |
-| `accessdesk_server`                   | `ACCESS_DESK_SERVER_DATABASE`       | application server | People and their accounts, subscriptions to updates, and messages that are not delivered yet. |
-| `accessdesk_resources_{organization}` | `ACCESS_DESK_ORGANIZATION_DATABASE` | application server | One organization: its members, resources, access requests, grants, and audit trail.           |
-| `accessdesk_gateway`                  | `ACCESS_DESK_GATEWAY_DATABASE`      | gateway            | Who opened each subscription, and the sessions people signed out of.                          |
+| Database                              | Setting                             | Used by            | What it stores                                                                                       |
+| ------------------------------------- | ----------------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------- |
+| `accessdesk_server`                   | `ACCESS_DESK_SERVER_DATABASE`       | application server | People and their accounts, subscriptions to updates, and messages that are not delivered yet.        |
+| `accessdesk_resources_{organization}` | `ACCESS_DESK_ORGANIZATION_DATABASE` | application server | The data of a single organization: its members, resources, access requests, grants, and audit trail. |
+| `accessdesk_gateway`                  | `ACCESS_DESK_GATEWAY_DATABASE`      | gateway            | Who opened each subscription, and the sessions people signed out of.                                 |
 
 The application server and the gateway never share a database. The gateway
 gets the application's data only by asking the application server.
