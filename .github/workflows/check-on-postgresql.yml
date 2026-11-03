@@ -33,7 +33,7 @@ jobs:
           POSTGRES_PASSWORD: ${{ env.ACCESS_DESK_DATABASE_PASSWORD }}
           POSTGRES_DB: postgres
         ports:
-          - ${{ env.ACCESS_DESK_DATABASE_PORT }}:5432
+          - 5432:5432
         # The server takes connections over TCP only once it has created its first databases.
         options: >-
           --health-cmd "pg_isready --host=127.0.0.1"
