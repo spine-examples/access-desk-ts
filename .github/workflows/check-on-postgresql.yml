@@ -60,7 +60,7 @@ jobs:
         run: pnpm run check
 
       - name: Test on PostgreSQL
-        run: pnpm run test:postgresql
+        run: pnpm run test
         env:
           ACCESS_DESK_DATABASE_HOST: ${{ env.ACCESS_DESK_DATABASE_HOST }}
           ACCESS_DESK_DATABASE_PORT: ${{ env.ACCESS_DESK_DATABASE_PORT }}

@@ -38,7 +38,7 @@ let sessions: Sessions;
 
 beforeEach(async () => {
   storage = await TestStorages.singleTenant(typeRegistry);
-  revoked = await RevokedTokens.open(TestStorages.settingsOf(storage));
+  revoked = await RevokedTokens.open({ url: storage.url });
   sessions = sessionsOfGateway(revoked);
 });
 

@@ -16,7 +16,7 @@ import { randomUUID } from "node:crypto";
 import { isIP } from "node:net";
 import { StringifierRegistry, type TypeRegistryLookup } from "@spine-event-engine/core";
 import type { TenantId } from "@spine-event-engine/proto";
-import { InMemoryStorageFactory, type StorageFactory } from "@spine-event-engine/storage";
+import type { StorageFactory } from "@spine-event-engine/storage";
 import {
   PostgresStorageFactory,
   type PostgresStorageFactoryBuilder,
@@ -26,36 +26,23 @@ import { Client } from "pg";
 /**
  * The storage a test keeps its contexts' data in, and deletes when it ends.
  *
- * `ACCESS_DESK_TEST_STORAGE` names where: `memory`, or `postgresql`.
- * On PostgreSQL, each storage gets separate new databases.
+ * Each storage gets separate new PostgreSQL databases.
  */
 export interface TestStorage {
-  /** The address of the storage's database, when it has just one. */
-  readonly url: string | undefined;
+  /**
+   * The address of the storage's database. For a multitenant context, it is
+   * the shared database.
+   */
+  readonly url: string;
   /**
    * Opens the storage, as a program does when it starts.
    *
-   * PostgreSQL keeps the data across restarts; memory does not.
+   * The data is kept across restarts.
    */
   open(): Promise<StorageFactory>;
   /** Closes the storage and deletes its data. */
   drop(): Promise<void>;
 }
-
-/** Keeps the application's data in its memory. */
-export interface MemoryStorageSettings {
-  readonly kind: "memory";
-}
-
-/** Keeps the application's data in a PostgreSQL database. */
-export interface PostgresStorageSettings {
-  readonly kind: "postgresql";
-  /** The address of the database. */
-  readonly url: string;
-}
-
-/** Where the application keeps its data, as its settings name it. */
-export type StorageSettings = MemoryStorageSettings | PostgresStorageSettings;
 
 /** Empty PostgreSQL databases, for a test that opens storage over them itself. */
 export interface TestDatabases {
@@ -65,47 +52,8 @@ export interface TestDatabases {
   drop(): Promise<void>;
 }
 
-/**
- * Creates storage for the tests, in memory or in new PostgreSQL databases, as
- * `ACCESS_DESK_TEST_STORAGE` says.
- */
+/** Creates storage for the tests, in new PostgreSQL databases. */
 export const TestStorages = {
-  /**
-   * Reads where this run keeps its data.
-   */
-  profile(): "memory" | "postgresql" {
-    const profile = process.env.ACCESS_DESK_TEST_STORAGE;
-    if (profile === "memory" || profile === "postgresql") {
-      return profile;
-    }
-    throw new Error(
-      `ACCESS_DESK_TEST_STORAGE must be "memory" or "postgresql", and is "${profile ?? ""}".`,
-    );
-  },
-
-  /**
-   * Returns the application settings that point at the storage.
-   *
-   * @param storage Storage from {@link TestStorages.singleTenant}.
-   */
-  settingsOf(storage: TestStorage): StorageSettings {
-    if (TestStorages.profile() === "memory") {
-      return { kind: "memory" };
-    }
-    if (storage.url === undefined) {
-      throw new Error("Only single-tenant storage is named by one database.");
-    }
-    return { kind: "postgresql", url: storage.url };
-  },
-
-  /**
-   * Whether the tests keep their data in PostgreSQL, so it outlasts a restart
-   * of a context.
-   */
-  durable(): boolean {
-    return TestStorages.profile() === "postgresql";
-  },
-
   /**
    * Creates empty PostgreSQL databases.
    *
@@ -142,11 +90,8 @@ export const TestStorages = {
    * @param registry The types of the context's messages.
    */
   async singleTenant(registry: TypeRegistryLookup): Promise<TestStorage> {
-    if (TestStorages.profile() === "memory") {
-      return new InMemoryTestStorage();
-    }
     const [url = ""] = await Databases.create(1);
-    return new PostgresTestStorage(registry, [url], url, (builder) => builder.setOptions({ url }));
+    return new PostgresTestStorage(registry, [url], (builder) => builder.setOptions({ url }));
   },
 
   /**
@@ -163,12 +108,9 @@ export const TestStorages = {
     registry: TypeRegistryLookup,
     tenants: readonly TenantId[],
   ): Promise<TestStorage> {
-    if (TestStorages.profile() === "memory") {
-      return new InMemoryTestStorage();
-    }
     const urls = await Databases.create(tenants.length + 1);
     const [shared = "", ...tenantUrls] = urls;
-    return new PostgresTestStorage(registry, urls, undefined, (builder) =>
+    return new PostgresTestStorage(registry, urls, (builder) =>
       builder.setOptions({ url: shared }).setTenantOptions(
         tenants.map((tenantId, index) => ({
           tenantId,
@@ -179,23 +121,9 @@ export const TestStorages = {
   },
 };
 
-/** Storage in memory. */
-class InMemoryTestStorage implements TestStorage {
-  readonly url = undefined;
-  readonly #factory = new InMemoryStorageFactory();
-
-  open(): Promise<StorageFactory> {
-    return Promise.resolve(this.#factory);
-  }
-
-  drop(): Promise<void> {
-    return this.#factory.close();
-  }
-}
-
 /** Storage in PostgreSQL databases made for one test. */
 class PostgresTestStorage implements TestStorage {
-  readonly url: string | undefined;
+  readonly url: string;
   /** The types of the context's messages. */
   readonly #registry: TypeRegistryLookup;
   /** The addresses of the storage's databases. */
@@ -208,12 +136,11 @@ class PostgresTestStorage implements TestStorage {
   constructor(
     registry: TypeRegistryLookup,
     databases: readonly string[],
-    url: string | undefined,
     configure: (builder: PostgresStorageFactoryBuilder) => PostgresStorageFactoryBuilder,
   ) {
     this.#registry = registry;
     this.#databases = databases;
-    this.url = url;
+    [this.url = ""] = databases;
     this.#configure = configure;
   }
 
@@ -330,9 +257,7 @@ const Databases = {
     const setting = (name: string, trimmed = true): string => {
       const value = process.env[name] ?? "";
       if (value.trim() === "") {
-        throw new Error(
-          `${name} is not set. The tests on PostgreSQL make their databases on that server.`,
-        );
+        throw new Error(`${name} is not set. The tests make their databases on that server.`);
       }
       return trimmed ? value.trim() : value;
     };

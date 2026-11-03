@@ -56,26 +56,14 @@ export interface ProviderSettings {
   readonly clientSecret: string;
 }
 
-/** Keeps data in the program's memory. Everything is forgotten when the program stops. */
-export interface MemoryStorageSettings {
-  readonly kind: "memory";
-}
-
-/** Keeps data in a PostgreSQL database, so it outlasts restarts. */
-export interface PostgresStorageSettings {
-  readonly kind: "postgresql";
+/** The PostgreSQL database a program keeps its data in. */
+export interface StorageSettings {
   /** The address of the database, with the account to sign in to it. */
   readonly url: string;
 }
 
-/** Where a program keeps its data. */
-export type StorageSettings = MemoryStorageSettings | PostgresStorageSettings;
-
-/**
- * Keeps the application server's data in PostgreSQL.
- */
-export interface PostgresServerStorageSettings {
-  readonly kind: "postgresql";
+/** The PostgreSQL databases the application server keeps its data in. */
+export interface ServerStorageSettings {
   /**
    * The address of the shared database.
    *
@@ -89,9 +77,6 @@ export interface PostgresServerStorageSettings {
    */
   readonly organizationDatabase: string;
 }
-
-/** Where the application server keeps its data. */
-export type ServerStorageSettings = MemoryStorageSettings | PostgresServerStorageSettings;
 
 /** How the application server is set up. */
 export interface ServerSettings {
@@ -141,8 +126,6 @@ class Reading {
   readonly #environment: NodeJS.ProcessEnv;
   /** The problems found so far, one sentence each. */
   readonly #problems: string[] = [];
-  /** Where the programs keep their data, once read. */
-  #storageKind: StorageSettings["kind"] | undefined;
   /** The PostgreSQL server the programs keep their data on, once read. */
   #databaseServer:
     | {
@@ -207,29 +190,23 @@ class Reading {
   }
 
   /**
-   * Reads where a program keeps its data, from `ACCESS_DESK_STORAGE`.
+   * Reads the database a program keeps its data in.
    *
    * @param database The setting that names the program's database on the
-   *   PostgreSQL server. It must be set only when the data is kept in PostgreSQL.
+   *   PostgreSQL server.
    */
   storage(database: string): StorageSettings {
-    return this.#storage() === "postgresql"
-      ? { kind: "postgresql", url: this.#databaseUrl(this.#databaseName(database)) }
-      : { kind: "memory" };
+    return { url: this.#databaseUrl(this.#databaseName(database)) };
   }
 
   /**
-   * Reads where the application server keeps its data, from `ACCESS_DESK_STORAGE`.
+   * Reads the databases the application server keeps its data in.
    *
-   * In PostgreSQL, `ACCESS_DESK_SERVER_DATABASE` names the shared database, and
+   * `ACCESS_DESK_SERVER_DATABASE` names the shared database, and
    * `ACCESS_DESK_ORGANIZATION_DATABASE` names each organization's database,
-   * with `{organization}` where its identifier goes. They must be set only
-   * when the data is kept in PostgreSQL.
+   * with `{organization}` where its identifier goes.
    */
   serverStorage(): ServerStorageSettings {
-    if (this.#storage() !== "postgresql") {
-      return { kind: "memory" };
-    }
     const name = "ACCESS_DESK_ORGANIZATION_DATABASE";
     const database = this.text(name);
     const fixed = database.replaceAll(ORGANIZATION, "");
@@ -245,24 +222,9 @@ class Reading {
       );
     }
     return {
-      kind: "postgresql",
       url: this.#databaseUrl(this.#databaseName("ACCESS_DESK_SERVER_DATABASE")),
       organizationDatabase: database,
     };
-  }
-
-  /** Reads where the programs keep their data, from `ACCESS_DESK_STORAGE`. */
-  #storage(): StorageSettings["kind"] {
-    if (this.#storageKind === undefined) {
-      const kind = this.text("ACCESS_DESK_STORAGE");
-      if (kind !== "" && kind !== "memory" && kind !== "postgresql") {
-        this.#problems.push(
-          `ACCESS_DESK_STORAGE must be "memory" or "postgresql", and is "${kind}".`,
-        );
-      }
-      this.#storageKind = kind === "postgresql" ? "postgresql" : "memory";
-    }
-    return this.#storageKind;
   }
 
   /** Reads organizations that must be listed, each once, separated by commas. */
@@ -387,7 +349,7 @@ export const Settings = {
    *   when the name it makes is too long for PostgreSQL, or when it makes the
    *   name of the shared database.
    */
-  organizationDatabase(storage: PostgresServerStorageSettings, organization: string): string {
+  organizationDatabase(storage: ServerStorageSettings, organization: string): string {
     if (!DATABASE_NAME.test(organization)) {
       throw new Error(
         `An organization's identifier must be of letters, digits, "-", and "_", ` +

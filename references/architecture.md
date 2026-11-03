@@ -38,8 +38,8 @@ The application runs as two programs. The application server hosts the
 contexts. The gateway is a separate program that reaches the server over the
 network, and it is the only one a browser talks to.
 
-Both programs store their data in PostgreSQL, or in memory for development
-and tests. The application server stores each organization in a separate
+The application server and the gateway store their data in PostgreSQL, and so
+do the tests. The application server stores each organization in a separate
 database. Everything that belongs to no single organization goes into one
 shared database: people, their accounts, email addresses, and memberships,
 subscriptions to both contexts, and messages waiting to be delivered. The

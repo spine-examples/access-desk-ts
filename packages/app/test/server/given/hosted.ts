@@ -17,6 +17,7 @@ import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { SignalEnvelopes } from "@spine-event-engine/core";
 import { TenantIdSchema, UserIdSchema } from "@spine-event-engine/proto";
 import { type BoundedContext, Server, SignalMetadata } from "@spine-event-engine/server";
+import type { StorageFactory } from "@spine-event-engine/storage";
 import { TestEnvironment } from "@access-desk/testing/environment";
 import { TestStorages } from "@access-desk/testing/storage";
 import { type OrganizationId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
@@ -61,7 +62,7 @@ export interface Hosted {
 
 /** The storage of an application server, which a test can start a server over again. */
 export interface ServerStorage {
-  /** Where the server keeps its data, as its settings name it. */
+  /** The databases the server keeps its data in, as its settings name them. */
   readonly settings: ServerStorageSettings;
   /** Deletes the data the storage kept. */
   drop(): Promise<void>;
@@ -70,19 +71,15 @@ export interface ServerStorage {
 /**
  * Creates the storage of an application server.
  *
- * On PostgreSQL, it is a new shared database. The database of each
- * organization is named after the shared one, and deleted with it. In
- * memory, every opening starts empty, as a restarted server does.
+ * It is a new shared database. The database of each organization is named
+ * after the shared one, and deleted with it.
  */
 export async function givenServerStorage(): Promise<ServerStorage> {
-  if (TestStorages.profile() === "memory") {
-    return { settings: { kind: "memory" }, drop: () => Promise.resolve() };
-  }
   const shared = await TestStorages.databases(1);
   const [url = ""] = shared.urls;
   const name = new URL(url).pathname.slice(1);
   return {
-    settings: { kind: "postgresql", url, organizationDatabase: `${name}_{organization}` },
+    settings: { url, organizationDatabase: `${name}_{organization}` },
     drop: async () => {
       await TestStorages.dropDatabasesStartingWith(`${name}_`);
       await shared.drop();
@@ -91,23 +88,22 @@ export async function givenServerStorage(): Promise<ServerStorage> {
 }
 
 /**
- * Creates the database of an organization, as a developer does, unless it is
- * there already.
+ * Opens the storage of an application server, as the server does when it
+ * starts.
  *
- * In memory, there is nothing to create.
+ * It first creates the database of each organization, as an application
+ * administrator does, unless it is there already.
  *
- * @param settings Where the application server keeps its data.
- * @param organization The organization's identifier.
+ * @param storage The storage of the server.
  */
-async function givenOrganizationDatabase(
-  settings: ServerStorageSettings,
-  organization: string,
-): Promise<void> {
-  if (settings.kind === "postgresql") {
-    const app: AppModule = await import("../../../dist/src/index.js");
+async function openServerStorage(storage: ServerStorage): Promise<StorageFactory> {
+  const settings = storage.settings;
+  const app: AppModule = await import("../../../dist/src/index.js");
+  for (const organization of ORGANIZATIONS) {
     const url = new URL(app.Settings.organizationDatabase(settings, organization));
     await TestStorages.createDatabases([url.pathname.slice(1)]);
   }
+  return app.Storage.openServer(settings, ORGANIZATIONS);
 }
 
 /**
@@ -133,12 +129,9 @@ export async function givenServer(storage?: ServerStorage): Promise<Hosted> {
   const kept = storage ?? (await givenServerStorage());
   let url = "";
   await TestEnvironment.reset();
-  for (const organization of ORGANIZATIONS) {
-    await givenOrganizationDatabase(kept.settings, organization);
-  }
   const contexts = await app.AccessDesk.assemble({
     server: () => url,
-    storage: await app.Storage.openServer(kept.settings, ORGANIZATIONS),
+    storage: await openServerStorage(kept),
     organizations: ORGANIZATIONS,
   });
   const server = await new Server({

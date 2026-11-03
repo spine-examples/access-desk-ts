@@ -15,7 +15,7 @@
 import { create } from "@bufbuild/protobuf";
 import { StringifierRegistry } from "@spine-event-engine/core";
 import { TenantIdSchema } from "@spine-event-engine/proto";
-import { InMemoryStorageFactory, type StorageFactory } from "@spine-event-engine/storage";
+import type { StorageFactory } from "@spine-event-engine/storage";
 import { PostgresStorageFactory } from "@spine-event-engine/storage-postgres";
 import { typeRegistry } from "../generated/model-registry.js";
 import { Settings, type ServerStorageSettings, type StorageSettings } from "./settings.js";
@@ -23,18 +23,15 @@ import { Settings, type ServerStorageSettings, type StorageSettings } from "./se
 /** Opens the storage a program keeps its data in. */
 export const Storage = {
   /**
-   * Opens the storage the settings name.
+   * Opens the storage in the PostgreSQL database the settings name.
    *
-   * A PostgreSQL database must exist already. Spine creates its tables in it
-   * the first time they are needed.
+   * The database must exist already. Spine creates its tables in it the first
+   * time they are needed.
    *
-   * @param settings Where the program keeps its data.
+   * @param settings The database the program keeps its data in.
    * @returns The opened storage.
    */
   open(settings: StorageSettings): Promise<StorageFactory> {
-    if (settings.kind === "memory") {
-      return Promise.resolve(new InMemoryStorageFactory());
-    }
     return PostgresStorageFactory.newBuilder()
       .setOptions({ url: settings.url })
       .setStringifierRegistry(Storage.stringifiers())
@@ -42,12 +39,13 @@ export const Storage = {
   },
 
   /**
-   * Opens the storage of the application server the settings name.
+   * Opens the storage of the application server in the PostgreSQL databases
+   * the settings name.
    *
-   * In PostgreSQL, each organization has a separate database; other data shares
-   * one database. All databases must exist already.
+   * Each organization has a separate database; other data shares one database.
+   * All databases must exist already.
    *
-   * @param settings Where the application server keeps its data.
+   * @param settings The databases the application server keeps its data in.
    * @param organizations The organizations the server keeps.
    * @returns The opened storage.
    */
@@ -55,9 +53,6 @@ export const Storage = {
     settings: ServerStorageSettings,
     organizations: readonly string[],
   ): Promise<StorageFactory> {
-    if (settings.kind === "memory") {
-      return Promise.resolve(new InMemoryStorageFactory());
-    }
     return PostgresStorageFactory.newBuilder()
       .setOptions({ url: settings.url })
       .setTenantOptions(

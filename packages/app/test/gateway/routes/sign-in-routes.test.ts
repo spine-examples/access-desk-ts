@@ -14,6 +14,8 @@
 
 import { generateKeyPairSync } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { TestStorages } from "@access-desk/testing/storage";
+import { typeRegistry } from "../../../generated/model-registry.js";
 import type { AccessDesk } from "../../../src/gateway/access-desk.js";
 import { RevokedTokens } from "../../../src/gateway/revoked-tokens.js";
 import { routing } from "../../../src/gateway/routes/route.js";
@@ -22,9 +24,11 @@ import { Sessions } from "../../../src/gateway/sessions.js";
 
 describe("Gateway sign-in routes should", () => {
   it("offer only the options route when no outside provider is configured", async () => {
+    const storage = await TestStorages.singleTenant(typeRegistry);
+    const revoked = await RevokedTokens.open({ url: storage.url });
     const sessions = new Sessions({
       key: generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey,
-      revoked: await RevokedTokens.open({ kind: "memory" }),
+      revoked,
     });
     try {
       const signIn = signInRoutes(
@@ -51,6 +55,8 @@ describe("Gateway sign-in routes should", () => {
       }).not.toThrow();
     } finally {
       await sessions.close();
+      await revoked.close();
+      await storage.drop();
     }
   });
 });

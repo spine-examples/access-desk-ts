@@ -26,40 +26,33 @@ The file is ignored by Git.
 Every setting is required. Nothing is assumed: a program that misses a
 setting refuses to start and names it.
 
-| Variable                            | Read by             | Meaning                                                 |
-| ----------------------------------- | ------------------- | ------------------------------------------------------- |
-| `ACCESS_DESK_SERVER_HOST`           | server, gateway     | The address the application server listens on.          |
-| `ACCESS_DESK_SERVER_PORT`           | server, gateway     | The port the application server listens on.             |
-| `ACCESS_DESK_ORGANIZATIONS`         | server              | The organizations the server keeps, by commas.          |
-| `ACCESS_DESK_GATEWAY_HOST`          | gateway, web client | The address the gateway listens on.                     |
-| `ACCESS_DESK_GATEWAY_PORT`          | gateway, web client | The port the gateway listens on.                        |
-| `ACCESS_DESK_WEB_HOST`              | gateway, web client | The address the web client listens on.                  |
-| `ACCESS_DESK_WEB_PORT`              | gateway, web client | The port the web client listens on.                     |
-| `GOOGLE_CLIENT_ID`                  | gateway             | The client identifier of the Google OAuth application.  |
-| `GOOGLE_CLIENT_SECRET`              | gateway             | The client secret of the Google OAuth application.      |
-| `ACCESS_DESK_STORAGE`               | server, gateway     | `memory`, or `postgresql` to keep data across restarts. |
-| `ACCESS_DESK_DATABASE_HOST`         | server, gateway     | The address of the PostgreSQL server.                   |
-| `ACCESS_DESK_DATABASE_PORT`         | server, gateway     | The port of the PostgreSQL server.                      |
-| `ACCESS_DESK_DATABASE_USER`         | server, gateway     | The account to connect to it with.                      |
-| `ACCESS_DESK_DATABASE_PASSWORD`     | server, gateway     | The password of that account, written as it is.         |
-| `ACCESS_DESK_ORGANIZATION_DATABASE` | server              | Each organization's database, with `{organization}`.    |
-| `ACCESS_DESK_SERVER_DATABASE`       | server              | The database of everything that is no organization's.   |
-| `ACCESS_DESK_GATEWAY_DATABASE`      | gateway             | The database of subscriptions and ended sessions.       |
-| `ACCESS_DESK_SESSION_KEY`           | gateway             | The P-256 key sessions are signed with, in base64.      |
+| Variable                            | Read by             | Meaning                                                |
+| ----------------------------------- | ------------------- | ------------------------------------------------------ |
+| `ACCESS_DESK_SERVER_HOST`           | server, gateway     | The address the application server listens on.         |
+| `ACCESS_DESK_SERVER_PORT`           | server, gateway     | The port the application server listens on.            |
+| `ACCESS_DESK_ORGANIZATIONS`         | server              | The organizations the server keeps, by commas.         |
+| `ACCESS_DESK_GATEWAY_HOST`          | gateway, web client | The address the gateway listens on.                    |
+| `ACCESS_DESK_GATEWAY_PORT`          | gateway, web client | The port the gateway listens on.                       |
+| `ACCESS_DESK_WEB_HOST`              | gateway, web client | The address the web client listens on.                 |
+| `ACCESS_DESK_WEB_PORT`              | gateway, web client | The port the web client listens on.                    |
+| `GOOGLE_CLIENT_ID`                  | gateway             | The client identifier of the Google OAuth application. |
+| `GOOGLE_CLIENT_SECRET`              | gateway             | The client secret of the Google OAuth application.     |
+| `ACCESS_DESK_DATABASE_HOST`         | server, gateway     | The address of the PostgreSQL server.                  |
+| `ACCESS_DESK_DATABASE_PORT`         | server, gateway     | The port of the PostgreSQL server.                     |
+| `ACCESS_DESK_DATABASE_USER`         | server, gateway     | The account to connect to it with.                     |
+| `ACCESS_DESK_DATABASE_PASSWORD`     | server, gateway     | The password of that account, written as it is.        |
+| `ACCESS_DESK_ORGANIZATION_DATABASE` | server              | Each organization's database, with `{organization}`.   |
+| `ACCESS_DESK_SERVER_DATABASE`       | server              | The database of everything that is no organization's.  |
+| `ACCESS_DESK_GATEWAY_DATABASE`      | gateway             | The database of subscriptions and ended sessions.      |
+| `ACCESS_DESK_SESSION_KEY`           | gateway             | The P-256 key sessions are signed with, in base64.     |
 
 People sign in through Google. If the gateway cannot reach Google when it
 starts, it does not start.
 
-The PostgreSQL server and the databases are needed only for `postgresql`.
-
 ### The database
 
-With `ACCESS_DESK_STORAGE=memory`, the application server and the gateway keep
-their data in memory and lose it when they stop. With
-`ACCESS_DESK_STORAGE=postgresql`, they keep it in PostgreSQL, so a restart
-loses nothing.
-
-All the databases live on one PostgreSQL server, set by
+The application server and the gateway keep their data in PostgreSQL, so a
+restart loses nothing. All the databases live on one PostgreSQL server, set by
 `ACCESS_DESK_DATABASE_HOST`, `_PORT`, `_USER`, and `_PASSWORD`. For
 development, [`deploy/compose.yaml`](../../deploy/compose.yaml) runs one in
 Docker. From the repository root:
@@ -117,9 +110,6 @@ runtime across restarts. To add an organization:
 2. Run `pnpm run postgres:start` to create its database.
 3. Restart the application server.
 
-In memory, no database is needed, but the server still accepts only the
-listed organizations.
-
 #### Subscriptions
 
 When a page in the browser subscribes to updates, both the gateway and the
@@ -154,7 +144,7 @@ expires, the gateway deletes the identifier.
 
 #### Tests
 
-Tests never touch the application's databases. On PostgreSQL, each test
+Tests never touch the application's databases. Each test
 creates new, empty databases named `accessdesk_test_<random>`, with the same
 layout as the application, and drops them when it finishes. See
 [Testing model](../../.agents/project.md#testing-model).

@@ -210,7 +210,7 @@ export async function givenGateway(): Promise<Running> {
   await givenOrganization(hosted, "globex", "olivia@acme.example");
   const storage = await TestStorages.singleTenant(typeRegistry);
   afterwards(() => storage.drop());
-  const revokedTokens = await app.RevokedTokens.open(TestStorages.settingsOf(storage));
+  const revokedTokens = await app.RevokedTokens.open({ url: storage.url });
   afterwards(() => revokedTokens.close());
   return startGateway({ hosted, storage, revokedTokens });
 }

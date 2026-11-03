@@ -50,12 +50,6 @@ listening.address = server.baseUrl;
 
 console.log(`Access Desk application server: ${server.baseUrl}`);
 console.log(
-  settings.storage.kind === "postgresql"
-    ? "People, organizations, and everything they own are kept in PostgreSQL."
-    : "People, organizations, and everything they own are kept in memory, " +
-        "and are forgotten when the server stops.",
-);
-console.log(
   `Organizations ${settings.organizations.join(", ")} are kept, and no other organization is.`,
 );
 if (!Settings.onlyThisMachine(host)) {
