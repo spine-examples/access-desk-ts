@@ -38,8 +38,9 @@ const external: Record<string, ExternalSignIn> = {
   google: { provider: google, callbackUri: settings.webUrl },
 };
 
-const subscriptions = await Storage.open(settings.storage);
-const revokedTokens = await RevokedTokens.open(settings.storage);
+const database = Storage.gatewayDatabase(settings.database);
+const subscriptions = await Storage.open(database);
+const revokedTokens = await RevokedTokens.open(database);
 
 const gateway = await Gateway.start({
   backend: settings.serverUrl,
@@ -56,11 +57,6 @@ const gateway = await Gateway.start({
 console.log(`Access Desk gateway: ${gateway.url}`);
 console.log(`Application server it reaches: ${settings.serverUrl}`);
 console.log(`People open the application at: ${settings.webUrl}`);
-console.log(
-  settings.storage.kind === "postgresql"
-    ? "Subscriptions and ended sessions are kept in PostgreSQL."
-    : "Subscriptions and ended sessions are kept in memory, and are forgotten when the gateway stops.",
-);
 // A browser that leaves or reloads a page cancels its pending requests.
 // That must not stop the gateway. Any other unhandled failure still does.
 const CANCELLED = 1;

@@ -14,8 +14,9 @@
 #
 
 #
-# Makes the databases the settings name, for local development, unless they
-# are there already.
+# Makes the databases of the application server and the gateway, for local
+# development, unless they are there already. The names must match those in
+# `packages/app/src/storage.ts`.
 #
 # The PostgreSQL server runs it when it first starts.
 #
@@ -41,13 +42,13 @@ SQL
 # Everything of the application server that belongs to no organization:
 # people, their accounts and memberships, subscriptions, and the messages
 # waiting for delivery.
-create "$ACCESS_DESK_SERVER_DATABASE"
+create accessdesk_server
 
 # Each organization has a separate database.
 for organization in $(echo "$ACCESS_DESK_ORGANIZATIONS" | tr ',' ' '); do
-    create "$(echo "$ACCESS_DESK_ORGANIZATION_DATABASE" | sed "s/{organization}/$organization/g")"
+    create "accessdesk_resources_$organization"
 done
 
 # The subscriptions people hold and the sessions they ended. The gateway
 # keeps them.
-create "$ACCESS_DESK_GATEWAY_DATABASE"
+create accessdesk_gateway

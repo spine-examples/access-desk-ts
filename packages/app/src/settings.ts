@@ -28,18 +28,6 @@ LOOPBACK.addAddress("::1", "ipv6");
  */
 const UNREADABLE_KEY = createSecretKey(new Uint8Array(1));
 
-/** Where an organization's identifier goes in the address of its database. */
-const ORGANIZATION = "{organization}";
-
-/** What the name of a database may be made of. */
-const DATABASE_NAME = /^[A-Za-z0-9_-]+$/;
-
-/**
- * The longest name of a database, in characters. PostgreSQL cuts a longer
- * name short, so two databases could end up with one name.
- */
-const DATABASE_NAME_LENGTH = 63;
-
 /** Where a program listens. */
 export interface Listening {
   /** The address to listen on. */
@@ -56,42 +44,17 @@ export interface ProviderSettings {
   readonly clientSecret: string;
 }
 
-/** Keeps data in the program's memory. Everything is forgotten when the program stops. */
-export interface MemoryStorageSettings {
-  readonly kind: "memory";
+/** The PostgreSQL server the programs keep their data on, and the account they sign in with. */
+export interface DatabaseServer {
+  /** The address of the server. */
+  readonly host: string;
+  /** The port of the server. */
+  readonly port: number;
+  /** The account the programs sign in with. */
+  readonly user: string;
+  /** The password of that account, exactly as it is written. */
+  readonly password: string;
 }
-
-/** Keeps data in a PostgreSQL database, so it outlasts restarts. */
-export interface PostgresStorageSettings {
-  readonly kind: "postgresql";
-  /** The address of the database, with the account to sign in to it. */
-  readonly url: string;
-}
-
-/** Where a program keeps its data. */
-export type StorageSettings = MemoryStorageSettings | PostgresStorageSettings;
-
-/**
- * Keeps the application server's data in PostgreSQL.
- */
-export interface PostgresServerStorageSettings {
-  readonly kind: "postgresql";
-  /**
-   * The address of the shared database.
-   *
-   * It keeps what belongs to no organization: people, their accounts and memberships,
-   * subscriptions, and the messages waiting for delivery.
-   */
-  readonly url: string;
-  /**
-   * The name of each organization's database, with `{organization}` where the
-   * organization's identifier goes.
-   */
-  readonly organizationDatabase: string;
-}
-
-/** Where the application server keeps its data. */
-export type ServerStorageSettings = MemoryStorageSettings | PostgresServerStorageSettings;
 
 /** How the application server is set up. */
 export interface ServerSettings {
@@ -104,8 +67,8 @@ export interface ServerSettings {
   //  runs, instead of listing them here, once Spine keeps the tenants given to
   //  its index across restarts.
   readonly organizations: readonly string[];
-  /** Where the application server keeps its data. */
-  readonly storage: ServerStorageSettings;
+  /** The PostgreSQL server the application server keeps its data on. */
+  readonly database: DatabaseServer;
 }
 
 /** How the gateway is set up. */
@@ -121,8 +84,11 @@ export interface GatewaySettings {
   readonly webUrl: string;
   /** How Access Desk is registered with Google, which people sign in through. */
   readonly google: ProviderSettings;
-  /** Where the gateway keeps the subscriptions people hold and the sessions they ended. */
-  readonly storage: StorageSettings;
+  /**
+   * The PostgreSQL server the gateway keeps the subscriptions people hold and
+   * the sessions they ended on.
+   */
+  readonly database: DatabaseServer;
   /**
    * The private key the gateway signs sessions with.
    *
@@ -141,17 +107,6 @@ class Reading {
   readonly #environment: NodeJS.ProcessEnv;
   /** The problems found so far, one sentence each. */
   readonly #problems: string[] = [];
-  /** Where the programs keep their data, once read. */
-  #storageKind: StorageSettings["kind"] | undefined;
-  /** The PostgreSQL server the programs keep their data on, once read. */
-  #databaseServer:
-    | {
-        readonly host: string;
-        readonly port: number;
-        readonly user: string;
-        readonly password: string;
-      }
-    | undefined;
 
   constructor(environment: NodeJS.ProcessEnv) {
     this.#environment = environment;
@@ -207,118 +162,33 @@ class Reading {
   }
 
   /**
-   * Reads where a program keeps its data, from `ACCESS_DESK_STORAGE`.
-   *
-   * @param database The setting that names the program's database on the
-   *   PostgreSQL server. It must be set only when the data is kept in PostgreSQL.
+   * Reads organizations that must be listed, each once, separated by commas.
    */
-  storage(database: string): StorageSettings {
-    return this.#storage() === "postgresql"
-      ? { kind: "postgresql", url: this.#databaseUrl(this.#databaseName(database)) }
-      : { kind: "memory" };
-  }
-
-  /**
-   * Reads where the application server keeps its data, from `ACCESS_DESK_STORAGE`.
-   *
-   * In PostgreSQL, `ACCESS_DESK_SERVER_DATABASE` names the shared database, and
-   * `ACCESS_DESK_ORGANIZATION_DATABASE` names each organization's database,
-   * with `{organization}` where its identifier goes. They must be set only
-   * when the data is kept in PostgreSQL.
-   */
-  serverStorage(): ServerStorageSettings {
-    if (this.#storage() !== "postgresql") {
-      return { kind: "memory" };
-    }
-    const name = "ACCESS_DESK_ORGANIZATION_DATABASE";
-    const database = this.text(name);
-    const fixed = database.replaceAll(ORGANIZATION, "");
-    if (database !== "" && !(database.includes(ORGANIZATION) && DATABASE_NAME.test(fixed))) {
-      this.#problems.push(
-        `${name} must name a database of letters, digits, "-", and "_", ` +
-          `with ${ORGANIZATION} where the organization goes, and is "${database}".`,
-      );
-    } else if (database !== "" && !this.#short(`${fixed}x`)) {
-      this.#problems.push(
-        `${name} leaves no room for the organization in a name of at most ` +
-          `${DATABASE_NAME_LENGTH.toString()} characters, and is "${database}".`,
-      );
-    }
-    return {
-      kind: "postgresql",
-      url: this.#databaseUrl(this.#databaseName("ACCESS_DESK_SERVER_DATABASE")),
-      organizationDatabase: database,
-    };
-  }
-
-  /** Reads where the programs keep their data, from `ACCESS_DESK_STORAGE`. */
-  #storage(): StorageSettings["kind"] {
-    if (this.#storageKind === undefined) {
-      const kind = this.text("ACCESS_DESK_STORAGE");
-      if (kind !== "" && kind !== "memory" && kind !== "postgresql") {
-        this.#problems.push(
-          `ACCESS_DESK_STORAGE must be "memory" or "postgresql", and is "${kind}".`,
-        );
-      }
-      this.#storageKind = kind === "postgresql" ? "postgresql" : "memory";
-    }
-    return this.#storageKind;
-  }
-
-  /** Reads organizations that must be listed, each once, separated by commas. */
   organizations(name: string): string[] {
     const text = this.text(name);
     const organizations = text.split(",").map((organization) => organization.trim());
     const valid =
-      organizations.every((organization) => DATABASE_NAME.test(organization)) &&
+      organizations.every((organization) => organization !== "") &&
       new Set(organizations).size === organizations.length;
     if (text !== "" && !valid) {
       this.#problems.push(
-        `${name} must list organizations, each once, separated by commas, each of ` +
-          `letters, digits, "-", and "_", and is "${text}".`,
+        `${name} must list organizations, each once, separated by commas, and is "${text}".`,
       );
     }
     return text === "" || !valid ? [] : organizations;
   }
 
-  /** Reads the name of a database on the PostgreSQL server, which must be set. */
-  #databaseName(name: string): string {
-    const text = this.text(name);
-    if (text !== "" && !DATABASE_NAME.test(text)) {
-      this.#problems.push(
-        `${name} must name a database of letters, digits, "-", and "_", and is "${text}".`,
-      );
-    } else if (!this.#short(text)) {
-      this.#problems.push(
-        `${name} must name a database of at most ${DATABASE_NAME_LENGTH.toString()} characters, ` +
-          `and is "${text}".`,
-      );
-    }
-    return text;
-  }
-
-  /** Whether a database's name is short enough for PostgreSQL to keep it whole. */
-  #short(database: string): boolean {
-    return Buffer.byteLength(database, "utf8") <= DATABASE_NAME_LENGTH;
-  }
-
   /**
-   * Builds the address of a database on the PostgreSQL server, from
-   * `ACCESS_DESK_DATABASE_HOST`, `_PORT`, `_USER`, and `_PASSWORD`.
+   * Reads the PostgreSQL server, from `ACCESS_DESK_DATABASE_HOST`, `_PORT`,
+   * `_USER`, and `_PASSWORD`.
    */
-  #databaseUrl(database: string): string {
-    this.#databaseServer ??= {
+  databaseServer(): DatabaseServer {
+    return {
       host: this.text("ACCESS_DESK_DATABASE_HOST"),
       port: this.port("ACCESS_DESK_DATABASE_PORT"),
       user: this.text("ACCESS_DESK_DATABASE_USER"),
       password: this.secret("ACCESS_DESK_DATABASE_PASSWORD"),
     };
-    const { host, port, user, password } = this.#databaseServer;
-    const address = isIP(host) === 6 ? `[${host}]` : host;
-    return (
-      `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}` +
-      `@${address}:${port.toString()}/${encodeURIComponent(database)}`
-    );
   }
 
   /** Reads a P-256 private key that must be set, written in base64 as PKCS #8. */
@@ -370,45 +240,8 @@ export const Settings = {
     return reading.done({
       listening: reading.listening("ACCESS_DESK_SERVER"),
       organizations: reading.organizations("ACCESS_DESK_ORGANIZATIONS"),
-      storage: reading.serverStorage(),
+      database: reading.databaseServer(),
     });
-  },
-
-  /**
-   * Builds the address of an organization's database.
-   *
-   * The organization's identifier goes where `ACCESS_DESK_ORGANIZATION_DATABASE`
-   * has `{organization}`.
-   *
-   * @param storage Where the application server keeps its data.
-   * @param organization The organization's identifier.
-   * @returns The address of the database, with the account to sign in to it.
-   * @throws Error when the identifier is not of letters, digits, "-", and "_",
-   *   when the name it makes is too long for PostgreSQL, or when it makes the
-   *   name of the shared database.
-   */
-  organizationDatabase(storage: PostgresServerStorageSettings, organization: string): string {
-    if (!DATABASE_NAME.test(organization)) {
-      throw new Error(
-        `An organization's identifier must be of letters, digits, "-", and "_", ` +
-          `and is "${organization}".`,
-      );
-    }
-    const database = storage.organizationDatabase.replaceAll(ORGANIZATION, organization);
-    if (Buffer.byteLength(database, "utf8") > DATABASE_NAME_LENGTH) {
-      throw new Error(
-        `The database of organization ${organization}, "${database}", is longer than ` +
-          `${DATABASE_NAME_LENGTH.toString()} characters.`,
-      );
-    }
-    const url = new URL(storage.url);
-    if (decodeURIComponent(url.pathname.slice(1)) === database) {
-      throw new Error(
-        `The database of organization ${organization}, "${database}", is the shared one.`,
-      );
-    }
-    url.pathname = `/${encodeURIComponent(database)}`;
-    return url.toString();
   },
 
   /**
@@ -427,7 +260,7 @@ export const Settings = {
       serverUrl: `http://${server.host}:${server.port.toString()}`,
       webUrl: `https://${web.host}:${web.port.toString()}/`,
       google: reading.provider("GOOGLE"),
-      storage: reading.storage("ACCESS_DESK_GATEWAY_DATABASE"),
+      database: reading.databaseServer(),
       sessionKey: reading.signingKey("ACCESS_DESK_SESSION_KEY"),
     });
   },

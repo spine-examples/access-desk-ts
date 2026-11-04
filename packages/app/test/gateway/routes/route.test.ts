@@ -14,19 +14,27 @@
 
 import { generateKeyPairSync } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
+import { typeRegistry } from "../../../generated/model-registry.js";
 import { RevokedTokens } from "../../../src/gateway/revoked-tokens.js";
 import { routing } from "../../../src/gateway/routes/route.js";
 import { Sessions } from "../../../src/gateway/sessions.js";
 
+let storage: TestStorage;
+let revoked: Awaited<ReturnType<typeof RevokedTokens.open>>;
 let sessions: Sessions;
 beforeEach(async () => {
+  storage = await TestStorages.singleTenant(typeRegistry);
+  revoked = await RevokedTokens.open(storage.url);
   sessions = new Sessions({
     key: generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey,
-    revoked: await RevokedTokens.open({ kind: "memory" }),
+    revoked,
   });
 });
 afterEach(async () => {
   await sessions.close();
+  await revoked.close();
+  await storage.drop();
 });
 
 function incoming(body: string, authorization?: string): Request {

@@ -27,7 +27,10 @@ import { Storage } from "../storage.js";
 const settings = Settings.ofServer(process.env);
 const { host, port } = settings.listening;
 
-const storage = await Storage.openServer(settings.storage, settings.organizations);
+const storage = await Storage.openServer(
+  Storage.serverDatabases(settings.database),
+  settings.organizations,
+);
 
 const listening: { address?: string } = {};
 const contexts = await AccessDesk.assemble({
@@ -49,12 +52,6 @@ const server = await new Server({
 listening.address = server.baseUrl;
 
 console.log(`Access Desk application server: ${server.baseUrl}`);
-console.log(
-  settings.storage.kind === "postgresql"
-    ? "People, organizations, and everything they own are kept in PostgreSQL."
-    : "People, organizations, and everything they own are kept in memory, " +
-        "and are forgotten when the server stops.",
-);
 console.log(
   `Organizations ${settings.organizations.join(", ")} are kept, and no other organization is.`,
 );

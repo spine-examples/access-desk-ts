@@ -16,7 +16,6 @@ import { timestampMs, type Timestamp } from "@bufbuild/protobuf/wkt";
 import type { SignedTokenRevocation } from "@spine-event-engine/auth";
 import { Time } from "@spine-event-engine/core/time";
 import { Pool } from "pg";
-import type { StorageSettings } from "../settings.js";
 
 // TODO:27-10-2026:mykyta.pimonov: Delete this store once Spine keeps revoked
 //  tokens itself. Spine leaves revocation to the application, so the gateway
@@ -24,49 +23,17 @@ import type { StorageSettings } from "../settings.js";
 /** The tokens of the sessions people ended before they expired, by signing out. */
 export const RevokedTokens = {
   /**
-   * Opens the store of revoked tokens where the settings name.
+   * Opens the store of revoked tokens in the gateway's database.
    *
-   * In PostgreSQL, the store keeps its table in the gateway's database, and
-   * creates the table when it is not there.
+   * The store keeps its table there, and creates the table when it is not there.
    *
-   * @param settings The settings of the storage to open.
+   * @param url The address of the gateway's database.
    * @returns The opened store. Whoever opens it closes it.
    */
-  async open(
-    settings: StorageSettings,
-  ): Promise<SignedTokenRevocation & { close(): Promise<void> }> {
-    return settings.kind === "memory"
-      ? new RevokedInMemory()
-      : await RevokedInPostgres.open(settings.url);
+  open(url: string): Promise<SignedTokenRevocation & { close(): Promise<void> }> {
+    return RevokedInPostgres.open(url);
   },
 };
-
-/** The revoked tokens, kept in the gateway's memory. A restart forgets them. */
-class RevokedInMemory implements SignedTokenRevocation {
-  readonly kind = "supported";
-  /** The identifiers of the revoked tokens, each with when it can be forgotten, in milliseconds. */
-  readonly #expiring = new Map<string, number>();
-
-  isRevoked(token: string): Promise<boolean> {
-    return Promise.resolve(this.#expiring.has(token));
-  }
-
-  revoke(token: string, expiresAt: Timestamp): Promise<void> {
-    const now = Time.currentTimeMillis();
-    for (const [revoked, expiring] of this.#expiring) {
-      if (expiring <= now) {
-        this.#expiring.delete(revoked);
-      }
-    }
-    this.#expiring.set(token, timestampMs(expiresAt));
-    return Promise.resolve();
-  }
-
-  close(): Promise<void> {
-    this.#expiring.clear();
-    return Promise.resolve();
-  }
-}
 
 /** The revoked tokens, kept in the gateway's PostgreSQL database. */
 class RevokedInPostgres implements SignedTokenRevocation {

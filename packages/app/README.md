@@ -26,41 +26,31 @@ The file is ignored by Git.
 Every setting is required. Nothing is assumed: a program that misses a
 setting refuses to start and names it.
 
-| Variable                            | Read by             | Meaning                                                 |
-| ----------------------------------- | ------------------- | ------------------------------------------------------- |
-| `ACCESS_DESK_SERVER_HOST`           | server, gateway     | The address the application server listens on.          |
-| `ACCESS_DESK_SERVER_PORT`           | server, gateway     | The port the application server listens on.             |
-| `ACCESS_DESK_ORGANIZATIONS`         | server              | The organizations the server keeps, by commas.          |
-| `ACCESS_DESK_GATEWAY_HOST`          | gateway, web client | The address the gateway listens on.                     |
-| `ACCESS_DESK_GATEWAY_PORT`          | gateway, web client | The port the gateway listens on.                        |
-| `ACCESS_DESK_WEB_HOST`              | gateway, web client | The address the web client listens on.                  |
-| `ACCESS_DESK_WEB_PORT`              | gateway, web client | The port the web client listens on.                     |
-| `GOOGLE_CLIENT_ID`                  | gateway             | The client identifier of the Google OAuth application.  |
-| `GOOGLE_CLIENT_SECRET`              | gateway             | The client secret of the Google OAuth application.      |
-| `ACCESS_DESK_STORAGE`               | server, gateway     | `memory`, or `postgresql` to keep data across restarts. |
-| `ACCESS_DESK_DATABASE_HOST`         | server, gateway     | The address of the PostgreSQL server.                   |
-| `ACCESS_DESK_DATABASE_PORT`         | server, gateway     | The port of the PostgreSQL server.                      |
-| `ACCESS_DESK_DATABASE_USER`         | server, gateway     | The account the programs sign in to it with.            |
-| `ACCESS_DESK_DATABASE_PASSWORD`     | server, gateway     | The password of that account, written as it is.         |
-| `ACCESS_DESK_ORGANIZATION_DATABASE` | server              | Each organization's database, with `{organization}`.    |
-| `ACCESS_DESK_SERVER_DATABASE`       | server              | The database of everything that is no organization's.   |
-| `ACCESS_DESK_GATEWAY_DATABASE`      | gateway             | The database of subscriptions and ended sessions.       |
-| `ACCESS_DESK_SESSION_KEY`           | gateway             | The P-256 key sessions are signed with, in base64.      |
+| Variable                        | Read by             | Meaning                                                |
+| ------------------------------- | ------------------- | ------------------------------------------------------ |
+| `ACCESS_DESK_SERVER_HOST`       | server, gateway     | The address the application server listens on.         |
+| `ACCESS_DESK_SERVER_PORT`       | server, gateway     | The port the application server listens on.            |
+| `ACCESS_DESK_ORGANIZATIONS`     | server              | The organizations the server keeps, by commas.         |
+| `ACCESS_DESK_GATEWAY_HOST`      | gateway, web client | The address the gateway listens on.                    |
+| `ACCESS_DESK_GATEWAY_PORT`      | gateway, web client | The port the gateway listens on.                       |
+| `ACCESS_DESK_WEB_HOST`          | gateway, web client | The address the web client listens on.                 |
+| `ACCESS_DESK_WEB_PORT`          | gateway, web client | The port the web client listens on.                    |
+| `GOOGLE_CLIENT_ID`              | gateway             | The client identifier of the Google OAuth application. |
+| `GOOGLE_CLIENT_SECRET`          | gateway             | The client secret of the Google OAuth application.     |
+| `ACCESS_DESK_DATABASE_HOST`     | server, gateway     | The address of the PostgreSQL server.                  |
+| `ACCESS_DESK_DATABASE_PORT`     | server, gateway     | The port of the PostgreSQL server.                     |
+| `ACCESS_DESK_DATABASE_USER`     | server, gateway     | The account to connect to it with.                     |
+| `ACCESS_DESK_DATABASE_PASSWORD` | server, gateway     | The password of that account, written as it is.        |
+| `ACCESS_DESK_SESSION_KEY`       | gateway             | The P-256 key sessions are signed with, in base64.     |
 
 People sign in through Google. If the gateway cannot reach Google when it
 starts, it does not start.
 
-The PostgreSQL server and the databases are needed only for `postgresql`.
-
 ### The database
 
-`ACCESS_DESK_STORAGE` chooses where the programs keep their data. `memory`
-forgets everything when a program stops; `postgresql` keeps it in the
-databases below, so people, organizations, subscriptions, and sessions outlast
-a restart.
-
-All the databases live on one PostgreSQL server, which
-`ACCESS_DESK_DATABASE_HOST`, `_PORT`, `_USER`, and `_PASSWORD` name. For
+The application server and the gateway keep their data in PostgreSQL, so a
+restart loses nothing. All the databases live on one PostgreSQL server, set by
+`ACCESS_DESK_DATABASE_HOST`, `_PORT`, `_USER`, and `_PASSWORD`. For
 development, [`deploy/compose.yaml`](../../deploy/compose.yaml) runs one in
 Docker. From the repository root:
 
@@ -68,89 +58,90 @@ Docker. From the repository root:
 pnpm run postgres:start
 ```
 
-Each start creates the databases the settings name that are missing:
-the shared one, one for each organization of `ACCESS_DESK_ORGANIZATIONS`, and
-the gateway's. Spine creates the tables in them, but never a database.
-`pnpm run postgres:stop` stops the server, and `pnpm run postgres:delete`
-deletes it with all its data.
+The command also creates any of the databases below that are missing.
+Spine creates the tables itself, but not the databases. `pnpm run postgres:stop` stops
+the PostgreSQL server, and `pnpm run postgres:delete` removes it along with
+all its data.
 
-| Database                              | Setting                             | Used by            | What it keeps                                                                                                                    |
-| ------------------------------------- | ----------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| `accessdesk_server`                   | `ACCESS_DESK_SERVER_DATABASE`       | application server | People, their accounts, email addresses, and memberships, what each subscription watches, and the messages waiting for delivery. |
-| `accessdesk_resources_{organization}` | `ACCESS_DESK_ORGANIZATION_DATABASE` | application server | One organization: its members, resources, access requests, grants, and audit trail.                                              |
-| `accessdesk_gateway`                  | `ACCESS_DESK_GATEWAY_DATABASE`      | gateway            | Whose each subscription is, and the identifiers of the sessions people signed out of.                                            |
+| Database                              | Used by            | What it stores                                                                                       |
+| ------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------- |
+| `accessdesk_server`                   | application server | People and their accounts, subscriptions to updates, and messages that are not delivered yet.        |
+| `accessdesk_resources_<organization>` | application server | The data of a single organization: its members, resources, access requests, grants, and audit trail. |
+| `accessdesk_gateway`                  | gateway            | Who opened each subscription, and the sessions people signed out of.                                 |
 
-The server never opens the gateway's database. The gateway opens none of the
-server's and reaches the data only through the server.
+The application server and the gateway never share a database. The gateway
+gets the application's data only by asking the application server.
 
 #### The shared database
 
-Spine gives each process one server environment, and all the contexts of the
-process keep their data in its one storage. What belongs to no organization
-goes to the shared database, `accessdesk_server`:
+In Spine, all contexts in one process share a single storage. Data that
+doesn't belong to a particular organization goes into the shared database,
+`accessdesk_server`:
 
-- Identity, which has no organizations: people, the accounts they sign in
-  with, their email addresses, and their memberships.
-- What each subscription to either context watches.
-- The messages waiting for delivery to either context.
+- Identity: people, the accounts they sign in with, their email addresses,
+  and their memberships. Identity is not split by organization.
+- Subscriptions to both contexts.
+- Messages waiting to be delivered, so commands accepted right before a
+  restart are still handled after it.
 
 #### Organizations
 
-Resources keeps each organization in a separate database, named after
-`ACCESS_DESK_ORGANIZATION_DATABASE`, with the organization's identifier where
-`{organization}` stands:
+Each organization gets a separate database, named after its identifier:
 
 ```dotenv
 ACCESS_DESK_ORGANIZATIONS=teamdev,codematters
-ACCESS_DESK_ORGANIZATION_DATABASE=accessdesk_resources_{organization}
 ```
 
-These settings give `accessdesk_resources_teamdev` and
-`accessdesk_resources_codematters`.
+With this setting, the databases are `accessdesk_resources_teamdev` and
+`accessdesk_resources_codematters`. PostgreSQL limits a database name to 63
+characters, so an identifier can be at most 42 characters long.
 
-The server keeps only the organizations `ACCESS_DESK_ORGANIZATIONS` lists, and
-refuses everything given in any other. Spine keeps no list of organizations
-across restarts, so the server reads it from the settings each time it starts.
-A new organization needs its database, a new entry in the list, and a restart
-of the server: add it to the list, run `pnpm run postgres:start` to create its
-database, and restart the server.
+The application server works only with the organizations listed in
+`ACCESS_DESK_ORGANIZATIONS`, and rejects requests for any other. The list is
+fixed for now, because Spine does not yet remember organizations added at
+runtime across restarts. To add an organization:
 
-In memory, there is no database to create, but the list applies all the same.
+1. Add it to `ACCESS_DESK_ORGANIZATIONS`.
+2. Run `pnpm run postgres:start` to create its database.
+3. Restart the application server.
 
 #### Subscriptions
 
-A browser's subscription is kept twice, once by each program, for different
-purposes.
+When a page in the browser subscribes to updates, both the gateway and the
+application server keep a record of the subscription:
 
-- The gateway keeps whose the subscription is and until when, in
-  `accessdesk_gateway`. It lets only the person who opened the subscription
-  activate or cancel it, and opens the active subscriptions again after the
-  gateway restarts.
-- The server keeps what the subscription watches and whether it is active, in
-  `accessdesk_server`. It sends updates to the active subscriptions, and keeps
-  them after the server restarts. A subscription to Resources carries its
-  organization, so it gets the updates of that organization only.
+- The gateway records who opened it and until when, in `accessdesk_gateway`.
+  This way, only that person can activate or cancel it, and the gateway can
+  restore it after a restart.
+- The application server records what the subscription watches and whether
+  it is active, in `accessdesk_server`. It uses this to send updates, and to
+  restore the subscription after a restart. A subscription to Resources
+  belongs to one organization and gets that organization's updates only.
 
 #### Sessions
 
-Sessions themselves are kept nowhere: the gateway signs them with
-`ACCESS_DESK_SESSION_KEY`. So a restart signs nobody out, and replacing the key
-signs everybody out. A new key comes from:
+The gateway does not store sessions. A session is a token signed with
+`ACCESS_DESK_SESSION_KEY`, and the browser keeps the token. As a result:
+
+- People stay signed in when the gateway restarts.
+- Changing the key signs everyone out.
+
+To generate a key:
 
 ```sh
 pnpm --dir packages/app run session-key
 ```
 
-A signed token stays valid until it expires. So when a person signs out, the
-gateway records the token's identifier in `accessdesk_gateway` and refuses the
-token from then on. It forgets the identifier once the token would have
-expired anyway.
+A signed token stays valid until it expires, even after the person signs out.
+So on sign-out, the gateway saves the token's identifier in
+`accessdesk_gateway` and rejects that token from then on. Once the token
+expires, the gateway deletes the identifier.
 
 #### Tests
 
-The tests never open the programs' databases. On PostgreSQL, each test creates
-new, empty databases on the same server, named `accessdesk_test_<random>`,
-laid out the way the programs lay out theirs, and drops them when it ends. See
+Tests never touch the application's databases. Each test
+creates new, empty databases named `accessdesk_test_<random>`, with the same
+layout as the application, and drops them when it finishes. See
 [Testing model](../../.agents/project.md#testing-model).
 
 ## Run it

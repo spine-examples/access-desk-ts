@@ -24,7 +24,7 @@ name: access-desk
 services:
   # The PostgreSQL server, where the programs reach it: at
   # ACCESS_DESK_DATABASE_HOST and _PORT, with the account the settings name.
-  # It makes the databases the settings name with `postgres/initdb/`, when it
+  # It makes the databases of the programs with `postgres/initdb/`, when it
   # first starts.
   postgres:
     # The newest PostgreSQL the Spine adapter was accepted against.
@@ -33,11 +33,8 @@ services:
       POSTGRES_USER: ${ACCESS_DESK_DATABASE_USER:?Set ACCESS_DESK_DATABASE_USER in .env.}
       POSTGRES_PASSWORD: ${ACCESS_DESK_DATABASE_PASSWORD:?Set ACCESS_DESK_DATABASE_PASSWORD in .env.}
       POSTGRES_DB: postgres
-      # The databases to make.
-      ACCESS_DESK_SERVER_DATABASE: ${ACCESS_DESK_SERVER_DATABASE:?Set ACCESS_DESK_SERVER_DATABASE in .env.}
+      # The organizations to make databases for.
       ACCESS_DESK_ORGANIZATIONS: ${ACCESS_DESK_ORGANIZATIONS:?Set ACCESS_DESK_ORGANIZATIONS in .env.}
-      ACCESS_DESK_ORGANIZATION_DATABASE: ${ACCESS_DESK_ORGANIZATION_DATABASE:?Set ACCESS_DESK_ORGANIZATION_DATABASE in .env.}
-      ACCESS_DESK_GATEWAY_DATABASE: ${ACCESS_DESK_GATEWAY_DATABASE:?Set ACCESS_DESK_GATEWAY_DATABASE in .env.}
     ports:
       - target: 5432
         host_ip: ${ACCESS_DESK_DATABASE_HOST:?Set ACCESS_DESK_DATABASE_HOST in .env.}

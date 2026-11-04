@@ -17,19 +17,16 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
 import { typeRegistry } from "../../generated/model-registry.js";
 import { RevokedTokens } from "../../src/gateway/revoked-tokens.js";
-import type { StorageSettings } from "../../src/settings.js";
 
 /** An hour, in milliseconds. */
 const HOUR_MS = 60 * 60 * 1_000;
 
 let storage: TestStorage;
-let settings: StorageSettings;
 let revoked: Awaited<ReturnType<typeof RevokedTokens.open>>;
 
 beforeEach(async () => {
   storage = await TestStorages.singleTenant(typeRegistry);
-  settings = TestStorages.settingsOf(storage);
-  revoked = await RevokedTokens.open(settings);
+  revoked = await RevokedTokens.open(storage.url);
 });
 
 afterEach(async () => {
@@ -60,15 +57,12 @@ describe("The revoked tokens should", () => {
     expect(await revoked.isRevoked("token-1")).toBe(true);
   });
 
-  it.runIf(TestStorages.profile() === "postgresql")(
-    "still include a revoked token when the gateway restarts, in PostgreSQL",
-    async () => {
-      await revoked.revoke("token-1", timestampFromMs(Date.now() + HOUR_MS));
-      await revoked.close();
+  it("still include a revoked token when the gateway restarts", async () => {
+    await revoked.revoke("token-1", timestampFromMs(Date.now() + HOUR_MS));
+    await revoked.close();
 
-      revoked = await RevokedTokens.open(settings);
+    revoked = await RevokedTokens.open(storage.url);
 
-      expect(await revoked.isRevoked("token-1")).toBe(true);
-    },
-  );
+    expect(await revoked.isRevoked("token-1")).toBe(true);
+  });
 });
