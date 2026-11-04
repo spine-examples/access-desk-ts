@@ -90,6 +90,11 @@ Do not use arbitrary sleeps for domain-time tests. Use a test time provider
 installed through Spine's `Time` and bounded eventual assertions only for
 truly asynchronous propagation.
 
+A test never makes a process react in a state it cannot be in. It starts the
+process instead of giving the commands the process gives, and gives such a
+command itself only after the process has run, as when a delivery is
+repeated.
+
 Cross-package contract changes need a clean build to be trusted. Because a
 package consumes another through `node_modules` (not a TS project reference),
 `tsc -b` does not recompile it when only the dependency's `.proto`/`.d.ts`
@@ -102,7 +107,7 @@ restore the files and remove the debug afterward; never commit or leave
 
 Completion reports must name the commands run, outcomes, untested boundaries,
 and any follow-up decision. A passing local BlackBox test must not be described
-as proof of cross-process, browser, authentication, or production Datastore
+as proof of cross-process, browser, authentication, or production database
 behavior.
 
 ## Repository hygiene

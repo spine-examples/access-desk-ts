@@ -57,7 +57,7 @@ import {
 
 const { expectRejection, recordEvents } = eventRecording(testActorContext);
 
-// The aggregate's own commands are posted directly, so each handler is
+// The aggregate's commands are posted directly, so each handler is
 // exercised alone. All of them address the requester's access to the payroll
 // resource, on a clock that stands at the start of the test until moved.
 beforeAll(loadResourcesContext, 30_000);
@@ -403,11 +403,14 @@ describe("ResourceAccessAggregate should", () => {
 
     it("issue several grants to the same person and resource", async () => {
       const given = await givenGrant("grant-morning", 0, 30);
-      const { scope } = given;
+      const { box, scope } = given;
 
       await issue(given, "grant-afternoon", 60, 90, { accessLevel: writeLevel });
 
-      const held = await readAccessHeldBy(scope);
+      const held = await box.eventually(
+        () => readAccessHeldBy(scope),
+        (grants) => grants.length === 2,
+      );
       expect(held.map((grant) => grant.id?.uuid).sort()).toEqual([
         "grant-afternoon",
         "grant-morning",

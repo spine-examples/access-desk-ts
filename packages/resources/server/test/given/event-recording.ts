@@ -14,7 +14,7 @@
 
 import { create, type Message, type MessageShape } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
-import { AnyMessages, TypeUrls } from "@spine-event-engine/core";
+import { AnyPacker, TypeUrls } from "@spine-event-engine/core";
 import type { ActorContext } from "@spine-event-engine/proto";
 import { TopicIdSchema, TopicSchema, TargetSchema } from "@spine-event-engine/proto/client";
 import { type BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
@@ -24,7 +24,7 @@ import { expect } from "vitest";
  * A live recording of one event type, delivered to a client subscription.
  *
  * A rejection is an event too. A rejection a command handler declares with
- * `@Throws` is a first-class produced signal, so it is subscribable on its own
+ * `@Throws` is a first-class produced signal, so it is subscribable independently
  * without a read-side consumer, just like any domain event.
  */
 export interface EventRecorder<Event> {
@@ -78,7 +78,7 @@ export interface EventRecording {
 /**
  * Builds event-recording test helpers bound to a bounded context's actor context.
  *
- * Each bounded context runs its subscriptions in its own actor and tenant scope,
+ * Each bounded context runs its subscriptions in a separate actor and tenant scope,
  * so the caller supplies that context; everything else is shared.
  *
  * @param actorContext Supplies the actor/tenant context each subscription uses.
@@ -106,7 +106,7 @@ export function eventRecording(actorContext: () => ActorContext): EventRecording
         }
         for (const event of delivery.update.update.value.event) {
           const message =
-            event.message === undefined ? undefined : AnyMessages.unpack(event.message, schema);
+            event.message === undefined ? undefined : AnyPacker.tryUnpack(event.message, schema);
           if (message !== undefined) {
             received.push(message);
           }

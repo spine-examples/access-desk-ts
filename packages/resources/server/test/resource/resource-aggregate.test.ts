@@ -35,7 +35,14 @@ import {
   resourcesBlackBox,
   testActorContext,
 } from "../given/resources-context.js";
-import { closeResource, createResource, deleteResource, openResource } from "./given/resource.js";
+import { awaitOrganizationView, createOrganization } from "../organization/given/organization.js";
+import {
+  closeResource,
+  createResourceAgain,
+  openResource,
+  registerAndAwaitResource,
+  registerResource,
+} from "./given/resource.js";
 
 const { expectRejection, recordEvents } = eventRecording(testActorContext);
 
@@ -49,9 +56,10 @@ describe("ResourceAggregate should", () => {
     it("emit 'ResourceCreated' carrying the initial closed policy", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
+      expect((await createOrganization(scope)).kind).toBe("ok");
       const events = await recordEvents(scope, ResourceCreatedSchema);
 
-      expect((await createResource(scope, "payroll")).kind).toBe("ok");
+      expect((await registerResource(scope, "payroll")).kind).toBe("ok");
 
       const event = await events.waitFor(box);
       expect(event.id?.uuid).toBe("payroll");
@@ -69,10 +77,11 @@ describe("ResourceAggregate should", () => {
     it("reject a duplicate creation with 'ResourceAlreadyExists'", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
-      expect((await createResource(scope, "payroll")).kind).toBe("ok");
+      expect((await createOrganization(scope)).kind).toBe("ok");
+      await registerAndAwaitResource(box, scope, "payroll");
 
       await expectRejection(box, scope, ResourceAlreadyExistsSchema, () =>
-        createResource(scope, "payroll"),
+        createResourceAgain(scope, "payroll"),
       );
     });
   });
@@ -81,11 +90,15 @@ describe("ResourceAggregate should", () => {
     it("emit 'ResourceDeleted'", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
-      expect((await createResource(scope, "payroll")).kind).toBe("ok");
+      expect((await createOrganization(scope)).kind).toBe("ok");
+      await registerAndAwaitResource(box, scope, "payroll-1", { name: "payroll" });
+      await awaitOrganizationView(box, scope, (view) =>
+        view.resource.some((resource) => resource.id?.uuid === "payroll-1"),
+      );
       const events = await recordEvents(scope, ResourceDeletedSchema);
       try {
-        expect((await deleteResource(scope, "payroll")).kind).toBe("ok");
-        expect((await events.waitFor(box)).id?.uuid).toBe("payroll");
+        expect((await registerResource(scope, "payroll-2", "payroll")).kind).toBe("ok");
+        expect((await events.waitFor(box)).id?.uuid).toBe("payroll-2");
       } finally {
         await events.cancel();
       }
@@ -96,7 +109,8 @@ describe("ResourceAggregate should", () => {
     it("emit 'ResourceOpenedForRequests' with the open policy", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
-      expect((await createResource(scope, "payroll")).kind).toBe("ok");
+      expect((await createOrganization(scope)).kind).toBe("ok");
+      await registerAndAwaitResource(box, scope, "payroll");
       const events = await recordEvents(scope, ResourceOpenedForRequestsSchema);
 
       expect((await openResource(scope, "payroll")).kind).toBe("ok");
@@ -110,7 +124,8 @@ describe("ResourceAggregate should", () => {
     it("reject opening an already-open resource", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
-      expect((await createResource(scope, "payroll")).kind).toBe("ok");
+      expect((await createOrganization(scope)).kind).toBe("ok");
+      await registerAndAwaitResource(box, scope, "payroll");
       expect((await openResource(scope, "payroll")).kind).toBe("ok");
 
       await expectRejection(box, scope, ResourceAlreadyOpenForRequestsSchema, () =>
@@ -123,7 +138,8 @@ describe("ResourceAggregate should", () => {
     it("emit 'ResourceClosedForRequests' with the closed policy", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
-      expect((await createResource(scope, "payroll")).kind).toBe("ok");
+      expect((await createOrganization(scope)).kind).toBe("ok");
+      await registerAndAwaitResource(box, scope, "payroll");
       expect((await openResource(scope, "payroll")).kind).toBe("ok");
       const events = await recordEvents(scope, ResourceClosedForRequestsSchema);
 
@@ -138,8 +154,9 @@ describe("ResourceAggregate should", () => {
     it("reject closing an already-closed resource", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
-      // A freshly created resource is already closed.
-      expect((await createResource(scope, "payroll")).kind).toBe("ok");
+      expect((await createOrganization(scope)).kind).toBe("ok");
+      // A freshly registered resource is already closed.
+      await registerAndAwaitResource(box, scope, "payroll");
 
       await expectRejection(box, scope, ResourceAlreadyClosedForRequestsSchema, () =>
         closeResource(scope, "payroll"),

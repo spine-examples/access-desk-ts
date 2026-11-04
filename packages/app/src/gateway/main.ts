@@ -13,7 +13,10 @@
  */
 
 import { typeRegistry } from "../../generated/model-registry.js";
+import { Closing } from "../closing.js";
 import { Settings } from "../settings.js";
+import { Storage } from "../storage.js";
+import { RevokedTokens } from "./revoked-tokens.js";
 import { Gateway } from "./gateway.js";
 import { SignInProvider } from "./providers.js";
 import type { ExternalSignIn } from "./routes/sign-in-routes.js";
@@ -35,6 +38,10 @@ const external: Record<string, ExternalSignIn> = {
   google: { provider: google, callbackUri: settings.webUrl },
 };
 
+const database = Storage.gatewayDatabase(settings.database);
+const subscriptions = await Storage.open(database);
+const revokedTokens = await RevokedTokens.open(database);
+
 const gateway = await Gateway.start({
   backend: settings.serverUrl,
   registry: typeRegistry,
@@ -43,6 +50,8 @@ const gateway = await Gateway.start({
   host: settings.listening.host,
   port: settings.listening.port,
   external,
+  sessionKey: settings.sessionKey,
+  storage: { subscriptions, revokedTokens },
 });
 
 console.log(`Access Desk gateway: ${gateway.url}`);
@@ -68,7 +77,10 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
     if (!stopping) {
       stopping = true;
-      void gateway.close();
+      void Closing.inOrder(gateway, revokedTokens, subscriptions).catch((error: unknown) => {
+        console.error("The gateway did not stop cleanly.", error);
+        process.exitCode = 1;
+      });
     }
   });
 }

@@ -24,6 +24,7 @@ The most useful `spine-ts` sources are:
 - `packages/core/{README.md,REFERENCE.md}`
 - `packages/server/{README.md,REFERENCE.md}`
 - `packages/storage-datastore/{README.md,REFERENCE.md}`
+- `packages/storage-postgres/{README.md,REFERENCE.md}`
 - `packages/auth/{README.md,REFERENCE.md}`
 - `packages/client-web/{README.md,REFERENCE.md}`
 - `packages/client-react/{README.md,REFERENCE.md}`
@@ -44,6 +45,7 @@ Use only packages required by the implemented slice. The anticipated family is:
 | Type registry, type URLs, `Any` helpers      | `@spine-event-engine/core`              |
 | Common storage contract                      | `@spine-event-engine/storage`           |
 | Google Cloud Datastore adapter               | `@spine-event-engine/storage-datastore` |
+| PostgreSQL adapter                           | `@spine-event-engine/storage-postgres`  |
 | Gateway authentication primitives            | `@spine-event-engine/auth`              |
 | Same-server command client                   | `@spine-event-engine/client-node`       |
 | Browser client                               | `@spine-event-engine/client-web`        |
@@ -72,7 +74,7 @@ Each bounded context is two packages. Its `model` package owns canonical
 `server` package holds the decorated handlers and the `BoundedContext` factory
 and is in `mode: "application"`, because `spine-proto handlers` discovers
 decorated classes only in the package that runs it; each context therefore
-composes its own model subset and generates its own handler registry. The
+composes a separate model subset and generates a handler registry. The
 top-level `app` package is also `mode: "application"`: it composes the complete
 application TypeRegistry from every context model and assembles the server. The
 accompanying `spine-proto-manifest.json` is generated output, not an authored
@@ -106,7 +108,7 @@ For one model to import another's `.proto` (e.g. Resources using Identity's
 `PersonId`), add the producer package to the consumer model's `spine-proto.json`
 `dependencies` **and** to its `package.json` `dependencies`, then `pnpm install`;
 declare transitive proto deps too. Reference cross-package types by full proto path
-(`accessdesk.identity.PersonId`). Spine's own value types are imported the same way:
+(`accessdesk.identity.PersonId`). Spine value types are imported the same way:
 `import "spine/net/email_address.proto";` gives `spine.net.EmailAddress`, whose
 schema `EmailAddressSchema` comes from `@spine-event-engine/proto`.
 Authored helper TS (e.g. enum-option accessors) lives in a model's `src/`; add
@@ -288,8 +290,8 @@ and the gateway carries the signed-in person to Resources as the actor.
 
 ## Protobuf Any and type registries
 
-Use the Spine core `Any`/TypeRegistry helpers verified against this exact
-snapshot. The server application composes the complete generated TypeRegistry;
+Pack and unpack `Any` with `AnyPacker`: `tryUnpack` returns nothing for another
+type, `unpack` throws. The server application composes the complete generated TypeRegistry;
 do not depend on runtime package scanning or mutable global schema registration.
 
 **Reading Protobuf enum custom options** (the "enum with `EnumValueOptions`
@@ -300,21 +302,64 @@ extension" pattern): `getOption` from `@bufbuild/protobuf`,
 local first. Pick an extension field number outside Spine's `73800`–`73971`
 block (Spine leaves `EnumValueOptions` free).
 
-## Datastore
+## Server environment
 
-Construct `DatastoreStorageFactory` with an application-owned configured Google
-Datastore client. Multitenant contexts use Datastore native namespaces derived
-reversibly from `TenantId`; a bounded-context name is diagnostic and does not
-itself partition kinds.
+- **One environment per process.** `ServerEnvironment.when(type).use(settings)`
+  sets it up once, before the first `ServerEnvironment.instance()`, and
+  `completeSetup()` must finish before a context is built. Every context of
+  the process keeps its data in the environment's one `storageFactory`; a
+  context builder takes no separate storage.
+- **The environment closes the storage.** Closing the environment closes its
+  `storageFactory`. It refuses to close while a context is open.
+- **The server closes its contexts.** `Server.close()` stops taking requests,
+  waits for the work already accepted, closes the server's contexts, and then
+  each of its `resources` in order. A server begun with `start()` never closes
+  the environment. A server begun with `run()` closes itself on `SIGINT` or
+  `SIGTERM`, and then the environment, when no other such server runs.
+- **Tests.** `ServerTests.resetEnvironment()` from
+  `@spine-event-engine/server/testing` closes the environment, so the next
+  test can set up a new one. It refuses while a context is open.
+- **One Delivery for all contexts.** By default, all messages of all contexts
+  go through one shard, one after another. A handler that waits for another
+  context of the same process waits forever, since that context's messages
+  queue behind it. A `deliveryStrategy` that gives each context a separate shard avoids it.
+- **Tenant index.** A multitenant context takes what is given in a tenant
+  only once the environment's `tenantIndex` keeps the tenant, and refuses
+  anything else as `TENANT_UNKNOWN`. In memory, `keep()` adds any tenant, and a
+  new process starts with none. Spine never calls `keep()` itself. It asks
+  `contains()` on every request in a tenant and before delivering each
+  message from the Inbox, and reads `page()` to prepare the tables of every
+  tenant when a context is built and on `createStorageStructures()`.
+- **Restart.** Spine keeps no tenant list beyond a fixed
+  `setTenantOptions` list. After a restart, the tenants are whatever the
+  `tenantIndex` lists. The Inbox and the subscriptions are kept in the shared
+  database, each with its tenant inside the message, and are delivered only
+  once the index admits that tenant.
 
-When stored framework/application values contain `Any`, build the required
-stringifier registry with the complete application TypeRegistry. Keep query
-values typed; do not pre-stringify them in application code.
+## PostgreSQL
 
-The adapter has a finite reconciliation ceiling and does not provide unlimited
-scan semantics. Declare and deploy application composite indexes for actual
-filter/order combinations. Exercise them with the Datastore-mode emulator and
-use a disposable cloud project for any explicitly authorized cloud smoke test.
+Access Desk keeps its data in PostgreSQL through `@spine-event-engine/storage-postgres`.
+
+- **Shared and tenant databases.** `setOptions({ url })` names the shared
+  database. It keeps every single-tenant context, the subscription registry,
+  the Inbox, and the delivery shards. Each tenant of a multitenant context
+  keeps its entities and events in a separate database, which
+  `setTenantOptions` or `setTenantResolver` names.
+- **Tenant catalog.** With `setTenantOptions`, the tenants listed are the
+  catalog of the default `tenantIndex`, and `keep()` refuses any other. With
+  `setTenantResolver`, the catalog is empty, so the application must supply a
+  `tenantIndex`.
+- **Connections.** Building the factory opens no connection, and neither does
+  creating storage. `checkConnection()` checks the shared database.
+  `close()` is async.
+- **Schema.** Spine creates its tables, with primary keys only. The databases
+  must exist already.
+- **Pools.** One per database, ten connections by default. Spine's pools do not
+  listen for `error`, so a dropped idle connection can stop the process. Pools
+  Access Desk opens itself listen.
+- **Subscriptions outlast restarts.** One nobody cancels stays for good, so the
+  gateway leaves it for Spine to clear when its session expires.
+- **Inbox.** Commands accepted before a stop are delivered after the restart.
 
 ## Authentication and browser clients
 
@@ -339,22 +384,25 @@ controls defined in the architecture.
 - `BrowserServer.open(undefined, { backend: { baseUrl }, … })` starts a
   standalone gateway in front of an application server in another program.
   Pass `registry` so `authorize` receives each command decoded.
-- A standalone gateway with sessions needs `bindings`:
-  `InMemorySubscriptionBindings` locally, `DurableSubscriptionBindings` in
-  production. The application server needs a `storageFactory` there too, so
-  neither program starts under `NODE_ENV=production` while everything is kept
-  in memory.
+- A standalone gateway with sessions needs `bindings`. `BrowserServer` treats
+  them as durable only if they are a `DurableSubscriptionBindings`. Only then
+  does it stop expired subscriptions on the application server and restore
+  stored ones at start. A wrapper around the store loses both.
+- `DurableSubscriptionBindings` runs operations on one subscription one at a
+  time, and keeps one more waiting. A second activation of an active
+  subscription waits instead of being refused; a cancel behind it is refused
+  as `binding-busy`.
+- `bindings.activate` receives the trusted context, not the session; only
+  `authorize` sees the session's principal. Spine may refuse a
+  request after `authorize` without calling the bindings.
 - Ending a session does not end its streams; Spine stops them only when the
   session's time runs out.
-- Only Spine's own cancel effect clears a subscription everywhere it is kept,
-  and the store receives it only when a browser cancels. So the gateway
-  cancels an ending session's subscriptions through its own address with the
-  session's token. What is left is stopped in the store, which ends the stream
-  but leaves the gateway's forwarding record until the gateway stops. `dispose`
-  of an in-memory store cannot clear that record either.
-- A subscription reports only what happens after it has opened all the way to
-  the application server, a moment after the client's `activate` returns. A
-  test must first make sure updates arrive.
+- Only Spine's cancel effect clears a subscription everywhere it is kept.
+  The store receives it only when a browser cancels, or when a subscription
+  expires.
+- Once the client's `activate` returns, the server has acknowledged the
+  subscription, and every later change arrives. On `2.0.0-snapshot.22`, updates
+  right after `activate` could be lost.
 - A query takes an id filter or `EQUAL` filters on top-level `(column)`
   fields. A subscription to read models takes id filters and `EQUAL` field
   filters, also on nested paths. A subscription to events takes only
@@ -368,10 +416,21 @@ controls defined in the architecture.
 - `authRoutes` match the whole address, query string included, so they suit
   `POST` with a body, not a provider callback carrying `?code=`. Their
   preflight answers allow no headers, so they serve only pages of the
-  gateway's own origin, as through a development proxy.
-- Without `cookies` the session is a bearer token. `OpaqueSessions.resolve`
-  accepts only `kind: "cookie"`, so the resolver passes the bearer value as
-  one.
+  gateway's origin, as through a development proxy.
+- Without `cookies`, a session is a bearer token. `SignedSessions` needs a
+  P-256 key. Without a `SignedTokenRevocation`, `logout` answers `expiryOnly`
+  and the token works until it expires. `OpaqueSessions` keeps sessions in
+  process memory.
+- `SignedSessions` accepts both ECDSA forms of a signature, so one token has
+  two texts with the same `jti`.
+- `SignedSessions` accepts a token for `clockSkewSeconds` after it expires, but
+  passes `revoke` the token's bare expiry.
+- `resolve` refuses every token while `isRevoked` fails. `logout` does not call
+  `isRevoked`.
+- `postAndSubscribe` subscribes, waits for the server's acknowledgement, then
+  posts. Its subscription brings only the events the command causes directly.
+  Spine has no call that returns the event itself; `firstUpdateTimeoutMs` with
+  `onFirstUpdateTimeout` bounds the wait.
 - `OidcFlow` accepts only HTTPS addresses and requires the `openid` scope.
 - `createGoogleProvider` returns `email_verified` as text, and needs
   `clientAuthentication: "client_secret_post"`, or Google refuses the code
@@ -393,7 +452,7 @@ subscriptions. Use bounded `eventually()` only for genuinely asynchronous
 visibility, not for immediate command results.
 
 BlackBox alone does not prove browser behavior, cross-process delivery,
-authentication, Datastore deployment, or multi-context choreography. Those need
+authentication, database deployment, or multi-context choreography. Those need
 separate integration and end-to-end tests listed in
 `references/architecture.md`.
 

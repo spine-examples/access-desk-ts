@@ -12,14 +12,29 @@
  * and limitations under the License.
  */
 
-import { afterEach, describe, expect, it } from "vitest";
+import { generateKeyPairSync } from "node:crypto";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
+import { typeRegistry } from "../../../generated/model-registry.js";
+import { RevokedTokens } from "../../../src/gateway/revoked-tokens.js";
 import { routing } from "../../../src/gateway/routes/route.js";
 import { Sessions } from "../../../src/gateway/sessions.js";
 
-let sessions = new Sessions();
+let storage: TestStorage;
+let revoked: Awaited<ReturnType<typeof RevokedTokens.open>>;
+let sessions: Sessions;
+beforeEach(async () => {
+  storage = await TestStorages.singleTenant(typeRegistry);
+  revoked = await RevokedTokens.open(storage.url);
+  sessions = new Sessions({
+    key: generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey,
+    revoked,
+  });
+});
 afterEach(async () => {
   await sessions.close();
-  sessions = new Sessions();
+  await revoked.close();
+  await storage.drop();
 });
 
 function incoming(body: string, authorization?: string): Request {
@@ -53,8 +68,8 @@ describe("Gateway route construction should", () => {
       id: "p-1",
       attributes: { email: "maya@example.com", name: "Maya" },
     });
-    expect(created.kind).toBe("created");
-    if (created.kind !== "created") {
+    expect(created.kind).toBe("issued");
+    if (created.kind !== "issued") {
       return;
     }
     const route = routing(["https://app.test"], sessions)("/sample", (body, session) =>

@@ -13,7 +13,7 @@
  */
 
 import { create } from "@bufbuild/protobuf";
-import { AnyMessages } from "@spine-event-engine/core";
+import { AnyPacker } from "@spine-event-engine/core";
 import { EmailAddressSchema, type EmailAddress } from "@spine-event-engine/proto";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {
@@ -112,7 +112,7 @@ describe("The organizations' members, reached through the application server, sh
     const added =
       entry?.event === undefined
         ? undefined
-        : AnyMessages.unpack(entry.event, OrganizationMemberAddedSchema);
+        : AnyPacker.tryUnpack(entry.event, OrganizationMemberAddedSchema);
     expect(added).toMatchObject({ person: { uuid: "maya" }, addedBy: { uuid: "noah" } });
     expect(entry?.actor?.uuid).toBe("noah");
   });

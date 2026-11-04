@@ -102,9 +102,10 @@ describe("MembershipProcessManager should", () => {
     organizations.refusing = true;
     expect((await addMember(scope, "noah@acme.example")).kind).toBe("ok");
     await box.eventually(
-      () => Promise.resolve(organizations.added.length),
-      (added) => added === 0,
+      () => Promise.resolve(organizations.refused),
+      (refused) => refused > 0,
     );
+    expect(organizations.added).toEqual([]);
 
     organizations.refusing = false;
     expect((await addMember(scope, "noah@acme.example")).kind).toBe("ok");

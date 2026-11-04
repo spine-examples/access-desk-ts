@@ -1,0 +1,68 @@
+#
+# Builds every pull request, checks its types and style,
+# and runs all the tests on PostgreSQL.
+#
+# The PostgreSQL server starts empty, and the tests create
+# the databases they need themselves and drop them afterwards.
+#
+
+name: Check on PostgreSQL
+
+on: pull_request
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ACCESS_DESK_DATABASE_HOST: localhost
+  ACCESS_DESK_DATABASE_PORT: 5432
+  ACCESS_DESK_DATABASE_USER: accessdesk
+  # Not a secret, since the server exists only while the job runs.
+  ACCESS_DESK_DATABASE_PASSWORD: accessdesk
+
+jobs:
+  verify:
+    name: Build and test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.6-alpine # The same version as in `deploy/compose.yaml`.
+        env:
+          POSTGRES_USER: ${{ env.ACCESS_DESK_DATABASE_USER }}
+          POSTGRES_PASSWORD: ${{ env.ACCESS_DESK_DATABASE_PASSWORD }}
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        # The server takes connections over TCP only once it has created its first databases.
+        options: >-
+          --health-cmd "pg_isready --host=127.0.0.1"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v6
+
+      # Takes the version from the `packageManager` field of the root `package.json`.
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build, typecheck, lint
+        run: pnpm run check
+
+      - name: Test on PostgreSQL
+        run: pnpm run test
+        env:
+          ACCESS_DESK_DATABASE_HOST: ${{ env.ACCESS_DESK_DATABASE_HOST }}
+          ACCESS_DESK_DATABASE_PORT: ${{ env.ACCESS_DESK_DATABASE_PORT }}
+          ACCESS_DESK_DATABASE_USER: ${{ env.ACCESS_DESK_DATABASE_USER }}
+          ACCESS_DESK_DATABASE_PASSWORD: ${{ env.ACCESS_DESK_DATABASE_PASSWORD }}

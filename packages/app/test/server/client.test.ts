@@ -15,7 +15,6 @@
 import { create } from "@bufbuild/protobuf";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { CreateOrganizationSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
-import { OrganizationCreatedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
 import { OrganizationIdSchema } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { OrganizationViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
 import { OrganizationViewQuery } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_query.js";
@@ -48,18 +47,25 @@ function connectionTo(address: () => string) {
   return connection;
 }
 
-function creation(organization: string) {
-  return {
-    command: CreateOrganizationSchema,
-    message: create(CreateOrganizationSchema, { id: { uuid: organization }, name: organization }),
-    event: OrganizationCreatedSchema,
-    answers: (event: { readonly id?: { readonly uuid: string } | undefined }) =>
-      event.id?.uuid === organization,
-  };
-}
-
 function organizationId(uuid: string) {
   return create(OrganizationIdSchema, { uuid });
+}
+
+/**
+ * Describes creating an organization, which shows in its view under its name.
+ *
+ * @param organization The organization, whose name is its identifier.
+ * @param name The name the organization is created under.
+ */
+function creationShown(organization: string, name: string = organization) {
+  return {
+    command: CreateOrganizationSchema,
+    message: create(CreateOrganizationSchema, { id: { uuid: organization }, name }),
+    view: OrganizationViewSchema,
+    idSchema: OrganizationIdSchema,
+    id: organizationId(organization),
+    shows: (view: { readonly name: string }) => (view.name === "" ? undefined : view.name),
+  };
 }
 
 describe("ServerConnection should", () => {
@@ -99,13 +105,13 @@ describe("ServerConnection should", () => {
     const connection = connectionTo(() => server.url);
 
     for (const organization of ["acme", "globex"]) {
-      const created = await client.ServerRequests.postAndAwait(
+      const shown = await client.ServerRequests.postAndAwaitView(
         connection
           .in(create(OrganizationIdSchema, { uuid: organization }))
           .onBehalfOf("access-desk"),
-        creation(organization),
+        creationShown(organization),
       );
-      expect(created?.name).toBe(organization);
+      expect(shown).toBe(organization);
     }
 
     expect((await organizationView(server, organizationId("acme")))?.name).toBe("acme");
@@ -116,59 +122,74 @@ describe("ServerConnection should", () => {
     const server = await hosted();
     const connection = connectionTo(() => server.url);
     const acme = connection.in(create(OrganizationIdSchema, { uuid: "acme" }));
-    await client.ServerRequests.postAndAwait(acme.onBehalfOf("access-desk"), creation("acme"));
+    await client.ServerRequests.postAndAwaitView(
+      acme.onBehalfOf("access-desk"),
+      creationShown("acme"),
+    );
 
     await connection.close();
 
     expect(connection.in(create(OrganizationIdSchema, { uuid: "acme" }))).not.toBe(acme);
-    const created = await client.ServerRequests.postAndAwait(
+    const shown = await client.ServerRequests.postAndAwaitView(
       connection.in(create(OrganizationIdSchema, { uuid: "globex" })).onBehalfOf("access-desk"),
-      creation("globex"),
+      creationShown("globex"),
     );
-    expect(created?.id?.uuid).toBe("globex");
+    expect(shown).toBe("globex");
   });
 });
 
-describe("postAndAwait should", () => {
-  it("give the command and return the event that answers it", async () => {
+describe("postAndAwaitView should", () => {
+  it("give the command and return what the read model shows once an update shows it", async () => {
     const server = await hosted();
     const connection = connectionTo(() => server.url);
 
-    const created = await client.ServerRequests.postAndAwait(
-      connection.in(create(OrganizationIdSchema, { uuid: "acme" })).onBehalfOf("access-desk"),
-      creation("acme"),
+    const shown = await client.ServerRequests.postAndAwaitView(
+      connection.in(organizationId("acme")).onBehalfOf("access-desk"),
+      creationShown("acme"),
     );
 
-    expect(created).toMatchObject({ id: { uuid: "acme" }, name: "acme" });
+    expect(shown).toBe("acme");
   });
 
-  it("return nothing when no event answers the command in time", async () => {
+  it("return nothing when an earlier command made the effect already", async () => {
     const server = await hosted();
     await givenOrganization(server, organizationId("acme"));
     const connection = connectionTo(() => server.url);
 
-    // An organization is created once, so creating it again leads to no event.
-    const created = await client.ServerRequests.postAndAwait(
-      connection.in(create(OrganizationIdSchema, { uuid: "acme" })).onBehalfOf("access-desk"),
-      creation("acme"),
+    const shown = await client.ServerRequests.postAndAwaitView(
+      connection.in(organizationId("acme")).onBehalfOf("access-desk"),
+      creationShown("acme"),
       300,
     );
 
-    expect(created).toBeUndefined();
+    expect(shown).toBeUndefined();
   });
 
-  it("pass over events of the same kind that answer something else", async () => {
+  it("return nothing when the read model does not show the effect in time", async () => {
     const server = await hosted();
     const connection = connectionTo(() => server.url);
 
-    const created = await client.ServerRequests.postAndAwait(
-      connection.in(create(OrganizationIdSchema, { uuid: "acme" })).onBehalfOf("access-desk"),
-      { ...creation("acme"), answers: () => false },
+    const shown = await client.ServerRequests.postAndAwaitView(
+      connection.in(organizationId("acme")).onBehalfOf("access-desk"),
+      { ...creationShown("acme"), shows: (): string | undefined => undefined },
       300,
     );
 
-    expect(created).toBeUndefined();
+    expect(shown).toBeUndefined();
     expect((await organizationView(server, organizationId("acme")))?.name).toBe("acme");
+  });
+
+  it("return nothing when the command is refused", async () => {
+    const server = await hosted();
+    const connection = connectionTo(() => server.url);
+
+    const shown = await client.ServerRequests.postAndAwaitView(
+      connection.in(organizationId("acme")).onBehalfOf("access-desk"),
+      creationShown("acme", ""),
+      300,
+    );
+
+    expect(shown).toBeUndefined();
   });
 });
 

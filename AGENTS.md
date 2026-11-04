@@ -119,7 +119,7 @@ work independent. Subagents must not spawn further agents.
   persistence, concurrency, idempotency, migration, or a demonstrated
   architectural block.
 - Give one implementer ownership of a bounded writable slice. Only one
-  production-code writer may own overlapping files at a time.
+  production-code writer may work on overlapping files at a time.
 - Keep shared Proto modules, registries, workspace manifests, integration
   envelopes, and root references under one explicit writer.
 - Parallelize only independent read-only discovery, documentation or API

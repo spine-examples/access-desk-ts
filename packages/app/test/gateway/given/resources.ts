@@ -14,7 +14,7 @@
 
 import { create } from "@bufbuild/protobuf";
 import type { Any } from "@bufbuild/protobuf/wkt";
-import { AnyMessages, TypeUrls } from "@spine-event-engine/core";
+import { AnyPacker, TypeUrls } from "@spine-event-engine/core";
 import { TopicSchema } from "@spine-event-engine/proto/client";
 import { expect } from "vitest";
 import { PersonIdSchema } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
@@ -153,17 +153,17 @@ export function readAuditTrailOfActor(
 
 /** Reads the events the entries of the audit trail keep. */
 export const AuditTrail = {
-  /** The name of the event an entry keeps, such as `ResourceRegistered`. */
+  /** Names the event an entry keeps, such as `ResourceRegistered`. */
   eventOf(entry: { readonly event?: Any | undefined }): string {
     const url = entry.event?.typeUrl ?? "";
     return url.slice(url.lastIndexOf(".") + 1);
   },
 
-  /** The person who became a member, in an entry of the organization's audit trail. */
+  /** Finds the person who became a member, in an entry of the organization's audit trail. */
   memberIn(entry: { readonly event?: Any | undefined }): string | undefined {
     return entry.event === undefined
       ? undefined
-      : AnyMessages.unpack(entry.event, OrganizationMemberAddedSchema)?.person?.uuid;
+      : AnyPacker.tryUnpack(entry.event, OrganizationMemberAddedSchema)?.person?.uuid;
   },
 };
 
@@ -257,7 +257,7 @@ export function accessRequest(running: Running, organization: string, id: string
 }
 
 /**
- * Which requests a browser asks for: the person's own, everything of the
+ * Which requests a browser asks for: the person's requests, everything of the
  * organization, those a given person made, or those for a given resource.
  */
 export type RequestsAsked =
@@ -268,7 +268,7 @@ export type RequestsAsked =
  *
  * @param running The running application.
  * @param as The signed-in person who reads.
- * @param asked Which requests to ask for. The person's own when left out.
+ * @param asked Which requests to ask for. The person's requests when left out.
  * @param organization The organization the request names.
  * @returns The requests, or `"refused"` when the gateway or the application
  *   server did not answer the request.
@@ -357,7 +357,7 @@ export async function watchCatalog(
         for (const { kind } of delivery.update.update.value.update) {
           const item =
             kind.case === "state"
-              ? AnyMessages.unpack(kind.value, ResourceCatalogItemSchema)
+              ? AnyPacker.tryUnpack(kind.value, ResourceCatalogItemSchema)
               : undefined;
           if (item?.id !== undefined) {
             received.push(item.id.uuid);
@@ -403,10 +403,17 @@ export async function givenTold(
   administrator: Signed,
   watched: Watched,
 ): Promise<void> {
+  const probes: string[] = [];
   for (let attempt = 0; attempt < 40; attempt += 1) {
     const probe = `probe-${crypto.randomUUID()}`;
+    probes.push(probe);
     expect(await registerResource(running, administrator, probe)).toBe("ok");
-    if (await watched.hears(probe, 500)) {
+    const heard = await eventually(
+      () => Promise.resolve(probes.some((sent) => watched.received.includes(sent))),
+      (any) => any,
+      500,
+    );
+    if (heard) {
       return;
     }
   }

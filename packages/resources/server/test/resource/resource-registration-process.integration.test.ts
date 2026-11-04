@@ -41,7 +41,7 @@ import {
 const { expectRejection, recordEvents } = eventRecording(testActorContext);
 
 // The process manager is NONE-visibility, so it is observed through the resource
-// it brings into the catalog rather than by reading its own state.
+// it brings into the catalog rather than by reading its state.
 beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
 

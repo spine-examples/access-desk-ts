@@ -72,7 +72,7 @@ rejection through the post outcome.
 
 ## Isolate aggregates and projections
 
-Aggregate and projection tests **post the entity's own commands directly**,
+Aggregate and projection tests **post the entity's commands directly**,
 bypassing the process manager, so the handler is exercised alone with an
 already-valid input. Drive a projection by posting the aggregate command that
 emits the event it subscribes to. These isolated tests carry every
@@ -82,7 +82,7 @@ single-handler rule and rejection.
 
 Write an integration test only for a **process manager** — the choreography that
 spans several entities. Aggregates and projections never get one; posting their
-own commands directly already covers them fully.
+commands directly already covers them fully.
 
 An integration test posts the process's **entry command** and lets the real
 choreography run — every command reaction, cross-entity fact, compensation, and
@@ -106,5 +106,5 @@ single-handler rejections here; those live in the isolated tests.
 ## Runner
 
 `vitest.config.ts` sets `fileParallelism: false` and 30s timeouts because each
-`BlackBox` test starts its own in-process server — keep them. Give every query a
+`BlackBox` test starts a separate in-process server — keep them. Give every query a
 fixed id and reach for `box.eventually` only for genuinely asynchronous reads.

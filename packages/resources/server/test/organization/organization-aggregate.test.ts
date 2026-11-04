@@ -43,6 +43,7 @@ import {
   createOrganization,
   readOrganizationViews,
 } from "./given/organization.js";
+import { registerResource } from "../resource/given/resource.js";
 
 const { expectRejection, recordEvents } = eventRecording(testActorContext);
 
@@ -138,7 +139,7 @@ describe("OrganizationAggregate should", () => {
       expect((await createOrganization(scope)).kind).toBe("ok");
       const events = await recordEvents(scope, ResourceAddedSchema);
 
-      expect((await addResource(scope, "payroll")).kind).toBe("ok");
+      expect((await registerResource(scope, "payroll")).kind).toBe("ok");
 
       const event = await events.waitFor(box);
       expect(event).toEqual(
@@ -155,7 +156,7 @@ describe("OrganizationAggregate should", () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await createOrganization(scope)).kind).toBe("ok");
-      expect((await addResource(scope, "payroll")).kind).toBe("ok");
+      expect((await registerResource(scope, "payroll")).kind).toBe("ok");
       await awaitOrganizationView(box, scope, (view) =>
         view.resource.some((resource) => resource.id?.uuid === "payroll"),
       );
@@ -184,17 +185,20 @@ describe("OrganizationAggregate should", () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await createOrganization(scope)).kind).toBe("ok");
-      expect((await addResource(scope, "payroll-a", "Payroll")).kind).toBe("ok");
+      expect((await registerResource(scope, "payroll-a", "Payroll")).kind).toBe("ok");
+      await awaitOrganizationView(box, scope, (view) =>
+        view.resource.some((resource) => resource.id?.uuid === "payroll-a"),
+      );
 
       const rejection = await expectRejection(
         box,
         scope,
         OrganizationResourceNameAlreadyUsedSchema,
-        () => addResource(scope, "payroll-b", " payroll "),
+        () => registerResource(scope, "payroll-b", " payroll "),
       );
 
       expect(rejection).toMatchObject({ resourceId: { uuid: "payroll-b" }, name: " payroll " });
-      const views = await readOrganizationViews(scope);
+      const views = await awaitOrganizationView(box, scope, (view) => view.resource.length > 0);
       expect(views[0]?.resource).toMatchObject([{ id: { uuid: "payroll-a" }, name: "Payroll" }]);
       expect(views[0]?.resource).toHaveLength(1);
     });

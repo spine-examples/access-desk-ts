@@ -38,8 +38,18 @@ The application runs as two programs. The application server hosts the
 contexts. The gateway is a separate program that reaches the server over the
 network, and it is the only one a browser talks to.
 
+The application server and the gateway store their data in PostgreSQL, and so
+do the tests. The application server stores each organization in a separate
+database. Everything that belongs to no single organization goes into one
+shared database: people, their accounts, email addresses, and memberships,
+subscriptions to both contexts, and messages waiting to be delivered. The
+server works only with the organizations listed in its settings, and each of
+them needs a database; adding one takes a restart. The gateway stores who
+opened each subscription and the sessions people signed out of in a separate
+database.
+
 An initial deployment may co-host both contexts in one application server.
-Co-location does not weaken the boundaries: each context must have its own model
+Co-location does not weaken the boundaries: each context must have a separate model
 package, generated module, `BoundedContext` instance, repositories, storage
 layout, handlers, and ownership. Direct cross-context entity, repository, or
 application-service calls are forbidden.
@@ -48,7 +58,7 @@ Cross-context state propagation and lifecycle choreography use versioned
 external events. Commands are domestic to their receiving context. Shared
 packages may contain wire contracts and value types, but never another
 context's behavior or mutable state. Each context owns its cross-context
-event contracts in its own model package; a consumer depends on the
+event contracts in its model package; a consumer depends on the
 publishing context's model for those schemas and declares its
 external-event receptors internally.
 
@@ -66,7 +76,7 @@ Organization is the tenant.
   adds people to the organization by email address.
 - Identity keeps the membership of each email address, keyed by the address,
   so an address belongs to one organization even when two administrators add
-  it at once. Each organization also keeps its own members, by person and
+  it at once. Each organization also keeps its members, by person and
   email address, in Resources.
 - Adding an address registers it, the same way signing in does. When nobody
   has signed in under it yet, a new person is registered for it, without a
@@ -81,8 +91,8 @@ Organization is the tenant.
 - Every tenant-scoped request, query, subscription, inbox row,
   outbox row, and audit record carries exactly one `OrganizationId` represented
   at the Spine boundary as the authoritative `TenantId`.
-- A trusted gateway resolves the opaque server-side session into the actor and
-  their organization. Client command fields must not be trusted as actor or
+- A trusted gateway resolves the session it signed into the actor and their
+  organization. Client command fields must not be trusted as actor or
   tenant authority.
 - Resources is multitenant. Identity is singletenant. The gateway carries the
   signed-in person into Resources as the actor.
@@ -98,13 +108,15 @@ There is no other way to sign in. Provider tokens are used for the one exchange
 and discarded. They are never stored in browser application storage or passed
 into bounded contexts.
 
-The gateway issues an opaque session at sign-in, bound to the organization the
-person belongs to, when they belong to one. For every
+The gateway issues a session at sign-in, bound to the organization the
+person belongs to, when they belong to one. The session's token carries the
+gateway's signature, so it stays good when the gateway restarts. The gateway
+remembers the sessions that were ended, so their tokens stay refused. For every
 command, query, and subscription the gateway takes the actor and the
 organization from the session, refuses a request that names another, checks
 that the person is a member, and admits only the commands a person may give. A
 command only the application gives, such as creating a grant, is refused from
-any client. The gateway keeps endpoints of its own only for signing in, the session, and
+any client. The gateway keeps dedicated endpoints only for signing in, the session, and
 signing out. Everything else is a command, a query, or a subscription it judges
 as it passes, including adding a member and reading who was added. A request to
 Identity names no organization, and the gateway refuses one that does.
@@ -113,7 +125,7 @@ A member can read and watch the organization and its catalog. Everything else
 they see only where it concerns them:
 
 - the requests they made and the grants they hold;
-- their own queue of requests to decide;
+- their queue of requests to decide;
 - for a resource they manage, its requests, grants, and audit trail.
 
 So a query or a subscription must say whose data it wants, with exactly one
@@ -232,7 +244,7 @@ is checked when a request is submitted, not again when it is approved.
 
 Any manager captured from the resource policy may decide a pending request; no
 approver is assigned. Admission preserves policy order and removes duplicate
-manager identifiers. A requester who is also a manager may decide their own
+manager identifiers. A requester who is also a manager may decide their
 request. Approval or denial is terminal and happens at most once. Denial
 requires a reason. Concurrent decisions on one request are handled one at a
 time, so only the first is accepted and the others are rejected with
@@ -242,7 +254,7 @@ time, so only the first is accepted and the others are rejected with
 
 Requests and grants are separate lifecycles. The request is a process. The
 grants one person holds to one resource form one aggregate, Resource Access,
-which reads nothing but its own state.
+which reads nothing but its state.
 
 A submission is checked before the request is accepted, and changes no grant:
 
@@ -256,7 +268,7 @@ A submission is checked before the request is accepted, and changes no grant:
    Otherwise the request is submitted and awaits a manager's decision.
 
 A first-time request and an extension request record the start and the
-failure of their submission with their own events.
+failure of their submission with their events.
 
 Grants change only after approval.
 
@@ -321,7 +333,7 @@ approval is accepted at `A`:
   gives access.
 
 All time-based code reads the current time from Spine's `Time`; tests install
-their own time provider and must not depend on arbitrary sleeping.
+a separate time provider and must not depend on arbitrary sleeping.
 
 For maximum-total-lifetime checks after a delayed scheduled approval, use the
 grant's effective start through the proposed new end, while preserving the
@@ -329,7 +341,7 @@ originally requested interval for audit.
 
 ## Audit (internal Resources component)
 
-Audit is an internal component of Resources, not a context of its own: audit
+Audit is an internal component of Resources, not a separate context: audit
 projections built from Resources' durable facts. They must be idempotent,
 immutable, organization-scoped, and rebuildable from durable facts, recording
 actor, time, reason, related identifiers, correlation, and causation while

@@ -16,7 +16,7 @@ import { create, isMessage, type Message, type MessageShape } from "@bufbuild/pr
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import type { Any } from "@bufbuild/protobuf/wkt";
 import type { AuthenticatedPrincipal, IncomingRequest } from "@spine-event-engine/auth";
-import { AnyMessages, TypeUrls } from "@spine-event-engine/core";
+import { AnyPacker, TypeUrls } from "@spine-event-engine/core";
 import { Filter_Operator, type Target } from "@spine-event-engine/proto/client";
 import { AccessGrantViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/resource_access_pb.js";
 import { RevokeAccessGrantSchema } from "@access-desk/resources-model/generated/accessdesk/resources/access/grant/commands_pb.js";
@@ -184,14 +184,14 @@ function onlyCondition(
 }
 
 /**
- * Whether a query is filtered to the person's own records, such as the
+ * Whether a query is filtered to the person's records, such as the
  * requests they made or the grants they hold.
  */
 function asksForOwn(target: Target, column: string, person: PersonId): boolean {
   const condition = onlyCondition(target);
   return (
     condition?.column === column &&
-    AnyMessages.unpack(condition.value, PersonIdSchema)?.uuid === person.uuid
+    AnyPacker.tryUnpack(condition.value, PersonIdSchema)?.uuid === person.uuid
   );
 }
 
@@ -204,7 +204,7 @@ function asksForManaged(
   const condition = onlyCondition(target);
   const resource =
     condition?.column === "resource"
-      ? AnyMessages.unpack(condition.value, ResourceIdSchema)
+      ? AnyPacker.tryUnpack(condition.value, ResourceIdSchema)
       : undefined;
   return (
     resource !== undefined &&
@@ -213,7 +213,7 @@ function asksForManaged(
   );
 }
 
-/** Whether a query asks only for the record kept under the person's own identifier. */
+/** Whether a query asks only for the record kept under the person's identifier. */
 function asksForOwnById(target: Target, person: PersonId): boolean {
   if (target.criterion.case !== "filters") {
     return false;
@@ -224,7 +224,7 @@ function asksForOwnById(target: Target, person: PersonId): boolean {
     conditions.length === 0 &&
     id !== undefined &&
     others.length === 0 &&
-    AnyMessages.unpack(id, PersonIdSchema)?.uuid === person.uuid
+    AnyPacker.tryUnpack(id, PersonIdSchema)?.uuid === person.uuid
   );
 }
 
@@ -239,13 +239,13 @@ type ReadRule = (target: Target, asking: Asking, desk: AccessDesk) => boolean | 
  *
  * - the requests they made, and those for a resource they manage;
  * - the grants they hold, and those to a resource they manage;
- * - their own queue of requests to decide;
+ * - their queue of requests to decide;
  * - the audit trail of a resource they manage.
  *
  * So a query for requests, grants, or audit trail must filter by the person or by
  * the resource. An administrator sees the audit trail of the whole organization,
  * and need not filter it. The decision queue is asked for by its identifier,
- * which is the manager's own. Anything not listed here cannot be read.
+ * which is the manager's identifier. Anything not listed here cannot be read.
  */
 const MEMBER_READS: ReadonlyMap<string, ReadRule> = new Map<string, ReadRule>([
   [TypeUrls.derive(OrganizationViewSchema), () => true],
@@ -293,7 +293,7 @@ function asksForMembershipsOf(target: Target, organization: OrganizationId): boo
   const condition = target.type === MEMBERSHIPS ? onlyCondition(target) : undefined;
   return (
     condition?.column === "organization" &&
-    AnyMessages.unpack(condition.value, OrganizationIdSchema)?.uuid === organization.uuid
+    AnyPacker.tryUnpack(condition.value, OrganizationIdSchema)?.uuid === organization.uuid
   );
 }
 

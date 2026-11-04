@@ -17,6 +17,9 @@ import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { SignalEnvelopes } from "@spine-event-engine/core";
 import { TenantIdSchema, UserIdSchema } from "@spine-event-engine/proto";
 import { type BoundedContext, Server, SignalMetadata } from "@spine-event-engine/server";
+import type { StorageFactory } from "@spine-event-engine/storage";
+import { TestEnvironment } from "@access-desk/testing/environment";
+import { TestStorages } from "@access-desk/testing/storage";
 import { type OrganizationId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import {
   AuditEntrySchema,
@@ -30,7 +33,16 @@ import {
 
 // Imported from compiled output, like the contexts it assembles: vitest cannot
 // execute the handler classes' standard decorators from raw TypeScript source.
-type AccessDeskModule = typeof import("../../../dist/src/server/access-desk.js");
+type AppModule = typeof import("../../../dist/src/index.js");
+type ServerDatabases = import("../../../dist/src/index.js").ServerDatabases;
+
+/**
+ * The organizations the tests of the application work in.
+ *
+ * The server keeps only these, as it keeps only those `ACCESS_DESK_ORGANIZATIONS`
+ * lists, and refuses everything given in any other organization.
+ */
+const ORGANIZATIONS = ["acme", "globex"] as const;
 
 /** A running application server and its contexts, owned by a test. */
 export interface Hosted {
@@ -40,8 +52,58 @@ export interface Hosted {
   readonly identity: BoundedContext;
   /** The organization-scoped Resources context. */
   readonly resources: BoundedContext;
-  /** Stops the server and closes its assembled contexts. */
+  /**
+   * Stops the server and closes its assembled contexts.
+   *
+   * It deletes the data the server kept, unless the test passed its storage in.
+   */
   stop(): Promise<void>;
+}
+
+/** The storage of an application server, which a test can start a server over again. */
+export interface ServerStorage {
+  /** The databases the server keeps its data in, as its settings name them. */
+  readonly settings: ServerDatabases;
+  /** Deletes the data the storage kept. */
+  drop(): Promise<void>;
+}
+
+/**
+ * Creates the storage of an application server.
+ *
+ * It is a new shared database. The database of each organization is named
+ * after the shared one, and deleted with it.
+ */
+export async function givenServerStorage(): Promise<ServerStorage> {
+  const shared = await TestStorages.databases(1);
+  const [url = ""] = shared.urls;
+  const name = new URL(url).pathname.slice(1);
+  return {
+    settings: { url, organizationDatabase: `${name}_{organization}` },
+    drop: async () => {
+      await TestStorages.dropDatabasesStartingWith(`${name}_`);
+      await shared.drop();
+    },
+  };
+}
+
+/**
+ * Opens the storage of an application server, as the server does when it
+ * starts.
+ *
+ * It first creates the database of each organization, as an application
+ * administrator does, unless it is there already.
+ *
+ * @param storage The storage of the server.
+ */
+async function openServerStorage(storage: ServerStorage): Promise<StorageFactory> {
+  const settings = storage.settings;
+  const app: AppModule = await import("../../../dist/src/index.js");
+  for (const organization of ORGANIZATIONS) {
+    const url = new URL(app.Storage.organizationDatabase(settings, organization));
+    await TestStorages.createDatabases([url.pathname.slice(1)]);
+  }
+  return app.Storage.openServer(settings, ORGANIZATIONS);
 }
 
 /**
@@ -53,13 +115,28 @@ export function tenant(organization: OrganizationId) {
   return create(TenantIdSchema, { kind: { case: "value", value: organization.uuid } });
 }
 
-/** Starts both application contexts on a free port, without creating an organization. */
-export async function givenServer(): Promise<Hosted> {
-  const assembly: AccessDeskModule = await import("../../../dist/src/server/access-desk.js");
+/**
+ * Starts both application contexts on a free port, without creating an organization.
+ *
+ * The server keeps the organizations the tests work in, and its data in the
+ * storage of the run.
+ *
+ * @param storage The storage to start the server over, to keep the data an
+ *   earlier server kept. New, empty storage when left out.
+ */
+export async function givenServer(storage?: ServerStorage): Promise<Hosted> {
+  const app: AppModule = await import("../../../dist/src/index.js");
+  const kept = storage ?? (await givenServerStorage());
   let url = "";
-  const contexts = await assembly.AccessDesk.assemble({ server: () => url });
+  await TestEnvironment.reset();
+  const contexts = await app.AccessDesk.assemble({
+    server: () => url,
+    storage: await openServerStorage(kept),
+    organizations: ORGANIZATIONS,
+  });
   const server = await new Server({
     contexts: [contexts.identity, contexts.resources],
+    resources: [contexts.members],
     port: 0,
   }).start();
   url = server.baseUrl;
@@ -69,7 +146,10 @@ export async function givenServer(): Promise<Hosted> {
     resources: contexts.resources,
     stop: async () => {
       await server.close();
-      await contexts.close();
+      await TestEnvironment.reset();
+      if (storage === undefined) {
+        await kept.drop();
+      }
     },
   };
 }
@@ -106,22 +186,33 @@ export async function give<Schema extends GenMessage<Message>>(
 }
 
 /**
- * Creates an organization in its own tenant, using its UUID as the display name.
+ * Creates an organization in a separate tenant, using its UUID as the display name,
+ * and waits until its view shows it.
  *
  * @param hosted The running server whose Resources context receives the command.
  * @param organization The new organization's value ID; its UUID also becomes the display name.
  */
-export function givenOrganization(hosted: Hosted, organization: OrganizationId): Promise<void> {
-  return give(
+export async function givenOrganization(
+  hosted: Hosted,
+  organization: OrganizationId,
+): Promise<void> {
+  await give(
     hosted.resources,
     CreateOrganizationSchema,
     create(CreateOrganizationSchema, { id: organization, name: organization.uuid }),
     { organization },
   );
+  const shown = await eventually(
+    () => organizationView(hosted, organization),
+    (view) => view !== undefined,
+  );
+  if (shown === undefined) {
+    throw new Error(`Organization ${organization.uuid} does not show in its view.`);
+  }
 }
 
 /**
- * Reads an organization's view from its own tenant; returns undefined before it appears.
+ * Reads an organization's view from the organization's tenant; returns undefined before it appears.
  *
  * @param hosted The running server whose Resources context holds the view.
  * @param organization The organization's value ID, used for both lookup and tenant.
@@ -136,7 +227,7 @@ export function organizationView(
 }
 
 /**
- * Reads the whole audit trail of an organization from its own tenant.
+ * Reads the whole audit trail of an organization from the organization's tenant.
  *
  * @param hosted The running server whose Resources context keeps the audit trail.
  * @param organization The organization's value ID, used as the tenant.

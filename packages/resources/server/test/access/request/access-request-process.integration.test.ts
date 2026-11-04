@@ -76,7 +76,7 @@ describe("AccessRequestProcessManager should", () => {
       expect(event.manager.map((manager) => manager.uuid)).toEqual(["primary", "second"]);
       expect(event.snapshot?.requester?.uuid).toBe(actor);
 
-      // The request is retrievable through its own query.
+      // The request is retrievable through a query.
       const requests = await box.eventually(
         () => readRequests(requester),
         (rows) =>
@@ -85,8 +85,14 @@ describe("AccessRequestProcessManager should", () => {
       expect(requests.some((r) => r.id?.uuid === "req-int")).toBe(true);
 
       // And through both managers' decision queues, each task carrying the snapshot.
-      expect(await managerHasTask(requester, "primary", "req-int")).toBe(true);
-      expect(await managerHasTask(requester, "second", "req-int")).toBe(true);
+      for (const manager of ["primary", "second"]) {
+        expect(
+          await box.eventually(
+            () => managerHasTask(requester, manager, "req-int"),
+            (present) => present,
+          ),
+        ).toBe(true);
+      }
       const assignments = await readAssignments(requester);
       const task = assignments
         .find((row) => row.id?.uuid === "primary")

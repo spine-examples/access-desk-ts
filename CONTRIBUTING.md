@@ -38,7 +38,7 @@ Code contributions must:
 All code contributions to the Spine Event Engine ecosystem require a Contributor
 License Agreement (CLA).
 
-- Individual contributors: If you are writing original source code and own
+- Individual contributors: If you are writing original source code and hold the rights to
   the intellectual property, you'll need to sign an individual CLA.
 
 - Corporate contributors: If you work for a company that wants to contribute

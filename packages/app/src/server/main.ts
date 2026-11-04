@@ -15,6 +15,7 @@
 import { Server } from "@spine-event-engine/server";
 import { AccessDesk } from "./access-desk.js";
 import { Settings } from "../settings.js";
+import { Storage } from "../storage.js";
 
 /**
  * The application server.
@@ -23,7 +24,13 @@ import { Settings } from "../settings.js";
  * sessions, or identity providers.
  */
 
-const { host, port } = Settings.ofServer(process.env).listening;
+const settings = Settings.ofServer(process.env);
+const { host, port } = settings.listening;
+
+const storage = await Storage.openServer(
+  Storage.serverDatabases(settings.database),
+  settings.organizations,
+);
 
 const listening: { address?: string } = {};
 const contexts = await AccessDesk.assemble({
@@ -33,28 +40,24 @@ const contexts = await AccessDesk.assemble({
     }
     return listening.address;
   },
+  storage,
+  organizations: settings.organizations,
 });
 const server = await new Server({
   contexts: [contexts.identity, contexts.resources],
+  resources: [contexts.members],
   host,
   port,
-}).start();
+}).run();
 listening.address = server.baseUrl;
 
 console.log(`Access Desk application server: ${server.baseUrl}`);
+console.log(
+  `Organizations ${settings.organizations.join(", ")} are kept, and no other organization is.`,
+);
 if (!Settings.onlyThisMachine(host)) {
   console.warn(
     `The application server listens on ${host}, so other machines can reach it. ` +
       "Make sure only the gateway can reach it.",
   );
-}
-
-let stopping = false;
-for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  process.once(signal, () => {
-    if (!stopping) {
-      stopping = true;
-      void server.close().then(() => contexts.close());
-    }
-  });
 }

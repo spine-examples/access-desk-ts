@@ -18,7 +18,6 @@ import { type BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
 import {
   CloseResourceForRequestsSchema,
   CreateResourceSchema,
-  DeleteResourceSchema,
   OpenResourceForRequestsSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/resource/commands_pb.js";
 import { RegisterResourceSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_registration_commands_pb.js";
@@ -45,7 +44,7 @@ export interface ResourceDraft {
   readonly maximumDuration: { readonly seconds: bigint };
 }
 
-/** A restricted, read-only payroll resource used as the baseline in every spec. */
+/** Drafts a restricted, read-only payroll resource, the baseline in every spec. */
 export function resourceDraft(overrides: Partial<ResourceDraft> = {}): ResourceDraft {
   return {
     name: "payroll",
@@ -57,23 +56,6 @@ export function resourceDraft(overrides: Partial<ResourceDraft> = {}): ResourceD
     maximumDuration: { seconds: 3600n },
     ...overrides,
   };
-}
-
-/** Posts `CreateResource` directly, bypassing the registration process. */
-export function createResource(
-  scope: BlackBoxScope,
-  resource: string,
-  overrides: Partial<ResourceDraft> = {},
-) {
-  return scope.post(
-    CreateResourceSchema,
-    create(CreateResourceSchema, { id: { uuid: resource }, ...resourceDraft(overrides) }),
-  );
-}
-
-/** Posts `DeleteResource` to remove a resource during compensation. */
-export function deleteResource(scope: BlackBoxScope, resource: string) {
-  return scope.post(DeleteResourceSchema, create(DeleteResourceSchema, { id: { uuid: resource } }));
 }
 
 /**
@@ -95,6 +77,38 @@ export function registerResource(
       id: { uuid: resource },
       organizationId: { uuid: organizationId },
       ...resourceDraft({ name, ...overrides }),
+    }),
+  );
+}
+
+/** Registers the resource, and waits until the catalog shows it. */
+export async function registerAndAwaitResource(
+  box: BlackBox,
+  scope: BlackBoxScope,
+  resource: string,
+  overrides: Partial<ResourceDraft> = {},
+): Promise<ResourceCatalogItem> {
+  await registerResource(scope, resource, overrides.name ?? resource, overrides);
+  return awaitCatalogItem(box, scope, resource);
+}
+
+/**
+ * Posts `CreateResource` for a registered resource, as its registration gives
+ * it again when its delivery is repeated.
+ *
+ * Register the resource first. Otherwise, the registration process reacts to
+ * the creation of a resource it never asked for.
+ */
+export function createResourceAgain(
+  scope: BlackBoxScope,
+  resource: string,
+  overrides: Partial<ResourceDraft> = {},
+) {
+  return scope.post(
+    CreateResourceSchema,
+    create(CreateResourceSchema, {
+      id: { uuid: resource },
+      ...resourceDraft({ name: resource, ...overrides }),
     }),
   );
 }

@@ -373,13 +373,19 @@ describe("AuditEntryProjection should", () => {
     const box = await resourcesBlackBox(testClock());
     const requester = await givenActiveGrant(box, "audit-grant", 10);
     await registerResource(requester, "ledger");
-    await awaitEntry(box, requester, ResourceRegisteredSchema);
+    await awaitEntry(
+      box,
+      requester,
+      ResourceRegisteredSchema,
+      (event) => event.id?.uuid === "ledger",
+    );
 
     const trail = await readAuditTrailOf(requester, resourceUuid);
 
     // What happened to the payroll resource, and nothing of the members or of the ledger.
     expect(eventsOf(trail).sort()).toEqual(
       [
+        "ResourceRegistered",
         "ResourceOpenedForRequests",
         "AccessRequestSubmitted",
         "AccessRequestApprovalStarted",

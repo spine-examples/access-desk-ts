@@ -14,12 +14,15 @@
 
 import { create, type Message, type MessageShape } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
-import { AnyMessages, TypeUrls } from "@spine-event-engine/core";
+import { AnyPacker, TypeUrls } from "@spine-event-engine/core";
 import { SignalMetadata } from "@spine-event-engine/server";
 import { type ActorContext, UserIdSchema } from "@spine-event-engine/proto";
 import { QueryIdSchema, QuerySchema, TargetSchema } from "@spine-event-engine/proto/client";
 import { BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
+import { TestEnvironment } from "@access-desk/testing/environment";
+import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
 
+import { typeRegistry } from "../../generated/model-registry.js";
 import { eventRecording } from "./event-recording.js";
 
 /** The gateway acting in the tests, once a provider has confirmed a person. */
@@ -27,7 +30,7 @@ export const actor = "gateway";
 
 const signalMetadata = new SignalMetadata();
 
-/** The actor context for reads and subscriptions. Signing in has no tenant. */
+/** Builds the actor context for reads and subscriptions. Signing in has no tenant. */
 export function testActorContext(): ActorContext {
   return signalMetadata.actorContext({ actor: create(UserIdSchema, { value: actor }) });
 }
@@ -45,7 +48,7 @@ export async function loadIdentityContext(): Promise<void> {
   identity = await import("../../dist/src/index.js");
 }
 
-/** The compiled Identity package. */
+/** Returns the compiled Identity package. */
 export function identityModule(): IdentityModule {
   if (identity === undefined) {
     throw new Error("Call loadIdentityContext() in beforeAll before opening a BlackBox.");
@@ -72,21 +75,32 @@ export const organizations = {
   added: [] as AddedMember[],
   /** Whether the organizations refuse to add anybody. */
   refusing: false,
+  /** How many times the organizations refused to add somebody. */
+  refused: 0,
 };
 
 const ownedBlackBoxes = new Set<BlackBox>();
+const ownedStorages = new Set<TestStorage>();
+const storages = new WeakMap<BlackBox, TestStorage>();
 
 /**
  * Starts one Identity BlackBox.
  *
  * Every box is tracked so a suite's `afterEach` can close them with
- * {@link closeIdentityBlackBoxes}.
+ * {@link closeIdentityBlackBoxes}. So is the storage it keeps its data in.
+ *
+ * @param storage The storage of an earlier box to open again, as a restarted
+ *   server would. New, empty storage when left out.
  */
-export async function identityBlackBox(): Promise<BlackBox> {
+export async function identityBlackBox(storage?: TestStorage): Promise<BlackBox> {
+  const kept = storage ?? (await TestStorages.singleTenant(typeRegistry));
+  ownedStorages.add(kept);
+  await TestEnvironment.start(await kept.open());
   const context = await identityModule().IdentityContext.create({
     members: {
       add: (member) => {
         if (organizations.refusing) {
+          organizations.refused += 1;
           return Promise.reject(new Error("The organization did not add the person."));
         }
         organizations.added.push({
@@ -105,15 +119,36 @@ export async function identityBlackBox(): Promise<BlackBox> {
     intervalMs: 20,
   });
   ownedBlackBoxes.add(box);
+  storages.set(box, kept);
   return box;
 }
 
-/** Closes and forgets every BlackBox opened through {@link identityBlackBox}. */
+/**
+ * Finds the storage a BlackBox keeps its data in, for opening it again.
+ *
+ * @param box A BlackBox opened through {@link identityBlackBox}.
+ */
+export function storageOf(box: BlackBox): TestStorage {
+  const storage = storages.get(box);
+  if (storage === undefined) {
+    throw new Error("Open the BlackBox through identityBlackBox() to reach its storage.");
+  }
+  return storage;
+}
+
+/**
+ * Closes and forgets every BlackBox opened through {@link identityBlackBox},
+ * and deletes the data they kept.
+ */
 export async function closeIdentityBlackBoxes(): Promise<void> {
   await Promise.all([...ownedBlackBoxes].map((box) => box.close()));
   ownedBlackBoxes.clear();
+  await TestEnvironment.reset();
+  await Promise.all([...ownedStorages].map((storage) => storage.drop()));
+  ownedStorages.clear();
   organizations.added = [];
   organizations.refusing = false;
+  organizations.refused = 0;
 }
 
 /**
@@ -140,7 +175,7 @@ export async function readAll<Schema extends GenMessage<Message>>(
     }),
   );
   return response.message.map(({ state }) => {
-    const value = state === undefined ? undefined : AnyMessages.unpack(state, schema);
+    const value = state === undefined ? undefined : AnyPacker.tryUnpack(state, schema);
     if (value === undefined) {
       throw new Error(`Expected a ${schema.typeName} query state.`);
     }

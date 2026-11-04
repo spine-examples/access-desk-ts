@@ -19,10 +19,7 @@ import {
   PersonRegisteredSchema,
   SignInAccountAddedSchema,
 } from "@access-desk/identity-model/generated/accessdesk/identity/person/events_pb.js";
-import {
-  AddSignInAccountSchema,
-  JoinOrganizationSchema,
-} from "@access-desk/identity-model/generated/accessdesk/identity/person/commands_pb.js";
+import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 
 import {
   actor,
@@ -31,7 +28,14 @@ import {
   loadIdentityContext,
   recordEvents,
 } from "../given/identity-context.js";
-import { account, addSignInAccount, awaitPerson, google, registerPerson } from "./given/person.js";
+import { addMember } from "../membership/given/membership.js";
+import {
+  account,
+  awaitLinked,
+  google,
+  linkExternalIdentity,
+  registerPerson,
+} from "./given/person.js";
 
 beforeAll(loadIdentityContext, 30_000);
 afterEach(closeIdentityBlackBoxes);
@@ -59,38 +63,29 @@ describe("PersonAggregate should", () => {
     it("name the person after the first account added", async () => {
       const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
-      await registerPerson(scope, "noah", "noah@acme.example");
-      await awaitPerson(box, scope, "noah");
       const added = await recordEvents(scope, SignInAccountAddedSchema);
 
-      expect((await addSignInAccount(scope, "noah", account(google, "1001"))).kind).toBe("ok");
-
-      expect(await added.waitFor(box)).toEqual(
-        create(SignInAccountAddedSchema, {
-          id: { uuid: "noah" },
-          account: account(google, "1001"),
-          name: "noah (name)",
-        }),
+      const linked = await linkExternalIdentity(
+        scope,
+        account(google, "1001"),
+        "noah@acme.example",
       );
+
+      expect(linked.kind).toBe("ok");
+      const event = await added.waitFor(box);
+      expect(event.account).toEqual(account(google, "1001"));
+      expect(event.name).toBe("1001 (name)");
       await added.cancel();
     });
 
     it("keep the name of a person who already has one", async () => {
       const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
-      await registerPerson(scope, "noah", "noah@acme.example");
-      await addSignInAccount(scope, "noah", account(google, "1001"));
-      await awaitPerson(box, scope, "noah", (view) => view.account.length === 1);
+      await linkExternalIdentity(scope, account(google, "1001"), "noah@acme.example");
+      await awaitLinked(box, scope, account(google, "1001"));
       const added = await recordEvents(scope, SignInAccountAddedSchema);
 
-      await scope.post(
-        AddSignInAccountSchema,
-        create(AddSignInAccountSchema, {
-          id: { uuid: "noah" },
-          account: account(google, "g-7"),
-          name: "Somebody else",
-        }),
-      );
+      await linkExternalIdentity(scope, account(google, "g-7"), "noah@acme.example");
 
       expect((await added.waitFor(box)).name).toBe("");
       await added.cancel();
@@ -101,26 +96,19 @@ describe("PersonAggregate should", () => {
     it("emit 'OrganizationJoined' for a registered person", async () => {
       const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
-      await registerPerson(scope, "noah", "noah@acme.example");
-      await awaitPerson(box, scope, "noah");
       const joined = await recordEvents(scope, OrganizationJoinedSchema);
 
-      await scope.post(
-        JoinOrganizationSchema,
-        create(JoinOrganizationSchema, {
-          id: { uuid: "noah" },
-          membership: { emailAddress: { value: "noah@acme.example" } },
-          organization: { uuid: "acme" },
-        }),
-      );
+      await addMember(scope, "noah@acme.example", OrganizationRole.MEMBER, "acme");
 
-      expect(await joined.waitFor(box)).toEqual(
+      const event = await joined.waitFor(box);
+      expect(event).toEqual(
         create(OrganizationJoinedSchema, {
-          id: { uuid: "noah" },
+          id: event.id,
           membership: { emailAddress: { value: "noah@acme.example" } },
           organization: { uuid: "acme" },
         }),
       );
+      expect(event.id?.uuid).toMatch(/^[0-9a-f-]{36}$/);
       await joined.cancel();
     });
   });

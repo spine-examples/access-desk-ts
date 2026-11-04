@@ -33,7 +33,7 @@ import {
 import { actor, readWhere } from "../../../given/resources-context.js";
 import { ManualClock } from "../../../given/manual-clock.js";
 import {
-  approveAccessRequest,
+  approveAndAwait,
   resourceUuid,
   seed,
   submitAndAssign,
@@ -42,8 +42,8 @@ import {
 import { managerHasTask } from "../../request/given/access-decision-assignment.js";
 import {
   awaitCatalogItem,
-  createResource,
   openResource,
+  registerAndAwaitResource,
   type ResourceDraft,
 } from "../../../resource/given/resource.js";
 
@@ -53,12 +53,12 @@ const requesterAccess = { grantee: { uuid: actor }, resource: { uuid: resourceUu
 /** The moment every grant test starts at, on a whole minute. */
 export const startOfTest = new Date("2030-01-01T10:00:00Z");
 
-/** A clock stopped at {@link startOfTest}. */
+/** Creates a clock stopped at {@link startOfTest}. */
 export function testClock(): ManualClock {
   return new ManualClock(startOfTest);
 }
 
-/** The time a number of minutes after {@link startOfTest}. */
+/** Computes the time a number of minutes after {@link startOfTest}. */
 export function minutesIn(minutes: number): Timestamp {
   return timestampFromDate(new Date(startOfTest.getTime() + minutes * 60_000));
 }
@@ -88,8 +88,7 @@ export function seedGrantedResource(box: BlackBox): Promise<void> {
  */
 export async function seedOtherResource(box: BlackBox, resource: string): Promise<void> {
   const scope = box.onBehalfOf(actor);
-  await createResource(scope, resource, {
-    name: resource,
+  await registerAndAwaitResource(box, scope, resource, {
     manager: [{ uuid: "primary" }],
     maximumDuration,
   });
@@ -129,7 +128,7 @@ export async function issueGrant(
       kind: { case: "scheduled", value: { start: minutesIn(start), end: minutesIn(end) } },
     },
   });
-  await approveAccessRequest(box, request, "primary");
+  await approveAndAwait(box, request, "primary");
 }
 
 /**
@@ -154,7 +153,7 @@ export async function approveExtension(
     () => managerHasTask(requester, "primary", request),
     (present) => present,
   );
-  await approveAccessRequest(box, request, "primary");
+  await approveAndAwait(box, request, "primary");
 }
 
 /** Posts `RevokeAccessGrant` on behalf of `manager`, naming them as the revoking person. */
@@ -268,7 +267,7 @@ export function postExtendAccessGrant(
   );
 }
 
-/** The grants a person holds, through the access query by grantee. */
+/** Reads the grants a person holds, through the access query by grantee. */
 export function readAccessHeldBy(
   reader: BlackBoxScope,
   grantee: string = actor,
@@ -283,7 +282,7 @@ export function readAccessHeldBy(
   );
 }
 
-/** The access granted to a resource, through the access query by resource. */
+/** Reads the access granted to a resource, through the access query by resource. */
 export function readAccessTo(
   reader: BlackBoxScope,
   resource: string = resourceUuid,
@@ -359,7 +358,7 @@ export async function givenActiveGrant(
   await submitAndAssign(box, requester, request, "primary", {
     period: { kind: { case: "immediateDuration", value: { seconds: BigInt(minutes * 60) } } },
   });
-  await approveAccessRequest(box, request, "primary");
+  await approveAndAwait(box, request, "primary");
   await awaitGrantIssued(box, requester, request);
   return requester;
 }
