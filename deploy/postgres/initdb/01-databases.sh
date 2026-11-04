@@ -18,7 +18,9 @@
 # development, unless they are there already. The names must match those in
 # `packages/app/src/storage.ts`.
 #
-# The PostgreSQL server runs it when it first starts.
+# The PostgreSQL server runs it when it first starts, on a new volume, and
+# `compose.yaml` runs it each time the server starts, for the databases of
+# organizations added since.
 #
 # Spine creates the tables inside the databases. It does not create databases.
 #
