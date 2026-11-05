@@ -1,0 +1,37 @@
+# --- Dependencies ---
+**/node_modules/
+.pnpm-store/
+
+# --- Build output ---
+**/dist/
+**/*.tsbuildinfo
+
+# --- Test / coverage output ---
+**/coverage/
+
+# --- Generated Spine / Protobuf output ---
+**/generated/
+**/.generated*
+**/.spine-proto-generation.json
+**/.spine-proto-generate.lock.*
+
+# --- Logs ---
+**/*.log
+
+# --- Environment & secrets (never put real credentials into an image) ---
+**/.env
+**/.env.*
+!**/.env.example
+**/.certs/
+
+# --- Repository, editor, and agent metadata ---
+.git/
+.github/
+.idea/
+.vscode/
+.claude/
+.codex/
+**/.eslintcache
+
+# --- OS ---
+**/.DS_Store
