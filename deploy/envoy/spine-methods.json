@@ -1,0 +1,9 @@
+[
+  "/spine.auth.AuthenticationService/ResolveContext",
+  "/spine.client.CommandService/Post",
+  "/spine.client.QueryService/Read",
+  "/spine.client.QueryService/Execute",
+  "/spine.client.SubscriptionService/Subscribe",
+  "/spine.client.SubscriptionService/Activate",
+  "/spine.client.SubscriptionService/Cancel"
+]
