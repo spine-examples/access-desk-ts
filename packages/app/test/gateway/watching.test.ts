@@ -25,6 +25,7 @@ import {
   opened,
   opening,
   principal,
+  readerOf,
   subscribed,
   subscription,
   watcher,
@@ -60,6 +61,7 @@ describe("What people watch through the gateway should", () => {
       await watching.activate({
         id,
         context: maya,
+        reader: readerOf(maya),
         nowMs: Date.now(),
         signal: new AbortController().signal,
         onDefinition: () => Promise.resolve(),
@@ -91,6 +93,7 @@ describe("What people watch through the gateway should", () => {
     const beginning = watching.activate({
       id,
       context: maya,
+      reader: readerOf(maya),
       nowMs: Date.now(),
       signal: new AbortController().signal,
       onDefinition: () => {
@@ -117,6 +120,7 @@ describe("What people watch through the gateway should", () => {
       await watching.activate({
         id,
         context: maya,
+        reader: readerOf(maya),
         nowMs: Date.now(),
         signal: new AbortController().signal,
         onDefinition: () => Promise.resolve(),
@@ -174,6 +178,7 @@ describe("What people watch through the gateway should", () => {
     const second = await watching.activate({
       id,
       context: maya,
+      reader: readerOf(maya),
       nowMs: Date.now(),
       signal: new AbortController().signal,
       onDefinition: () => Promise.resolve(),
@@ -224,6 +229,7 @@ describe("What people watch through the gateway should", () => {
         await watching.activate({
           id,
           context: maya,
+          reader: readerOf(maya),
           nowMs,
           signal: new AbortController().signal,
           onDefinition: () => Promise.resolve(),
@@ -293,6 +299,7 @@ describe("What people watch through the gateway should", () => {
     const again = watching.activate({
       id,
       context: maya,
+      reader: readerOf(maya),
       nowMs: Date.now(),
       signal: new AbortController().signal,
       onDefinition: () => Promise.resolve(),
@@ -402,6 +409,7 @@ describe("What people watch through the gateway should", () => {
     const outcome = await watching.cancel({
       id,
       context: maya,
+      reader: readerOf(maya),
       nowMs: Date.now(),
       onDefinition: () => {
         cancelledAtServer += 1;

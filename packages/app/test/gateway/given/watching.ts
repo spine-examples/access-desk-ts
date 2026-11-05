@@ -15,6 +15,7 @@
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 import type { AuthenticatedPrincipal, IncomingRequest } from "@spine-event-engine/auth";
 import { TypeUrls } from "@spine-event-engine/core";
+import type { ReaderIdentity } from "@spine-event-engine/core/spi/trusted-reader";
 import { ActorContextSchema, type ActorContext } from "@spine-event-engine/proto";
 import {
   SubscriptionSchema,
@@ -102,6 +103,16 @@ export async function subscribed(watching: Watching, context: ActorContext): Pro
 }
 
 /**
+ * Returns the person who reads through a subscription, as Spine knows them
+ * from the session: the actor of the context.
+ *
+ * @param context Who subscribes, and in which organization.
+ */
+export function readerOf(context: ActorContext): ReaderIdentity {
+  return { kind: "principal", id: context.actor?.value ?? "" };
+}
+
+/**
  * Has a person subscribe to their organization.
  *
  * @param watching What people watch through the gateway.
@@ -123,6 +134,7 @@ export async function subscription(
   const kept = await watching.create({
     topic: { kind: "subscription-topic", bytes: toBinary(TopicSchema, topic) },
     whenExpires: Date.now() + 60_000,
+    reader: readerOf(context),
   });
   return fromBinary(SubscriptionSchema, kept.bytes);
 }
@@ -165,6 +177,7 @@ export async function opened(
     .activate({
       id,
       context,
+      reader: readerOf(context),
       nowMs: Date.now(),
       signal: new AbortController().signal,
       onDefinition: (_definition, signal) =>
