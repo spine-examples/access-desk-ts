@@ -311,6 +311,8 @@ export const Policy = {
     switch (request.kind) {
       case "command":
         return OUTSIDE_ORGANIZATIONS.has(request.messageType);
+      case "app-query":
+        return OUTSIDE_ORGANIZATIONS.has(request.query.message?.typeUrl ?? "");
       case "query":
       case "subscribe":
         return OUTSIDE_ORGANIZATIONS.has(request.target.type);
@@ -328,6 +330,8 @@ export const Policy = {
    * 2. A command must be one a member may give.
    * 3. A query or a subscription must be for something the member may see. An
    *    administrator may also read who was added to the organization.
+   * 4. An application query is refused: the application answers none to a
+   *    member yet.
    *
    * @param desk Looks up what a rule needs to know.
    * @returns The check the gateway runs on each request.
@@ -377,6 +381,8 @@ export const Policy = {
           );
         case "subscribe":
           return mayRead(request.target, asking, desk);
+        case "app-query":
+          return false;
         case "activate":
         case "cancel":
           return true;
