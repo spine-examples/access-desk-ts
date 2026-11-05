@@ -16,8 +16,9 @@
 # The web client's page, served as a hosting service serves it in production:
 # over HTTPS, at an address of its own, apart from the application it calls.
 #
-# 1. A path in `assets/` gets that file, or `404`.
-# 2. Any other path gets its file, if there is one, or else the page itself,
+# 1. `/config.json` gets the page's settings, from the container's environment.
+# 2. A path in `assets/` gets that file, or `404`.
+# 3. Any other path gets its file, if there is one, or else the page itself,
 #    which shows the page of that path in the browser.
 #
 # The nginx image fills in the `ACCESS_DESK_` settings from the container's
@@ -43,6 +44,14 @@ server {
     # are listed.
     gzip on;
     gzip_types text/css application/javascript image/svg+xml;
+
+    # The page's settings, which it reads as it starts.
+    location = /config.json {
+        include /etc/nginx/conf.d/web-headers.inc;
+        add_header Cache-Control "no-cache" always;
+        default_type application/json;
+        return 200 '{"apiUrl":"https://${ACCESS_DESK_API_HOST}:${ACCESS_DESK_API_PORT}"}';
+    }
 
     # Vite names each file here after its content, so a file never changes
     # under its name, and the browser keeps it for a year without asking

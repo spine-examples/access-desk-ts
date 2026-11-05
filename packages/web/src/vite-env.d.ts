@@ -13,15 +13,3 @@
  */
 
 /// <reference types="vite/client" />
-
-/** The settings the page is built with. */
-interface ImportMetaEnv {
-  /** The address the page calls the application at. */
-  readonly VITE_API_URL: string;
-}
-
-/** The metadata available to a browser module. */
-interface ImportMeta {
-  /** The built-in Vite values and application settings available to the module. */
-  readonly env: ImportMetaEnv;
-}

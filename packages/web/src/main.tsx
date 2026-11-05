@@ -16,12 +16,19 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router/dom";
 import { AppRouter } from "./app/router.js";
+import { Config } from "./config.js";
 import { Session } from "./session/session.js";
 import "./styles/global.css";
 
 const root = document.getElementById("root");
 if (root === null) {
   throw new Error("The page has no place to show the application.");
+}
+try {
+  await Config.load();
+} catch (error) {
+  root.textContent = "The page cannot start: it does not know where the application is.";
+  throw error;
 }
 const router = AppRouter.create();
 createRoot(root).render(
