@@ -29,7 +29,7 @@ const cert = new URL(".certs/localhost.pem", import.meta.url);
  */
 export default defineConfig(({ command, mode }): UserConfig => {
   const settings = { ...loadEnv(mode, repository, "ACCESS_DESK_"), ...process.env };
-  /** Reads the settings the page cannot do without, in the order named. */
+  /** Reads required settings, in the order named. */
   const read = (names: readonly string[]): string[] => {
     const missing = names.filter((name) => (settings[name]?.trim() ?? "") === "");
     if (missing.length > 0) {

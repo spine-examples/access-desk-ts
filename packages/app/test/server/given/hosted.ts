@@ -12,6 +12,7 @@
  * and limitations under the License.
  */
 
+import { randomBytes } from "node:crypto";
 import { create, type Message, type MessageShape } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { SignalEnvelopes } from "@spine-event-engine/core";
@@ -35,6 +36,12 @@ import {
 // execute the handler classes' standard decorators from raw TypeScript source.
 type AppModule = typeof import("../../../dist/src/index.js");
 type ServerDatabases = import("../../../dist/src/index.js").ServerDatabases;
+
+/**
+ * The key a test's gateway signs who makes each request it passes on, and the
+ * application server checks it with.
+ */
+export const FORWARDING_PROOF_KEY = randomBytes(32);
 
 /**
  * The organizations the tests of the application work in.
@@ -138,6 +145,7 @@ export async function givenServer(storage?: ServerStorage): Promise<Hosted> {
     contexts: [contexts.identity, contexts.resources],
     resources: [contexts.members],
     port: 0,
+    services: { readerAdmission: app.ForwardingProof.admission(FORWARDING_PROOF_KEY) },
   }).start();
   url = server.baseUrl;
   return {

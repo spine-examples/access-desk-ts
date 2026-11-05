@@ -69,6 +69,11 @@ export interface ServerSettings {
   readonly organizations: readonly string[];
   /** The PostgreSQL server the application server keeps its data on. */
   readonly database: DatabaseServer;
+  /**
+   * The key the application server checks, with the gateway, who makes each
+   * request the gateway passes on.
+   */
+  readonly forwardingProofKey: Buffer;
 }
 
 /** How the gateway is set up. */
@@ -96,6 +101,11 @@ export interface GatewaySettings {
    * the same.
    */
   readonly sessionKey: KeyObject;
+  /**
+   * The key the gateway signs, for the application server, who makes each
+   * request it passes on.
+   */
+  readonly forwardingProofKey: Buffer;
 }
 
 /**
@@ -213,6 +223,16 @@ class Reading {
     return UNREADABLE_KEY;
   }
 
+  /** Reads a key of at least 32 bytes that must be set, written in base64. */
+  sharedKey(name: string): Buffer {
+    const text = this.secret(name);
+    const key = Buffer.from(text, "base64");
+    if (text !== "" && key.length < 32) {
+      this.#problems.push(`${name} must be a key of at least 32 bytes, written in base64.`);
+    }
+    return key;
+  }
+
   /** Returns the settings, or throws one error that lists every problem. */
   done<Settings>(settings: Settings): Settings {
     if (this.#problems.length > 0) {
@@ -241,6 +261,7 @@ export const Settings = {
       listening: reading.listening("ACCESS_DESK_SERVER"),
       organizations: reading.organizations("ACCESS_DESK_ORGANIZATIONS"),
       database: reading.databaseServer(),
+      forwardingProofKey: reading.sharedKey("ACCESS_DESK_FORWARDING_PROOF_KEY"),
     });
   },
 
@@ -262,6 +283,7 @@ export const Settings = {
       google: reading.provider("GOOGLE"),
       database: reading.databaseServer(),
       sessionKey: reading.signingKey("ACCESS_DESK_SESSION_KEY"),
+      forwardingProofKey: reading.sharedKey("ACCESS_DESK_FORWARDING_PROOF_KEY"),
     });
   },
 

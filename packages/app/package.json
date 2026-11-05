@@ -18,7 +18,8 @@
     "lint": "eslint src test --no-error-on-unmatched-pattern",
     "server": "node --env-file-if-exists=../../.env dist/src/server/main.js",
     "gateway": "node --env-file-if-exists=../../.env dist/src/gateway/main.js",
-    "session-key": "node scripts/session-key.mjs"
+    "session-key": "node scripts/session-key.mjs",
+    "forwarding-proof-key": "node scripts/forwarding-proof-key.mjs"
   },
   "dependencies": {
     "@bufbuild/protobuf": "2.12.1",

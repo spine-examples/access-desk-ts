@@ -14,6 +14,7 @@
 
 import { Server } from "@spine-event-engine/server";
 import { AccessDesk } from "./access-desk.js";
+import { ForwardingProof } from "../forwarding-proof.js";
 import { Settings } from "../settings.js";
 import { Storage } from "../storage.js";
 
@@ -48,6 +49,7 @@ const server = await new Server({
   resources: [contexts.members],
   host,
   port,
+  services: { readerAdmission: ForwardingProof.admission(settings.forwardingProofKey) },
 }).run();
 listening.address = server.baseUrl;
 

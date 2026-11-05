@@ -39,7 +39,13 @@ import {
 import { CreateOrganizationSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
 import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
 
-import { give, givenServer, tenant as tenantOf, type Hosted } from "../../server/given/hosted.js";
+import {
+  give,
+  givenServer,
+  FORWARDING_PROOF_KEY,
+  tenant as tenantOf,
+  type Hosted,
+} from "../../server/given/hosted.js";
 import { typeRegistry } from "../../../generated/model-registry.js";
 
 // Imported from compiled output, like the contexts it assembles: vitest cannot
@@ -97,6 +103,22 @@ export async function stopGateways(): Promise<void> {
   for (const stop of started.splice(0).reverse()) {
     await stop();
   }
+}
+
+/**
+ * Returns the identity providers a gateway of the tests signs people in
+ * through: one, which confirms whatever the tests say.
+ *
+ * @param providers The gateway's providers, as built.
+ */
+function fakeProviders(providers: ProvidersModule): External {
+  return {
+    fake: fakeProvider(
+      IdentityProvider.GOOGLE,
+      "https://provider.test",
+      providers.ConfirmedIdentity,
+    ),
+  };
 }
 
 /**
@@ -254,14 +276,9 @@ async function startGateway(kept: Kept): Promise<Running> {
     registry: app.typeRegistry,
     origins: [ORIGIN],
     port: 0,
-    external: {
-      fake: fakeProvider(
-        IdentityProvider.GOOGLE,
-        "https://provider.test",
-        providers.ConfirmedIdentity,
-      ),
-    },
+    external: fakeProviders(providers),
     sessionKey: SESSION_KEY,
+    forwardingProofKey: FORWARDING_PROOF_KEY,
     storage: { subscriptions: await kept.storage.open(), revokedTokens: kept.revokedTokens },
   });
   // The gateway and the application server are separate, so each is stopped.
