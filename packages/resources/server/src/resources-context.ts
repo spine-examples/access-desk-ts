@@ -12,6 +12,7 @@
  * and limitations under the License.
  */
 
+import "../generated/spine-bootstrap.js";
 import type { Message } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { anyIs, anyUnpack } from "@bufbuild/protobuf/wkt";
@@ -199,7 +200,6 @@ export const ResourcesContext = {
       auditTrailRouting.route(event, (_event, context) => entryOf(event, context));
     }
     return BoundedContext.multitenant("Resources")
-      .withGeneratedRegistryRoot(new URL("..", import.meta.url))
       .add(OrganizationAggregate)
       .add(OrganizationViewProjection)
       .add(ResourceRegistrationProcessManager, { eventRouting: resourceRegistrationProcmanRouting })

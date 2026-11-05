@@ -12,6 +12,7 @@
  * and limitations under the License.
  */
 
+import "../generated/spine-bootstrap.js";
 import { create } from "@bufbuild/protobuf";
 import type { EmailAddress } from "@spine-event-engine/proto";
 import { BoundedContext, CommandRouting, EventRouting } from "@spine-event-engine/server";
@@ -95,7 +96,6 @@ export const IdentityContext = {
         event.membership === undefined ? [] : [event.membership],
       );
     return BoundedContext.singleTenant("Identity")
-      .withGeneratedRegistryRoot(new URL("..", import.meta.url))
       .add(ExternalIdentityProcessManager, { eventRouting: accountRouting })
       .add(ExternalIdentityViewProjection)
       .add(PersonEmailAggregate)
