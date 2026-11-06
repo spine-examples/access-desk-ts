@@ -66,8 +66,10 @@ packages/
   network. The gateway endpoints live in `src/gateway/routes/`, and
   are only for signing in and the session; everything else passes through
   as Spine requests judged by `src/gateway/policy.ts`. The gateway signs each
-  request it passes on, and the server takes the actor only from a signed one
-  (`src/forwarding-proof.ts`, key `ACCESS_DESK_FORWARDING_PROOF_KEY`).
+  request it passes on with the person who makes it, the gateway and the
+  server send a token derived from the same key with their own calls, and
+  the server refuses a call with neither (`src/forwarding-proof.ts`, key
+  `ACCESS_DESK_FORWARDING_PROOF_KEY`).
   `pnpm --dir packages/app run server` and `run gateway` start each.
   Every program is configured in one `.env` in the repository root.
 - **`web`** — `@access-desk/web`, the React/Vite client: `react-router`

@@ -39,7 +39,8 @@ type ServerDatabases = import("../../../dist/src/index.js").ServerDatabases;
 
 /**
  * The key a test's gateway signs who makes each request it passes on, and the
- * application server checks it with.
+ * application server checks it with. The gateway and the application server
+ * prove the calls they make themselves with a token derived from it.
  */
 export const FORWARDING_PROOF_KEY = randomBytes(32);
 
@@ -138,6 +139,7 @@ export async function givenServer(storage?: ServerStorage): Promise<Hosted> {
   await TestEnvironment.reset();
   const contexts = await app.AccessDesk.assemble({
     server: () => url,
+    forwardingProofKey: FORWARDING_PROOF_KEY,
     storage: await openServerStorage(kept),
     organizations: ORGANIZATIONS,
   });

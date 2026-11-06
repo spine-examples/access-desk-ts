@@ -41,6 +41,7 @@ const contexts = await AccessDesk.assemble({
     }
     return listening.address;
   },
+  forwardingProofKey: settings.forwardingProofKey,
   storage,
   organizations: settings.organizations,
 });

@@ -121,9 +121,11 @@ signing out. Everything else is a command, a query, or a subscription it judges
 as it passes, including adding a member and reading who was added. A request to
 Identity names no organization, and the gateway refuses one that does.
 
-The application server takes the actor of a call the gateway passes on only
-when the call carries the gateway's signature, made with a key both programs
-share. A call without one names nobody.
+The application server takes only calls proved with a key it shares with the
+gateway, and refuses any other before it reads it. The gateway signs each call
+it passes on with the signed-in person who makes it, and the server takes the
+actor from that signature. The gateway's own reads and the calls between the
+contexts carry a token derived from the same key and name nobody.
 
 A member can read and watch the organization and its catalog. Everything else
 they see only where it concerns them:

@@ -71,7 +71,9 @@ export interface ServerSettings {
   readonly database: DatabaseServer;
   /**
    * The key the application server checks, with the gateway, who makes each
-   * request the gateway passes on.
+   * request the gateway passes on. A token derived from it proves the
+   * server's calls to itself. The server refuses a call this key does not
+   * prove.
    */
   readonly forwardingProofKey: Buffer;
 }
@@ -103,7 +105,7 @@ export interface GatewaySettings {
   readonly sessionKey: KeyObject;
   /**
    * The key the gateway signs, for the application server, who makes each
-   * request it passes on.
+   * request it passes on, and each call it makes itself.
    */
   readonly forwardingProofKey: Buffer;
 }

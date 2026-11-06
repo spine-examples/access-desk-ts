@@ -52,12 +52,17 @@ export const ReachedOrganizationMembers = {
    * So adding that failed halfway can be tried again.
    *
    * @param server Returns the address of the application server, once it listens.
+   * @param key The key the application server proves its calls to itself with.
    * @param patienceMs How long to wait for the organization to confirm. Ten
    *   seconds when left out.
    * @returns The service, as Identity uses it.
    */
-  through(server: () => string, patienceMs: number = PATIENCE_MS): ReachedOrganizationMembers {
-    const connection = new ServerConnection(server);
+  through(
+    server: () => string,
+    key: Buffer,
+    patienceMs: number = PATIENCE_MS,
+  ): ReachedOrganizationMembers {
+    const connection = new ServerConnection(server, key);
     const organizationOf = (organization: OrganizationId) =>
       connection.in(organization).onBehalfOf(SYSTEM);
 

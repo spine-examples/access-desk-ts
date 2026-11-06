@@ -44,7 +44,7 @@ refuses to start and names it.
 | `ACCESS_DESK_DATABASE_USER`        | server, gateway     | The account to connect to it with.                                                     |
 | `ACCESS_DESK_DATABASE_PASSWORD`    | server, gateway     | The password of that account, written as it is.                                        |
 | `ACCESS_DESK_SESSION_KEY`          | gateway             | The P-256 key sessions are signed with, in base64.                                     |
-| `ACCESS_DESK_FORWARDING_PROOF_KEY` | server, gateway     | The shared key of at least 32 bytes, in base64, that signs who makes a passed-on call. |
+| `ACCESS_DESK_FORWARDING_PROOF_KEY` | server, gateway     | The shared key of at least 32 bytes, in base64, proving every call made to the server. |
 
 People sign in through Google. If the gateway cannot reach Google when it
 starts, it does not start.
@@ -140,8 +140,10 @@ pnpm --dir packages/app run session-key
 ```
 
 The gateway signs each request it passes on to the application server, so the
-server knows who makes it. Both read the same `ACCESS_DESK_FORWARDING_PROOF_KEY`.
-To generate that key:
+server knows who makes it. The gateway and the server send a token derived from
+the same key with the calls they make themselves, and the server refuses a call
+with neither. Both read the same `ACCESS_DESK_FORWARDING_PROOF_KEY`. To
+generate that key:
 
 ```sh
 pnpm --dir packages/app run forwarding-proof-key

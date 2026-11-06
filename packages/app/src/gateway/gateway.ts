@@ -58,7 +58,8 @@ export interface GatewayOptions {
   readonly sessionKey: KeyObject;
   /**
    * The key the gateway signs, for the application server, who makes each
-   * request it passes on. The application server holds the same key.
+   * request it passes on, and each call it makes itself. The application
+   * server holds the same key.
    */
   readonly forwardingProofKey: Buffer;
   /** Where the gateway keeps its data, so it outlasts a restart. */
@@ -94,7 +95,7 @@ export const Gateway = {
    * @returns The running gateway.
    */
   async start(options: GatewayOptions): Promise<Gateway> {
-    const server = new ServerConnection(() => options.backend);
+    const server = new ServerConnection(() => options.backend, options.forwardingProofKey);
     const desk = new AccessDesk(server);
     const origins = [...options.origins];
     const listening: { address?: string } = {};

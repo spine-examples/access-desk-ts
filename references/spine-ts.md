@@ -406,8 +406,10 @@ controls defined in the architecture.
   forwards through `BrowserServer`'s `forwardingProof`, a `ReaderProofIssuer`.
   The server checks it through `services.readerAdmission.forwarded`, a
   `ReaderProofVerifier`, and `readerAdmission.direct` decides a call that
-  carries no signature. With neither, the server is public and knows no
-  principal.
+  carries no forwarding signature: it receives the call's service, method,
+  request bytes, and headers, and `undefined` refuses the call as
+  `Unauthenticated` before validation. With `forwarded` alone, such a call is
+  refused. With neither, the server is public and knows no principal.
 - Ending a session does not end its streams; Spine stops them only when the
   session's time runs out. A gateway that ends sessions early cancels their
   subscriptions itself.
