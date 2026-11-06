@@ -34,7 +34,7 @@
  * judges each call.
  *
  * Run it from this directory, with `ACCESS_DESK_WEB_HOST`, `ACCESS_DESK_WEB_PORT`,
- * and `ACCESS_DESK_API_PORT` in the environment:
+ * `ACCESS_DESK_API_PORT`, and `ACCESS_DESK_GATEWAY_PORT` in the environment:
  *
  *   node render.mjs > envoy.yaml
  */
@@ -43,9 +43,9 @@ import process from "node:process";
 import gatewayEndpoints from "./gateway-endpoints.json" with { type: "json" };
 import spineMethods from "./spine-methods.json" with { type: "json" };
 
-/** Where Envoy reaches the gateway, and where it finds its certificate. */
+/** The gateway's container, and where Envoy finds its certificate. */
 const CONTAINERS = {
-  gateway: { address: "gateway", port: 8080 },
+  gateway: "gateway",
   certificate: "/certs/localhost.pem",
   key: "/certs/localhost-key.pem",
 };
@@ -82,6 +82,7 @@ const AccessDeskEnvoy = {
     const port = AccessDeskEnvoy.setting(environment, "ACCESS_DESK_WEB_PORT");
     const origin = new URL(`https://${host}:${port}`).origin;
     const listenPort = AccessDeskEnvoy.setting(environment, "ACCESS_DESK_API_PORT");
+    const gatewayPort = AccessDeskEnvoy.setting(environment, "ACCESS_DESK_GATEWAY_PORT");
     const routes = [
       ...spineMethods.map((path) => ({
         path,
@@ -153,7 +154,7 @@ ${routes.map((route) => AccessDeskEnvoy.routes(route)).join("\n")}
           - lb_endpoints:
               - endpoint:
                   address:
-                    socket_address: { address: ${CONTAINERS.gateway.address}, port_value: ${String(CONTAINERS.gateway.port)} }
+                    socket_address: { address: ${CONTAINERS.gateway}, port_value: ${gatewayPort} }
 `;
   },
 
