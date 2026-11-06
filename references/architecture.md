@@ -54,13 +54,13 @@ package, generated module, `BoundedContext` instance, repositories, storage
 layout, handlers, and ownership. Direct cross-context entity, repository, or
 application-service calls are forbidden.
 
-Cross-context state propagation and lifecycle choreography use versioned
-external events. Commands are domestic to their receiving context. Shared
-packages may contain wire contracts and value types, but never another
-context's behavior or mutable state. Each context owns its cross-context
-event contracts in its model package; a consumer depends on the
-publishing context's model for those schemas and declares its
-external-event receptors internally.
+The contexts exchange no events. The one cross-context step is Identity
+adding a person to an organization's members in Resources: it sends Resources
+a command through a client of the application server, and waits for it to
+confirm, as the membership flow below describes. Shared packages may contain
+wire contracts and value types, but never another context's behavior or
+mutable state. A context that sends another a command depends on that
+context's model package for its schema.
 
 ## Tenant, identity, and authorization model
 
@@ -88,8 +88,8 @@ Organization is the tenant.
   adds their account, and gives the person their name.
 - A person who signs in works in the organization they belong to. A person who
   belongs to none can do nothing yet. Creating an organization comes later.
-- Every tenant-scoped request, query, subscription, inbox row,
-  outbox row, and audit record carries exactly one `OrganizationId` represented
+- Every tenant-scoped request, query, subscription, inbox row, and audit
+  record carries exactly one `OrganizationId` represented
   at the Spine boundary as the authoritative `TenantId`.
 - A trusted gateway resolves the session it signed into the actor and their
   organization. Client command fields must not be trusted as actor or
@@ -121,6 +121,10 @@ signing out. Everything else is a command, a query, or a subscription it judges
 as it passes, including adding a member and reading who was added. A request to
 Identity names no organization, and the gateway refuses one that does.
 
+The application server takes the actor of a call the gateway passes on only
+when the call carries the gateway's signature, made with a key both programs
+share. A call without one names nobody.
+
 A member can read and watch the organization and its catalog. Everything else
 they see only where it concerns them:
 
@@ -129,7 +133,8 @@ they see only where it concerns them:
 - for a resource they manage, its requests, grants, and audit trail.
 
 So a query or a subscription must say whose data it wants, with exactly one
-condition on one column. The gateway refuses anything else. An administrator
+condition on one column, or ask for the decision queue by its identifier,
+which is the manager's. The gateway refuses anything else. An administrator
 can also read the audit trail of the whole organization.
 
 What a browser watches belongs to the session it was opened under. When the
@@ -142,9 +147,8 @@ Authority takes two forms, both organization-scoped.
 
 A **role** is standing authority a person holds in the organization itself:
 Member (the baseline every member holds, who may act as a requester) and
-Administrator, who adds people to the organization and registers resources.
-A manager is to see the audit trail of the resources they manage,
-and an administrator that of the whole organization.
+Administrator, who adds people to the organization, registers resources, and
+reads the audit trail of the whole organization.
 
 A **relation** is a position toward one specific entity, read from domain state
 rather than granted as a role: the **manager** of a resource and the
@@ -370,8 +374,10 @@ must be documented before production use.
 
 ## Browser and read-side behavior
 
-The intended browser stack is React with Vite, `@spine-event-engine/client-web`,
-and `@spine-event-engine/client-react`.
+The web client is React with Vite, `react-router`,
+`@spine-event-engine/client-web`, and `@spine-event-engine/client-react`. It
+reads where it calls the application from `/config.json` as it opens, so one
+build runs anywhere.
 
 - The browser connects through the authenticated application gateway, never a
   trusted private backend directly.
