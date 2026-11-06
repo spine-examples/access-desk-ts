@@ -13,19 +13,23 @@
 #
 
 #
-# Access Desk on a developer's machine.
-#
-# Run it from the repository root, with the settings of the `.env` there:
+# Access Desk on a developer's machine, each program in a container of its
+# own. Run it from the repository root, with the settings of the `.env` there:
 #
 #   docker compose --env-file .env --file deploy/compose.yaml ...
+#
+# Three containers are published on this machine:
+#
+#   envoy     The way in to the application server.
+#   web       The web client.
+#   postgres  For the tests, and to look into the databases directly.
 #
 name: access-desk
 
 services:
-  # The PostgreSQL server, where the programs reach it: at
-  # ACCESS_DESK_DATABASE_HOST and _PORT, with the account the settings name.
-  # It makes the databases of the programs with `postgres/initdb/`, when it
-  # first starts.
+  # The PostgreSQL server of the application server and the gateway.
+  # Each time it starts, it makes the missing databases, such as one of an
+  # organization added to ACCESS_DESK_ORGANIZATIONS.
   postgres:
     # The newest PostgreSQL the Spine adapter was accepted against.
     image: postgres:18.6-alpine
@@ -33,24 +37,171 @@ services:
       POSTGRES_USER: ${ACCESS_DESK_DATABASE_USER:?Set ACCESS_DESK_DATABASE_USER in .env.}
       POSTGRES_PASSWORD: ${ACCESS_DESK_DATABASE_PASSWORD:?Set ACCESS_DESK_DATABASE_PASSWORD in .env.}
       POSTGRES_DB: postgres
-      # The organizations to make databases for.
+      PGPORT: ${ACCESS_DESK_DATABASE_PORT:?Set ACCESS_DESK_DATABASE_PORT in .env.}
       ACCESS_DESK_ORGANIZATIONS: ${ACCESS_DESK_ORGANIZATIONS:?Set ACCESS_DESK_ORGANIZATIONS in .env.}
     ports:
-      - target: 5432
+      - target: ${ACCESS_DESK_DATABASE_PORT:?Set ACCESS_DESK_DATABASE_PORT in .env.}
         host_ip: ${ACCESS_DESK_DATABASE_HOST:?Set ACCESS_DESK_DATABASE_HOST in .env.}
         published: ${ACCESS_DESK_DATABASE_PORT:?Set ACCESS_DESK_DATABASE_PORT in .env.}
     volumes:
       # PostgreSQL 18 images keep their data under this directory.
-      - data:/var/lib/postgresql
+      - postgres-data:/var/lib/postgresql
       - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
+    # Emptied each time the container starts, so the mark that the databases
+    # are made is never one left by an earlier start.
+    tmpfs:
+      - /run/access-desk
+    post_start:
+      # Runs inside this container. Once the server takes connections over
+      # TCP, which it does only after a new volume gets its first databases,
+      # it makes the missing databases and marks that they are made.
+      - command:
+          - sh
+          - -c
+          - >-
+            until pg_isready --quiet --host=127.0.0.1 --username="$$POSTGRES_USER" --dbname=postgres;
+            do sleep 1; done &&
+            /docker-entrypoint-initdb.d/01-databases.sh &&
+            touch /run/access-desk/databases-made
     healthcheck:
-      # Over TCP, which the server takes only once it has made its first
-      # databases, not over the socket it opens while it makes them.
+      # Healthy once the server takes connections over TCP and every database
+      # is made.
       test:
-        ["CMD-SHELL", "pg_isready --host=127.0.0.1 --username=$${POSTGRES_USER} --dbname=postgres"]
+        [
+          "CMD-SHELL",
+          "pg_isready --host=127.0.0.1 --username=$${POSTGRES_USER} --dbname=postgres && test -e /run/access-desk/databases-made",
+        ]
       interval: 2s
       timeout: 3s
       retries: 30
 
+  # The application server, with the Identity and Resources contexts. It is
+  # not published: only the gateway calls it.
+  server:
+    image: access-desk:local
+    build:
+      # The files the Dockerfile copies from: the whole repository.
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: application
+    command: ["dist/src/server/main.js"]
+    environment:
+      ACCESS_DESK_SERVER_HOST: 0.0.0.0
+      ACCESS_DESK_SERVER_PORT: ${ACCESS_DESK_SERVER_PORT:?Set ACCESS_DESK_SERVER_PORT in .env.}
+      ACCESS_DESK_DATABASE_HOST: postgres
+      ACCESS_DESK_DATABASE_PORT: ${ACCESS_DESK_DATABASE_PORT:?Set ACCESS_DESK_DATABASE_PORT in .env.}
+      ACCESS_DESK_DATABASE_USER: ${ACCESS_DESK_DATABASE_USER:?Set ACCESS_DESK_DATABASE_USER in .env.}
+      ACCESS_DESK_DATABASE_PASSWORD: ${ACCESS_DESK_DATABASE_PASSWORD:?Set ACCESS_DESK_DATABASE_PASSWORD in .env.}
+      ACCESS_DESK_ORGANIZATIONS: ${ACCESS_DESK_ORGANIZATIONS:?Set ACCESS_DESK_ORGANIZATIONS in .env.}
+      ACCESS_DESK_FORWARDING_PROOF_KEY: ${ACCESS_DESK_FORWARDING_PROOF_KEY:?Set ACCESS_DESK_FORWARDING_PROOF_KEY in .env.}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # Healthy once it takes an HTTP/2 connection.
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "const c=require('node:http2').connect('http://127.0.0.1:'+process.env.ACCESS_DESK_SERVER_PORT);c.on('connect',()=>{c.close();process.exit(0)});c.on('error',()=>process.exit(1))",
+        ]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  # The gateway, which signs people in through Google and decides which of
+  # their calls reach the application server. It is not published: only Envoy
+  # calls it.
+  gateway:
+    image: access-desk:local
+    command: ["dist/src/gateway/main.js"]
+    environment:
+      ACCESS_DESK_GATEWAY_HOST: 0.0.0.0
+      ACCESS_DESK_GATEWAY_PORT: ${ACCESS_DESK_GATEWAY_PORT:?Set ACCESS_DESK_GATEWAY_PORT in .env.}
+      ACCESS_DESK_SERVER_HOST: server
+      ACCESS_DESK_SERVER_PORT: ${ACCESS_DESK_SERVER_PORT:?Set ACCESS_DESK_SERVER_PORT in .env.}
+      ACCESS_DESK_WEB_HOST: ${ACCESS_DESK_WEB_HOST:?Set ACCESS_DESK_WEB_HOST in .env.}
+      ACCESS_DESK_WEB_PORT: ${ACCESS_DESK_WEB_PORT:?Set ACCESS_DESK_WEB_PORT in .env.}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID in .env.}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?Set GOOGLE_CLIENT_SECRET in .env.}
+      ACCESS_DESK_DATABASE_HOST: postgres
+      ACCESS_DESK_DATABASE_PORT: ${ACCESS_DESK_DATABASE_PORT:?Set ACCESS_DESK_DATABASE_PORT in .env.}
+      ACCESS_DESK_DATABASE_USER: ${ACCESS_DESK_DATABASE_USER:?Set ACCESS_DESK_DATABASE_USER in .env.}
+      ACCESS_DESK_DATABASE_PASSWORD: ${ACCESS_DESK_DATABASE_PASSWORD:?Set ACCESS_DESK_DATABASE_PASSWORD in .env.}
+      ACCESS_DESK_SESSION_KEY: ${ACCESS_DESK_SESSION_KEY:?Set ACCESS_DESK_SESSION_KEY in .env.}
+      ACCESS_DESK_FORWARDING_PROOF_KEY: ${ACCESS_DESK_FORWARDING_PROOF_KEY:?Set ACCESS_DESK_FORWARDING_PROOF_KEY in .env.}
+    depends_on:
+      server:
+        condition: service_healthy
+    healthcheck:
+      # Healthy once it answers. Any answer will do: the gateway refuses a call
+      # that comes from no page.
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:'+process.env.ACCESS_DESK_GATEWAY_PORT+'/auth/options',{method:'POST',body:'{}'}).then(()=>process.exit(0),()=>process.exit(1))",
+        ]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  # The web client's page, served by nginx over HTTPS,
+  # with this machine's certificate from `packages/web/.certs`.
+  web:
+    image: access-desk-web:local
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: web
+    environment:
+      NGINX_ENVSUBST_FILTER: ^ACCESS_DESK_
+      ACCESS_DESK_WEB_PORT: ${ACCESS_DESK_WEB_PORT:?Set ACCESS_DESK_WEB_PORT in .env.}
+      ACCESS_DESK_API_HOST: ${ACCESS_DESK_API_HOST:?Set ACCESS_DESK_API_HOST in .env.}
+      ACCESS_DESK_API_PORT: ${ACCESS_DESK_API_PORT:?Set ACCESS_DESK_API_PORT in .env.}
+    ports:
+      - target: ${ACCESS_DESK_WEB_PORT:?Set ACCESS_DESK_WEB_PORT in .env.}
+        host_ip: 127.0.0.1
+        published: ${ACCESS_DESK_WEB_PORT:?Set ACCESS_DESK_WEB_PORT in .env.}
+    volumes:
+      - ../packages/web/.certs:/certs:ro
+    healthcheck:
+      # Healthy once it serves the page.
+      test:
+        [
+          "CMD-SHELL",
+          "curl --fail --silent --insecure --output /dev/null https://127.0.0.1:$${ACCESS_DESK_WEB_PORT}/",
+        ]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  # Envoy, which takes the page's calls over HTTPS, and passes on to the gateway only those the gateway serves.
+  envoy:
+    image: access-desk-envoy:local
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: envoy
+      args:
+        ACCESS_DESK_WEB_HOST: ${ACCESS_DESK_WEB_HOST:?Set ACCESS_DESK_WEB_HOST in .env.}
+        ACCESS_DESK_WEB_PORT: ${ACCESS_DESK_WEB_PORT:?Set ACCESS_DESK_WEB_PORT in .env.}
+        ACCESS_DESK_API_PORT: ${ACCESS_DESK_API_PORT:?Set ACCESS_DESK_API_PORT in .env.}
+        ACCESS_DESK_GATEWAY_PORT: ${ACCESS_DESK_GATEWAY_PORT:?Set ACCESS_DESK_GATEWAY_PORT in .env.}
+    command: ["-c", "/etc/envoy/envoy.yaml"]
+    ports:
+      - target: ${ACCESS_DESK_API_PORT:?Set ACCESS_DESK_API_PORT in .env.}
+        host_ip: 127.0.0.1
+        published: ${ACCESS_DESK_API_PORT:?Set ACCESS_DESK_API_PORT in .env.}
+    volumes:
+      - ../packages/web/.certs:/certs:ro
+    depends_on:
+      gateway:
+        condition: service_healthy
+
 volumes:
-  data:
+  # The databases of PostgreSQL. They outlast its container, until
+  # `pnpm run postgres:delete`.
+  postgres-data:
