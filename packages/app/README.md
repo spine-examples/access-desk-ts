@@ -343,7 +343,6 @@ organization.
 | `RegisterResource`                                               | An administrator, for their organization.                                  |
 | Query or subscription on a read model                            | A member, as [What a member may read](#what-a-member-may-read) describes.  |
 | Opening or cancelling a subscription                             | The person who made it, in the organization they made it in.               |
-| Application query                                                | Nobody yet: the application answers none to a member.                      |
 
 ### What a member may read
 

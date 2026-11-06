@@ -50,10 +50,15 @@ posts a request), whereas a helper (below) knows nothing about it.
 
 ## Helpers
 
-A **helper** is a generic, domain-agnostic utility reused across every context —
-it arranges no domain state. Reuse these instead of re-implementing them per test:
+A **helper** is a generic, domain-agnostic utility — it arranges no domain
+state. Reuse these instead of re-implementing them per test:
 
-- `test/given/event-recording.ts` — `eventRecording(actorContext)` returns
+- `@access-desk/testing` — `TestEnvironment.start`/`reset` around each context
+  a test builds, and the PostgreSQL storage of a test from
+  `@access-desk/testing/storage`, such as
+  `TestStorages.multitenant(typeRegistry, [tenant()])`.
+- `test/given/event-recording.ts`, one copy in each context's `server` package —
+  `eventRecording(actorContext)` returns
   `{ recordEvents, expectRejection }`. Bind it once per context with that
   context's `testActorContext`:
   `const { recordEvents, expectRejection } = eventRecording(testActorContext);`.
@@ -106,5 +111,7 @@ single-handler rejections here; those live in the isolated tests.
 ## Runner
 
 `vitest.config.ts` sets `fileParallelism: false` and 30s timeouts because each
-`BlackBox` test starts a separate in-process server — keep them. Give every query a
+`BlackBox` test starts a separate in-process server — keep them. Every test
+keeps its data in PostgreSQL, so the server `ACCESS_DESK_DATABASE_*` names must
+be running. Give every query a
 fixed id and reach for `box.eventually` only for genuinely asynchronous reads.
