@@ -33,8 +33,14 @@
  * Envoy decides nothing about who calls. The gateway signs people in and
  * judges each call.
  *
+ * Envoy reports whether it is ready to pass calls on at `/ready` of its
+ * administration interface, which listens only inside its container, at
+ * `127.0.0.1` and `ENVOY_ADMINISTRATION_PORT`. That port is no setting of
+ * `.env`: `compose.yaml` gives it, to this script and to the healthcheck.
+ *
  * Run it from this directory, with `ACCESS_DESK_WEB_HOST`, `ACCESS_DESK_WEB_PORT`,
- * `ACCESS_DESK_API_PORT`, and `ACCESS_DESK_GATEWAY_PORT` in the environment:
+ * `ACCESS_DESK_API_PORT`, `ACCESS_DESK_GATEWAY_PORT`, and
+ * `ENVOY_ADMINISTRATION_PORT` in the environment:
  *
  *   node render.mjs > envoy.yaml
  */
@@ -83,6 +89,7 @@ const AccessDeskEnvoy = {
     const origin = new URL(`https://${host}:${port}`).origin;
     const listenPort = AccessDeskEnvoy.setting(environment, "ACCESS_DESK_API_PORT");
     const gatewayPort = AccessDeskEnvoy.setting(environment, "ACCESS_DESK_GATEWAY_PORT");
+    const administrationPort = AccessDeskEnvoy.setting(environment, "ENVOY_ADMINISTRATION_PORT");
     const routes = [
       ...spineMethods.map((path) => ({
         path,
@@ -95,7 +102,10 @@ const AccessDeskEnvoy = {
         maxRequestBytes: GATEWAY_ENDPOINT_BYTES,
       })),
     ];
-    return `static_resources:
+    return `admin:
+  address:
+    socket_address: { address: 127.0.0.1, port_value: ${administrationPort} }
+static_resources:
   listeners:
     - name: browser_gateway
       address:
@@ -216,7 +226,7 @@ ${limit}
   setting(environment, name) {
     const value = environment[name];
     if (value === undefined || value === "") {
-      throw new Error(`Set ${name} in .env.`);
+      throw new Error(`${name} is not set.`);
     }
     return value;
   },

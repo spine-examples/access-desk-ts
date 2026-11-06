@@ -13,6 +13,13 @@ own, laid out as in production.
 
 `gateway` and `server` run from one image, each with its own program.
 
+The containers are joined by separate networks, so each one reaches only the
+containers it calls:
+
+- `web` reaches none of them.
+- `envoy` reaches only `gateway`.
+- `gateway` reaches `server` and `postgres`.
+
 ```mermaid
 flowchart LR
   Browser -->|HTTPS, the web client| Web[web]
@@ -40,6 +47,10 @@ endpoint of `gateway` there too.
 
 [`envoy/render.mjs`](envoy/render.mjs) renders its configuration from `.env`
 when the image is built.
+
+It reports itself healthy once it is ready to pass calls on, as `/ready` of
+its administration interface answers. That interface listens only inside the
+container, at the port `compose.yaml` gives it, and is not published.
 
 ## postgres
 
