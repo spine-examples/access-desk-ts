@@ -8,7 +8,9 @@ The page people work in Access Desk through.
 | `/`             | Leads a member to their organization. A person in no organization yet signs in again once an administrator adds them. |
 | `/organization` | The organization: its name, the person's role in it, and its members with their roles.                                |
 
-The session lasts while the browser tab is open, and closing the tab ends it.
+The page keeps the session in its browser tab only, so closing the tab forgets
+it there. Its token stays good at the gateway until it expires, eight hours
+after signing in; signing out ends it at once.
 
 ## Run it
 
@@ -40,8 +42,8 @@ machine.
 
 ## HTTPS
 
-Google sends people back only to an HTTPS address, so the page is served over
-HTTPS. Make a certificate for this machine once:
+The page is served over HTTPS, as in production. Make a certificate for this
+machine once:
 
 ```sh
 pnpm --dir packages/web run cert

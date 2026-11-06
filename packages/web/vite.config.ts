@@ -55,7 +55,9 @@ export default defineConfig(({ command, mode }): UserConfig => {
     "ACCESS_DESK_GATEWAY_PORT",
   ]);
   if (!existsSync(key) || !existsSync(cert)) {
-    throw new Error("The page is served over HTTPS. Make its certificate with `pnpm run cert`.");
+    throw new Error(
+      "The page is served over HTTPS. Make its certificate with `pnpm --dir packages/web run cert`.",
+    );
   }
   const gateway = `http://${gatewayHost}:${gatewayPort}`;
   const listening = {
