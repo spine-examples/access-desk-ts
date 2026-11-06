@@ -20,11 +20,14 @@
 #
 # Three containers are published on this machine:
 #
+#   postgres  For the tests, and to look into the databases directly.
 #   envoy     The way in to the application server.
 #   web       The web client.
-#   postgres  For the tests, and to look into the databases directly.
 #
 name: access-desk
+
+# The port of Envoy's administration interface, inside its container only.
+x-envoy-administration-port: &envoy-administration-port "9901"
 
 services:
   # The PostgreSQL server of the application server and the gateway.
@@ -43,6 +46,7 @@ services:
       - target: ${ACCESS_DESK_DATABASE_PORT:?Set ACCESS_DESK_DATABASE_PORT in .env.}
         host_ip: ${ACCESS_DESK_DATABASE_HOST:?Set ACCESS_DESK_DATABASE_HOST in .env.}
         published: ${ACCESS_DESK_DATABASE_PORT:?Set ACCESS_DESK_DATABASE_PORT in .env.}
+    networks: [backend]
     volumes:
       # PostgreSQL 18 images keep their data under this directory.
       - postgres-data:/var/lib/postgresql
@@ -85,6 +89,7 @@ services:
       dockerfile: deploy/Dockerfile
       target: application
     command: ["dist/src/server/main.js"]
+    networks: [backend]
     environment:
       ACCESS_DESK_SERVER_HOST: 0.0.0.0
       ACCESS_DESK_SERVER_PORT: ${ACCESS_DESK_SERVER_PORT:?Set ACCESS_DESK_SERVER_PORT in .env.}
@@ -116,6 +121,7 @@ services:
   gateway:
     image: access-desk:local
     command: ["dist/src/gateway/main.js"]
+    networks: [ingress, backend]
     environment:
       ACCESS_DESK_GATEWAY_HOST: 0.0.0.0
       ACCESS_DESK_GATEWAY_PORT: ${ACCESS_DESK_GATEWAY_PORT:?Set ACCESS_DESK_GATEWAY_PORT in .env.}
@@ -148,6 +154,46 @@ services:
       timeout: 2s
       retries: 30
 
+  # Envoy, which takes the page's calls over HTTPS, and passes on to the gateway only those the gateway serves.
+  envoy:
+    image: access-desk-envoy:local
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: envoy
+      args:
+        ACCESS_DESK_WEB_HOST: ${ACCESS_DESK_WEB_HOST:?Set ACCESS_DESK_WEB_HOST in .env.}
+        ACCESS_DESK_WEB_PORT: ${ACCESS_DESK_WEB_PORT:?Set ACCESS_DESK_WEB_PORT in .env.}
+        ACCESS_DESK_API_PORT: ${ACCESS_DESK_API_PORT:?Set ACCESS_DESK_API_PORT in .env.}
+        ACCESS_DESK_GATEWAY_PORT: ${ACCESS_DESK_GATEWAY_PORT:?Set ACCESS_DESK_GATEWAY_PORT in .env.}
+        ENVOY_ADMINISTRATION_PORT: *envoy-administration-port
+    command: ["-c", "/etc/envoy/envoy.yaml"]
+    environment:
+      ENVOY_ADMINISTRATION_PORT: *envoy-administration-port
+    ports:
+      - target: ${ACCESS_DESK_API_PORT:?Set ACCESS_DESK_API_PORT in .env.}
+        host_ip: 127.0.0.1
+        published: ${ACCESS_DESK_API_PORT:?Set ACCESS_DESK_API_PORT in .env.}
+    networks: [ingress]
+    volumes:
+      - ../packages/web/.certs:/certs:ro
+    depends_on:
+      gateway:
+        condition: service_healthy
+    healthcheck:
+      # Healthy once Envoy's `/ready`, inside the container only, says it is
+      # ready to pass calls on. Bash asks, as the image has no HTTP client.
+      test:
+        [
+          "CMD",
+          "bash",
+          "-c",
+          "exec 3<>/dev/tcp/127.0.0.1/$${ENVOY_ADMINISTRATION_PORT} && printf 'GET /ready HTTP/1.1\\r\\nHost: 127.0.0.1\\r\\nConnection: close\\r\\n\\r\\n' >&3 && read -r status <&3 && [[ $$status == *' 200 '* ]]",
+        ]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
   # The web client's page, served by nginx over HTTPS,
   # with this machine's certificate from `packages/web/.certs`.
   web:
@@ -165,6 +211,7 @@ services:
       - target: ${ACCESS_DESK_WEB_PORT:?Set ACCESS_DESK_WEB_PORT in .env.}
         host_ip: 127.0.0.1
         published: ${ACCESS_DESK_WEB_PORT:?Set ACCESS_DESK_WEB_PORT in .env.}
+    networks: [frontend]
     volumes:
       - ../packages/web/.certs:/certs:ro
     healthcheck:
@@ -178,28 +225,13 @@ services:
       timeout: 2s
       retries: 30
 
-  # Envoy, which takes the page's calls over HTTPS, and passes on to the gateway only those the gateway serves.
-  envoy:
-    image: access-desk-envoy:local
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile
-      target: envoy
-      args:
-        ACCESS_DESK_WEB_HOST: ${ACCESS_DESK_WEB_HOST:?Set ACCESS_DESK_WEB_HOST in .env.}
-        ACCESS_DESK_WEB_PORT: ${ACCESS_DESK_WEB_PORT:?Set ACCESS_DESK_WEB_PORT in .env.}
-        ACCESS_DESK_API_PORT: ${ACCESS_DESK_API_PORT:?Set ACCESS_DESK_API_PORT in .env.}
-        ACCESS_DESK_GATEWAY_PORT: ${ACCESS_DESK_GATEWAY_PORT:?Set ACCESS_DESK_GATEWAY_PORT in .env.}
-    command: ["-c", "/etc/envoy/envoy.yaml"]
-    ports:
-      - target: ${ACCESS_DESK_API_PORT:?Set ACCESS_DESK_API_PORT in .env.}
-        host_ip: 127.0.0.1
-        published: ${ACCESS_DESK_API_PORT:?Set ACCESS_DESK_API_PORT in .env.}
-    volumes:
-      - ../packages/web/.certs:/certs:ro
-    depends_on:
-      gateway:
-        condition: service_healthy
+networks:
+  # The web client alone.
+  frontend:
+  # Envoy, and the gateway it passes calls on to.
+  ingress:
+  # The gateway, the application server, and PostgreSQL.
+  backend:
 
 volumes:
   # The databases of PostgreSQL. They outlast its container, until

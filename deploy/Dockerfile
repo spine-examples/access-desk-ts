@@ -63,6 +63,7 @@ ARG ACCESS_DESK_WEB_HOST
 ARG ACCESS_DESK_WEB_PORT
 ARG ACCESS_DESK_API_PORT
 ARG ACCESS_DESK_GATEWAY_PORT
+ARG ENVOY_ADMINISTRATION_PORT
 RUN node render.mjs > envoy.yaml
 
 # Envoy, pinned to an exact image, with that configuration.
