@@ -27,7 +27,7 @@ Every setting is required. Nothing is assumed: a program that misses a setting
 refuses to start and names it.
 
 | Variable                           | Read by             | Meaning                                                                                |
-| ---------------------------------- |---------------------|----------------------------------------------------------------------------------------|
+| ---------------------------------- | ------------------- | -------------------------------------------------------------------------------------- |
 | `ACCESS_DESK_SERVER_HOST`          | server, gateway     | The address the application server listens on.                                         |
 | `ACCESS_DESK_SERVER_PORT`          | server, gateway     | The port the application server listens on.                                            |
 | `ACCESS_DESK_ORGANIZATIONS`        | server, database    | The organizations the server keeps, by commas.                                         |
