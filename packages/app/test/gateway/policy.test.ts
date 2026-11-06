@@ -14,8 +14,8 @@
 
 import { create, type Message } from "@bufbuild/protobuf";
 import type { AuthenticatedPrincipal, IncomingRequest } from "@spine-event-engine/auth";
-import { AnyPacker, TypeUrls } from "@spine-event-engine/core";
-import { Filter_Operator, TargetSchema } from "@spine-event-engine/proto/client";
+import { AnyPacker, TypeUrls, type MessageSchema } from "@spine-event-engine/core";
+import { AppQuerySchema, Filter_Operator, TargetSchema } from "@spine-event-engine/proto/client";
 import { describe, expect, it, vi } from "vitest";
 import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 import { AddMemberSchema } from "@access-desk/identity-model/generated/accessdesk/identity/membership/commands_pb.js";
@@ -48,6 +48,14 @@ const principal: AuthenticatedPrincipal = {
 
 function command(message: Message, messageType = ""): IncomingRequest {
   return { kind: "command", message, messageType } as IncomingRequest;
+}
+
+/** An application query whose message is an empty one of a kind. */
+function appQuery(schema: MessageSchema): IncomingRequest {
+  return {
+    kind: "app-query",
+    query: create(AppQuerySchema, { message: AnyPacker.pack(schema, create(schema)) }),
+  } as IncomingRequest;
 }
 
 function target(schema: typeof MembershipViewSchema | typeof OrganizationViewSchema) {
@@ -139,6 +147,17 @@ describe("Gateway request classification should", () => {
     expect(Policy.concernsNoOrganization({ kind: "activate" } as IncomingRequest)).toBe(false);
     expect(Policy.concernsNoOrganization({ kind: "cancel" } as IncomingRequest)).toBe(false);
   });
+
+  it("route an application query by the kind of its message", () => {
+    expect(Policy.concernsNoOrganization(appQuery(AddMemberSchema))).toBe(true);
+    expect(Policy.concernsNoOrganization(appQuery(OpenResourceForRequestsSchema))).toBe(false);
+    expect(
+      Policy.concernsNoOrganization({
+        kind: "app-query",
+        query: create(AppQuerySchema),
+      } as IncomingRequest),
+    ).toBe(false);
+  });
 });
 
 describe("Gateway policy should", () => {
@@ -217,6 +236,16 @@ describe("Gateway policy should", () => {
     expect(await authorize(principal, command(create(AddOrganizationMemberSchema)))).toBe(false);
     expect(await authorize(principal, { kind: "activate" } as IncomingRequest)).toBe(true);
     expect(await authorize(principal, { kind: "cancel" } as IncomingRequest)).toBe(true);
+  });
+
+  it("refuse every application query, even to an administrator", async () => {
+    const member = Policy.authorization(desk() as unknown as AccessDesk);
+    const administrator = Policy.authorization(
+      desk(OrganizationRole.ADMINISTRATOR) as unknown as AccessDesk,
+    );
+
+    expect(await member(principal, appQuery(OrganizationViewSchema))).toBe(false);
+    expect(await administrator(principal, appQuery(OrganizationViewSchema))).toBe(false);
   });
 
   it("allow an administrator only the exact memberships query for their organization", async () => {

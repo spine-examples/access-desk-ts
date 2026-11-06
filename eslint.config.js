@@ -14,6 +14,7 @@
 
 import js from "@eslint/js";
 import eslintConfigPrettier from "eslint-config-prettier";
+import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
@@ -57,6 +58,11 @@ export default tseslint.config(
         },
       ],
     },
+  },
+  // The web client follows React's rules of hooks.
+  {
+    ...reactHooks.configs.flat.recommended,
+    files: ["packages/web/src/**/*.ts", "packages/web/src/**/*.tsx"],
   },
   eslintConfigPrettier,
 );

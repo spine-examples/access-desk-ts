@@ -12,7 +12,15 @@
  * and limitations under the License.
  */
 
-/**
- * Web package foundation. Browser behavior is introduced in a later iteration.
+/*
+ * Prints a new key for the gateway to sign, for the application server, who
+ * makes each request it passes on, ready for `ACCESS_DESK_FORWARDING_PROOF_KEY` in
+ * `.env`.
+ *
+ * It is 32 random bytes, written in base64. Keep it secret: whoever has it can
+ * pass a request on as anybody.
  */
-export {};
+
+import { randomBytes } from "node:crypto";
+
+console.log(randomBytes(32).toString("base64"));

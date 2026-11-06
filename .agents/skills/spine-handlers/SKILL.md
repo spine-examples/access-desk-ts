@@ -40,7 +40,9 @@ the **first** parameter, e.g. `@Subscribe onX(e: External<SomeEvent>)`.
    `model/proto/accessdesk/resources/access/request/`).
 3. Register it in the context factory: `.add(EntityClass)` (or
    `.add(EntityClass, { eventRouting })` for exact routing). Re-run the context
-   `server`'s `compose` + `handlers`.
+   `server`'s `compose` + `handlers`. `handlers` writes
+   `generated/spine-bootstrap.ts`, which the context factory imports first; keep
+   that import.
 4. Prove it with a `BlackBox` test importing the context from `dist/` (see
    `references/spine-ts.md`, Testing boundaries).
 
@@ -72,7 +74,7 @@ the field-absent case the assertion silently ignores. Depth in
 
 ## Reading another entity's state
 
-A PM or projection reads other entities with `this.select(Schema, {})`:
+A process manager reads other entities with `this.select(Schema, {})`:
 `.findById(id as never)` for one, or `.byId(...ids).read()` / `.all()` for many —
 **one query, not a loop of `findById`.** It reads any **query-visible** entity's
 state from the same stand the public client queries — a projection **or a

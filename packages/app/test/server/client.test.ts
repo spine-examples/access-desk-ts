@@ -19,7 +19,13 @@ import { OrganizationIdSchema } from "@access-desk/identity-model/generated/acce
 import { OrganizationViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
 import { OrganizationViewQuery } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_query.js";
 
-import { givenOrganization, givenServer, organizationView, type Hosted } from "./given/hosted.js";
+import {
+  FORWARDING_PROOF_KEY,
+  givenOrganization,
+  givenServer,
+  organizationView,
+  type Hosted,
+} from "./given/hosted.js";
 
 type ClientModule = typeof import("../../dist/src/server/client.js");
 let client: ClientModule;
@@ -42,7 +48,7 @@ async function hosted(): Promise<Hosted> {
 }
 
 function connectionTo(address: () => string) {
-  const connection = new client.ServerConnection(address);
+  const connection = new client.ServerConnection(address, FORWARDING_PROOF_KEY);
   closing.push(() => connection.close());
   return connection;
 }

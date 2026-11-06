@@ -25,6 +25,7 @@ import {
   TopicIdSchema,
   TopicSchema,
 } from "@spine-event-engine/proto/client";
+import { ForwardingProof } from "../forwarding-proof.js";
 
 /** A client of the application server for one organization, or for what belongs to none. */
 export type ServerClient = ReturnType<typeof Client.usingTransport>;
@@ -33,11 +34,14 @@ export type ServerClient = ReturnType<typeof Client.usingTransport>;
  * The one connection a program keeps to the application server.
  *
  * Each organization has a separate client, and all clients share this
- * connection.
+ * connection. Each call carries the token of own calls, as the application
+ * server refuses a call without one.
  */
 export class ServerConnection {
   /** Returns the address of the application server. */
   readonly #address: () => string;
+  /** The key the program proves its calls with, which the application server shares. */
+  readonly #key: Buffer;
   /** The connection, once the first client was made. */
   #open:
     | { sessions: Http2SessionManager; transport: ReturnType<typeof createGrpcTransport> }
@@ -52,9 +56,12 @@ export class ServerConnection {
    * @param address Returns the address of the application server. It is called
    *   when the connection is first needed, so the server need not listen
    *   before then.
+   * @param key The key the program proves its calls with, which the
+   *   application server shares.
    */
-  constructor(address: () => string) {
+  constructor(address: () => string, key: Buffer) {
     this.#address = address;
+    this.#key = key;
   }
 
   /**
@@ -94,7 +101,11 @@ export class ServerConnection {
       const sessions = new Http2SessionManager(baseUrl);
       this.#open = {
         sessions,
-        transport: createGrpcTransport({ baseUrl, sessionManager: sessions }),
+        transport: createGrpcTransport({
+          baseUrl,
+          sessionManager: sessions,
+          interceptors: [ForwardingProof.ownCalls(this.#key)],
+        }),
       };
     }
     return this.#open.transport;

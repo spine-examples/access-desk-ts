@@ -29,6 +29,7 @@ import { BrowserServer } from "@spine-event-engine/server/browser";
 import type { StorageFactory } from "@spine-event-engine/storage";
 import { ServerConnection } from "../server/client.js";
 import { AccessDesk } from "./access-desk.js";
+import { ForwardingProof } from "../forwarding-proof.js";
 import { Policy } from "./policy.js";
 import { routing } from "./routes/route.js";
 import { sessionRoutes } from "./routes/session-routes.js";
@@ -55,6 +56,12 @@ export interface GatewayOptions {
   readonly external: Readonly<Record<string, ExternalSignIn>>;
   /** The P-256 private key the gateway signs sessions with. */
   readonly sessionKey: KeyObject;
+  /**
+   * The key the gateway signs, for the application server, who makes each
+   * request it passes on, and each call it makes itself. The application
+   * server holds the same key.
+   */
+  readonly forwardingProofKey: Buffer;
   /** Where the gateway keeps its data, so it outlasts a restart. */
   readonly storage: {
     /** Where the gateway keeps the subscriptions people hold. */
@@ -88,7 +95,7 @@ export const Gateway = {
    * @returns The running gateway.
    */
   async start(options: GatewayOptions): Promise<Gateway> {
-    const server = new ServerConnection(() => options.backend);
+    const server = new ServerConnection(() => options.backend, options.forwardingProofKey);
     const desk = new AccessDesk(server);
     const origins = [...options.origins];
     const listening: { address?: string } = {};
@@ -107,6 +114,7 @@ export const Gateway = {
 
     const running = await BrowserServer.open(undefined, {
       backend: { baseUrl: options.backend },
+      forwardingProof: ForwardingProof.issuer(options.forwardingProofKey),
       bindings: watching,
       host: options.host ?? "127.0.0.1",
       port: options.port,

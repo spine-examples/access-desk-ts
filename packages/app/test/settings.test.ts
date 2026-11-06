@@ -12,7 +12,7 @@
  * and limitations under the License.
  */
 
-import { generateKeyPairSync } from "node:crypto";
+import { generateKeyPairSync, randomBytes } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
 import { Settings } from "../src/settings.js";
@@ -22,6 +22,12 @@ const SESSION_KEY = generateKeyPairSync("ec", { namedCurve: "P-256" })
   .privateKey.export({ type: "pkcs8", format: "der" })
   .toString("base64");
 
+/**
+ * A key the gateway signs who makes each request it passes on, and the
+ * application server checks it with, as `.env` holds it.
+ */
+const FORWARDING_PROOF_KEY = randomBytes(32);
+
 const server = {
   ACCESS_DESK_SERVER_HOST: "127.0.0.1",
   ACCESS_DESK_SERVER_PORT: "8090",
@@ -30,6 +36,7 @@ const server = {
   ACCESS_DESK_DATABASE_PORT: "5432",
   ACCESS_DESK_DATABASE_USER: "desk",
   ACCESS_DESK_DATABASE_PASSWORD: "secret",
+  ACCESS_DESK_FORWARDING_PROOF_KEY: FORWARDING_PROOF_KEY.toString("base64"),
 };
 const gateway = {
   ...server,
@@ -48,6 +55,7 @@ describe("The settings should", () => {
       listening: { host: "127.0.0.1", port: 8090 },
       organizations: ["teamdev", "codematters"],
       database: { host: "127.0.0.1", port: 5432, user: "desk", password: "secret" },
+      forwardingProofKey: FORWARDING_PROOF_KEY,
     });
   });
 
@@ -62,6 +70,7 @@ describe("The settings should", () => {
       database: { host: "127.0.0.1", port: 5432, user: "desk", password: "secret" },
     });
     expect(settings.sessionKey.asymmetricKeyDetails?.namedCurve).toBe("prime256v1");
+    expect(settings.forwardingProofKey).toEqual(FORWARDING_PROOF_KEY);
   });
 
   it("refuse organizations that are not listed one by one", () => {
@@ -81,10 +90,21 @@ describe("The settings should", () => {
 
   it("refuse to assume anything, and name every setting that is missing", () => {
     expect(() => Settings.ofServer({})).toThrow(
-      /ACCESS_DESK_SERVER_HOST is not set[\s\S]*ACCESS_DESK_SERVER_PORT is not set[\s\S]*ACCESS_DESK_ORGANIZATIONS is not set[\s\S]*ACCESS_DESK_DATABASE_HOST is not set[\s\S]*ACCESS_DESK_DATABASE_PORT is not set[\s\S]*ACCESS_DESK_DATABASE_USER is not set[\s\S]*ACCESS_DESK_DATABASE_PASSWORD is not set/,
+      /ACCESS_DESK_SERVER_HOST is not set[\s\S]*ACCESS_DESK_SERVER_PORT is not set[\s\S]*ACCESS_DESK_ORGANIZATIONS is not set[\s\S]*ACCESS_DESK_DATABASE_HOST is not set[\s\S]*ACCESS_DESK_DATABASE_PORT is not set[\s\S]*ACCESS_DESK_DATABASE_USER is not set[\s\S]*ACCESS_DESK_DATABASE_PASSWORD is not set[\s\S]*ACCESS_DESK_FORWARDING_PROOF_KEY is not set/,
     );
     expect(() => Settings.ofGateway({})).toThrow(
-      /ACCESS_DESK_GATEWAY_HOST[\s\S]*ACCESS_DESK_GATEWAY_PORT[\s\S]*ACCESS_DESK_SERVER_HOST[\s\S]*ACCESS_DESK_SERVER_PORT[\s\S]*ACCESS_DESK_WEB_HOST[\s\S]*ACCESS_DESK_WEB_PORT[\s\S]*GOOGLE_CLIENT_ID is not set[\s\S]*GOOGLE_CLIENT_SECRET is not set[\s\S]*ACCESS_DESK_DATABASE_HOST is not set[\s\S]*ACCESS_DESK_SESSION_KEY is not set/,
+      /ACCESS_DESK_GATEWAY_HOST[\s\S]*ACCESS_DESK_GATEWAY_PORT[\s\S]*ACCESS_DESK_SERVER_HOST[\s\S]*ACCESS_DESK_SERVER_PORT[\s\S]*ACCESS_DESK_WEB_HOST[\s\S]*ACCESS_DESK_WEB_PORT[\s\S]*GOOGLE_CLIENT_ID is not set[\s\S]*GOOGLE_CLIENT_SECRET is not set[\s\S]*ACCESS_DESK_DATABASE_HOST is not set[\s\S]*ACCESS_DESK_SESSION_KEY is not set[\s\S]*ACCESS_DESK_FORWARDING_PROOF_KEY is not set/,
+    );
+  });
+
+  it("refuse a forwarding proof key shorter than 32 bytes", () => {
+    expect(() =>
+      Settings.ofServer({
+        ...server,
+        ACCESS_DESK_FORWARDING_PROOF_KEY: randomBytes(16).toString("base64"),
+      }),
+    ).toThrow(
+      "ACCESS_DESK_FORWARDING_PROOF_KEY must be a key of at least 32 bytes, written in base64.",
     );
   });
 

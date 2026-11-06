@@ -44,7 +44,7 @@ belongs to; a person who was added shows there before they first sign in.
 ### Resources
 
 | Owner                      | Trigger (actor/event)              | Command                     | Event(s)                        | Rejections                           |
-| -------------------------- |------------------------------------| --------------------------- | ------------------------------- | ------------------------------------ |
+| -------------------------- | ---------------------------------- | --------------------------- | ------------------------------- | ------------------------------------ |
 | Organization               | Application Administrator          | Create Organization         | Organization Created            | Organization Already Exists          |
 | Organization               | Membership (PM), in Identity       | Add Organization Member     | Organization Member Added       | —                                    |
 | Resource Registration (PM) | Organization Administrator         | Register Resource           | Resource Registration Requested | —                                    |

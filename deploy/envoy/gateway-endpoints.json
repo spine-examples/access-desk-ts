@@ -1,0 +1,7 @@
+[
+  "/auth/options",
+  "/auth/external/start",
+  "/auth/external/complete",
+  "/auth/session",
+  "/auth/sign-out"
+]

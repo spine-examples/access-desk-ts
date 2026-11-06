@@ -19,7 +19,7 @@ Classify work before editing:
 - **High-risk:** new bounded context; Event Storming replacement; public/wire
   contract; tenant/security boundary;
   same-server command delivery; delivery strategy or Process Manager inbox
-  durability; outbox/relay; persistence
+  durability; persistence
   transaction/index; concurrency; idempotency; migration; or cross-context
   choreography.
 
@@ -35,8 +35,8 @@ requirements/architecture pass and explicit acceptance criteria.
 3. For an Event Storming update, first replace the canonical current model
    snapshot — the aggregates, process managers, and their command→event
    transitions the board shows — before changing code.
-4. Change shared target-command and integration Proto contracts first when the
-   behavior crosses a context boundary.
+4. Change the Proto contracts first when the behavior crosses a context
+   boundary.
 5. Generate code; never patch generated output.
 6. Implement one vertical behavior slice, including the projection/client
    effect needed to observe it.
@@ -82,9 +82,16 @@ convergence:
 2. targeted typecheck/lint for the affected package;
 3. deterministic unit tests;
 4. affected-context BlackBox tests;
-5. choreography and crash/replay tests for integration changes;
-6. gateway/browser tests for auth, subscriptions, and UI changes;
-7. workspace verification profile once repository scripts exist.
+5. choreography and crash/replay tests for a change that crosses contexts;
+6. gateway tests, in `packages/app/test/gateway`, for sign-in, sessions,
+   authorization, and subscriptions;
+7. `pnpm run verify`: build, typecheck, lint, and every test.
+
+Every test keeps its data in PostgreSQL, on the server `ACCESS_DESK_DATABASE_*`
+names, so the server must be running, as `pnpm run postgres:start` runs it. CI
+runs `pnpm run check` and then `pnpm run test` against PostgreSQL 18.6. The web
+client has no tests yet, so a change to it is checked by its build, typecheck,
+and lint, and by hand in a browser.
 
 Do not use arbitrary sleeps for domain-time tests. Use a test time provider
 installed through Spine's `Time` and bounded eventual assertions only for

@@ -1,0 +1,39 @@
+#
+# Copyright 2026 CodeMatters, Lda.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+# except in compliance with the License. You may obtain a copy of the License at
+#
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software distributed under
+# the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+# either express or implied. See the License for the specific language governing permissions
+# and limitations under the License.
+#
+
+#
+# What every answer of the page's server says about how the browser may use
+# it, errors included, hence `always`.
+#
+# Each `location` of `default.conf` includes this file. Headers set once on
+# the `server` would not do: a `location` with an `add_header` of its own
+# drops every `add_header` of the `server` around it.
+#
+
+# The page keeps its session in the browser tab, so a script it did not bring
+# must not run, nor send anything anywhere. The page:
+#
+# 1. runs only its own scripts and styles, and shows only its own images;
+# 2. calls only its own address and the application, at ACCESS_DESK_API_HOST
+#    and _PORT;
+# 3. embeds no plugins, and is embedded in no other page;
+# 4. sends forms only to its own address.
+add_header Content-Security-Policy "default-src 'self'; connect-src 'self' https://${ACCESS_DESK_API_HOST}:${ACCESS_DESK_API_PORT}; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'" always;
+
+# The browser takes a file for the type the answer names, never for one it
+# guesses.
+add_header X-Content-Type-Options "nosniff" always;
+
+# No request of the page names the page's address, which can hold the sign-in answer.
+add_header Referrer-Policy "no-referrer" always;

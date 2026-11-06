@@ -26,6 +26,7 @@ import { OrganizationMemberAddedSchema } from "@access-desk/resources-model/gene
 
 import {
   eventually,
+  FORWARDING_PROOF_KEY,
   givenOrganization,
   givenServer,
   auditTrailOf,
@@ -55,7 +56,11 @@ async function hosted(): Promise<Hosted> {
 }
 
 function membersOf(server: Hosted, patienceMs?: number) {
-  const members = module.ReachedOrganizationMembers.through(() => server.url, patienceMs);
+  const members = module.ReachedOrganizationMembers.through(
+    () => server.url,
+    FORWARDING_PROOF_KEY,
+    patienceMs,
+  );
   closing.push(() => members.close());
   return members;
 }

@@ -1,0 +1,73 @@
+#
+# Copyright 2026 CodeMatters, Lda.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+# except in compliance with the License. You may obtain a copy of the License at
+#
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software distributed under
+# the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+# either express or implied. See the License for the specific language governing permissions
+# and limitations under the License.
+#
+
+#
+# The web client's page, served as a hosting service serves it in production:
+# over HTTPS, at an address of its own, apart from the application it calls.
+#
+# 1. `/config.json` gets the page's settings, from the container's environment.
+# 2. A path in `assets/` gets that file, or `404`.
+# 3. Any other path gets its file, if there is one, or else the page itself,
+#    which shows the page of that path in the browser.
+#
+# The nginx image fills in the `ACCESS_DESK_` settings from the container's
+# environment when the container starts, and writes the result to
+# `/etc/nginx/conf.d/default.conf`. `compose.yaml` gives it the settings.
+#
+server {
+    # At the port the browser opens the page at, over HTTPS.
+    # The certificate is this machine's own, from `packages/web/.certs`,
+    # which `compose.yaml` mounts at `/certs`.
+    listen ${ACCESS_DESK_WEB_PORT} ssl;
+    http2 on;
+    ssl_certificate /certs/localhost.pem;
+    ssl_certificate_key /certs/localhost-key.pem;
+
+    # Answers do not name the version of nginx.
+    server_tokens off;
+
+    # The page's files, as Vite built them. The Dockerfile copies them here.
+    root /srv/web;
+
+    # Text is sent compressed. nginx compresses HTML unasked; the other types
+    # are listed.
+    gzip on;
+    gzip_types text/css application/javascript image/svg+xml;
+
+    # The page's settings, which it reads as it starts.
+    location = /config.json {
+        include /etc/nginx/conf.d/web-headers.inc;
+        add_header Cache-Control "no-cache" always;
+        default_type application/json;
+        return 200 '{"apiUrl":"https://${ACCESS_DESK_API_HOST}:${ACCESS_DESK_API_PORT}"}';
+    }
+
+    # Vite names each file here after its content, so a file never changes
+    # under its name, and the browser keeps it for a year without asking
+    # again. A file that is not here does not exist: the path gets `404`.
+    location /assets/ {
+        include /etc/nginx/conf.d/web-headers.inc;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        try_files $uri =404;
+    }
+
+    # Everything else: the icon, and the page at any of its own paths, such
+    # as `/organization`. The browser asks again each time, as the page names
+    # the files of the newest build.
+    location / {
+        include /etc/nginx/conf.d/web-headers.inc;
+        add_header Cache-Control "no-cache" always;
+        try_files $uri /index.html;
+    }
+}

@@ -38,6 +38,11 @@ export interface AccessDeskOptions {
    */
   readonly server: () => string;
   /**
+   * The key the gateway and the application server share. Identity proves its
+   * calls to the application server with a token derived from it.
+   */
+  readonly forwardingProofKey: Buffer;
+  /**
    * Where the application keeps its data: each organization apart, and
    * everything that belongs to no organization together.
    */
@@ -97,7 +102,7 @@ export const AccessDesk = {
     for (const organization of options.organizations) {
       await environment.tenantIndex.keep(AccessDesk.tenantOf(organization));
     }
-    const members = ReachedOrganizationMembers.through(options.server);
+    const members = ReachedOrganizationMembers.through(options.server, options.forwardingProofKey);
     const identity = await IdentityContext.create({ members });
     const resources = await ResourcesContext.create();
     return { identity, resources, members };

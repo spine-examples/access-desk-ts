@@ -2,8 +2,8 @@
 
 The application runs as two programs.
 
-- **The application server** hosts the Identity and Resources contexts. It
-  knows nothing of browsers, sessions, or identity providers.
+- **The application server** hosts the Identity and Resources bounded contexts.
+  It knows nothing of browsers, sessions, or identity providers.
 - **The gateway** signs people in, keeps their sessions, and decides what each
   may send on. It holds no part of the application and reaches the server over
   the network.
@@ -23,25 +23,28 @@ All of Access Desk is configured in one file, `.env`, in the root of the
 repository. Copy [`.env.example`](../../.env.example) there and fill it in.
 The file is ignored by Git.
 
-Every setting is required. Nothing is assumed: a program that misses a
-setting refuses to start and names it.
+Every setting is required. Nothing is assumed: a program that misses a setting
+refuses to start and names it.
 
-| Variable                        | Read by             | Meaning                                                |
-| ------------------------------- | ------------------- | ------------------------------------------------------ |
-| `ACCESS_DESK_SERVER_HOST`       | server, gateway     | The address the application server listens on.         |
-| `ACCESS_DESK_SERVER_PORT`       | server, gateway     | The port the application server listens on.            |
-| `ACCESS_DESK_ORGANIZATIONS`     | server              | The organizations the server keeps, by commas.         |
-| `ACCESS_DESK_GATEWAY_HOST`      | gateway, web client | The address the gateway listens on.                    |
-| `ACCESS_DESK_GATEWAY_PORT`      | gateway, web client | The port the gateway listens on.                       |
-| `ACCESS_DESK_WEB_HOST`          | gateway, web client | The address the web client listens on.                 |
-| `ACCESS_DESK_WEB_PORT`          | gateway, web client | The port the web client listens on.                    |
-| `GOOGLE_CLIENT_ID`              | gateway             | The client identifier of the Google OAuth application. |
-| `GOOGLE_CLIENT_SECRET`          | gateway             | The client secret of the Google OAuth application.     |
-| `ACCESS_DESK_DATABASE_HOST`     | server, gateway     | The address of the PostgreSQL server.                  |
-| `ACCESS_DESK_DATABASE_PORT`     | server, gateway     | The port of the PostgreSQL server.                     |
-| `ACCESS_DESK_DATABASE_USER`     | server, gateway     | The account to connect to it with.                     |
-| `ACCESS_DESK_DATABASE_PASSWORD` | server, gateway     | The password of that account, written as it is.        |
-| `ACCESS_DESK_SESSION_KEY`       | gateway             | The P-256 key sessions are signed with, in base64.     |
+| Variable                           | Read by             | Meaning                                                                                |
+| ---------------------------------- | ------------------- | -------------------------------------------------------------------------------------- |
+| `ACCESS_DESK_SERVER_HOST`          | server, gateway     | The address the application server listens on.                                         |
+| `ACCESS_DESK_SERVER_PORT`          | server, gateway     | The port the application server listens on.                                            |
+| `ACCESS_DESK_ORGANIZATIONS`        | server, database    | The organizations the server keeps, by commas.                                         |
+| `ACCESS_DESK_GATEWAY_HOST`         | gateway, web client | The address the gateway listens on.                                                    |
+| `ACCESS_DESK_GATEWAY_PORT`         | gateway, web client | The port the gateway listens on.                                                       |
+| `ACCESS_DESK_WEB_HOST`             | gateway, web client | The address the web client listens on, where Google sends people back.                 |
+| `ACCESS_DESK_WEB_PORT`             | gateway, web client | The port the web client listens on.                                                    |
+| `ACCESS_DESK_API_HOST`             | web client          | The address the page calls the application at.                                         |
+| `ACCESS_DESK_API_PORT`             | web client          | The port the page calls the application at.                                            |
+| `GOOGLE_CLIENT_ID`                 | gateway             | The client identifier of the Google OAuth application.                                 |
+| `GOOGLE_CLIENT_SECRET`             | gateway             | The client secret of the Google OAuth application.                                     |
+| `ACCESS_DESK_DATABASE_HOST`        | server, gateway     | The address of the PostgreSQL server.                                                  |
+| `ACCESS_DESK_DATABASE_PORT`        | server, gateway     | The port of the PostgreSQL server.                                                     |
+| `ACCESS_DESK_DATABASE_USER`        | server, gateway     | The account to connect to it with.                                                     |
+| `ACCESS_DESK_DATABASE_PASSWORD`    | server, gateway     | The password of that account, written as it is.                                        |
+| `ACCESS_DESK_SESSION_KEY`          | gateway             | The P-256 key sessions are signed with, in base64.                                     |
+| `ACCESS_DESK_FORWARDING_PROOF_KEY` | server, gateway     | The shared key of at least 32 bytes, in base64, proving every call made to the server. |
 
 People sign in through Google. If the gateway cannot reach Google when it
 starts, it does not start.
@@ -58,10 +61,13 @@ Docker. From the repository root:
 pnpm run postgres:start
 ```
 
-The command also creates any of the databases below that are missing.
-Spine creates the tables itself, but not the databases. `pnpm run postgres:stop` stops
-the PostgreSQL server, and `pnpm run postgres:delete` removes it along with
-all its data.
+Each time PostgreSQL starts, it creates any of the databases below that are
+missing. Running the command again after changing `ACCESS_DESK_ORGANIZATIONS`
+restarts it with the new setting.
+
+Spine creates the tables itself, but not the databases. `pnpm run postgres:stop`
+stops the PostgreSQL server. `pnpm run postgres:delete` removes it, and all
+its data.
 
 | Database                              | Used by            | What it stores                                                                                       |
 | ------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------- |
@@ -102,7 +108,8 @@ fixed for now, because Spine does not yet remember organizations added at
 runtime across restarts. To add an organization:
 
 1. Add it to `ACCESS_DESK_ORGANIZATIONS`.
-2. Run `pnpm run postgres:start` to create its database.
+2. Run `pnpm run postgres:start` to restart PostgreSQL with the new setting
+   and create its database.
 3. Restart the application server.
 
 #### Subscriptions
@@ -132,6 +139,16 @@ To generate a key:
 pnpm --dir packages/app run session-key
 ```
 
+The gateway signs each request it passes on to the application server, so the
+server knows who makes it. The gateway and the server send a token derived from
+the same key with the calls they make themselves, and the server refuses a call
+with neither. Both read the same `ACCESS_DESK_FORWARDING_PROOF_KEY`. To
+generate that key:
+
+```sh
+pnpm --dir packages/app run forwarding-proof-key
+```
+
 A signed token stays valid until it expires, even after the person signs out.
 So on sign-out, the gateway saves the token's identifier in
 `accessdesk_gateway` and rejects that token from then on. Once the token
@@ -146,17 +163,31 @@ layout as the application, and drops them when it finishes. See
 
 ## Run it
 
-Build once, then start each program in a separate terminal.
+1. Fill in `.env`, as [Set it up](#set-it-up) tells. The keys come from
+   `pnpm --dir packages/app run session-key` and
+   `pnpm --dir packages/app run forwarding-proof-key`.
+2. Start PostgreSQL, as [The database](#the-database) tells.
+3. Build once, then start each program in a separate terminal:
 
-```sh
-pnpm --dir packages/app run build
-pnpm --dir packages/app run server
-pnpm --dir packages/app run gateway
-```
+   ```sh
+   pnpm --dir packages/app run build
+   ```
+
+   ```sh
+   pnpm --dir packages/app run server
+   ```
+
+   ```sh
+   pnpm --dir packages/app run gateway
+   ```
+
+People open the application in the web client,
+[`packages/web`](../web/README.md). To run all of it laid out as in production
+instead, see [`deploy/README.md`](../../deploy/README.md).
 
 ## The gateway's endpoints
 
-The gateway has six dedicated endpoints, for signing in and for the session.
+The gateway has five dedicated endpoints, for signing in and for the session.
 Everything else a browser does is a Spine command, query, or subscription sent
 to the same address; see [What passes through](#what-passes-through).
 
@@ -273,12 +304,11 @@ Answers `200`:
 }
 ```
 
-| Field          | Value                                                                                           |
-| -------------- | ----------------------------------------------------------------------------------------------- |
-| `person`       | The signed-in person.                                                                           |
-| `accounts`     | The accounts the person signs in with, each by its provider and the name the provider gives it. |
-| `organization` | The organization the session works in, or `null` when the person belongs to none.               |
-| `role`         | `member` or `administrator`.                                                                    |
+| Field          | Value                                                                                                                                                               |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `person`       | The signed-in person.                                                                                                                                               |
+| `accounts`     | The accounts the person signs in with, each by its provider and the name the provider gives it.                                                                     |
+| `organization` | The organization the session works in, or `null` when the person belongs to none: its `id`, its `name`, and the person's `role` there, `member` or `administrator`. |
 
 A person who was added to an organization after they signed in sees it from
 their next sign-in.
@@ -314,6 +344,7 @@ organization.
 | `OpenResourceForRequests`, `CloseResourceForRequests`            | A manager of the resource, or an administrator.                            |
 | `RegisterResource`                                               | An administrator, for their organization.                                  |
 | Query or subscription on a read model                            | A member, as [What a member may read](#what-a-member-may-read) describes.  |
+| Opening or cancelling a subscription                             | The person who made it, in the organization they made it in.               |
 
 ### What a member may read
 
