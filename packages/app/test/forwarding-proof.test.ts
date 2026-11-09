@@ -47,7 +47,7 @@ describe("The application server should", () => {
     });
   });
 
-  it("refuse a command without a token, and not carry it out", async () => {
+  it("refuse a command without a token", async () => {
     const server = await Calls.server();
 
     await expect(

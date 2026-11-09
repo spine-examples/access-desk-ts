@@ -238,7 +238,7 @@ describe("Gateway policy should", () => {
     expect(await authorize(principal, { kind: "cancel" } as IncomingRequest)).toBe(true);
   });
 
-  it("refuse every application query, even to an administrator", async () => {
+  it("refuse every application query", async () => {
     const member = Policy.authorization(desk() as unknown as AccessDesk);
     const administrator = Policy.authorization(
       desk(OrganizationRole.ADMINISTRATOR) as unknown as AccessDesk,

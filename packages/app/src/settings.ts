@@ -64,9 +64,7 @@ export interface ServerSettings {
   readonly database: DatabaseServer;
   /**
    * The key the application server checks, with the gateway, who makes each
-   * request the gateway passes on. A token derived from it proves the
-   * server's calls to itself. The server refuses a call this key does not
-   * prove.
+   * request the gateway passes on.
    */
   readonly forwardingProofKey: ForwardingProofKey;
 }
