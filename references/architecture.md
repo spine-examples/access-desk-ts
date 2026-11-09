@@ -54,10 +54,10 @@ package, generated module, `BoundedContext` instance, repositories, storage
 layout, handlers, and ownership. Direct cross-context entity, repository, or
 application-service calls are forbidden.
 
-The contexts exchange no events. The one cross-context step is Identity
-adding a person to an organization's members in Resources: it sends Resources
-a command through a client of the application server, and waits for it to
-confirm, as the membership flow below describes. Shared packages may contain
+The contexts exchange no events. The one cross-context step is the Identity
+bounded context adding a person to an organization's members in the Resources
+bounded context: it sends a command there through a client of the application
+server, and waits for it to confirm, as the membership flow below describes. Shared packages may contain
 wire contracts and value types, but never another context's behavior or
 mutable state. A context that sends another a command depends on that
 context's model package for its schema.
@@ -74,16 +74,16 @@ Organization is the tenant.
 - An account is linked to its person once.
 - A person belongs to one organization, and stays in it. An administrator
   adds people to the organization by email address.
-- Identity keeps the membership of each email address, keyed by the address,
-  so an address belongs to one organization even when two administrators add
-  it at once. Each organization also keeps its members, by person and
-  email address, in Resources.
+- The Identity bounded context keeps the membership of each email address,
+  keyed by the address, so an address belongs to one organization even when
+  two administrators add it at once. Each organization also keeps its members,
+  by person and email address, in the Resources bounded context.
 - Adding an address registers it, the same way signing in does. When nobody
   has signed in under it yet, a new person is registered for it, without a
-  name or an account. Identity then has the organization add that person to
-  its members and waits for it to confirm. Only then is the address added, and
-  the person joins the organization. The application gives Identity a client of
-  the application server for this.
+  name or an account. The Identity bounded context then has the organization
+  add that person to its members and waits for it to confirm. Only then is the
+  address added, and the person joins the organization. The application gives
+  the Identity bounded context a client of the application server for this.
 - Whoever first signs in under an added address is that person. The sign-in
   adds their account, and gives the person their name.
 - A person who signs in works in the organization they belong to. A person who
@@ -94,8 +94,9 @@ Organization is the tenant.
 - A trusted gateway resolves the session it signed into the actor and their
   organization. Client command fields must not be trusted as actor or
   tenant authority.
-- Resources is multitenant. Identity is singletenant. The gateway carries the
-  signed-in person into Resources as the actor.
+- The Resources bounded context is multitenant, and the Identity bounded
+  context is single-tenant. The gateway carries the signed-in person into the
+  Resources bounded context as the actor.
 - Roles and permissions are organization-scoped. A role in one organization
   gives no authority in another.
 - Storage namespaces and context-prefixed kinds provide defense in depth; they
@@ -119,7 +120,8 @@ command only the application gives, such as creating a grant, is refused from
 any client. The gateway keeps dedicated endpoints only for signing in, the session, and
 signing out. Everything else is a command, a query, or a subscription it judges
 as it passes, including adding a member and reading who was added. A request to
-Identity names no organization, and the gateway refuses one that does.
+the Identity bounded context names no organization, and the gateway refuses one
+that does.
 
 The application server takes only calls proved with a key it shares with the
 gateway, and refuses any other before it reads it. The gateway signs each call
@@ -168,10 +170,11 @@ still performs coarse role- and tenant-level authorization of every command,
 query, and subscription as defense in depth; it never replaces the domain
 invariant, and a caller-supplied identifier is never authority.
 
-## Resources and policy ownership
+## Policy ownership in the Resources bounded context
 
-Resources is authoritative for organizations, their members, resources, and
-resource policy. Identity is authoritative for who belongs to which organization.
+The Resources bounded context is authoritative for organizations, their
+members, resources, and resource policy. The Identity bounded context is
+authoritative for who belongs to which organization.
 A resource carries descriptive catalog attributes — its
 identity, description, and category — that describe it for browsing but are not
 access decision rules.
@@ -345,10 +348,10 @@ For maximum-total-lifetime checks after a delayed scheduled approval, use the
 grant's effective start through the proposed new end, while preserving the
 originally requested interval for audit.
 
-## Audit (internal Resources component)
+## Audit in the Resources bounded context
 
-Audit is an internal component of Resources, not a separate context: audit
-projections built from Resources' durable facts. They must be idempotent,
+Audit is an internal component of the Resources bounded context, not a
+separate context: audit projections built from its durable facts. They must be idempotent,
 immutable, organization-scoped, and rebuildable from durable facts, recording
 actor, time, reason, related identifiers, correlation, and causation while
 redacting secrets, credentials, and unnecessary payload data. Audit ingestion

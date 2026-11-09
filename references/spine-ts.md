@@ -109,8 +109,8 @@ handler metadata of the package's decorated classes. The module that builds a
 context imports it first, `import "../generated/spine-bootstrap.js"`, so `add()`
 finds the metadata of each class.
 
-For one model to import another's `.proto` (e.g. Resources using Identity's
-`PersonId`), add the producer package to the consumer model's `spine-proto.json`
+For one model to import another's `.proto`, such as the model of the Resources
+bounded context using `PersonId` from the Identity bounded context, add the producer package to the consumer model's `spine-proto.json`
 `dependencies` **and** to its `package.json` `dependencies`, then `pnpm install`;
 declare transitive proto deps too. Reference cross-package types by full proto path
 (`accessdesk.identity.PersonId`). Spine value types are imported the same way:
@@ -144,7 +144,8 @@ is delivered. (`box.assertEvents()` does not include rejection events; subscribe
 ## Bounded contexts and handlers
 
 Choose `BoundedContext.singleTenant()` or `.multitenant()` explicitly. Access
-Desk uses a single-tenant Identity context and a multitenant Resources context.
+Desk uses a single-tenant Identity bounded context and a multitenant Resources
+bounded context.
 
 Use generated handler metadata with bare `@Assign`, `@Command`, `@React`, and
 `@Subscribe` decorators. Aggregates protect one consistency boundary;
@@ -288,9 +289,11 @@ Mark a cross-context event receptor with direct first-parameter
   production delivery guarantee.
 
 A single-tenant producer's event has no tenant, while a multitenant entity
-handler requires one, so a raw Identity event cannot reach a Resources handler.
-Access Desk needs no such delivery: Identity and Resources exchange no facts,
-and the gateway carries the signed-in person to Resources as the actor.
+handler requires one, so a raw event of the Identity bounded context cannot
+reach a handler of the Resources bounded context. Access Desk needs no such
+delivery: the Identity and Resources bounded contexts exchange no facts, and
+the gateway carries the signed-in person to the Resources bounded context as
+the actor.
 
 ## Protobuf Any and type registries
 
