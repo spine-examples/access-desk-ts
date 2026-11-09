@@ -91,5 +91,6 @@ then it reports itself healthy. The databases are kept in the volume
 4. Open the address of `web` and sign in.
 
 After a change to the code or to `.env`, run `pnpm run containers:start`
-again. Stop the containers with `pnpm run containers:stop`; remove them with
-every database with `pnpm run postgres:delete`.
+again. Stop the containers with `pnpm run containers:stop`, and remove them
+with `pnpm run containers:delete`, which keeps the databases. Remove PostgreSQL
+with every database with `pnpm run postgres:delete`; the other containers stay.

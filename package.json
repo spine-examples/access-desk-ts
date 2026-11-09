@@ -24,9 +24,10 @@
     "verify": "pnpm run check && pnpm run test",
     "postgres:start": "docker compose --env-file .env --file deploy/compose.yaml up --detach --wait postgres",
     "postgres:stop": "docker compose --env-file .env --file deploy/compose.yaml stop postgres",
-    "postgres:delete": "docker compose --env-file .env --file deploy/compose.yaml down --volumes",
+    "postgres:delete": "docker compose --env-file .env --file deploy/compose.yaml rm --stop --force postgres && docker volume rm --force access-desk_postgres-data",
     "containers:start": "docker compose --env-file .env --file deploy/compose.yaml up --build --detach --wait",
-    "containers:stop": "docker compose --env-file .env --file deploy/compose.yaml stop"
+    "containers:stop": "docker compose --env-file .env --file deploy/compose.yaml stop",
+    "containers:delete": "docker compose --env-file .env --file deploy/compose.yaml down"
   },
   "devDependencies": {
     "@bufbuild/protobuf": "2.12.1",

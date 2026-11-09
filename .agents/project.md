@@ -118,8 +118,9 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
   starts, a `post_start` hook makes the databases the settings name that are
   missing, with `deploy/postgres/initdb/01-databases.sh`. `delete` also
   deletes its data.
-- `pnpm run containers:start` / `containers:stop` — the whole application laid
-  out as in production, as `deploy/README.md` describes.
+- `pnpm run containers:start` / `containers:stop` / `containers:delete` — the
+  whole application laid out as in production, as `deploy/README.md`
+  describes. `delete` removes the containers and keeps the databases.
 - `pnpm --dir packages/web run dev` — the web client's development server, over
   HTTPS with the certificate `pnpm --dir packages/web run cert` makes.
 - `pnpm --dir packages/app run session-key` — prints a new key for
