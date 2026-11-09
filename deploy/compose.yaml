@@ -29,6 +29,11 @@ name: access-desk
 # The port of Envoy's administration interface, inside its container only.
 x-envoy-administration-port: &envoy-administration-port "9901"
 
+# This machine's certificate, as `web` and `envoy` find it once
+# `packages/web/.certs` is mounted at `/certs`.
+x-certificate: &certificate "/certs/localhost.pem"
+x-certificate-key: &certificate-key "/certs/localhost-key.pem"
+
 services:
   # The PostgreSQL server of the application server and the gateway.
   # Each time it starts, it makes the missing databases, such as one of an
@@ -165,11 +170,15 @@ services:
         ACCESS_DESK_WEB_HOST: ${ACCESS_DESK_WEB_HOST:?Set ACCESS_DESK_WEB_HOST in .env.}
         ACCESS_DESK_WEB_PORT: ${ACCESS_DESK_WEB_PORT:?Set ACCESS_DESK_WEB_PORT in .env.}
         ACCESS_DESK_API_PORT: ${ACCESS_DESK_API_PORT:?Set ACCESS_DESK_API_PORT in .env.}
+        ACCESS_DESK_GATEWAY_HOST: gateway
         ACCESS_DESK_GATEWAY_PORT: ${ACCESS_DESK_GATEWAY_PORT:?Set ACCESS_DESK_GATEWAY_PORT in .env.}
-        ENVOY_ADMINISTRATION_PORT: *envoy-administration-port
+        ACCESS_DESK_ENVOY_ADMINISTRATION_PORT: *envoy-administration-port
+        ACCESS_DESK_ENVOY_CERTIFICATE: *certificate
+        ACCESS_DESK_ENVOY_CERTIFICATE_KEY: *certificate-key
     command: ["-c", "/etc/envoy/envoy.yaml"]
     environment:
-      ENVOY_ADMINISTRATION_PORT: *envoy-administration-port
+      # For the healthcheck, which runs inside the container.
+      ACCESS_DESK_ENVOY_ADMINISTRATION_PORT: *envoy-administration-port
     ports:
       - target: ${ACCESS_DESK_API_PORT:?Set ACCESS_DESK_API_PORT in .env.}
         host_ip: 127.0.0.1
@@ -188,7 +197,7 @@ services:
           "CMD",
           "bash",
           "-c",
-          "exec 3<>/dev/tcp/127.0.0.1/$${ENVOY_ADMINISTRATION_PORT} && printf 'GET /ready HTTP/1.1\\r\\nHost: 127.0.0.1\\r\\nConnection: close\\r\\n\\r\\n' >&3 && read -r status <&3 && [[ $$status == *' 200 '* ]]",
+          "exec 3<>/dev/tcp/127.0.0.1/$${ACCESS_DESK_ENVOY_ADMINISTRATION_PORT} && printf 'GET /ready HTTP/1.1\\r\\nHost: 127.0.0.1\\r\\nConnection: close\\r\\n\\r\\n' >&3 && read -r status <&3 && [[ $$status == *' 200 '* ]]",
         ]
       interval: 2s
       timeout: 2s
@@ -205,6 +214,8 @@ services:
     environment:
       NGINX_ENVSUBST_FILTER: ^ACCESS_DESK_
       ACCESS_DESK_WEB_PORT: ${ACCESS_DESK_WEB_PORT:?Set ACCESS_DESK_WEB_PORT in .env.}
+      ACCESS_DESK_WEB_CERTIFICATE: *certificate
+      ACCESS_DESK_WEB_CERTIFICATE_KEY: *certificate-key
       ACCESS_DESK_API_HOST: ${ACCESS_DESK_API_HOST:?Set ACCESS_DESK_API_HOST in .env.}
       ACCESS_DESK_API_PORT: ${ACCESS_DESK_API_PORT:?Set ACCESS_DESK_API_PORT in .env.}
     ports:

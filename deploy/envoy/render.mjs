@@ -35,12 +35,18 @@
  *
  * Envoy reports whether it is ready to pass calls on at `/ready` of its
  * administration interface, which listens only inside its container, at
- * `127.0.0.1` and `ENVOY_ADMINISTRATION_PORT`. That port is no setting of
- * `.env`: `compose.yaml` gives it, to this script and to the healthcheck.
+ * `127.0.0.1` and `ACCESS_DESK_ENVOY_ADMINISTRATION_PORT`.
  *
- * Run it from this directory, with `ACCESS_DESK_WEB_HOST`, `ACCESS_DESK_WEB_PORT`,
- * `ACCESS_DESK_API_PORT`, `ACCESS_DESK_GATEWAY_PORT`, and
- * `ENVOY_ADMINISTRATION_PORT` in the environment:
+ * Envoy takes the calls with the certificate at
+ * `ACCESS_DESK_ENVOY_CERTIFICATE` and its key at
+ * `ACCESS_DESK_ENVOY_CERTIFICATE_KEY`, and finds the gateway at
+ * `ACCESS_DESK_GATEWAY_HOST` and `_PORT`.
+ *
+ * Run it from this directory, with these in the environment:
+ * `ACCESS_DESK_WEB_HOST`, `ACCESS_DESK_WEB_PORT`, `ACCESS_DESK_API_PORT`,
+ * `ACCESS_DESK_GATEWAY_HOST`, `ACCESS_DESK_GATEWAY_PORT`,
+ * `ACCESS_DESK_ENVOY_ADMINISTRATION_PORT`, `ACCESS_DESK_ENVOY_CERTIFICATE`, and
+ * `ACCESS_DESK_ENVOY_CERTIFICATE_KEY`:
  *
  *   node render.mjs > envoy.yaml
  */
@@ -48,13 +54,6 @@ import process from "node:process";
 
 import gatewayEndpoints from "./gateway-endpoints.json" with { type: "json" };
 import spineMethods from "./spine-methods.json" with { type: "json" };
-
-/** The gateway's container, and where Envoy finds its certificate. */
-const CONTAINERS = {
-  gateway: "gateway",
-  certificate: "/certs/localhost.pem",
-  key: "/certs/localhost-key.pem",
-};
 
 /** The largest Spine call Envoy passes on: 1 MiB. */
 const SPINE_CALL_BYTES = 1_048_576;
@@ -88,8 +87,17 @@ const AccessDeskEnvoy = {
     const port = AccessDeskEnvoy.setting(environment, "ACCESS_DESK_WEB_PORT");
     const origin = new URL(`https://${host}:${port}`).origin;
     const listenPort = AccessDeskEnvoy.setting(environment, "ACCESS_DESK_API_PORT");
+    const gatewayHost = AccessDeskEnvoy.setting(environment, "ACCESS_DESK_GATEWAY_HOST");
     const gatewayPort = AccessDeskEnvoy.setting(environment, "ACCESS_DESK_GATEWAY_PORT");
-    const administrationPort = AccessDeskEnvoy.setting(environment, "ENVOY_ADMINISTRATION_PORT");
+    const certificate = AccessDeskEnvoy.setting(environment, "ACCESS_DESK_ENVOY_CERTIFICATE");
+    const certificateKey = AccessDeskEnvoy.setting(
+      environment,
+      "ACCESS_DESK_ENVOY_CERTIFICATE_KEY",
+    );
+    const administrationPort = AccessDeskEnvoy.setting(
+      environment,
+      "ACCESS_DESK_ENVOY_ADMINISTRATION_PORT",
+    );
     const routes = [
       ...spineMethods.map((path) => ({
         path,
@@ -117,8 +125,8 @@ static_resources:
               "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
               common_tls_context:
                 tls_certificates:
-                  - certificate_chain: { filename: ${CONTAINERS.certificate} }
-                    private_key: { filename: ${CONTAINERS.key} }
+                  - certificate_chain: { filename: ${certificate} }
+                    private_key: { filename: ${certificateKey} }
           filters:
             - name: envoy.filters.network.http_connection_manager
               typed_config:
@@ -164,7 +172,7 @@ ${routes.map((route) => AccessDeskEnvoy.routes(route)).join("\n")}
           - lb_endpoints:
               - endpoint:
                   address:
-                    socket_address: { address: ${CONTAINERS.gateway}, port_value: ${gatewayPort} }
+                    socket_address: { address: ${gatewayHost}, port_value: ${gatewayPort} }
 `;
   },
 

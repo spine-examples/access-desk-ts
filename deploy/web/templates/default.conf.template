@@ -28,11 +28,11 @@
 server {
     # At the port the browser opens the page at, over HTTPS.
     # The certificate is this machine's own, from `packages/web/.certs`,
-    # which `compose.yaml` mounts at `/certs`.
+    # at the paths `compose.yaml` gives.
     listen ${ACCESS_DESK_WEB_PORT} ssl;
     http2 on;
-    ssl_certificate /certs/localhost.pem;
-    ssl_certificate_key /certs/localhost-key.pem;
+    ssl_certificate ${ACCESS_DESK_WEB_CERTIFICATE};
+    ssl_certificate_key ${ACCESS_DESK_WEB_CERTIFICATE_KEY};
 
     # Answers do not name the version of nginx.
     server_tokens off;
