@@ -78,9 +78,6 @@ const SUBSCRIPTION_STREAM = "/spine.client.SubscriptionService/Activate";
 const AccessDeskEnvoy = {
   /**
    * Renders the configuration.
-   *
-   * @param {NodeJS.ProcessEnv} environment Where the settings are read.
-   * @returns {string} The configuration, as YAML.
    */
   render(environment) {
     const host = AccessDeskEnvoy.setting(environment, "ACCESS_DESK_WEB_HOST");
@@ -184,9 +181,6 @@ ${routes.map((route) => AccessDeskEnvoy.routes(route)).join("\n")}
    * 2. The browser's question whether the page may make the call is answered
    *    by Envoy's CORS rules.
    * 3. Any other such question gets an empty answer, which allows nothing.
-   *
-   * @param {{ path: string, timeoutMs: number, maxRequestBytes: number }} route The call.
-   * @returns {string} The routes, as YAML.
    */
   routes({ path, timeoutMs, maxRequestBytes }) {
     const timeout = `timeout: ${String(timeoutMs / 1000)}s`;
@@ -210,9 +204,6 @@ ${limit}
    *
    * An endpoint must not take the path of a Spine method, and must name one
    * exact path, so Envoy passes on nothing else.
-   *
-   * @param {string} path The endpoint's path.
-   * @returns {string} The path.
    */
   endpoint(path) {
     if (spineMethods.includes(path)) {
@@ -226,10 +217,6 @@ ${limit}
 
   /**
    * Reads a required setting.
-   *
-   * @param {NodeJS.ProcessEnv} environment Where the settings are read.
-   * @param {string} name The setting.
-   * @returns {string} Its value.
    */
   setting(environment, name) {
     const value = environment[name];

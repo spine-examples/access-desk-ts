@@ -18,11 +18,21 @@
 #
 #   docker compose --env-file .env --file deploy/compose.yaml ...
 #
-# Three containers are published on this machine:
+# The containers, and where each is published on this machine:
 #
-#   postgres  For the tests, and to look into the databases directly.
-#   envoy     The way in to the application server.
-#   web       The web client.
+#   web       The web client, served by nginx.
+#             https://<ACCESS_DESK_WEB_HOST>:<ACCESS_DESK_WEB_PORT>
+#   envoy     An Envoy proxy that takes the web client's calls over HTTPS and
+#             passes them on to the gateway.
+#             https://<ACCESS_DESK_API_HOST>:<ACCESS_DESK_API_PORT>
+#   gateway   The framework's browser server: signs people in through Google
+#             and passes their allowed gRPC-Web calls on to the server.
+#             Not published.
+#   server    The gRPC server of the Identity and Resources bounded contexts.
+#             Not published.
+#   postgres  The databases of the application server and the gateway.
+#             <ACCESS_DESK_DATABASE_HOST>:<ACCESS_DESK_DATABASE_PORT>, for the
+#             tests.
 #
 name: access-desk
 
@@ -84,12 +94,11 @@ services:
       timeout: 3s
       retries: 30
 
-  # The application server, with the Identity and Resources contexts. It is
-  # not published: only the gateway calls it.
+  # The application server, with the Identity and Resources contexts.
+  # It is not published: only the gateway calls it.
   server:
     image: access-desk:local
     build:
-      # The files the Dockerfile copies from: the whole repository.
       context: ..
       dockerfile: deploy/Dockerfile
       target: application
@@ -245,6 +254,6 @@ networks:
   backend:
 
 volumes:
-  # The databases of PostgreSQL. They outlast its container, until
-  # `pnpm run postgres:delete`.
+  # The databases of the application server and the gateway.
+  # They outlast the `postgres` container and are removed only by `pnpm run postgres:delete`.
   postgres-data:

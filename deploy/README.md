@@ -3,15 +3,30 @@
 Runs Access Desk on a developer's machine, each program in a container of its
 own, laid out as in production.
 
-| Container  | What it runs                                                                        | Published on this machine at                                                                             |
-| ---------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `web`      | The web client, served by nginx as a hosting service would.                         | `https://<ACCESS_DESK_WEB_HOST>:<ACCESS_DESK_WEB_PORT>`                                                  |
-| `envoy`    | The entrance to the application: takes the web client's calls and passes them on.   | `https://<ACCESS_DESK_API_HOST>:<ACCESS_DESK_API_PORT>`                                                  |
-| `gateway`  | The gateway: signs people in, keeps their sessions, and decides what they may call. | Not published.                                                                                           |
-| `server`   | The application server, with the Identity and Resources bounded contexts.           | Not published.                                                                                           |
-| `postgres` | PostgreSQL, with the databases of the application server and the gateway.           | `<ACCESS_DESK_DATABASE_HOST>:<ACCESS_DESK_DATABASE_PORT>`, for the tests and to look into the databases. |
+| Container  | What it runs                                                                                                             | Published at                                                              |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| `web`      | The web client, served by nginx.                                                                                         | `https://<ACCESS_DESK_WEB_HOST>:<ACCESS_DESK_WEB_PORT>`                   |
+| `envoy`    | An Envoy proxy that takes the web client's calls over HTTPS and passes them on to the gateway.                           | `https://<ACCESS_DESK_API_HOST>:<ACCESS_DESK_API_PORT>`                   |
+| `gateway`  | The framework's browser server: signs people in through Google and passes their allowed gRPC-Web calls on to the server. | Not published.                                                            |
+| `server`   | The gRPC server of the Identity and Resources bounded contexts.                                                          | Not published.                                                            |
+| `postgres` | The databases of the application server and the gateway.                                                                 | `<ACCESS_DESK_DATABASE_HOST>:<ACCESS_DESK_DATABASE_PORT>`, for the tests. |
 
-`gateway` and `server` run from one image, each with its own program.
+The names in angle brackets are environment variables from `.env`.
+
+`envoy`, `gateway`, `server`, and `postgres` together make up the API. The web
+client reaches the API at one address.
+
+```mermaid
+flowchart LR
+  Browser --> Web[web]
+  Browser --> Envoy
+  subgraph API
+    Envoy[envoy] --> Gateway[gateway]
+    Gateway --> Server[server]
+    Server --> Postgres[postgres]
+    Gateway --> Postgres
+  end
+```
 
 The containers are joined by separate networks, so each one reaches only the
 containers it calls:
@@ -20,37 +35,38 @@ containers it calls:
 - `envoy` reaches only `gateway`.
 - `gateway` reaches `server` and `postgres`.
 
-```mermaid
-flowchart LR
-  Browser -->|HTTPS, the web client| Web[web]
-  Browser -->|HTTPS, its calls| Envoy[envoy]
-  Envoy -->|Spine methods, /auth/| Gateway[gateway]
-  Gateway --> Server[server]
-  Server --> Postgres[postgres]
-  Gateway --> Postgres
-```
-
 ## web
 
 nginx serves the built web client over HTTPS, as a hosting service would. At
-`/config.json` it gives the address of `envoy`, `ACCESS_DESK_API_HOST` and
-`_PORT`, which the web client calls. Its configuration is in
+`/config.json` it gives the address of `envoy`, from `ACCESS_DESK_API_HOST` and
+`ACCESS_DESK_API_PORT`, which the web client calls. The paths of the
+certificate come from `compose.yaml`. The configuration of nginx is in
 [`web/templates/`](web/templates).
 
 ## envoy
 
-Takes the web client's calls over HTTPS, only from the address of `web`, and
-passes on to `gateway` only those `gateway` serves; it refuses the rest. The
-paths it passes on are in [`envoy/spine-methods.json`](envoy/spine-methods.json)
-and [`envoy/gateway-endpoints.json`](envoy/gateway-endpoints.json): add a new
-endpoint of `gateway` there too.
+Takes the web client's calls over HTTPS, and answers the browser's
+cross-origin checks only for the address of `web`. It passes on to `gateway`
+only the paths `gateway` serves, and refuses the rest. The paths are listed in
+[`envoy/spine-methods.json`](envoy/spine-methods.json), the framework's
+methods, and in [`envoy/gateway-endpoints.json`](envoy/gateway-endpoints.json),
+the gateway's own endpoints. A new endpoint of `gateway` goes into the second.
 
-[`envoy/render.mjs`](envoy/render.mjs) renders its configuration from `.env`
-when the image is built.
+[`envoy/render.mjs`](envoy/render.mjs) renders the configuration when the image
+is built, from `.env` and from `compose.yaml`, which gives the address of
+`gateway`, the paths of the certificate, and the port of the administration
+interface.
 
 It reports itself healthy once it is ready to pass calls on, as `/ready` of
 its administration interface answers. That interface listens only inside the
-container, at the port `compose.yaml` gives it, and is not published.
+container and is not published.
+
+## gateway and server
+
+Both run from one image, each started with its own command from
+`compose.yaml`. Both need the same `ACCESS_DESK_FORWARDING_PROOF_KEY`: without
+it neither starts, and with different keys `server` refuses every call of
+`gateway`.
 
 ## postgres
 
