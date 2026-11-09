@@ -11,8 +11,7 @@ routing source of truth.
   documentation, entity options, and append-only schema evolution.
 - `spine-handlers`: choose the right Spine decorator
   (`@Assign`/`@Command`/`@React`/`@Subscribe`) and wire an aggregate, projection,
-  or process manager under `packages/*/server/src`, avoiding the framework
-  gotchas (value-object ids, `ok`-acking rejections).
+  or process manager under `packages/*/server/src`.
 - `write-tests`: lay out and write server-side `BlackBox` tests under
   `packages/*/server/test` — one file per entity plus one process integration,
   `given/` fixtures, generic helper reuse, and event/rejection
