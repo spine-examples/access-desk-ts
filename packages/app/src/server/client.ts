@@ -25,7 +25,7 @@ import {
   TopicIdSchema,
   TopicSchema,
 } from "@spine-event-engine/proto/client";
-import { ForwardingProof } from "../forwarding-proof.js";
+import { ForwardingProof, type ForwardingProofKey } from "../forwarding-proof.js";
 
 /** A client of the application server for one organization, or for what belongs to none. */
 export type ServerClient = ReturnType<typeof Client.usingTransport>;
@@ -41,7 +41,7 @@ export class ServerConnection {
   /** Returns the address of the application server. */
   readonly #address: () => string;
   /** The key the program proves its calls with, which the application server shares. */
-  readonly #key: Buffer;
+  readonly #key: ForwardingProofKey;
   /** The connection, once the first client was made. */
   #open:
     | { sessions: Http2SessionManager; transport: ReturnType<typeof createGrpcTransport> }
@@ -59,7 +59,7 @@ export class ServerConnection {
    * @param key The key the program proves its calls with, which the
    *   application server shares.
    */
-  constructor(address: () => string, key: Buffer) {
+  constructor(address: () => string, key: ForwardingProofKey) {
     this.#address = address;
     this.#key = key;
   }

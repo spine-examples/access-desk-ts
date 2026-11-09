@@ -26,6 +26,7 @@ import type { StorageFactory } from "@spine-event-engine/storage";
 import { IdentityContext } from "@access-desk/identity-server";
 import { ResourcesContext } from "@access-desk/resources-server";
 import { typeRegistry } from "../../generated/model-registry.js";
+import type { ForwardingProofKey } from "../forwarding-proof.js";
 import { ReachedOrganizationMembers } from "./organization-members.js";
 
 /** How the application is assembled. */
@@ -41,7 +42,7 @@ export interface AccessDeskOptions {
    * The key the gateway and the application server share. Identity proves its
    * calls to the application server with a token derived from it.
    */
-  readonly forwardingProofKey: Buffer;
+  readonly forwardingProofKey: ForwardingProofKey;
   /**
    * Where the application keeps its data: each organization apart, and
    * everything that belongs to no organization together.

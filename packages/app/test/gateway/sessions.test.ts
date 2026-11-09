@@ -12,7 +12,6 @@
  * and limitations under the License.
  */
 
-import { generateKeyPairSync } from "node:crypto";
 import { create } from "@bufbuild/protobuf";
 import { timestampFromMs } from "@bufbuild/protobuf/wkt";
 import { Time } from "@spine-event-engine/core/time";
@@ -24,6 +23,7 @@ import { RevokedTokens } from "../../src/gateway/revoked-tokens.js";
 import { Sessions } from "../../src/gateway/sessions.js";
 import {
   failingWhenTold,
+  newSessionKey,
   notingStops,
   person,
   request,
@@ -135,7 +135,7 @@ describe("Gateway sessions should", () => {
 
   it("refuse a token signed with another key", async () => {
     const other = new Sessions({
-      key: generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey,
+      key: newSessionKey(),
       revoked,
     });
     const forged = await other.issue(person);

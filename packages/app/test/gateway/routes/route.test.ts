@@ -12,13 +12,13 @@
  * and limitations under the License.
  */
 
-import { generateKeyPairSync } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
 import { typeRegistry } from "../../../generated/model-registry.js";
 import { RevokedTokens } from "../../../src/gateway/revoked-tokens.js";
 import { routing } from "../../../src/gateway/routes/route.js";
 import { Sessions } from "../../../src/gateway/sessions.js";
+import { newSessionKey } from "../given/sessions.js";
 
 let storage: TestStorage;
 let revoked: Awaited<ReturnType<typeof RevokedTokens.open>>;
@@ -27,7 +27,7 @@ beforeEach(async () => {
   storage = await TestStorages.singleTenant(typeRegistry);
   revoked = await RevokedTokens.open(storage.url);
   sessions = new Sessions({
-    key: generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey,
+    key: newSessionKey(),
     revoked,
   });
 });

@@ -60,7 +60,23 @@ export const ORIGIN = "http://app.test";
 export const CALLBACK = "https://app.test/signed-in";
 
 /** The key the gateways of the tests sign sessions with. */
-export const SESSION_KEY = generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey;
+export const SESSION_KEY = await sessionKey();
+
+/**
+ * Creates the key the gateways of the tests sign sessions with, as the
+ * compiled gateway takes it.
+ */
+async function sessionKey(): Promise<import("../../../dist/src/index.js").SessionKey> {
+  const app: AppModule = await import("../../../dist/src/index.js");
+  const text = generateKeyPairSync("ec", { namedCurve: "P-256" })
+    .privateKey.export({ type: "pkcs8", format: "der" })
+    .toString("base64");
+  const key = app.SessionKey.fromBase64(text);
+  if (key === undefined) {
+    throw new Error("A new P-256 key cannot be read back.");
+  }
+  return key;
+}
 
 /** The running application behind its gateway. */
 export interface Running {

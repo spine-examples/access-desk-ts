@@ -12,7 +12,6 @@
  * and limitations under the License.
  */
 
-import { createHash, createPublicKey, type KeyObject } from "node:crypto";
 import {
   SignedSessions,
   type AuthenticatedPrincipal,
@@ -29,6 +28,7 @@ import {
   type OrganizationId,
 } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import type { SignedIn } from "./access-desk.js";
+import type { SessionKey } from "./session-key.js";
 
 /** The principal attribute that holds a session's identifier. */
 export const SESSION = "session";
@@ -103,8 +103,8 @@ export interface Issued {
 
 /** How the sessions are kept. */
 export interface SessionsOptions {
-  /** The P-256 private key the gateway signs sessions with. */
-  readonly key: KeyObject;
+  /** The key the gateway signs sessions with. */
+  readonly key: SessionKey;
   /** The tokens of the sessions people ended before they expired. */
   readonly revoked: SignedTokenRevocation;
   /** The subscriptions held under the sessions. */
@@ -135,7 +135,7 @@ export class Sessions {
     this.#sessions = new SignedSessions({
       issuer: ISSUER,
       audience: AUDIENCE,
-      activeKey: { kid: Sessions.#keyIdOf(options.key), privateKey: options.key },
+      activeKey: options.key.signing(),
       revocation: {
         kind: "supported",
         isRevoked: (id) => revoked.isRevoked(id),
@@ -305,16 +305,5 @@ export class Sessions {
     } catch {
       return undefined;
     }
-  }
-
-  /**
-   * Derives the identifier of a signing key, written in every token it signs.
-   *
-   * It comes from the public half of the key, so the same key always
-   * has the same identifier, and the identifier tells nothing secret.
-   */
-  static #keyIdOf(key: KeyObject): string {
-    const publicKey = createPublicKey(key).export({ type: "spki", format: "der" });
-    return createHash("sha256").update(publicKey).digest("base64url").slice(0, 16);
   }
 }

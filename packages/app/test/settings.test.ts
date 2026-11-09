@@ -12,7 +12,7 @@
  * and limitations under the License.
  */
 
-import { generateKeyPairSync, randomBytes } from "node:crypto";
+import { createHmac, generateKeyPairSync, randomBytes } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
 import { Settings } from "../src/settings.js";
@@ -27,6 +27,12 @@ const SESSION_KEY = generateKeyPairSync("ec", { namedCurve: "P-256" })
  * application server checks it with, as `.env` holds it.
  */
 const FORWARDING_PROOF_KEY = randomBytes(32);
+
+/** Something the tests sign, to tell which key the settings hold. */
+const SIGNED = new TextEncoder().encode("signed");
+
+/** The signature of `SIGNED` with the forwarding proof key `.env` holds. */
+const SIGNATURE = createHmac("sha256", FORWARDING_PROOF_KEY).update(SIGNED).digest("base64url");
 
 const server = {
   ACCESS_DESK_SERVER_HOST: "127.0.0.1",
@@ -51,12 +57,14 @@ const gateway = {
 
 describe("The settings should", () => {
   it("give where the application server listens, which organizations it keeps, and where it keeps its data", () => {
-    expect(Settings.ofServer(server)).toEqual({
+    const settings = Settings.ofServer(server);
+
+    expect(settings).toMatchObject({
       listening: { host: "127.0.0.1", port: 8090 },
       organizations: ["teamdev", "codematters"],
       database: { host: "127.0.0.1", port: 5432, user: "desk", password: "secret" },
-      forwardingProofKey: FORWARDING_PROOF_KEY,
     });
+    expect(settings.forwardingProofKey.sign(SIGNED)).toBe(SIGNATURE);
   });
 
   it("describe how the gateway is set up, reaching the server where the server listens", () => {
@@ -69,8 +77,10 @@ describe("The settings should", () => {
       google: { clientId: "google-id", clientSecret: "google-secret" },
       database: { host: "127.0.0.1", port: 5432, user: "desk", password: "secret" },
     });
-    expect(settings.sessionKey.asymmetricKeyDetails?.namedCurve).toBe("prime256v1");
-    expect(settings.forwardingProofKey).toEqual(FORWARDING_PROOF_KEY);
+    expect(settings.sessionKey.signing().privateKey.asymmetricKeyDetails?.namedCurve).toBe(
+      "prime256v1",
+    );
+    expect(settings.forwardingProofKey.sign(SIGNED)).toBe(SIGNATURE);
   });
 
   it("refuse organizations that are not listed one by one", () => {

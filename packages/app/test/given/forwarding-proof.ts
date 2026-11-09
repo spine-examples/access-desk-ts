@@ -12,7 +12,6 @@
  * and limitations under the License.
  */
 
-import { randomBytes } from "node:crypto";
 import { create } from "@bufbuild/protobuf";
 import { Http2SessionManager, createGrpcTransport } from "@connectrpc/connect-node";
 import { Client } from "@spine-event-engine/client-node";
@@ -22,11 +21,11 @@ import {
   type OrganizationView,
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
 
-import type { CallStep } from "../../dist/src/forwarding-proof.js";
-import { givenServer, type Hosted } from "../server/given/hosted.js";
+import type { CallStep, ForwardingProofKey } from "../../dist/src/forwarding-proof.js";
+import { forwardingProofKey, givenServer, type Hosted } from "../server/given/hosted.js";
 
 /** A key the gateway and the application server do not share. */
-export const OTHER_KEY = randomBytes(32);
+export const OTHER_KEY = await forwardingProofKey();
 
 /** The status of a call the application server refuses, as it cannot tell who makes it. */
 export const UNAUTHENTICATED = 16;
@@ -72,7 +71,7 @@ export const Calls = {
    * Builds the step that sends the token derived from the key with each call,
    * as the gateway and the server itself do.
    */
-  async tokenOf(key: Buffer): Promise<CallStep> {
+  async tokenOf(key: ForwardingProofKey): Promise<CallStep> {
     const proof = await import("../../dist/src/forwarding-proof.js");
     return proof.ForwardingProof.ownCalls(key);
   },
@@ -100,13 +99,13 @@ export const Calls = {
 /** Signing and checking a request the gateway passes on. */
 export const Proofs = {
   /** Signs a request as the gateway does. */
-  async signed(key: Buffer, bytes: Uint8Array): Promise<string> {
+  async signed(key: ForwardingProofKey, bytes: Uint8Array): Promise<string> {
     const proof = await import("../../dist/src/forwarding-proof.js");
     return proof.ForwardingProof.issuer(key).issue(bytes);
   },
 
   /** Checks a signature as the application server does. */
-  async checks(key: Buffer, bytes: Uint8Array, signature: string): Promise<boolean> {
+  async checks(key: ForwardingProofKey, bytes: Uint8Array, signature: string): Promise<boolean> {
     const proof = await import("../../dist/src/forwarding-proof.js");
     const verifier = proof.ForwardingProof.admission(key).forwarded;
     if (verifier === undefined) {

@@ -22,6 +22,7 @@ import {
 } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { OrganizationMemberAddedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
 import { OrganizationViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
+import type { ForwardingProofKey } from "../forwarding-proof.js";
 import { PATIENCE_MS, ServerConnection, ServerRequests } from "./client.js";
 
 /** The name under which the application itself acts. */
@@ -59,7 +60,7 @@ export const ReachedOrganizationMembers = {
    */
   through(
     server: () => string,
-    key: Buffer,
+    key: ForwardingProofKey,
     patienceMs: number = PATIENCE_MS,
   ): ReachedOrganizationMembers {
     const connection = new ServerConnection(server, key);

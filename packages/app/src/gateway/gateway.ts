@@ -12,7 +12,6 @@
  * and limitations under the License.
  */
 
-import type { KeyObject } from "node:crypto";
 import { create } from "@bufbuild/protobuf";
 import { createGrpcWebTransport } from "@connectrpc/connect-node";
 import {
@@ -29,11 +28,12 @@ import { BrowserServer } from "@spine-event-engine/server/browser";
 import type { StorageFactory } from "@spine-event-engine/storage";
 import { ServerConnection } from "../server/client.js";
 import { AccessDesk } from "./access-desk.js";
-import { ForwardingProof } from "../forwarding-proof.js";
+import { ForwardingProof, type ForwardingProofKey } from "../forwarding-proof.js";
 import { Policy } from "./policy.js";
 import { routing } from "./routes/route.js";
 import { sessionRoutes } from "./routes/session-routes.js";
 import { signInRoutes, type ExternalSignIn } from "./routes/sign-in-routes.js";
+import type { SessionKey } from "./session-key.js";
 import { Sessions } from "./sessions.js";
 import { Watching, type CancelAsBrowser } from "./watching.js";
 
@@ -55,13 +55,13 @@ export interface GatewayOptions {
   /** The identity providers people sign in through, such as Google, by key. */
   readonly external: Readonly<Record<string, ExternalSignIn>>;
   /** The P-256 private key the gateway signs sessions with. */
-  readonly sessionKey: KeyObject;
+  readonly sessionKey: SessionKey;
   /**
    * The key the gateway signs, for the application server, who makes each
    * request it passes on, and each call it makes itself. The application
    * server holds the same key.
    */
-  readonly forwardingProofKey: Buffer;
+  readonly forwardingProofKey: ForwardingProofKey;
   /** Where the gateway keeps its data, so it outlasts a restart. */
   readonly storage: {
     /** Where the gateway keeps the subscriptions people hold. */

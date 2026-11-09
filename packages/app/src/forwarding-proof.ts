@@ -12,7 +12,7 @@
  * and limitations under the License.
  */
 
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, createSecretKey, timingSafeEqual, type KeyObject } from "node:crypto";
 import type { GrpcTransportOptions } from "@connectrpc/connect-node";
 import type { ReaderProofIssuer } from "@spine-event-engine/core/spi/reader-forwarding";
 import type { SpineServicesOptions } from "@spine-event-engine/server";
@@ -23,14 +23,58 @@ export type ReaderAdmission = NonNullable<SpineServicesOptions["readerAdmission"
 /** A step each call to the application server passes through before it is sent. */
 export type CallStep = NonNullable<GrpcTransportOptions["interceptors"]>[number];
 
+/** The shortest key the gateway and the application server may share: 32 bytes. */
+const SHORTEST_KEY_BYTES = 32;
+
 /** The header that carries the token of a program's own call. */
 const OWN_CALL_TOKEN_HEADER = "access-desk-own-call-token";
 
 /**
- * The label the token of own calls is derived from. The key signs it, so the
- * token never repeats a signature of a request the gateway passes on.
+ * The label the token of own calls is derived from.
+ *
+ * The key signs it, so the token never repeats a signature
+ * of a request the gateway passes on.
  */
 const OWN_CALL_TOKEN_LABEL = "access-desk own call";
+
+/**
+ * The key the gateway and the application server share, which proves who makes
+ * a call to the application server.
+ *
+ * It is at least 32 bytes long, and never shows its bytes, so it cannot reach
+ * a log by accident.
+ */
+export class ForwardingProofKey {
+  /** The bytes of the key, as Node keeps a secret key. */
+  readonly #key: KeyObject;
+
+  private constructor(key: KeyObject) {
+    this.#key = key;
+  }
+
+  /**
+   * Reads a key written in base64.
+   *
+   * @param text The key, in base64.
+   * @returns The key, or `undefined` when it is shorter than 32 bytes.
+   */
+  static fromBase64(text: string): ForwardingProofKey | undefined {
+    const bytes = Buffer.from(text, "base64");
+    return bytes.length < SHORTEST_KEY_BYTES
+      ? undefined
+      : new ForwardingProofKey(createSecretKey(bytes));
+  }
+
+  /**
+   * Signs bytes with the key.
+   *
+   * @param bytes What is signed.
+   * @returns The HMAC-SHA256 signature, in base64url.
+   */
+  sign(bytes: Uint8Array): string {
+    return createHmac("sha256", this.#key).update(bytes).digest("base64url");
+  }
+}
 
 /**
  * The proof the application server takes of who makes a call to it.
@@ -40,11 +84,11 @@ const OWN_CALL_TOKEN_LABEL = "access-desk own call";
  *
  * 1. The gateway signs each request it passes on, with the signed-in person
  *    who makes it. The application server takes the person from the request
- *    only when it checks the signature.
+ *    only when the signature checks out.
  * 2. The gateway and the application server send a token with each call they
- *    make themselves, as the gateway's reads and the calls between the
- *    contexts. The token is derived from the key, so the key itself never
- *    travels. Such a call names nobody.
+ *    make themselves, such as the gateway's reads and the calls between the
+ *    bounded contexts. The token is derived from the key, so the key itself
+ *    never travels. Such a call names nobody.
  * 3. The application server refuses a call with neither, or with one that does
  *    not hold, before it reads the call.
  */
@@ -53,9 +97,10 @@ export const ForwardingProof = {
    * Builds the gateway's side: signs each request it passes on.
    *
    * @param key The key the gateway and the application server share.
+   * @returns The signer the framework's browser server passes requests on with.
    */
-  issuer(key: Buffer): ReaderProofIssuer {
-    return { issue: (bytes) => sign(key, bytes) };
+  issuer(key: ForwardingProofKey): ReaderProofIssuer {
+    return { issue: (bytes) => key.sign(bytes) };
   },
 
   /**
@@ -66,7 +111,7 @@ export const ForwardingProof = {
    * @returns The step that adds the token to each call of a connection to the
    *   application server.
    */
-  ownCalls(key: Buffer): CallStep {
+  ownCalls(key: ForwardingProofKey): CallStep {
     const token = ownCallToken(key);
     return (next) => (request) => {
       request.header.set(OWN_CALL_TOKEN_HEADER, token);
@@ -80,11 +125,13 @@ export const ForwardingProof = {
    * a call with neither.
    *
    * @param key The key the gateway and the application server share.
+   * @returns The rules the framework's services admit calls to the
+   *   application server by.
    */
-  admission(key: Buffer): ReaderAdmission {
+  admission(key: ForwardingProofKey): ReaderAdmission {
     const token = ownCallToken(key);
     return {
-      forwarded: { verify: (bytes, proof) => matches(proof, sign(key, bytes)) },
+      forwarded: { verify: (bytes, proof) => matches(proof, key.sign(bytes)) },
       direct: {
         authenticate: ({ peer }) =>
           matches(peer.requestHeader.get(OWN_CALL_TOKEN_HEADER), token) ? {} : undefined,
@@ -93,17 +140,17 @@ export const ForwardingProof = {
   },
 };
 
-/** Signs one request the gateway passes on, in base64url. */
-function sign(key: Buffer, bytes: Uint8Array): string {
-  return createHmac("sha256", key).update(bytes).digest("base64url");
-}
-
 /** Derives the token of own calls from the key. */
-function ownCallToken(key: Buffer): string {
-  return sign(key, Buffer.from(OWN_CALL_TOKEN_LABEL));
+function ownCallToken(key: ForwardingProofKey): string {
+  return key.sign(Buffer.from(OWN_CALL_TOKEN_LABEL));
 }
 
-/** Whether the signature or token a call carries is the expected one. */
+/**
+ * Whether the signature or token a call carries is the expected one.
+ *
+ * The comparison takes the same time however much of the two agrees, so its
+ * timing tells nothing of the expected value.
+ */
 function matches(given: string | null, expected: string): boolean {
   if (given === null) {
     return false;
