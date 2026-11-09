@@ -20,7 +20,7 @@
 #   web          nginx with the built page. It fills in its settings from the
 #                container's environment as it starts.
 #   envoy        Envoy with its configuration, rendered as the image is built
-#                for the page's address and the application's port.
+#                from the settings `compose.yaml` gives.
 #
 # `workspace` and `envoy-configuration` only build what the images take.
 #
@@ -42,12 +42,12 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm -r run build
 
-# The application server and the gateway, run by Node as an unprivileged user.
+# Every package built, run by Node as an unprivileged user. Each container
+# names the program it runs: the application server or the gateway.
 FROM workspace AS application
 WORKDIR /workspace/packages/app
 USER node
 ENTRYPOINT ["node"]
-CMD ["dist/src/server/main.js"]
 
 # The built page, served by nginx with the templates in `web/templates/`.
 FROM nginx:1.30.6-alpine AS web
