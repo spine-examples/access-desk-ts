@@ -275,9 +275,10 @@ describe("AccessRequestProcessManager should", () => {
 
     it("reject reuse of a request identifier", async () => {
       const box = await resourcesBlackBox();
-      const requester = await givenPending(box, "req-reused");
-      const submitted = await recordEvents(requester, AccessRequestSubmittedSchema);
+      const submitted = await recordEvents(box.onBehalfOf(actor), AccessRequestSubmittedSchema);
       try {
+        const requester = await givenPending(box, "req-reused");
+        await submitted.waitFor(box);
         await requester.post(SubmitAccessRequestSchema, submitRequest("req-reused"));
         await requester.post(
           SubmitAccessExtensionRequestSchema,
@@ -289,7 +290,7 @@ describe("AccessRequestProcessManager should", () => {
           () => statusOf(requester, "req-reused"),
           (status) => status === AccessRequestStatus.CANCELED,
         );
-        expect(submitted.received).toHaveLength(0);
+        expect(submitted.received).toHaveLength(1);
       } finally {
         await submitted.cancel();
       }
