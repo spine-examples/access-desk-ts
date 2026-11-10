@@ -249,9 +249,9 @@ networks:
   # The web client alone.
   frontend:
   # Envoy, and the gateway it passes calls on to.
-  ingress:
+  backend-ingress:
   # The gateway, the application server, and PostgreSQL.
-  backend:
+  backend-internal:
 
 volumes:
   # The databases of the application server and the gateway.
