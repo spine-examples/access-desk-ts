@@ -1,7 +1,8 @@
 # Access Desk web client
 
-The page people work in Access Desk through, built with React and Vite. It
-calls the API: the gateway and the application server behind it.
+The page people work in Access Desk through, built with React and Vite. It is
+the frontend, and calls the backend: the gateway and the application server
+behind it.
 
 | Page            | What it does                                                                                                                            |
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
@@ -11,7 +12,7 @@ calls the API: the gateway and the application server behind it.
 
 ## Configuration
 
-The web client reads the address of the API (`apiUrl`) when it opens, not when
+The web client reads the address of the backend (`apiUrl`) when it opens, not when
 it is built. Before anything else, it fetches `/config.json` from its own
 address:
 
@@ -31,18 +32,18 @@ Each server of the web client answers `/config.json` in its own way:
 - the development server gives its own address and forwards the calls to the
   gateway running on this machine, so `ACCESS_DESK_API_HOST` and `_PORT` are
   not used there;
-- a hosting service gives the address of the API, from `ACCESS_DESK_API_HOST`
+- a hosting service gives the address of the backend, from `ACCESS_DESK_API_HOST`
   and `ACCESS_DESK_API_PORT`, as [`deploy/README.md`](../../deploy/README.md)
   lays it out on this machine.
 
 ## Signing in and session
 
 People sign in through Google with PKCE. Before sending the browser to Google,
-the web client saves a one-time secret, and the API accepts the code Google
+the web client saves a one-time secret, and the backend accepts the code Google
 sends back only together with that secret. A stolen code alone signs nobody in.
 
-After signing in, the API gives the web client a session token. The web client
-keeps it in the browser tab and checks it with the API each time the page
+After signing in, the backend gives the web client a session token. The web client
+keeps it in the browser tab and checks it with the backend each time the page
 opens. The token lasts eight hours or until the person signs out, and closing
 the tab forgets it.
 

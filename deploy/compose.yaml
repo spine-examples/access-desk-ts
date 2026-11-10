@@ -61,7 +61,7 @@ services:
       - target: ${ACCESS_DESK_DATABASE_PORT:?Set ACCESS_DESK_DATABASE_PORT in .env.}
         host_ip: ${ACCESS_DESK_DATABASE_HOST:?Set ACCESS_DESK_DATABASE_HOST in .env.}
         published: ${ACCESS_DESK_DATABASE_PORT:?Set ACCESS_DESK_DATABASE_PORT in .env.}
-    networks: [backend]
+    networks: [backend-internal]
     volumes:
       # PostgreSQL 18 images keep their data under this directory.
       - postgres-data:/var/lib/postgresql
@@ -103,7 +103,7 @@ services:
       dockerfile: deploy/Dockerfile
       target: application
     command: ["dist/src/server/main.js"]
-    networks: [backend]
+    networks: [backend-internal]
     environment:
       ACCESS_DESK_SERVER_HOST: 0.0.0.0
       ACCESS_DESK_SERVER_PORT: ${ACCESS_DESK_SERVER_PORT:?Set ACCESS_DESK_SERVER_PORT in .env.}
@@ -135,7 +135,7 @@ services:
   gateway:
     image: access-desk:local
     command: ["dist/src/gateway/main.js"]
-    networks: [ingress, backend]
+    networks: [backend-ingress, backend-internal]
     environment:
       ACCESS_DESK_GATEWAY_HOST: 0.0.0.0
       ACCESS_DESK_GATEWAY_PORT: ${ACCESS_DESK_GATEWAY_PORT:?Set ACCESS_DESK_GATEWAY_PORT in .env.}
@@ -192,7 +192,7 @@ services:
       - target: ${ACCESS_DESK_API_PORT:?Set ACCESS_DESK_API_PORT in .env.}
         host_ip: 127.0.0.1
         published: ${ACCESS_DESK_API_PORT:?Set ACCESS_DESK_API_PORT in .env.}
-    networks: [ingress]
+    networks: [backend-ingress]
     volumes:
       - ../packages/web/.certs:/certs:ro
     depends_on:

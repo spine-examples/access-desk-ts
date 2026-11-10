@@ -13,14 +13,20 @@ own, laid out as in production.
 
 The names in angle brackets are environment variables from `.env`.
 
-`envoy`, `gateway`, `server`, and `postgres` together make up the API. The web
-client reaches the API at one address.
+`web` is the frontend: the web client, served as a hosting service would.
+`envoy`, `gateway`, `server`, and `postgres` are the backend: everything the
+web client calls, at one address. The two addresses differ only in port on
+this machine, and the browser treats them as different origins, as it treats
+two hosts in production.
 
 ```mermaid
 flowchart LR
-  Browser --> Web[web]
+  Browser --> Web
   Browser --> Envoy
-  subgraph API
+  subgraph Frontend
+    Web[web]
+  end
+  subgraph Backend
     Envoy[envoy] --> Gateway[gateway]
     Gateway --> Server[server]
     Server --> Postgres[postgres]
