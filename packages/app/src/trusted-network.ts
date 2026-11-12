@@ -42,6 +42,6 @@ export const TrustedNetwork: {
   issuer: { issue: () => PROOF },
   admission: {
     forwarded: { verify: () => true },
-    direct: { authenticate: () => ({}) },
+    direct: { authenticate: () => ({ reader: {} }) },
   },
 };

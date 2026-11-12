@@ -12,8 +12,18 @@
  * and limitations under the License.
  */
 
-import type { BrowserAuthRoute } from "@spine-event-engine/server/browser";
+import type {
+  BrowserAuthRoute,
+  BrowserCredentialAdmission,
+} from "@spine-event-engine/server/browser";
 import type { Session, Sessions } from "../sessions.js";
+
+/** The endpoints read no cookie and no CSRF header, as a session comes as a bearer token. */
+const BEARER_ONLY: BrowserCredentialAdmission = {
+  csrfHeaderNames: [],
+  credentialCookieNames: [],
+  stateCookieNames: [],
+};
 
 /** A status and the JSON that goes with it. */
 export type Answer = readonly [status: number, body: object];
@@ -65,6 +75,7 @@ export function routing(origins: string[], sessions: Sessions): Route {
     origins,
     maxRequestBytes: 16_384,
     timeoutMs: 20_000,
+    admission: BEARER_ONLY,
     onRequest: async (request) => {
       let body: unknown;
       try {
