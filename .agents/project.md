@@ -65,10 +65,7 @@ packages/
   (sign-in, sessions, authorization), which reaches the server over the
   network. The gateway endpoints live in `src/gateway/routes/`, and
   are only for signing in and the session; everything else passes through
-  as Spine requests judged by `src/gateway/policy.ts`. The server trusts
-  every call that reaches it, as only the gateway does; Spine still forwards
-  a signed-in person only with a proof, so `src/trusted-network.ts` sends a
-  fixed proof and accepts it.
+  as Spine requests judged by `src/gateway/policy.ts`.
   `pnpm --dir packages/app run server` and `run gateway` start each.
   Every program is configured in one `.env` in the repository root.
 - **`web`** — `@access-desk/web`, the React/Vite client: `react-router`

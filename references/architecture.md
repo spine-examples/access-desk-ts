@@ -123,12 +123,6 @@ as it passes, including adding a member and reading who was added. A request to
 the Identity bounded context names no organization, and the gateway refuses one
 that does.
 
-The application server trusts every call that reaches it, as only the gateway
-and the server itself reach it: no other program shares its network. The
-gateway passes each call on with the signed-in person who makes it, and the
-server takes the person from it. The framework passes a person on only with a
-proof, so the gateway sends a fixed proof, and the server accepts it.
-
 A member can read and watch the organization and its catalog. Everything else
 they see only where it concerns them:
 

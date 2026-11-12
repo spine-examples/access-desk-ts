@@ -140,8 +140,6 @@ pnpm --dir packages/app run session-key
 
 The gateway passes each request on to the application server together with
 who makes it, and the server trusts it, as only the gateway reaches the server.
-The framework passes a signed-in person on only with a proof, so
-`src/trusted-network.ts` sends a fixed proof, and has the server accept it.
 
 A signed token stays valid until it expires, even after the person signs out.
 So on sign-out, the gateway saves the token's identifier in
