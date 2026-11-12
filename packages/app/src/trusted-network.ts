@@ -18,31 +18,28 @@ import type { SpineServicesOptions } from "@spine-event-engine/server";
 /** The application server's rules for admitting a call and the person it is made for. */
 export type ReaderAdmission = NonNullable<SpineServicesOptions["readerAdmission"]>;
 
-/** The mark the gateway puts on each call it passes on, in place of a signature. */
-const TRUSTED = "trusted-network";
+/** The fixed proof the gateway sends with each call, as nothing is signed. */
+const PROOF = "trusted-network";
 
+// TODO:12-11-2026:mykyta.pimonov: Delete this object once Spine lets
+//  a gateway pass the signed-in person on to an application server it trusts
+//  without a proof. Spine asks for a proof on every such call, so the gateway
+//  sends a fixed proof and the server accepts it.
 /**
- * The trust between the gateway and the application server, which rests on
- * the network alone.
+ * The way the gateway passes the signed-in person on to the application
+ * server.
  *
- * Only the gateway and the application server itself reach the application
- * server, as no other program shares its network. So the server takes every
- * call that reaches it, and the person a call of the gateway names.
- *
- * The framework still passes a signed-in person on only with a proof, and
- * takes the person from a call only through a check of that proof. Here the
- * proof is a fixed mark, and the check accepts it.
+ * Only the gateway can reach the server, so the server trusts the person each
+ * call names. The framework passes a person on only with a proof, so the
+ * gateway sends a fixed one, and the server accepts it.
  */
 export const TrustedNetwork: {
-  /** The gateway's side, which marks each call it passes on. */
+  /** The gateway's side, which adds the proof to each call. */
   readonly issuer: ReaderProofIssuer;
-  /**
-   * The application server's side, which takes every call, and the person a
-   * call of the gateway names.
-   */
+  /** The server's side, which accepts every call and the person it names. */
   readonly admission: ReaderAdmission;
 } = {
-  issuer: { issue: () => TRUSTED },
+  issuer: { issue: () => PROOF },
   admission: {
     forwarded: { verify: () => true },
     direct: { authenticate: () => ({}) },
