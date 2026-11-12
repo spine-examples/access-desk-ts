@@ -13,7 +13,6 @@
  */
 
 import { BlockList, isIP } from "node:net";
-import { ForwardingProofKey } from "./forwarding-proof.js";
 import { SessionKey } from "./gateway/session-key.js";
 
 /** The addresses that are reached only from the same machine. */
@@ -62,11 +61,6 @@ export interface ServerSettings {
   readonly organizations: readonly string[];
   /** The PostgreSQL server the application server keeps its data on. */
   readonly database: DatabaseServer;
-  /**
-   * The key the application server checks, with the gateway, who makes each
-   * request the gateway passes on.
-   */
-  readonly forwardingProofKey: ForwardingProofKey;
 }
 
 /** How the gateway is set up. */
@@ -94,11 +88,6 @@ export interface GatewaySettings {
    * the same.
    */
   readonly sessionKey: SessionKey;
-  /**
-   * The key the gateway signs, for the application server, who makes each
-   * request it passes on, and each call it makes itself.
-   */
-  readonly forwardingProofKey: ForwardingProofKey;
 }
 
 /**
@@ -210,21 +199,6 @@ class Reading {
   }
 
   /**
-   * Reads the key the gateway and the application server share, which must be
-   * set: at least 32 bytes, written in base64.
-   *
-   * @returns The key, or `undefined` when there is a problem with it.
-   */
-  forwardingProofKey(name: string): ForwardingProofKey | undefined {
-    const text = this.secret(name);
-    const key = text === "" ? undefined : ForwardingProofKey.fromBase64(text);
-    if (text !== "" && key === undefined) {
-      this.#problems.push(`${name} must be a key of at least 32 bytes, written in base64.`);
-    }
-    return key;
-  }
-
-  /**
    * Returns the settings, or throws one error that lists every problem.
    *
    * A value that could not be read is `undefined` only alongside a problem
@@ -260,7 +234,6 @@ export const Settings = {
       listening: reading.listening("ACCESS_DESK_SERVER"),
       organizations: reading.organizations("ACCESS_DESK_ORGANIZATIONS"),
       database: reading.databaseServer(),
-      forwardingProofKey: reading.forwardingProofKey("ACCESS_DESK_FORWARDING_PROOF_KEY"),
     });
   },
 
@@ -282,7 +255,6 @@ export const Settings = {
       google: reading.provider("GOOGLE"),
       database: reading.databaseServer(),
       sessionKey: reading.sessionKey("ACCESS_DESK_SESSION_KEY"),
-      forwardingProofKey: reading.forwardingProofKey("ACCESS_DESK_FORWARDING_PROOF_KEY"),
     });
   },
 

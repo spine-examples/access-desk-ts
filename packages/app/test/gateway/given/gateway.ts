@@ -39,13 +39,7 @@ import {
 import { CreateOrganizationSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
 import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
 
-import {
-  give,
-  givenServer,
-  FORWARDING_PROOF_KEY,
-  tenant as tenantOf,
-  type Hosted,
-} from "../../server/given/hosted.js";
+import { give, givenServer, tenant as tenantOf, type Hosted } from "../../server/given/hosted.js";
 import { typeRegistry } from "../../../generated/model-registry.js";
 
 // Imported from compiled output, like the contexts it assembles: vitest cannot
@@ -294,7 +288,6 @@ async function startGateway(kept: Kept): Promise<Running> {
     port: 0,
     external: fakeProviders(providers),
     sessionKey: SESSION_KEY,
-    forwardingProofKey: FORWARDING_PROOF_KEY,
     storage: { subscriptions: await kept.storage.open(), revokedTokens: kept.revokedTokens },
   });
   // The gateway and the application server are separate, so each is stopped.

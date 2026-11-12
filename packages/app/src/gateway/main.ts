@@ -51,7 +51,6 @@ const gateway = await Gateway.start({
   port: settings.listening.port,
   external,
   sessionKey: settings.sessionKey,
-  forwardingProofKey: settings.forwardingProofKey,
   storage: { subscriptions, revokedTokens },
 });
 

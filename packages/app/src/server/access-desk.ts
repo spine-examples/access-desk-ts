@@ -26,7 +26,6 @@ import type { StorageFactory } from "@spine-event-engine/storage";
 import { IdentityContext } from "@access-desk/identity-server";
 import { ResourcesContext } from "@access-desk/resources-server";
 import { typeRegistry } from "../../generated/model-registry.js";
-import type { ForwardingProofKey } from "../forwarding-proof.js";
 import { ReachedOrganizationMembers } from "./organization-members.js";
 
 /** How the application is assembled. */
@@ -38,11 +37,6 @@ export interface AccessDeskOptions {
    * administrator adds them.
    */
   readonly server: () => string;
-  /**
-   * The key the gateway and the application server share. Identity proves its
-   * calls to the application server with a token derived from it.
-   */
-  readonly forwardingProofKey: ForwardingProofKey;
   /**
    * Where the application keeps its data: each organization apart, and
    * everything that belongs to no organization together.
@@ -103,7 +97,7 @@ export const AccessDesk = {
     for (const organization of options.organizations) {
       await environment.tenantIndex.keep(AccessDesk.tenantOf(organization));
     }
-    const members = ReachedOrganizationMembers.through(options.server, options.forwardingProofKey);
+    const members = ReachedOrganizationMembers.through(options.server);
     const identity = await IdentityContext.create({ members });
     const resources = await ResourcesContext.create();
     return { identity, resources, members };

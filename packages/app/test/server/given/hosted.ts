@@ -12,7 +12,6 @@
  * and limitations under the License.
  */
 
-import { randomBytes } from "node:crypto";
 import { create, type Message, type MessageShape } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { SignalEnvelopes } from "@spine-event-engine/core";
@@ -36,27 +35,6 @@ import {
 // execute the handler classes' standard decorators from raw TypeScript source.
 type AppModule = typeof import("../../../dist/src/index.js");
 type ServerDatabases = import("../../../dist/src/index.js").ServerDatabases;
-type ForwardingProofKey = import("../../../dist/src/index.js").ForwardingProofKey;
-
-/**
- * The key a test's gateway signs who makes each request it passes on, and the
- * application server checks it with. The gateway and the application server
- * prove the calls they make themselves with a token derived from it.
- */
-export const FORWARDING_PROOF_KEY = await forwardingProofKey();
-
-/**
- * Creates a new key the gateway and the application server may share, as the
- * compiled application takes it.
- */
-export async function forwardingProofKey(): Promise<ForwardingProofKey> {
-  const app: AppModule = await import("../../../dist/src/index.js");
-  const key = app.ForwardingProofKey.fromBase64(randomBytes(32).toString("base64"));
-  if (key === undefined) {
-    throw new Error("A new key of 32 bytes cannot be read back.");
-  }
-  return key;
-}
 
 /**
  * The organizations the tests of the application work in.
@@ -153,7 +131,6 @@ export async function givenServer(storage?: ServerStorage): Promise<Hosted> {
   await TestEnvironment.reset();
   const contexts = await app.AccessDesk.assemble({
     server: () => url,
-    forwardingProofKey: FORWARDING_PROOF_KEY,
     storage: await openServerStorage(kept),
     organizations: ORGANIZATIONS,
   });
@@ -161,7 +138,7 @@ export async function givenServer(storage?: ServerStorage): Promise<Hosted> {
     contexts: [contexts.identity, contexts.resources],
     resources: [contexts.members],
     port: 0,
-    services: { readerAdmission: app.ForwardingProof.admission(FORWARDING_PROOF_KEY) },
+    services: { readerAdmission: app.TrustedNetwork.admission },
   }).start();
   url = server.baseUrl;
   return {
