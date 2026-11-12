@@ -51,13 +51,6 @@ and the web client does not show them yet.
      pnpm --dir packages/app run session-key
      ```
 
-   - the forwarding proof key, `ACCESS_DESK_FORWARDING_PROOF_KEY`, which this
-     prints:
-
-     ```sh
-     pnpm --dir packages/app run forwarding-proof-key
-     ```
-
 3. Make the certificate of the page and the application once:
 
    ```sh

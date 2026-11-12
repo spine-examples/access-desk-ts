@@ -65,11 +65,10 @@ packages/
   (sign-in, sessions, authorization), which reaches the server over the
   network. The gateway endpoints live in `src/gateway/routes/`, and
   are only for signing in and the session; everything else passes through
-  as Spine requests judged by `src/gateway/policy.ts`. The gateway signs each
-  request it passes on with the person who makes it, the gateway and the
-  server send a token derived from the same key with their own calls, and
-  the server refuses a call with neither (`src/forwarding-proof.ts`, key
-  `ACCESS_DESK_FORWARDING_PROOF_KEY`).
+  as Spine requests judged by `src/gateway/policy.ts`. The server trusts
+  every call that reaches it, as only the gateway does; Spine still forwards
+  a signed-in person only with a proof, so `src/trusted-network.ts` sends a
+  fixed proof and accepts it.
   `pnpm --dir packages/app run server` and `run gateway` start each.
   Every program is configured in one `.env` in the repository root.
 - **`web`** — `@access-desk/web`, the React/Vite client: `react-router`
@@ -125,8 +124,6 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
   HTTPS with the certificate `pnpm --dir packages/web run cert` makes.
 - `pnpm --dir packages/app run session-key` — prints a new key for
   `ACCESS_DESK_SESSION_KEY`.
-- `pnpm --dir packages/app run forwarding-proof-key` — prints a new key for
-  `ACCESS_DESK_FORWARDING_PROOF_KEY`.
 - `pnpm run format` / `format:check`.
 
 > After changing a `model` package's contracts, `tsc -b` (incremental) will **not**

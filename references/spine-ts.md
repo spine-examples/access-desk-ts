@@ -405,8 +405,9 @@ controls defined in the architecture.
 - The bindings' `create`, `activate`, and `cancel` also take `reader: ReaderIdentity`, the principal the subscription belongs
   to. Spine refuses another principal's activation or cancellation.
 - The application server takes a principal from a
-  forwarded call only by a configured verifier. The gateway signs each call it
-  forwards through `BrowserServer`'s `forwardingProof`, a `ReaderProofIssuer`.
+  forwarded call only by a configured verifier. A gateway with sessions always
+  forwards the principal, and forwards it only with a proof from
+  `BrowserServer`'s `forwardingProof`, a `ReaderProofIssuer`.
   The server checks it through `services.readerAdmission.forwarded`, a
   `ReaderProofVerifier`, and `readerAdmission.direct` decides a call that
   carries no forwarding signature: it receives the call's service, method,

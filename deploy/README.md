@@ -70,9 +70,8 @@ container and is not published.
 ## gateway and server
 
 Both run from one image, each started with its own command from
-`compose.yaml`. Both need the same `ACCESS_DESK_FORWARDING_PROOF_KEY`: without
-it neither starts, and with different keys `server` refuses every call of
-`gateway`.
+`compose.yaml`. `server` trusts every call that reaches it, as only `gateway`
+shares its network.
 
 ## postgres
 

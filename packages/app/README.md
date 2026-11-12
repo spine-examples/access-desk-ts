@@ -26,25 +26,24 @@ The file is ignored by Git.
 Every setting is required. Nothing is assumed: a program that misses a setting
 refuses to start and names it.
 
-| Variable                           | Read by             | Meaning                                                                                |
-| ---------------------------------- | ------------------- | -------------------------------------------------------------------------------------- |
-| `ACCESS_DESK_SERVER_HOST`          | server, gateway     | The address the application server listens on.                                         |
-| `ACCESS_DESK_SERVER_PORT`          | server, gateway     | The port the application server listens on.                                            |
-| `ACCESS_DESK_ORGANIZATIONS`        | server, database    | The organizations the server keeps, by commas.                                         |
-| `ACCESS_DESK_GATEWAY_HOST`         | gateway, web client | The address the gateway listens on.                                                    |
-| `ACCESS_DESK_GATEWAY_PORT`         | gateway, web client | The port the gateway listens on.                                                       |
-| `ACCESS_DESK_WEB_HOST`             | gateway, web client | The address the web client listens on, where Google sends people back.                 |
-| `ACCESS_DESK_WEB_PORT`             | gateway, web client | The port the web client listens on.                                                    |
-| `ACCESS_DESK_API_HOST`             | web client          | The address the page calls the application at.                                         |
-| `ACCESS_DESK_API_PORT`             | web client          | The port the page calls the application at.                                            |
-| `GOOGLE_CLIENT_ID`                 | gateway             | The client identifier of the Google OAuth application.                                 |
-| `GOOGLE_CLIENT_SECRET`             | gateway             | The client secret of the Google OAuth application.                                     |
-| `ACCESS_DESK_DATABASE_HOST`        | server, gateway     | The address of the PostgreSQL server.                                                  |
-| `ACCESS_DESK_DATABASE_PORT`        | server, gateway     | The port of the PostgreSQL server.                                                     |
-| `ACCESS_DESK_DATABASE_USER`        | server, gateway     | The account to connect to it with.                                                     |
-| `ACCESS_DESK_DATABASE_PASSWORD`    | server, gateway     | The password of that account, written as it is.                                        |
-| `ACCESS_DESK_SESSION_KEY`          | gateway             | The P-256 key sessions are signed with, in base64.                                     |
-| `ACCESS_DESK_FORWARDING_PROOF_KEY` | server, gateway     | The shared key of at least 32 bytes, in base64, proving every call made to the server. |
+| Variable                        | Read by             | Meaning                                                                |
+| ------------------------------- | ------------------- | ---------------------------------------------------------------------- |
+| `ACCESS_DESK_SERVER_HOST`       | server, gateway     | The address the application server listens on.                         |
+| `ACCESS_DESK_SERVER_PORT`       | server, gateway     | The port the application server listens on.                            |
+| `ACCESS_DESK_ORGANIZATIONS`     | server, database    | The organizations the server keeps, by commas.                         |
+| `ACCESS_DESK_GATEWAY_HOST`      | gateway, web client | The address the gateway listens on.                                    |
+| `ACCESS_DESK_GATEWAY_PORT`      | gateway, web client | The port the gateway listens on.                                       |
+| `ACCESS_DESK_WEB_HOST`          | gateway, web client | The address the web client listens on, where Google sends people back. |
+| `ACCESS_DESK_WEB_PORT`          | gateway, web client | The port the web client listens on.                                    |
+| `ACCESS_DESK_API_HOST`          | web client          | The address the page calls the application at.                         |
+| `ACCESS_DESK_API_PORT`          | web client          | The port the page calls the application at.                            |
+| `GOOGLE_CLIENT_ID`              | gateway             | The client identifier of the Google OAuth application.                 |
+| `GOOGLE_CLIENT_SECRET`          | gateway             | The client secret of the Google OAuth application.                     |
+| `ACCESS_DESK_DATABASE_HOST`     | server, gateway     | The address of the PostgreSQL server.                                  |
+| `ACCESS_DESK_DATABASE_PORT`     | server, gateway     | The port of the PostgreSQL server.                                     |
+| `ACCESS_DESK_DATABASE_USER`     | server, gateway     | The account to connect to it with.                                     |
+| `ACCESS_DESK_DATABASE_PASSWORD` | server, gateway     | The password of that account, written as it is.                        |
+| `ACCESS_DESK_SESSION_KEY`       | gateway             | The P-256 key sessions are signed with, in base64.                     |
 
 People sign in through Google. If the gateway cannot reach Google when it
 starts, it does not start.
@@ -139,15 +138,10 @@ To generate a key:
 pnpm --dir packages/app run session-key
 ```
 
-The gateway signs each request it passes on to the application server, so the
-server knows who makes it. The gateway and the server send a token derived from
-the same key with the calls they make themselves, and the server refuses a call
-with neither. Both read the same `ACCESS_DESK_FORWARDING_PROOF_KEY`. To
-generate that key:
-
-```sh
-pnpm --dir packages/app run forwarding-proof-key
-```
+The gateway passes each request on to the application server together with
+who makes it, and the server trusts it, as only the gateway reaches the server.
+The framework passes a signed-in person on only with a proof, so
+`src/trusted-network.ts` sends a fixed proof, and has the server accept it.
 
 A signed token stays valid until it expires, even after the person signs out.
 So on sign-out, the gateway saves the token's identifier in
@@ -163,9 +157,8 @@ layout as the application, and drops them when it finishes. See
 
 ## Run it
 
-1. Fill in `.env`, as [Set it up](#set-it-up) tells. The keys come from
-   `pnpm --dir packages/app run session-key` and
-   `pnpm --dir packages/app run forwarding-proof-key`.
+1. Fill in `.env`, as [Set it up](#set-it-up) tells. The session key comes
+   from `pnpm --dir packages/app run session-key`.
 2. Start PostgreSQL, as [The database](#the-database) tells.
 3. Build once, then start each program in a separate terminal:
 
