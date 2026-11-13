@@ -17,10 +17,27 @@ import { create } from "@bufbuild/protobuf";
 import type { SignedTokenRevocation } from "@spine-event-engine/auth";
 import { EmailAddressSchema } from "@spine-event-engine/proto";
 import { PersonIdSchema } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
+import { SessionKey } from "../../../src/gateway/session-key.js";
 import { Sessions, type SessionSubscriptions } from "../../../src/gateway/sessions.js";
 
+/**
+ * Creates a new key a gateway may sign sessions with.
+ *
+ * @throws Error when the new key cannot be read back, which never happens.
+ */
+export function newSessionKey(): SessionKey {
+  const text = generateKeyPairSync("ec", { namedCurve: "P-256" })
+    .privateKey.export({ type: "pkcs8", format: "der" })
+    .toString("base64");
+  const key = SessionKey.fromBase64(text);
+  if (key === undefined) {
+    throw new Error("A new P-256 key cannot be read back.");
+  }
+  return key;
+}
+
 /** The key the gateway of the tests signs sessions with. */
-const KEY = generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey;
+const KEY = newSessionKey();
 
 /** The order of the P-256 curve, the number every signature's `s` is taken modulo. */
 const P256_ORDER = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551n;

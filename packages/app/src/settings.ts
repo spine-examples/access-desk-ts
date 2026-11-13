@@ -12,21 +12,13 @@
  * and limitations under the License.
  */
 
-import { createPrivateKey, createSecretKey, type KeyObject } from "node:crypto";
 import { BlockList, isIP } from "node:net";
+import { SessionKey } from "./gateway/session-key.js";
 
 /** The addresses that are reached only from the same machine. */
 const LOOPBACK = new BlockList();
 LOOPBACK.addSubnet("127.0.0.0", 8, "ipv4");
 LOOPBACK.addAddress("::1", "ipv6");
-
-/**
- * Stands in for a session key that could not be read, as an empty text does
- * for a missing setting, so that one error names every problem.
- *
- * Nothing is signed with it: settings with a problem are refused as a whole.
- */
-const UNREADABLE_KEY = createSecretKey(new Uint8Array(1));
 
 /** Where a program listens. */
 export interface Listening {
@@ -95,7 +87,7 @@ export interface GatewaySettings {
    * A session stays good across a restart of the gateway while the key stays
    * the same.
    */
-  readonly sessionKey: KeyObject;
+  readonly sessionKey: SessionKey;
 }
 
 /**
@@ -191,30 +183,28 @@ class Reading {
     };
   }
 
-  /** Reads a P-256 private key that must be set, written in base64 as PKCS #8. */
-  signingKey(name: string): KeyObject {
+  /**
+   * Reads the key the gateway signs sessions with, which must be set: a P-256
+   * private key, written in base64 as PKCS #8.
+   *
+   * @returns The key, or `undefined` when there is a problem with it.
+   */
+  sessionKey(name: string): SessionKey | undefined {
     const text = this.text(name);
-    if (text === "") {
-      return UNREADABLE_KEY;
+    const key = text === "" ? undefined : SessionKey.fromBase64(text);
+    if (text !== "" && key === undefined) {
+      this.#problems.push(`${name} must be a P-256 private key, written in base64 as PKCS #8.`);
     }
-    try {
-      const key = createPrivateKey({
-        key: Buffer.from(text, "base64"),
-        format: "der",
-        type: "pkcs8",
-      });
-      if (key.asymmetricKeyDetails?.namedCurve === "prime256v1") {
-        return key;
-      }
-    } catch {
-      // Reported below, like a key of another kind.
-    }
-    this.#problems.push(`${name} must be a P-256 private key, written in base64 as PKCS #8.`);
-    return UNREADABLE_KEY;
+    return key;
   }
 
-  /** Returns the settings, or throws one error that lists every problem. */
-  done<Settings>(settings: Settings): Settings {
+  /**
+   * Returns the settings, or throws one error that lists every problem.
+   *
+   * A value that could not be read is `undefined` only alongside a problem
+   * that names it, so settings without problems have every value.
+   */
+  done<Settings>(settings: Unread<Settings>): Settings {
     if (this.#problems.length > 0) {
       throw new Error(
         [
@@ -223,9 +213,12 @@ class Reading {
         ].join("\n"),
       );
     }
-    return settings;
+    return settings as Settings;
   }
 }
+
+/** Settings as they are read, where a value that could not be read is `undefined`. */
+type Unread<Settings> = { readonly [Name in keyof Settings]: Settings[Name] | undefined };
 
 /** The settings of the application server and of the gateway. */
 export const Settings = {
@@ -261,7 +254,7 @@ export const Settings = {
       webUrl: `https://${web.host}:${web.port.toString()}/`,
       google: reading.provider("GOOGLE"),
       database: reading.databaseServer(),
-      sessionKey: reading.signingKey("ACCESS_DESK_SESSION_KEY"),
+      sessionKey: reading.sessionKey("ACCESS_DESK_SESSION_KEY"),
     });
   },
 

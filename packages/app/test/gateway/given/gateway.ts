@@ -54,7 +54,23 @@ export const ORIGIN = "http://app.test";
 export const CALLBACK = "https://app.test/signed-in";
 
 /** The key the gateways of the tests sign sessions with. */
-export const SESSION_KEY = generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey;
+export const SESSION_KEY = await sessionKey();
+
+/**
+ * Creates the key the gateways of the tests sign sessions with, as the
+ * compiled gateway takes it.
+ */
+async function sessionKey(): Promise<import("../../../dist/src/index.js").SessionKey> {
+  const app: AppModule = await import("../../../dist/src/index.js");
+  const text = generateKeyPairSync("ec", { namedCurve: "P-256" })
+    .privateKey.export({ type: "pkcs8", format: "der" })
+    .toString("base64");
+  const key = app.SessionKey.fromBase64(text);
+  if (key === undefined) {
+    throw new Error("A new P-256 key cannot be read back.");
+  }
+  return key;
+}
 
 /** The running application behind its gateway. */
 export interface Running {
@@ -97,6 +113,22 @@ export async function stopGateways(): Promise<void> {
   for (const stop of started.splice(0).reverse()) {
     await stop();
   }
+}
+
+/**
+ * Returns the identity providers a gateway of the tests signs people in
+ * through: one, which confirms whatever the tests say.
+ *
+ * @param providers The gateway's providers, as built.
+ */
+function fakeProviders(providers: ProvidersModule): External {
+  return {
+    fake: fakeProvider(
+      IdentityProvider.GOOGLE,
+      "https://provider.test",
+      providers.ConfirmedIdentity,
+    ),
+  };
 }
 
 /**
@@ -254,13 +286,7 @@ async function startGateway(kept: Kept): Promise<Running> {
     registry: app.typeRegistry,
     origins: [ORIGIN],
     port: 0,
-    external: {
-      fake: fakeProvider(
-        IdentityProvider.GOOGLE,
-        "https://provider.test",
-        providers.ConfirmedIdentity,
-      ),
-    },
+    external: fakeProviders(providers),
     sessionKey: SESSION_KEY,
     storage: { subscriptions: await kept.storage.open(), revokedTokens: kept.revokedTokens },
   });

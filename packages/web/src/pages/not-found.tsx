@@ -12,7 +12,18 @@
  * and limitations under the License.
  */
 
-/**
- * Web package foundation. Browser behavior is introduced in a later iteration.
- */
-export {};
+import type { ReactElement } from "react";
+import { Link } from "react-router";
+
+/** The fallback page for URLs that match no application route. */
+export const NotFound = {
+  /** Renders a page-not-found message and a link to the home page. */
+  Page: (): ReactElement => {
+    return (
+      <section>
+        <h1>No such page</h1>
+        <Link to="/">Go to the start</Link>
+      </section>
+    );
+  },
+};

@@ -61,7 +61,9 @@ describe("The settings should", () => {
       google: { clientId: "google-id", clientSecret: "google-secret" },
       database: { host: "127.0.0.1", port: 5432, user: "desk", password: "secret" },
     });
-    expect(settings.sessionKey.asymmetricKeyDetails?.namedCurve).toBe("prime256v1");
+    expect(settings.sessionKey.signing().privateKey.asymmetricKeyDetails?.namedCurve).toBe(
+      "prime256v1",
+    );
   });
 
   it("refuse organizations that are not listed one by one", () => {

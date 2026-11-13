@@ -138,6 +138,7 @@ export async function givenServer(storage?: ServerStorage): Promise<Hosted> {
     contexts: [contexts.identity, contexts.resources],
     resources: [contexts.members],
     port: 0,
+    services: { readerAdmission: app.TrustedNetwork.admission },
   }).start();
   url = server.baseUrl;
   return {

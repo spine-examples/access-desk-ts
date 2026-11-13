@@ -37,16 +37,18 @@ packages/
   identity/    { model, server }      # global / single-tenant
   resources/   { model, server }
   app/                                # composition root: complete registry, organization setup, gateway
-  web/                                # React + Vite browser client (later iterations)
+  web/                                # React + Vite browser client: sign-in and reading one's organization
   testing/                            # what the tests of every package share
 ```
 
 - **`<context>/model`** — `@access-desk/<context>-model`, `spine-proto.json` `mode: "model"`.
   Canonical `.proto` under `proto/accessdesk/<context>/` plus the generated
-  `ProtoModule`; pure wire contracts, no behavior. Resources subdivides its protos
-  into per-area folders (`organization/`, `resource/`, `access/request/`, `access/grant/`),
-  each a separate sub-package under `accessdesk.resources.*`, with shared `identifiers.proto`
-  and `values.proto` at the top level (filename conventions in the `protobuf-style` skill).
+  `ProtoModule`; pure wire contracts, no behavior. Each context subdivides its
+  protos into per-area folders, each a separate sub-package: Identity into
+  `person/` and `membership/`, Resources into `organization/`, `resource/`,
+  `access/request/`, `access/grant/`, and `audit/`. Shared `identifiers.proto` and
+  `values.proto` stay at the top level; filename conventions are in the
+  `protobuf-style` skill.
 - **`<context>/server`** — `@access-desk/<context>-server`, `spine-proto.json`
   `mode: "application"`. Its `src/` and `test/` directories mirror the model's
   domain folders; only the context factory, public index, and context-wide test
@@ -54,6 +56,8 @@ packages/
   projections, process managers), its `create<Context>Context()` factory, and
   BlackBox tests. It is an _application_ package because
   `spine-proto handlers` discovers decorated classes only in the package that runs it.
+  The factory's module imports the generated `spine-bootstrap.js` first, so the
+  context finds its handlers.
 - **`app`** — `@access-desk/app`, `mode: "application"`, composes **both** context
   models into the complete application `TypeRegistry`. It runs as two programs:
   `src/server/` is the application server, which hosts both contexts;
@@ -64,13 +68,19 @@ packages/
   as Spine requests judged by `src/gateway/policy.ts`.
   `pnpm --dir packages/app run server` and `run gateway` start each.
   Every program is configured in one `.env` in the repository root.
-- **`web`** — `@access-desk/web`, the React/Vite client.
+- **`web`** — `@access-desk/web`, the React/Vite client: `react-router`
+  pages in `src/pages/`, the session in `src/session/`, and calls to the
+  application in `src/api/`, read through `@spine-event-engine/client-react`.
+  As it opens, it reads where it calls the application from `/config.json`,
+  which its server gives. The development server gives its own address and
+  passes the calls on to the gateway. Served as in production, `/config.json`
+  gives `ACCESS_DESK_API_HOST` and `_PORT`.
 
 **Dependency rule:** a `server` may depend on another context's `model` (wire
-contracts) but **never** on another context's `server` (behavior) — the pnpm graph
-enforces that contexts interact only through published facts. Each context owns
-its cross-context contracts in its `model` and declares `External<T>`
-receptors internally.
+contracts) but **never** on another context's `server` (behavior). The contexts
+exchange no events: Identity adds a person to an organization's members by a
+Resources command it sends through a client of the application server, which
+`app` gives it.
 
 ## The Spine Proto pipeline
 
@@ -88,9 +98,11 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
 
 - `pnpm install`
 - `pnpm run generate` — the pipeline above.
-- `pnpm run build` — `pnpm -r run build` (each package generates then `tsc -b`).
-- `pnpm run typecheck` — per-package `tsc -b`.
-- `pnpm run lint` — per-package `eslint src test` (type-aware).
+- `pnpm run build` — `pnpm -r run build`: each context and `app` generate and
+  then `tsc -b`, and `web` runs `tsc` and `vite build`. `testing` has no build.
+- `pnpm run typecheck` — each package's own typecheck.
+- `pnpm run lint` — each package's ESLint, type-aware: `src` and `test`, or
+  `src` alone for `testing` and `web`.
 - `pnpm run test` — builds, then a single central `vitest run` from the root,
   with every test in throwaway PostgreSQL databases made on the server of
   `ACCESS_DESK_DATABASE_HOST` and the rest. Needs the database server running.
@@ -98,9 +110,15 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
 - `pnpm run verify` — `check`, then `test`. **This is the gate.**
 - `pnpm run postgres:start` / `postgres:stop` / `postgres:delete` — the
   development PostgreSQL server in Docker (the `postgres` service of
-  `deploy/compose.yaml`), configured from the root `.env`. `start` makes the
-  databases the settings name that are missing, with
-  `deploy/postgres/initdb/01-databases.sh`. `delete` also deletes its data.
+  `deploy/compose.yaml`), configured from the root `.env`. Each time it
+  starts, a `post_start` hook makes the databases the settings name that are
+  missing, with `deploy/postgres/initdb/01-databases.sh`. `delete` also
+  deletes its data.
+- `pnpm run containers:start` / `containers:stop` / `containers:delete` — the
+  whole application laid out as in production, as `deploy/README.md`
+  describes. `delete` removes the containers and keeps the databases.
+- `pnpm --dir packages/web run dev` — the web client's development server, over
+  HTTPS with the certificate `pnpm --dir packages/web run cert` makes.
 - `pnpm --dir packages/app run session-key` — prints a new key for
   `ACCESS_DESK_SESSION_KEY`.
 - `pnpm run format` / `format:check`.
@@ -116,6 +134,9 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
 - BlackBox tests (`@spine-event-engine/testing`) exercise one built context through a
   local server and the public client. They live under the matching domain path in
   `packages/<ctx>/server/test/`.
+- The `app` tests, in `packages/app/test/`, run the application server and the
+  gateway together: settings, storage, sign-in, sessions, authorization, and
+  subscriptions through a real gateway. The web client has no tests yet.
 - **Every test keeps its data in PostgreSQL**, on the server `.env` names, as
   the application does. The `@access-desk/testing` package (`packages/testing`, TypeScript the tests import
   as it is, with no build) gives every BlackBox, server, and gateway
@@ -156,8 +177,8 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
 
 ## Dependencies
 
-- One exact Spine family pinned at **`@spine-event-engine/* 2.0.0-snapshot.25`** with
-  `@bufbuild/protobuf 2.12.1`. PostgreSQL storage is
+- One exact Spine family, pinned in `package.json`, with the
+  `@bufbuild/protobuf` it selects. PostgreSQL storage is
   `@spine-event-engine/storage-postgres`, which brings `pg 8.23.0`; the gateway
   and the tests use the same `pg`. Never invent an API. Keep the whole family on one
   version; upgrade it together in a dedicated task.

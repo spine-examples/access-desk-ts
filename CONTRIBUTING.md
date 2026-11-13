@@ -26,6 +26,8 @@ ran.
 
 Code contributions must:
 
+- Pass `pnpm run verify`: build, typecheck, lint, and every test. The tests
+  need PostgreSQL running, as [README.md](README.md) describes.
 - Include accompanying tests.
 - Be licensed under the Apache v2.0 license with the appropriate copyright
   header on each file.

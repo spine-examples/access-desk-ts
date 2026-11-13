@@ -54,13 +54,13 @@ package, generated module, `BoundedContext` instance, repositories, storage
 layout, handlers, and ownership. Direct cross-context entity, repository, or
 application-service calls are forbidden.
 
-Cross-context state propagation and lifecycle choreography use versioned
-external events. Commands are domestic to their receiving context. Shared
-packages may contain wire contracts and value types, but never another
-context's behavior or mutable state. Each context owns its cross-context
-event contracts in its model package; a consumer depends on the
-publishing context's model for those schemas and declares its
-external-event receptors internally.
+The contexts exchange no events. The one cross-context step is the Identity
+bounded context adding a person to an organization's members in the Resources
+bounded context: it sends a command there through a client of the application
+server, and waits for it to confirm, as the membership flow below describes. Shared packages may contain
+wire contracts and value types, but never another context's behavior or
+mutable state. A context that sends another a command depends on that
+context's model package for its schema.
 
 ## Tenant, identity, and authorization model
 
@@ -74,28 +74,29 @@ Organization is the tenant.
 - An account is linked to its person once.
 - A person belongs to one organization, and stays in it. An administrator
   adds people to the organization by email address.
-- Identity keeps the membership of each email address, keyed by the address,
-  so an address belongs to one organization even when two administrators add
-  it at once. Each organization also keeps its members, by person and
-  email address, in Resources.
+- The Identity bounded context keeps the membership of each email address,
+  keyed by the address, so an address belongs to one organization even when
+  two administrators add it at once. Each organization also keeps its members,
+  by person and email address, in the Resources bounded context.
 - Adding an address registers it, the same way signing in does. When nobody
   has signed in under it yet, a new person is registered for it, without a
-  name or an account. Identity then has the organization add that person to
-  its members and waits for it to confirm. Only then is the address added, and
-  the person joins the organization. The application gives Identity a client of
-  the application server for this.
+  name or an account. The Identity bounded context then has the organization
+  add that person to its members and waits for it to confirm. Only then is the
+  address added, and the person joins the organization. The application gives
+  the Identity bounded context a client of the application server for this.
 - Whoever first signs in under an added address is that person. The sign-in
   adds their account, and gives the person their name.
 - A person who signs in works in the organization they belong to. A person who
   belongs to none can do nothing yet. Creating an organization comes later.
-- Every tenant-scoped request, query, subscription, inbox row,
-  outbox row, and audit record carries exactly one `OrganizationId` represented
+- Every tenant-scoped request, query, subscription, inbox row, and audit
+  record carries exactly one `OrganizationId` represented
   at the Spine boundary as the authoritative `TenantId`.
 - A trusted gateway resolves the session it signed into the actor and their
   organization. Client command fields must not be trusted as actor or
   tenant authority.
-- Resources is multitenant. Identity is singletenant. The gateway carries the
-  signed-in person into Resources as the actor.
+- The Resources bounded context is multitenant, and the Identity bounded
+  context is single-tenant. The gateway carries the signed-in person into the
+  Resources bounded context as the actor.
 - Roles and permissions are organization-scoped. A role in one organization
   gives no authority in another.
 - Storage namespaces and context-prefixed kinds provide defense in depth; they
@@ -119,7 +120,8 @@ command only the application gives, such as creating a grant, is refused from
 any client. The gateway keeps dedicated endpoints only for signing in, the session, and
 signing out. Everything else is a command, a query, or a subscription it judges
 as it passes, including adding a member and reading who was added. A request to
-Identity names no organization, and the gateway refuses one that does.
+the Identity bounded context names no organization, and the gateway refuses one
+that does.
 
 A member can read and watch the organization and its catalog. Everything else
 they see only where it concerns them:
@@ -129,7 +131,8 @@ they see only where it concerns them:
 - for a resource they manage, its requests, grants, and audit trail.
 
 So a query or a subscription must say whose data it wants, with exactly one
-condition on one column. The gateway refuses anything else. An administrator
+condition on one column, or ask for the decision queue by its identifier,
+which is the manager's. The gateway refuses anything else. An administrator
 can also read the audit trail of the whole organization.
 
 What a browser watches belongs to the session it was opened under. When the
@@ -142,9 +145,8 @@ Authority takes two forms, both organization-scoped.
 
 A **role** is standing authority a person holds in the organization itself:
 Member (the baseline every member holds, who may act as a requester) and
-Administrator, who adds people to the organization and registers resources.
-A manager is to see the audit trail of the resources they manage,
-and an administrator that of the whole organization.
+Administrator, who adds people to the organization, registers resources, and
+reads the audit trail of the whole organization.
 
 A **relation** is a position toward one specific entity, read from domain state
 rather than granted as a role: the **manager** of a resource and the
@@ -162,10 +164,11 @@ still performs coarse role- and tenant-level authorization of every command,
 query, and subscription as defense in depth; it never replaces the domain
 invariant, and a caller-supplied identifier is never authority.
 
-## Resources and policy ownership
+## Policy ownership in the Resources bounded context
 
-Resources is authoritative for organizations, their members, resources, and
-resource policy. Identity is authoritative for who belongs to which organization.
+The Resources bounded context is authoritative for organizations, their
+members, resources, and resource policy. The Identity bounded context is
+authoritative for who belongs to which organization.
 A resource carries descriptive catalog attributes — its
 identity, description, and category — that describe it for browsing but are not
 access decision rules.
@@ -339,10 +342,10 @@ For maximum-total-lifetime checks after a delayed scheduled approval, use the
 grant's effective start through the proposed new end, while preserving the
 originally requested interval for audit.
 
-## Audit (internal Resources component)
+## Audit in the Resources bounded context
 
-Audit is an internal component of Resources, not a separate context: audit
-projections built from Resources' durable facts. They must be idempotent,
+Audit is an internal component of the Resources bounded context, not a
+separate context: audit projections built from its durable facts. They must be idempotent,
 immutable, organization-scoped, and rebuildable from durable facts, recording
 actor, time, reason, related identifiers, correlation, and causation while
 redacting secrets, credentials, and unnecessary payload data. Audit ingestion
@@ -370,8 +373,10 @@ must be documented before production use.
 
 ## Browser and read-side behavior
 
-The intended browser stack is React with Vite, `@spine-event-engine/client-web`,
-and `@spine-event-engine/client-react`.
+The web client is React with Vite, `react-router`,
+`@spine-event-engine/client-web`, and `@spine-event-engine/client-react`. It
+reads where it calls the application from `/config.json` as it opens, so one
+build runs anywhere.
 
 - The browser connects through the authenticated application gateway, never a
   trusted private backend directly.

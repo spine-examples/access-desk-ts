@@ -11,7 +11,7 @@ rejections from the Event Storming board. Architecture details belong in
 - Identity
 - Resources
 
-## Identity
+## Identity bounded context
 
 | Owner                  | Trigger (actor/event)                | Command                                         | Event(s)                          | Rejections                           |
 | ---------------------- | ------------------------------------ | ----------------------------------------------- | --------------------------------- | ------------------------------------ |
@@ -41,24 +41,24 @@ belongs to; a person who was added shows there before they first sign in.
 
 ## Board transcription
 
-### Resources
+### Resources bounded context
 
-| Owner                      | Trigger (actor/event)              | Command                     | Event(s)                        | Rejections                           |
-| -------------------------- |------------------------------------| --------------------------- | ------------------------------- | ------------------------------------ |
-| Organization               | Application Administrator          | Create Organization         | Organization Created            | Organization Already Exists          |
-| Organization               | Membership (PM), in Identity       | Add Organization Member     | Organization Member Added       | —                                    |
-| Resource Registration (PM) | Organization Administrator         | Register Resource           | Resource Registration Requested | —                                    |
-| Resource Registration (PM) | on Resource Registration Requested | Create Resource             | —                               | —                                    |
-| Resource                   | Resource Registration (PM)         | Create Resource             | Resource Created                | Resource Already Exists              |
-| Resource Registration (PM) | on Resource Already Exists         | —                           | Resource Registration Failed    | —                                    |
-| Resource Registration (PM) | on Resource Created                | Add Resource                | —                               | —                                    |
-| Organization               | Resource Registration (PM)         | Add Resource                | Resource Added                  | Resource Name Already Used           |
-| Resource Registration (PM) | on Resource Name Already Used      | Delete Resource             | —                               | —                                    |
-| Resource                   | Resource Registration (PM)         | Delete Resource             | Resource Deleted                | —                                    |
-| Resource Registration (PM) | on Resource Added                  | —                           | Resource Registered             | —                                    |
-| Resource Registration (PM) | on Resource Deleted                | —                           | Resource Registration Failed    | —                                    |
-| Resource                   | Resource Manager                   | Open Resource For Requests  | Resource Opened For Requests    | Resource Already Open For Requests   |
-| Resource                   | Resource Manager                   | Close Resource For Requests | Resource Closed For Requests    | Resource Already Closed For Requests |
+| Owner                      | Trigger (actor/event)                            | Command                     | Event(s)                        | Rejections                           |
+| -------------------------- | ------------------------------------------------ | --------------------------- | ------------------------------- | ------------------------------------ |
+| Organization               | Application Administrator                        | Create Organization         | Organization Created            | Organization Already Exists          |
+| Organization               | Membership (PM), in the Identity bounded context | Add Organization Member     | Organization Member Added       | —                                    |
+| Resource Registration (PM) | Organization Administrator                       | Register Resource           | Resource Registration Requested | —                                    |
+| Resource Registration (PM) | on Resource Registration Requested               | Create Resource             | —                               | —                                    |
+| Resource                   | Resource Registration (PM)                       | Create Resource             | Resource Created                | Resource Already Exists              |
+| Resource Registration (PM) | on Resource Already Exists                       | —                           | Resource Registration Failed    | —                                    |
+| Resource Registration (PM) | on Resource Created                              | Add Resource                | —                               | —                                    |
+| Organization               | Resource Registration (PM)                       | Add Resource                | Resource Added                  | Resource Name Already Used           |
+| Resource Registration (PM) | on Resource Name Already Used                    | Delete Resource             | —                               | —                                    |
+| Resource                   | Resource Registration (PM)                       | Delete Resource             | Resource Deleted                | —                                    |
+| Resource Registration (PM) | on Resource Added                                | —                           | Resource Registered             | —                                    |
+| Resource Registration (PM) | on Resource Deleted                              | —                           | Resource Registration Failed    | —                                    |
+| Resource                   | Resource Manager                                 | Open Resource For Requests  | Resource Opened For Requests    | Resource Already Open For Requests   |
+| Resource                   | Resource Manager                                 | Close Resource For Requests | Resource Closed For Requests    | Resource Already Closed For Requests |
 
 Process: **Resource Registration** runs `Register Resource → Resource
 Registration Requested → Create Resource → Resource Created → Add Resource →

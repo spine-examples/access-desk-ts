@@ -15,38 +15,38 @@ importers:
         specifier: 9.39.1
         version: 9.39.1
       '@spine-event-engine/auth':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@spine-event-engine/client-node':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@spine-event-engine/client-react':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25(@types/react@19.2.18)(react@19.2.8)
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26(@types/react@19.2.18)(react@19.2.8)
       '@spine-event-engine/client-web':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@spine-event-engine/core':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@spine-event-engine/proto':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@spine-event-engine/proto-tools':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@spine-event-engine/server':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25(@spine-event-engine/auth@2.0.0-snapshot.25)
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26(@spine-event-engine/auth@2.0.0-snapshot.26)
       '@spine-event-engine/storage':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@spine-event-engine/storage-postgres':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@spine-event-engine/testing':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25(@spine-event-engine/auth@2.0.0-snapshot.25)
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26(@spine-event-engine/auth@2.0.0-snapshot.26)
       '@types/node':
         specifier: 24.13.2
         version: 24.13.2
@@ -56,6 +56,9 @@ importers:
       eslint-config-prettier:
         specifier: 10.1.8
         version: 10.1.8(eslint@9.39.1)
+      eslint-plugin-react-hooks:
+        specifier: 7.1.1
+        version: 7.1.1(eslint@9.39.1)
       prettier:
         specifier: 3.9.0
         version: 3.9.0
@@ -90,26 +93,26 @@ importers:
         specifier: 2.1.2
         version: 2.1.2(@bufbuild/protobuf@2.12.1)(@connectrpc/connect@2.1.2(@bufbuild/protobuf@2.12.1))
       '@spine-event-engine/auth':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@spine-event-engine/client-node':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@spine-event-engine/core':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@spine-event-engine/proto':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@spine-event-engine/server':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25(@spine-event-engine/auth@2.0.0-snapshot.25)
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26(@spine-event-engine/auth@2.0.0-snapshot.26)
       '@spine-event-engine/storage':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@spine-event-engine/storage-postgres':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       pg:
         specifier: 8.23.0
         version: 8.23.0
@@ -118,11 +121,11 @@ importers:
         specifier: 0.0.0
         version: link:../testing
       '@spine-event-engine/client-web':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@spine-event-engine/proto-tools':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@types/node':
         specifier: 24.13.2
         version: 24.13.2
@@ -142,15 +145,15 @@ importers:
         specifier: 2.12.1
         version: 2.12.1
       '@spine-event-engine/core':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@spine-event-engine/proto':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
     devDependencies:
       '@spine-event-engine/proto-tools':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -167,27 +170,27 @@ importers:
         specifier: 2.12.1
         version: 2.12.1
       '@spine-event-engine/core':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@spine-event-engine/proto':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@spine-event-engine/server':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25(@spine-event-engine/auth@2.0.0-snapshot.25)
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26(@spine-event-engine/auth@2.0.0-snapshot.26)
       '@spine-event-engine/storage':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
     devDependencies:
       '@access-desk/testing':
         specifier: 0.0.0
         version: link:../../testing
       '@spine-event-engine/proto-tools':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@spine-event-engine/testing':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25(@spine-event-engine/auth@2.0.0-snapshot.25)
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26(@spine-event-engine/auth@2.0.0-snapshot.26)
       '@types/node':
         specifier: 24.13.2
         version: 24.13.2
@@ -207,15 +210,15 @@ importers:
         specifier: 2.12.1
         version: 2.12.1
       '@spine-event-engine/core':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@spine-event-engine/proto':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
     devDependencies:
       '@spine-event-engine/proto-tools':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -235,27 +238,27 @@ importers:
         specifier: 2.12.1
         version: 2.12.1
       '@spine-event-engine/core':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@spine-event-engine/proto':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@spine-event-engine/server':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25(@spine-event-engine/auth@2.0.0-snapshot.25)
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26(@spine-event-engine/auth@2.0.0-snapshot.26)
       '@spine-event-engine/storage':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
     devDependencies:
       '@access-desk/testing':
         specifier: 0.0.0
         version: link:../../testing
       '@spine-event-engine/proto-tools':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@spine-event-engine/testing':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25(@spine-event-engine/auth@2.0.0-snapshot.25)
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26(@spine-event-engine/auth@2.0.0-snapshot.26)
       '@types/node':
         specifier: 24.13.2
         version: 24.13.2
@@ -269,20 +272,20 @@ importers:
   packages/testing:
     dependencies:
       '@spine-event-engine/core':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@spine-event-engine/proto':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@spine-event-engine/server':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25(@spine-event-engine/auth@2.0.0-snapshot.25)
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26(@spine-event-engine/auth@2.0.0-snapshot.26)
       '@spine-event-engine/storage':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       '@spine-event-engine/storage-postgres':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
       pg:
         specifier: 8.23.0
         version: 8.23.0
@@ -299,24 +302,127 @@ importers:
 
   packages/web:
     dependencies:
+      '@access-desk/identity-model':
+        specifier: 0.0.0
+        version: link:../identity/model
+      '@access-desk/resources-model':
+        specifier: 0.0.0
+        version: link:../resources/model
       '@bufbuild/protobuf':
         specifier: 2.12.1
         version: 2.12.1
       '@spine-event-engine/client-react':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25(@types/react@19.2.18)(react@19.2.8)
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26(@types/react@19.2.18)(react@19.2.8)
       '@spine-event-engine/client-web':
-        specifier: 2.0.0-snapshot.25
-        version: 2.0.0-snapshot.25
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
+      '@spine-event-engine/core':
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
+      '@spine-event-engine/proto':
+        specifier: 2.0.0-snapshot.26
+        version: 2.0.0-snapshot.26
+      react:
+        specifier: 19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: 19.2.8
+        version: 19.2.8(react@19.2.8)
+      react-router:
+        specifier: 8.4.0
+        version: 8.4.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
     devDependencies:
+      '@types/node':
+        specifier: 24.13.2
+        version: 24.13.2
+      '@types/react':
+        specifier: 19.2.18
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: 19.2.7
+        version: 19.2.7(@types/react@19.2.18)
+      '@vitejs/plugin-react':
+        specifier: 6.1.2
+        version: 6.1.2(vite@8.2.2(@types/node@24.13.2))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
+      vite:
+        specifier: 8.2.2
+        version: 8.2.2(@types/node@24.13.2)
       vitest:
         specifier: 5.0.3
-        version: 5.0.3(@types/node@26.4.0)(vite@8.2.2(@types/node@26.4.0))
+        version: 5.0.3(@types/node@24.13.2)(vite@8.2.2(@types/node@24.13.2))
 
 packages:
+
+  '@babel/code-frame@7.29.7':
+    resolution: {integrity: sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw==}
+    engines: {node: '>=6.9.0'}
+
+  '@babel/compat-data@7.29.7':
+    resolution: {integrity: sha512-locTkQyKvwIEgBzVrn8693ebc97F2U8ZHjbXwDXJ5Fn2TCpNwTlKcaKLkdHop5c/icOFE7qt7Q9JC5hnKNa6Gg==}
+    engines: {node: '>=6.9.0'}
+
+  '@babel/core@7.29.7':
+    resolution: {integrity: sha512-RgHBCvtjbOK2gXSNBNIkNoEc9qoVEtau3hj8gEqKQuL3HZAibKarWFEI3Lfm6EYKkLalOh8eSrj9b+ch9H/VBA==}
+    engines: {node: '>=6.9.0'}
+
+  '@babel/generator@7.29.8':
+    resolution: {integrity: sha512-gZbepsdh3WDtgZKWL+vTPh71LSBrm/Y4/QDZBVCcYfmeTEEuoOYwlSy+G1StfJg+/Zy550u/3TATbm7qDbbMtg==}
+    engines: {node: '>=6.9.0'}
+
+  '@babel/helper-compilation-targets@7.29.7':
+    resolution: {integrity: sha512-wem6WaBj4NaVYVdNhLPPVacES6ZJ+KBBfSkTMD3YZxbP3rm3Di85tJU5ljaUNhaOynt+Aj0xruhYuzQBt8n71g==}
+    engines: {node: '>=6.9.0'}
+
+  '@babel/helper-globals@7.29.7':
+    resolution: {integrity: sha512-3nQVUAtvkKH9zahfWgw96Jc/uFOmjACE1kQz82E2lqWmHBgjzbNlsC22nuQTfahmWeQtTq5nQ/4Nnd2A1wj4zA==}
+    engines: {node: '>=6.9.0'}
+
+  '@babel/helper-module-imports@7.29.7':
+    resolution: {integrity: sha512-ejHwrQQYcm9xnTivShn2IDOlIzInN34AXskvq9QicvCtEzq1Vzclu/tKF8Jq1Cg8JG2GL6/EmjgsCT7lXepE3g==}
+    engines: {node: '>=6.9.0'}
+
+  '@babel/helper-module-transforms@7.29.7':
+    resolution: {integrity: sha512-UPUVSyXbOh627KiCIGQSgwWzGeBKLkaJ9PJEdrngIwMSzxLR4jS4+f1f1jb7VzBbg8nFLaYotvVPFCTqdrmTAg==}
+    engines: {node: '>=6.9.0'}
+    peerDependencies:
+      '@babel/core': ^7.0.0
+
+  '@babel/helper-string-parser@7.29.11':
+    resolution: {integrity: sha512-snZbO7MEDOof+hvNa97EjEY7qD7h2kwvQr5AJC3ZhQudKW5dnej6k3kP9NQV88hJwaS8vDqRLFo9rivLEhle2g==}
+    engines: {node: '>=6.9.0'}
+
+  '@babel/helper-validator-identifier@7.29.7':
+    resolution: {integrity: sha512-qehxGkRj55h/ff8EMaJ+cYhyaKlHIxqYDn682wQD7RNp9UujOQsHog2uS0r2vzr4pW+sXf90NeeayjcNaX3fFg==}
+    engines: {node: '>=6.9.0'}
+
+  '@babel/helper-validator-option@7.29.7':
+    resolution: {integrity: sha512-N9ZErrD+yW5geCDtBqnOoxmR8+tNKiGuxKlDpuJxfsqpa2dFcexaziGAE/qoHLiDDreVNMupxGmSoNlyvsA3gw==}
+    engines: {node: '>=6.9.0'}
+
+  '@babel/helpers@7.29.10':
+    resolution: {integrity: sha512-EMCx3AGZ3WfAl6ht7AyQoPm2Lh+BGYEMdc4Q6Hf7uSCDOZFuLq44qNwL+iaim8VlyYhRAo4X43+weadK8ZB4Yg==}
+    engines: {node: '>=6.9.0'}
+
+  '@babel/parser@7.29.11':
+    resolution: {integrity: sha512-OZ6+oaK7GMyg3IfCpj8JOmn8n+w2rJbDT0LLfVDTLb1ZFeKDh3AiNELgCMUw175IJHSkLl74hG0M0VLsvx+gag==}
+    engines: {node: '>=6.0.0'}
+    hasBin: true
+
+  '@babel/template@7.29.7':
+    resolution: {integrity: sha512-puq+Gf35oI24FeN11LkoUQFqv9uwNeWpxXZi/Ji3rRIoKAzKnxRaZ+Gkj0vKS9ZCiTESfng1N9LyOyXvo+m+Gg==}
+    engines: {node: '>=6.9.0'}
+
+  '@babel/traverse@7.29.10':
+    resolution: {integrity: sha512-B3lYAs2nkKskbgQ1nfy8Ma9ao9Q1rntTAQHrzzyDuj+TSO+X3le6PfWwqDvodsb+OumE10eMFfuMCTQSQ5iuIQ==}
+    engines: {node: '>=6.9.0'}
+
+  '@babel/types@7.29.11':
+    resolution: {integrity: sha512-WCsemW40Cpc6gouC1SrY6PBaZ+oLRlEVY9XBvZBI7il/HyUrb2nJ505wE1MHEFyDZNnrWDEuy4jL50WVHfTTSQ==}
+    engines: {node: '>=6.9.0'}
 
   '@bufbuild/buf-darwin-arm64@1.71.0':
     resolution: {integrity: sha512-qZ7xZQyen/jOKFPVs3dlN9pMA56PI4YEo3r4/9ixtiH9gyFgfowR31axsocUgXGThjiN8mvOA8WfpG2tvaSvsw==}
@@ -457,6 +563,12 @@ packages:
     resolution: {integrity: sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ==}
     engines: {node: '>=18.18'}
 
+  '@jridgewell/gen-mapping@0.3.13':
+    resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
+
+  '@jridgewell/remapping@2.3.5':
+    resolution: {integrity: sha512-LI9u/+laYG4Ds1TDKSJW2YPrIlcVYOwi2fUC6xB43lueCjgxV4lffOCZCtYFiH6TNOX+tQKXx97T4IKHbhyHEQ==}
+
   '@jridgewell/resolve-uri@3.1.2':
     resolution: {integrity: sha512-bRISgCIjP20/tbWSPWMEi54QVPRZExkuD9lJL+UIxUKtwVJA8wW1Trb1jMs1RFXo1CBTNZ/5hpC9QvmKWdopKw==}
     engines: {node: '>=6.0.0'}
@@ -489,6 +601,9 @@ packages:
 
   '@oxc-project/types@0.147.0':
     resolution: {integrity: sha512-IJ3s6ltHLp45S0bh7phkX+gJO7A1Wuz2EaqpAhb8WjqDwbzMiWKHhyyT42tskaWjEYXtHtVCPpnBJVT9+dcRLg==}
+
+  '@remix-run/route-pattern@0.22.1':
+    resolution: {integrity: sha512-czdGJWh09Lapvcqt7Vb09KlrU2PhRJ8xQaI+AItTuD9aDJ5MAgxnS38lnys6Ll+6RJEqPiaUqTwIQhVLwFvv+w==}
 
   '@rolldown/binding-android-arm-eabi@1.2.6':
     resolution: {integrity: sha512-b+jTcARdTiFLI6jB4a5XjTm0RWd6KcRfQj/I2356fxUZemiho9zQLxo0RtCuMDAyKcLo6cEltkgbQp6d1+sjjQ==}
@@ -589,57 +704,57 @@ packages:
   '@rolldown/pluginutils@1.0.1':
     resolution: {integrity: sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==}
 
-  '@spine-event-engine/ai@2.0.0-snapshot.25':
-    resolution: {integrity: sha512-l6ucqdFT1R9AGMOktQKzOMFZhQ6iP5Tfy78HUhEVF9/leeDt+lgrP4WFBHCnpxY3R35oXYlEJFIYJoMUEDjWzg==}
+  '@spine-event-engine/ai@2.0.0-snapshot.26':
+    resolution: {integrity: sha512-z3L0dZGTI5vvRbDcLT4JGHu0AHZ37iDQZ50t+VRoaQOt1SXC3XkFLTyA2OnqHD1m0HbeOg5ethSbLwLY8+9HHg==}
 
-  '@spine-event-engine/auth@2.0.0-snapshot.25':
-    resolution: {integrity: sha512-4mI8mmZ1b+hdg56zWl/s07C8drgfgO60DEVn2jmLt98kZqlpfrAJ5gIdOIFEk6ycy+ZE6Qhj8mTLdG0acBcMwA==}
+  '@spine-event-engine/auth@2.0.0-snapshot.26':
+    resolution: {integrity: sha512-MQOe4jt6qXvPJ16XI8bc5E4ZQeqkrb9p9ap0fpwMEJrOkG6fV+0CIc/WQacGbpEy13zFokqTQrgQ7kEWMK+6Ig==}
 
-  '@spine-event-engine/client-node@2.0.0-snapshot.25':
-    resolution: {integrity: sha512-1bSVNJbqPHey3Vv3he8NqJcSyT+4fp2zvVYR0XxtBQcjgWlIuAB2c3sVyqUDNY7Af8NAxjz9EHw9VmXNKFGeyw==}
+  '@spine-event-engine/client-node@2.0.0-snapshot.26':
+    resolution: {integrity: sha512-zhZ/gH+WtM0RhLmqDHa+RkreXypS26SF56qWcvUo+KaYl37sKScnjBBS2nJvyL6csXPjLEwVGp68T2gD6oaduw==}
     hasBin: true
 
-  '@spine-event-engine/client-react@2.0.0-snapshot.25':
-    resolution: {integrity: sha512-0IGX66th2jjFlb+xT637m6Jy3KTEy0fsbS6OjYwmXAtmfYLL4i2Zg8VT0/8nMTinzc1uEVIQuqpVptFMmawaMA==}
+  '@spine-event-engine/client-react@2.0.0-snapshot.26':
+    resolution: {integrity: sha512-N3gBee1PujKcj8AXy47XKAF0CXOpEyA31FXEqxX9oIy846puPflTdsBxNR8uxlF6GcZzvxU/K2vwDKiF+VxQ3g==}
     peerDependencies:
       '@types/react': ^19.2.7
       react: ^19.2.8
 
-  '@spine-event-engine/client-web@2.0.0-snapshot.25':
-    resolution: {integrity: sha512-CBbpMQlEwoMiiuye2sAgeILGRQ1oRJOgtXg36Znsr72vmDixWoTewzgvGmFQtZVAVpfDAdFNxbIXlphc2KTu8g==}
+  '@spine-event-engine/client-web@2.0.0-snapshot.26':
+    resolution: {integrity: sha512-66cPXoM7/sVZYus0uUB7g0U2ONEeV7yjwLb+DBcx9RBt7hAjtReC35h+qVDh/UCbh5y/wUAjhRWxf4y4MZV10Q==}
 
-  '@spine-event-engine/core@2.0.0-snapshot.25':
-    resolution: {integrity: sha512-zbmbD4FC8tOnmNZfxo/b3C6WJYtF69rrGokAw1MXO5fhuWSjQBm2x0szm1K5B4Qt+RRHuuGhCBLIi8699Rjq8w==}
+  '@spine-event-engine/core@2.0.0-snapshot.26':
+    resolution: {integrity: sha512-pIq47O4voxG1ZZzd7smuRNiMPcHTn7wIHxqig6x+FY2ey+/cQeXw2B+tDsGA5yUDnxd2Qvil0MlxTcFCGf4kDw==}
 
-  '@spine-event-engine/deployment@2.0.0-snapshot.25':
-    resolution: {integrity: sha512-8xkA8QyGx6Cc9tS2iNwbzMkVdWznAgLG+AuEr+s4j/RIvYW3wfaNg4h2IeTL6+hBrdNtyI4HXVYOPJKZrYrucA==}
+  '@spine-event-engine/deployment@2.0.0-snapshot.26':
+    resolution: {integrity: sha512-b7v43N42O7TiYNcC+5pcjh8CykvT/BuRKtPeOUhnwvU0AE2GXG/m+vQoy8ZzwAEmqpKplxQRr2ExDtMBkc+5dQ==}
 
-  '@spine-event-engine/proto-tools@2.0.0-snapshot.25':
-    resolution: {integrity: sha512-WhqjH0cdQgdIXvzHhW7Por9cGTp99ee8WkvmgP+VQyxz8t3xuvy1LNmQw+fEmGpMiTtO9RlE/IKKJn99/B1mYA==}
+  '@spine-event-engine/proto-tools@2.0.0-snapshot.26':
+    resolution: {integrity: sha512-9Cn1wPH3Pplyp7KLxDPIXuc7HjOyh4OdlxzCNKjOLNjktUeTJ9UDDQBc8LOm/eo5VQLVn+uoOJtUO9YL2h/dBQ==}
     hasBin: true
 
-  '@spine-event-engine/proto@2.0.0-snapshot.25':
-    resolution: {integrity: sha512-eMBBu81NHouw5Pkw4e63OrKwuNCsyIu1GUC00ZPWnmWibMIbpA/wSbyM+nrzKPqjRkW1yfuMK//2aOhoT3U1ww==}
+  '@spine-event-engine/proto@2.0.0-snapshot.26':
+    resolution: {integrity: sha512-4rkAqI53NLti+6yCR7zOefD3lmpDRMq21ocjgaNJdwMQ/XgK6u5O9ngnfCGr+nTcL59IHijlghs+4AnyiFrewA==}
 
-  '@spine-event-engine/server@2.0.0-snapshot.25':
-    resolution: {integrity: sha512-Sk2juoS3H7+rJ9wBku6MNUmHov62kc7pr3ymjb57s7Mqvk/tJOGDQ6s/PCrv7H+3uMCoZDOPLaCPbuT52Q1qug==}
+  '@spine-event-engine/server@2.0.0-snapshot.26':
+    resolution: {integrity: sha512-RxJ1aeQCEncme416w4at8wma1v8YLCAAICUonVUJ3/D2zD5eU8f/tcUuu9DD1KpKRJt135Fc+X9kx7q0A62pwQ==}
     peerDependencies:
-      '@spine-event-engine/auth': 2.0.0-snapshot.25
+      '@spine-event-engine/auth': 2.0.0-snapshot.26
     peerDependenciesMeta:
       '@spine-event-engine/auth':
         optional: true
 
-  '@spine-event-engine/storage-postgres@2.0.0-snapshot.25':
-    resolution: {integrity: sha512-RL5skYU0t8+7Q26MXVLd9WsFgAwd8xfEjkYqBFwMBn/6qoHsRzRyA3qF3zHq0WpSGwHX9FeLjX0xLkYj0zJQJw==}
+  '@spine-event-engine/storage-postgres@2.0.0-snapshot.26':
+    resolution: {integrity: sha512-twS5hHDr62Qh1jzPoGAwc90pOUoavUmhEapbzZH991VfqXI+U1LWP0PULWdeBGNNJ1o5K1PUs/sxaN2tESsFQQ==}
 
-  '@spine-event-engine/storage@2.0.0-snapshot.25':
-    resolution: {integrity: sha512-YQLPASxCc1pa+UTAAdOuN4ZwQljbjUjnAgCcUMv/bm/zOEXr8BJLU6Rlhs8UXsrNZPwcB4ItCvhns0S4Xaey/w==}
+  '@spine-event-engine/storage@2.0.0-snapshot.26':
+    resolution: {integrity: sha512-JgDvd9Z8tnveJi/6FS7GEvAuduJLZr5erMXKXhN1Qe20WqUVhg0a5sK4w0dNG3MfP18nGXLbRTfwcJL/NLk/Og==}
 
-  '@spine-event-engine/testing@2.0.0-snapshot.25':
-    resolution: {integrity: sha512-uVv5F3+uOoB1fOKpoR3+rvrQJ92DYxgiZbSQXzD21H4W2Zv+PzmtsEZ0nV7xDiDaCYLA1QCX4jeXulcLlbcZ3w==}
+  '@spine-event-engine/testing@2.0.0-snapshot.26':
+    resolution: {integrity: sha512-doGH9eT6PgdAnPMTUK30aPPdnbxVakEvRjiMTeVGd0Fmsd970IrkclM0sA6nBEt+8tZ95jlIhK2Dm8TqCsiBoA==}
 
-  '@spine-event-engine/transport@2.0.0-snapshot.25':
-    resolution: {integrity: sha512-iWzbTuN8YXyc7SZfVSHjlvCDO+Dhq9CxXT5asXUtFNJJubhhsZzBRQJuZ06wT2lyKeuZGr3MMb+yNbNkQjIgfg==}
+  '@spine-event-engine/transport@2.0.0-snapshot.26':
+    resolution: {integrity: sha512-9HLLMWFf/7fuaGh7mwUYV+HirsEtmXDP+0QC5MUl/WJlcfJM5KOgcc13CQx12uKJQ3pa71cRMrOOZ5U4myMnLQ==}
 
   '@spine-event-engine/validation@2.0.0-snapshot.7':
     resolution: {integrity: sha512-axp84tc+rE3c0Z3lbC6sHBt5irGiBAdix9rbrSMZrogNVJCuePtMqxlbRR5NDK1jRGzXMwm2MWcwwOLRQSJ3tg==}
@@ -667,6 +782,11 @@ packages:
 
   '@types/pg@8.23.1':
     resolution: {integrity: sha512-fKVHpikPdg4GKks3JuLEhvwSyvwzF23hnabPy6DD8ljVbC7+6J5dQzdv4arV6jqq57djnMgs1HKBxX4P8aBI3A==}
+
+  '@types/react-dom@19.2.7':
+    resolution: {integrity: sha512-I8bPpDLcHBv1qiIiXDCy71Rt8eQDKJP0sMSWJphDdAcdqiJ1sGpZamavoEIRZmYzjia9LuEb2HlYdDpmoENpvQ==}
+    peerDependencies:
+      '@types/react': ^19.2.0
 
   '@types/react@19.2.18':
     resolution: {integrity: sha512-AnzbBERsrLKtk2XSfTbYRLjQPdy116Sty4q+T+Bp3IC4l6jNBvreVPAHmpq9qhXQM7CXZPjLVmGMw9sy+hxQ3w==}
@@ -735,6 +855,22 @@ packages:
     peerDependencies:
       typescript: '*'
 
+  '@vitejs/plugin-react@6.1.2':
+    resolution: {integrity: sha512-fhJNGUdscQa4HkI0xFxwonWyhnVReCPDbXI7FH7jmzpnVCrFQI7PRrhWecO263610vOrs9tr2Y4xcf8uAdFxbw==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    peerDependencies:
+      '@rolldown/plugin-babel': ^0.1.7 || ^0.2.0
+      babel-plugin-react-compiler: ^1.0.0
+      oxc-transform-react: ^0.152.0
+      vite: ^8.0.0
+    peerDependenciesMeta:
+      '@rolldown/plugin-babel':
+        optional: true
+      babel-plugin-react-compiler:
+        optional: true
+      oxc-transform-react:
+        optional: true
+
   '@vitest/mocker@5.0.3':
     resolution: {integrity: sha512-T8sWAIbkSyAjkwTcaEc3Iu0o9A27X1/kdXrizhZkGuSKScRQtRzclfAMpOTcGdXCsqxeWlpGy3XjqaW8CpLORg==}
     peerDependencies:
@@ -780,6 +916,11 @@ packages:
     resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
     engines: {node: 18 || 20 || >=22}
 
+  baseline-browser-mapping@2.11.34:
+    resolution: {integrity: sha512-Aqr8mA1kIvyJ3UY5YAY7ib8LSo1DmDMbMnVqGPtsKW1LxaFQFwn9Eb3yvq2fUKJsRvaXjnAV7R5osqETapzNiA==}
+    engines: {node: '>=6.0.0'}
+    hasBin: true
+
   brace-expansion@1.1.18:
     resolution: {integrity: sha512-Edep/X9fGqVNmzKBVsDYIOtD+z1tuezV70LBjdCst9Tqu76lsnvRiZ6oTic1n+/BIwX6QDGAO94PN4N2SADvtw==}
 
@@ -787,9 +928,17 @@ packages:
     resolution: {integrity: sha512-ScQ4IuvIEF1TMlP7Zt+vjJ//9zlPb2SDcxWxM3bk8s6t6GGdJ7KO1dCcTidOPJKePW30LE/2cT7wCyPho9/Wxg==}
     engines: {node: 20 || >=22}
 
+  browserslist@4.29.5:
+    resolution: {integrity: sha512-khTmKu5NGYTotqcYo8Bew2k4RAE9PuXRSFRXG2lQBrCEQHyeQ/vX6gKMxfokwywBsLiXZMnHsmWMG1pnO8J7uQ==}
+    engines: {node: ^6 || ^7 || ^8 || ^9 || ^10 || ^11 || ^12 || >=13.7}
+    hasBin: true
+
   callsites@3.1.0:
     resolution: {integrity: sha512-P8BjAsXvZS+VIDUI11hHCQEv74YT67YUi5JJFNWIqL235sBmjX4+qx9Muvls5ivyNENctx46xQLQ3aTuE7ssaQ==}
     engines: {node: '>=6'}
+
+  caniuse-lite@1.0.30001819:
+    resolution: {integrity: sha512-LFUqIIAwpzsIuevnKnsR9qnStBcgzPShTX61lBwN9uFkkf8o8zLiebEjbW8AYtZiF+1YKDWfdt/pWDtMuG8Xwg==}
 
   chai@6.2.2:
     resolution: {integrity: sha512-NUPRluOfOiTKBKvWPtSD4PhFvWCqOi0BGStNWs57X9js7XGTprSmFoz5F0tWhR4WPjNeR9jXqdC7/UpSJTnlRg==}
@@ -808,6 +957,12 @@ packages:
 
   concat-map@0.0.1:
     resolution: {integrity: sha512-/Srv4dswyQNBfohGpz9o6Yb3Gz3SrUDqBH5rTuhGR7ahtlbYKnVxw2bCFMRljaA7EXHaXZ8wsHdodFvbkhKmqg==}
+
+  convert-source-map@2.0.0:
+    resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
+
+  cookie-es@3.1.1:
+    resolution: {integrity: sha512-UaXxwISYJPTr9hwQxMFYZ7kNhSXboMXP+Z3TRX6f1/NyaGPfuNUZOWP1pUEb75B2HjfklIYLVRfWiFZJyC6Npg==}
 
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
@@ -832,8 +987,15 @@ packages:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
 
+  electron-to-chromium@1.5.467:
+    resolution: {integrity: sha512-Nw9X371rtZmYcBSnEijnCDONILjs93biCZO34juC7MBOmK8E+GFnyD4T/WvyrlJkppul7oxg6TwvtKst9SODTw==}
+
   es-module-lexer@2.3.2:
     resolution: {integrity: sha512-poHGpORABojJJucnV9KbOavETW8lBVnphkW77ER5/BQ5Fz7oXSoCNek7IH3vR5nRjdsEz926ibFYX8KtLQmdyw==}
+
+  escalade@3.2.0:
+    resolution: {integrity: sha512-WUj2qlxaQtO4g6Pq5c29GTcWGDyd8itL8zTlipgECz3JesAiiOKotd8JU6otB3PACgG6xkJUyVhboMS+bje/jA==}
+    engines: {node: '>=6'}
 
   escape-string-regexp@4.0.0:
     resolution: {integrity: sha512-TtpcNJ3XAzx3Gq8sWRzJaVajRs0uVxA2YAkdb1jm2YkPz4G6egUFAyA3n5vtEIZefPk5Wa4UXbKuS5fKkJWdgA==}
@@ -844,6 +1006,12 @@ packages:
     hasBin: true
     peerDependencies:
       eslint: '>=7.0.0'
+
+  eslint-plugin-react-hooks@7.1.1:
+    resolution: {integrity: sha512-f2I7Gw6JbvCexzIInuSbZpfdQ44D7iqdWX01FKLvrPgqxoE7oMj8clOfto8U6vYiz4yd5oKu39rRSVOe1zRu0g==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      eslint: ^3.0.0 || ^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0-0 || ^9.0.0 || ^10.0.0
 
   eslint-scope@8.4.0:
     resolution: {integrity: sha512-sNXOfKCn74rt8RICKMvJS7XKV/Xk9kA7DyJr8mJik3S7Cwgy3qlkkmyS2uQB3jiJg6VNdZd/pDBJu0nvG2NlTg==}
@@ -937,6 +1105,10 @@ packages:
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
 
+  gensync@1.0.0-beta.2:
+    resolution: {integrity: sha512-3hN7NaskYvMDLQY55gnW3NQ+mesEAepTqlg+VEbj7zzqEMBVNhzcGYYeqFo/TlYz6eQiFcp1HcsCZO+nGgS8zg==}
+    engines: {node: '>=6.9.0'}
+
   glob-parent@6.0.2:
     resolution: {integrity: sha512-XxwI8EOhVQgWp6iDL+3b0r86f4d6AX6zSU55HfB4ydCEuXLXc5FcYeOu+nnGftS4TEju/11rt4KJPTMgbfmv4A==}
     engines: {node: '>=10.13.0'}
@@ -948,6 +1120,12 @@ packages:
   has-flag@4.0.0:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
     engines: {node: '>=8'}
+
+  hermes-estree@0.25.1:
+    resolution: {integrity: sha512-0wUoCcLp+5Ev5pDW2OriHC2MJCbwLwuRx+gAqMTOkGKJJiBCLjtrvy4PWUGn6MIVefecRpzoOZ/UV6iGdOr+Cw==}
+
+  hermes-parser@0.25.1:
+    resolution: {integrity: sha512-6pEjquH3rqaI6cYAXYPcz9MS4rY6R4ngRgrgfDshRptUZIc3lw0MCIJIGDj9++mfySOuPTHB4nrSW99BCvOPIA==}
 
   ignore@5.3.2:
     resolution: {integrity: sha512-hsBTNUqQTDwkWtcdYI2i06Y/nUBEsNEDJKjWdigLvegy8kDuJAS8uRlpkkcQpyEXL0Z/pjDy5HBmMjRCJ2gq+g==}
@@ -979,8 +1157,16 @@ packages:
   jose@6.2.4:
     resolution: {integrity: sha512-N8acGzVsQy6M/fjFcxtysNc4Q379TcM5dM/qKkNtsHFji88yANnXTr7BLeP75iPnFwBfQzM/jg2BZ9+HZrHCZA==}
 
+  js-tokens@4.0.0:
+    resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
+
   js-yaml@4.3.2:
     resolution: {integrity: sha512-SFNOvSJ+Dgf/9An904Yx+CgSlIPCkIpao4qo51lpee25TIRejdH3rhR4EZMGoNx3/TP3O+wzWuiTFl4sqbltzA==}
+    hasBin: true
+
+  jsesc@3.1.0:
+    resolution: {integrity: sha512-/sM3dO2FOzXjKQhJuo0Q173wf2KOo8t4I8vHy6lF9poUp7bKT0/NHE8fPX23PwfhnykfqnC2xRxOnVw5XuGIaA==}
+    engines: {node: '>=6'}
     hasBin: true
 
   json-buffer@3.0.1:
@@ -991,6 +1177,11 @@ packages:
 
   json-stable-stringify-without-jsonify@1.0.1:
     resolution: {integrity: sha512-Bdboy+l7tA3OGW6FjyFHWkP5LuByj1Tk33Ljyq0axyzdk9//JSi2u3fP1QSmd1KNwq6VOKYGlAu87CisVir6Pw==}
+
+  json5@2.2.3:
+    resolution: {integrity: sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg==}
+    engines: {node: '>=6'}
+    hasBin: true
 
   keyv@4.5.4:
     resolution: {integrity: sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw==}
@@ -1084,6 +1275,9 @@ packages:
     resolution: {integrity: sha512-abAZY0TkGw1LOA8n0yGJbRi9R0upRWymYBZItWfiktXMTHqdgCpHukONoX/Byfbt1RfRdw/GjT/PwrztePYOcw==}
     engines: {node: '>=18'}
 
+  lru-cache@5.1.1:
+    resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
+
   magic-string@1.4.3:
     resolution: {integrity: sha512-z12OxmaPGE0F4xlpGdjuAUckipLpQlTAuAmyGhNoD7ODpYUzvDfvtxUbjM/jwznyP178oju/KDdyi220wNJ0RQ==}
 
@@ -1104,6 +1298,10 @@ packages:
 
   natural-compare@1.4.0:
     resolution: {integrity: sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==}
+
+  node-releases@2.0.60:
+    resolution: {integrity: sha512-OmO8+GM1JUZqXET720VrJCwkjUCXmCMQm0Z3UDDRbfNLHS4NEAvY60j5jiFv0tkKw2PNNlqOLhahVmwJIOLDIQ==}
+    engines: {node: '>=18'}
 
   obug@2.1.4:
     resolution: {integrity: sha512-4a+OsYv9UktOJKE+l1A4OufDgdRF9PifWj+tJnHURo/P+WOxpG4GzUFL9qCalmWauao6ogiG+QvnCovwPoyAWA==}
@@ -1207,6 +1405,21 @@ packages:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
     engines: {node: '>=6'}
 
+  react-dom@19.2.8:
+    resolution: {integrity: sha512-rVprimfGBG3DR+Tq0IQG2DT5PxKth1WIGDmj5yPmlzr4YBe7uyE+Du4oVqTDXZSHGGGXRtTJEGSSePyQCMBglQ==}
+    peerDependencies:
+      react: ^19.2.8
+
+  react-router@8.4.0:
+    resolution: {integrity: sha512-JtydAkBvU9UTEe5qNC+POhu+ZBNM7rlKY2IegwXc7Idj7xfRG16x5RZrw3mju+XlqBxfvb2ky9P3jUp9WyWC1g==}
+    engines: {node: '>=22.22.0'}
+    peerDependencies:
+      react: '>=19.2.7'
+      react-dom: '>=19.2.7'
+    peerDependenciesMeta:
+      react-dom:
+        optional: true
+
   react@19.2.8:
     resolution: {integrity: sha512-PWaYA1L/q9u2u7xYQi+Y3L3Yfnie7XyLeaJICV1MGD6LprsBxcAqGjYyr0eY3p+QdsA+x/Irkt4Qif8D63+Sbw==}
     engines: {node: '>=0.10.0'}
@@ -1218,6 +1431,13 @@ packages:
   rolldown@1.2.6:
     resolution: {integrity: sha512-vMM4q3aixf46GiF1Kok8jDPFsEpXgFWGjUHXNkNHNm+Y2adXAG2dbX91jkti3i0ZRsOlcmbuzAz1poObSHCmUA==}
     engines: {node: ^20.19.0 || >=22.12.0}
+    hasBin: true
+
+  scheduler@0.27.0:
+    resolution: {integrity: sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==}
+
+  semver@6.3.1:
+    resolution: {integrity: sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA==}
     hasBin: true
 
   semver@7.8.5:
@@ -1305,6 +1525,12 @@ packages:
 
   undici-types@8.3.0:
     resolution: {integrity: sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ==}
+
+  update-browserslist-db@1.3.4:
+    resolution: {integrity: sha512-t8wonIOdQyOjtPd2VktlBu6QjTVTks6v8bSi7kd0r2Vll8TK1JYDZtRRdbmCHOAMphkZgrzK+L+vXK4pyZ8t4A==}
+    hasBin: true
+    peerDependencies:
+      browserslist: '>= 4.21.0'
 
   uri-js@4.4.1:
     resolution: {integrity: sha512-7rKUyy33Q1yc98pQ1DAmLtwX109F7TIfWlW1Ydo8Wl1ii1SeHieeh0HHfPeL2fMXK6z0s8ecKs9frCuLJvndBg==}
@@ -1411,11 +1637,123 @@ packages:
     resolution: {integrity: sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ==}
     engines: {node: '>=0.4'}
 
+  yallist@3.1.1:
+    resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
+
   yocto-queue@0.1.0:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
+  zod-validation-error@4.0.2:
+    resolution: {integrity: sha512-Q6/nZLe6jxuU80qb/4uJ4t5v2VEZ44lzQjPDhYJNztRQ4wyWc6VF3D3Kb/fAuPetZQnhS3hnajCf9CsWesghLQ==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      zod: ^3.25.0 || ^4.0.0
+
+  zod@4.6.7:
+    resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
+
 snapshots:
+
+  '@babel/code-frame@7.29.7':
+    dependencies:
+      '@babel/helper-validator-identifier': 7.29.7
+      js-tokens: 4.0.0
+      picocolors: 1.1.1
+
+  '@babel/compat-data@7.29.7': {}
+
+  '@babel/core@7.29.7':
+    dependencies:
+      '@babel/code-frame': 7.29.7
+      '@babel/generator': 7.29.8
+      '@babel/helper-compilation-targets': 7.29.7
+      '@babel/helper-module-transforms': 7.29.7(@babel/core@7.29.7)
+      '@babel/helpers': 7.29.10
+      '@babel/parser': 7.29.11
+      '@babel/template': 7.29.7
+      '@babel/traverse': 7.29.10
+      '@babel/types': 7.29.11
+      '@jridgewell/remapping': 2.3.5
+      convert-source-map: 2.0.0
+      debug: 4.4.3
+      gensync: 1.0.0-beta.2
+      json5: 2.2.3
+      semver: 6.3.1
+    transitivePeerDependencies:
+      - supports-color
+
+  '@babel/generator@7.29.8':
+    dependencies:
+      '@babel/parser': 7.29.11
+      '@babel/types': 7.29.11
+      '@jridgewell/gen-mapping': 0.3.13
+      '@jridgewell/trace-mapping': 0.3.31
+      jsesc: 3.1.0
+
+  '@babel/helper-compilation-targets@7.29.7':
+    dependencies:
+      '@babel/compat-data': 7.29.7
+      '@babel/helper-validator-option': 7.29.7
+      browserslist: 4.29.5
+      lru-cache: 5.1.1
+      semver: 6.3.1
+
+  '@babel/helper-globals@7.29.7': {}
+
+  '@babel/helper-module-imports@7.29.7':
+    dependencies:
+      '@babel/traverse': 7.29.10
+      '@babel/types': 7.29.11
+    transitivePeerDependencies:
+      - supports-color
+
+  '@babel/helper-module-transforms@7.29.7(@babel/core@7.29.7)':
+    dependencies:
+      '@babel/core': 7.29.7
+      '@babel/helper-module-imports': 7.29.7
+      '@babel/helper-validator-identifier': 7.29.7
+      '@babel/traverse': 7.29.10
+    transitivePeerDependencies:
+      - supports-color
+
+  '@babel/helper-string-parser@7.29.11': {}
+
+  '@babel/helper-validator-identifier@7.29.7': {}
+
+  '@babel/helper-validator-option@7.29.7': {}
+
+  '@babel/helpers@7.29.10':
+    dependencies:
+      '@babel/template': 7.29.7
+      '@babel/types': 7.29.11
+
+  '@babel/parser@7.29.11':
+    dependencies:
+      '@babel/types': 7.29.11
+
+  '@babel/template@7.29.7':
+    dependencies:
+      '@babel/code-frame': 7.29.7
+      '@babel/parser': 7.29.11
+      '@babel/types': 7.29.11
+
+  '@babel/traverse@7.29.10':
+    dependencies:
+      '@babel/code-frame': 7.29.7
+      '@babel/generator': 7.29.8
+      '@babel/helper-globals': 7.29.7
+      '@babel/parser': 7.29.11
+      '@babel/template': 7.29.7
+      '@babel/types': 7.29.11
+      debug: 4.4.3
+    transitivePeerDependencies:
+      - supports-color
+
+  '@babel/types@7.29.11':
+    dependencies:
+      '@babel/helper-string-parser': 7.29.11
+      '@babel/helper-validator-identifier': 7.29.7
 
   '@bufbuild/buf-darwin-arm64@1.71.0':
     optional: true
@@ -1542,6 +1880,16 @@ snapshots:
 
   '@humanwhocodes/retry@0.4.3': {}
 
+  '@jridgewell/gen-mapping@0.3.13':
+    dependencies:
+      '@jridgewell/sourcemap-codec': 1.6.0
+      '@jridgewell/trace-mapping': 0.3.31
+
+  '@jridgewell/remapping@2.3.5':
+    dependencies:
+      '@jridgewell/gen-mapping': 0.3.13
+      '@jridgewell/trace-mapping': 0.3.31
+
   '@jridgewell/resolve-uri@3.1.2': {}
 
   '@jridgewell/sourcemap-codec@1.6.0': {}
@@ -1570,6 +1918,8 @@ snapshots:
       '@loglayer/shared': 4.4.0
 
   '@oxc-project/types@0.147.0': {}
+
+  '@remix-run/route-pattern@0.22.1': {}
 
   '@rolldown/binding-android-arm-eabi@1.2.6':
     optional: true
@@ -1618,127 +1968,127 @@ snapshots:
 
   '@rolldown/pluginutils@1.0.1': {}
 
-  '@spine-event-engine/ai@2.0.0-snapshot.25':
+  '@spine-event-engine/ai@2.0.0-snapshot.26':
     dependencies:
       '@bufbuild/protobuf': 2.12.1
-      '@spine-event-engine/core': 2.0.0-snapshot.25
-      '@spine-event-engine/proto': 2.0.0-snapshot.25
+      '@spine-event-engine/core': 2.0.0-snapshot.26
+      '@spine-event-engine/proto': 2.0.0-snapshot.26
 
-  '@spine-event-engine/auth@2.0.0-snapshot.25':
+  '@spine-event-engine/auth@2.0.0-snapshot.26':
     dependencies:
       '@bufbuild/protobuf': 2.12.1
       '@connectrpc/connect': 2.1.2(@bufbuild/protobuf@2.12.1)
-      '@spine-event-engine/core': 2.0.0-snapshot.25
-      '@spine-event-engine/deployment': 2.0.0-snapshot.25
-      '@spine-event-engine/proto': 2.0.0-snapshot.25
+      '@spine-event-engine/core': 2.0.0-snapshot.26
+      '@spine-event-engine/deployment': 2.0.0-snapshot.26
+      '@spine-event-engine/proto': 2.0.0-snapshot.26
       jose: 6.2.4
       loglayer: 9.4.0
 
-  '@spine-event-engine/client-node@2.0.0-snapshot.25':
+  '@spine-event-engine/client-node@2.0.0-snapshot.26':
     dependencies:
       '@bufbuild/protobuf': 2.12.1
       '@bufbuild/protoplugin': 2.12.1
       '@connectrpc/connect': 2.1.2(@bufbuild/protobuf@2.12.1)
       '@connectrpc/connect-node': 2.1.2(@bufbuild/protobuf@2.12.1)(@connectrpc/connect@2.1.2(@bufbuild/protobuf@2.12.1))
-      '@spine-event-engine/client-web': 2.0.0-snapshot.25
-      '@spine-event-engine/core': 2.0.0-snapshot.25
-      '@spine-event-engine/proto': 2.0.0-snapshot.25
+      '@spine-event-engine/client-web': 2.0.0-snapshot.26
+      '@spine-event-engine/core': 2.0.0-snapshot.26
+      '@spine-event-engine/proto': 2.0.0-snapshot.26
     transitivePeerDependencies:
       - supports-color
 
-  '@spine-event-engine/client-react@2.0.0-snapshot.25(@types/react@19.2.18)(react@19.2.8)':
+  '@spine-event-engine/client-react@2.0.0-snapshot.26(@types/react@19.2.18)(react@19.2.8)':
     dependencies:
-      '@spine-event-engine/client-web': 2.0.0-snapshot.25
-      '@spine-event-engine/proto': 2.0.0-snapshot.25
+      '@spine-event-engine/client-web': 2.0.0-snapshot.26
+      '@spine-event-engine/proto': 2.0.0-snapshot.26
       '@types/react': 19.2.18
       react: 19.2.8
 
-  '@spine-event-engine/client-web@2.0.0-snapshot.25':
+  '@spine-event-engine/client-web@2.0.0-snapshot.26':
     dependencies:
       '@bufbuild/protobuf': 2.12.1
       '@connectrpc/connect': 2.1.2(@bufbuild/protobuf@2.12.1)
       '@connectrpc/connect-web': 2.1.2(@bufbuild/protobuf@2.12.1)(@connectrpc/connect@2.1.2(@bufbuild/protobuf@2.12.1))
-      '@spine-event-engine/core': 2.0.0-snapshot.25
-      '@spine-event-engine/proto': 2.0.0-snapshot.25
+      '@spine-event-engine/core': 2.0.0-snapshot.26
+      '@spine-event-engine/proto': 2.0.0-snapshot.26
 
-  '@spine-event-engine/core@2.0.0-snapshot.25':
+  '@spine-event-engine/core@2.0.0-snapshot.26':
     dependencies:
       '@bufbuild/protobuf': 2.12.1
-      '@spine-event-engine/proto': 2.0.0-snapshot.25
+      '@spine-event-engine/proto': 2.0.0-snapshot.26
       '@spine-event-engine/validation': 2.0.0-snapshot.7(@bufbuild/protobuf@2.12.1)
 
-  '@spine-event-engine/deployment@2.0.0-snapshot.25':
+  '@spine-event-engine/deployment@2.0.0-snapshot.26':
     dependencies:
       '@bufbuild/protobuf': 2.12.1
-      '@spine-event-engine/proto': 2.0.0-snapshot.25
-      '@spine-event-engine/storage': 2.0.0-snapshot.25
+      '@spine-event-engine/proto': 2.0.0-snapshot.26
+      '@spine-event-engine/storage': 2.0.0-snapshot.26
       loglayer: 9.4.0
 
-  '@spine-event-engine/proto-tools@2.0.0-snapshot.25':
+  '@spine-event-engine/proto-tools@2.0.0-snapshot.26':
     dependencies:
       '@bufbuild/buf': 1.71.0
       '@bufbuild/protobuf': 2.12.1
       '@bufbuild/protoc-gen-es': 2.12.1(@bufbuild/protobuf@2.12.1)
       '@bufbuild/protoplugin': 2.12.1
-      '@spine-event-engine/proto': 2.0.0-snapshot.25
+      '@spine-event-engine/proto': 2.0.0-snapshot.26
       semver: 7.8.5
       typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
-  '@spine-event-engine/proto@2.0.0-snapshot.25':
+  '@spine-event-engine/proto@2.0.0-snapshot.26':
     dependencies:
       '@bufbuild/protobuf': 2.12.1
 
-  '@spine-event-engine/server@2.0.0-snapshot.25(@spine-event-engine/auth@2.0.0-snapshot.25)':
+  '@spine-event-engine/server@2.0.0-snapshot.26(@spine-event-engine/auth@2.0.0-snapshot.26)':
     dependencies:
       '@bufbuild/protobuf': 2.12.1
       '@connectrpc/connect': 2.1.2(@bufbuild/protobuf@2.12.1)
       '@connectrpc/connect-node': 2.1.2(@bufbuild/protobuf@2.12.1)(@connectrpc/connect@2.1.2(@bufbuild/protobuf@2.12.1))
-      '@spine-event-engine/ai': 2.0.0-snapshot.25
-      '@spine-event-engine/core': 2.0.0-snapshot.25
-      '@spine-event-engine/deployment': 2.0.0-snapshot.25
-      '@spine-event-engine/proto': 2.0.0-snapshot.25
-      '@spine-event-engine/storage': 2.0.0-snapshot.25
-      '@spine-event-engine/transport': 2.0.0-snapshot.25
+      '@spine-event-engine/ai': 2.0.0-snapshot.26
+      '@spine-event-engine/core': 2.0.0-snapshot.26
+      '@spine-event-engine/deployment': 2.0.0-snapshot.26
+      '@spine-event-engine/proto': 2.0.0-snapshot.26
+      '@spine-event-engine/storage': 2.0.0-snapshot.26
+      '@spine-event-engine/transport': 2.0.0-snapshot.26
       loglayer: 9.4.0
     optionalDependencies:
-      '@spine-event-engine/auth': 2.0.0-snapshot.25
+      '@spine-event-engine/auth': 2.0.0-snapshot.26
 
-  '@spine-event-engine/storage-postgres@2.0.0-snapshot.25':
+  '@spine-event-engine/storage-postgres@2.0.0-snapshot.26':
     dependencies:
       '@bufbuild/protobuf': 2.12.1
-      '@spine-event-engine/core': 2.0.0-snapshot.25
-      '@spine-event-engine/proto': 2.0.0-snapshot.25
-      '@spine-event-engine/storage': 2.0.0-snapshot.25
+      '@spine-event-engine/core': 2.0.0-snapshot.26
+      '@spine-event-engine/proto': 2.0.0-snapshot.26
+      '@spine-event-engine/storage': 2.0.0-snapshot.26
       '@types/pg': 8.23.1
       pg: 8.23.0
     transitivePeerDependencies:
       - pg-native
 
-  '@spine-event-engine/storage@2.0.0-snapshot.25':
+  '@spine-event-engine/storage@2.0.0-snapshot.26':
     dependencies:
       '@bufbuild/protobuf': 2.12.1
-      '@spine-event-engine/core': 2.0.0-snapshot.25
-      '@spine-event-engine/proto': 2.0.0-snapshot.25
+      '@spine-event-engine/core': 2.0.0-snapshot.26
+      '@spine-event-engine/proto': 2.0.0-snapshot.26
 
-  '@spine-event-engine/testing@2.0.0-snapshot.25(@spine-event-engine/auth@2.0.0-snapshot.25)':
+  '@spine-event-engine/testing@2.0.0-snapshot.26(@spine-event-engine/auth@2.0.0-snapshot.26)':
     dependencies:
       '@bufbuild/protobuf': 2.12.1
-      '@spine-event-engine/ai': 2.0.0-snapshot.25
-      '@spine-event-engine/client-node': 2.0.0-snapshot.25
-      '@spine-event-engine/core': 2.0.0-snapshot.25
-      '@spine-event-engine/proto': 2.0.0-snapshot.25
-      '@spine-event-engine/server': 2.0.0-snapshot.25(@spine-event-engine/auth@2.0.0-snapshot.25)
-      '@spine-event-engine/storage': 2.0.0-snapshot.25
+      '@spine-event-engine/ai': 2.0.0-snapshot.26
+      '@spine-event-engine/client-node': 2.0.0-snapshot.26
+      '@spine-event-engine/core': 2.0.0-snapshot.26
+      '@spine-event-engine/proto': 2.0.0-snapshot.26
+      '@spine-event-engine/server': 2.0.0-snapshot.26(@spine-event-engine/auth@2.0.0-snapshot.26)
+      '@spine-event-engine/storage': 2.0.0-snapshot.26
     transitivePeerDependencies:
       - '@spine-event-engine/auth'
       - supports-color
 
-  '@spine-event-engine/transport@2.0.0-snapshot.25':
+  '@spine-event-engine/transport@2.0.0-snapshot.26':
     dependencies:
       '@bufbuild/protobuf': 2.12.1
-      '@spine-event-engine/proto': 2.0.0-snapshot.25
+      '@spine-event-engine/proto': 2.0.0-snapshot.26
 
   '@spine-event-engine/validation@2.0.0-snapshot.7(@bufbuild/protobuf@2.12.1)':
     dependencies:
@@ -1770,6 +2120,10 @@ snapshots:
       '@types/node': 24.13.2
       pg-protocol: 1.16.1
       pg-types: 2.2.0
+
+  '@types/react-dom@19.2.7(@types/react@19.2.18)':
+    dependencies:
+      '@types/react': 19.2.18
 
   '@types/react@19.2.18':
     dependencies:
@@ -1873,6 +2227,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@vitejs/plugin-react@6.1.2(vite@8.2.2(@types/node@24.13.2))':
+    dependencies:
+      '@rolldown/pluginutils': 1.0.1
+      vite: 8.2.2(@types/node@24.13.2)
+
   '@vitest/mocker@5.0.3(vite@8.2.2(@types/node@24.13.2))':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
@@ -1918,6 +2277,8 @@ snapshots:
 
   balanced-match@4.0.4: {}
 
+  baseline-browser-mapping@2.11.34: {}
+
   brace-expansion@1.1.18:
     dependencies:
       balanced-match: 1.0.2
@@ -1927,7 +2288,17 @@ snapshots:
     dependencies:
       balanced-match: 4.0.4
 
+  browserslist@4.29.5:
+    dependencies:
+      baseline-browser-mapping: 2.11.34
+      caniuse-lite: 1.0.30001819
+      electron-to-chromium: 1.5.467
+      node-releases: 2.0.60
+      update-browserslist-db: 1.3.4(browserslist@4.29.5)
+
   callsites@3.1.0: {}
+
+  caniuse-lite@1.0.30001819: {}
 
   chai@6.2.2: {}
 
@@ -1943,6 +2314,10 @@ snapshots:
   color-name@1.1.4: {}
 
   concat-map@0.0.1: {}
+
+  convert-source-map@2.0.0: {}
+
+  cookie-es@3.1.1: {}
 
   cross-spawn@7.0.6:
     dependencies:
@@ -1960,13 +2335,28 @@ snapshots:
 
   detect-libc@2.1.2: {}
 
+  electron-to-chromium@1.5.467: {}
+
   es-module-lexer@2.3.2: {}
+
+  escalade@3.2.0: {}
 
   escape-string-regexp@4.0.0: {}
 
   eslint-config-prettier@10.1.8(eslint@9.39.1):
     dependencies:
       eslint: 9.39.1
+
+  eslint-plugin-react-hooks@7.1.1(eslint@9.39.1):
+    dependencies:
+      '@babel/core': 7.29.7
+      '@babel/parser': 7.29.11
+      eslint: 9.39.1
+      hermes-parser: 0.25.1
+      zod: 4.6.7
+      zod-validation-error: 4.0.2(zod@4.6.7)
+    transitivePeerDependencies:
+      - supports-color
 
   eslint-scope@8.4.0:
     dependencies:
@@ -2071,6 +2461,8 @@ snapshots:
   fsevents@2.3.3:
     optional: true
 
+  gensync@1.0.0-beta.2: {}
+
   glob-parent@6.0.2:
     dependencies:
       is-glob: 4.0.3
@@ -2078,6 +2470,12 @@ snapshots:
   globals@14.0.0: {}
 
   has-flag@4.0.0: {}
+
+  hermes-estree@0.25.1: {}
+
+  hermes-parser@0.25.1:
+    dependencies:
+      hermes-estree: 0.25.1
 
   ignore@5.3.2: {}
 
@@ -2100,15 +2498,21 @@ snapshots:
 
   jose@6.2.4: {}
 
+  js-tokens@4.0.0: {}
+
   js-yaml@4.3.2:
     dependencies:
       argparse: 2.0.1
+
+  jsesc@3.1.0: {}
 
   json-buffer@3.0.1: {}
 
   json-schema-traverse@0.4.1: {}
 
   json-stable-stringify-without-jsonify@1.0.1: {}
+
+  json5@2.2.3: {}
 
   keyv@4.5.4:
     dependencies:
@@ -2182,6 +2586,10 @@ snapshots:
       '@loglayer/shared': 4.4.0
       '@loglayer/transport': 3.3.0
 
+  lru-cache@5.1.1:
+    dependencies:
+      yallist: 3.1.1
+
   magic-string@1.4.3:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.6.0
@@ -2199,6 +2607,8 @@ snapshots:
   nanoid@3.3.18: {}
 
   natural-compare@1.4.0: {}
+
+  node-releases@2.0.60: {}
 
   obug@2.1.4: {}
 
@@ -2288,6 +2698,19 @@ snapshots:
 
   punycode@2.3.1: {}
 
+  react-dom@19.2.8(react@19.2.8):
+    dependencies:
+      react: 19.2.8
+      scheduler: 0.27.0
+
+  react-router@8.4.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
+    dependencies:
+      '@remix-run/route-pattern': 0.22.1
+      cookie-es: 3.1.1
+      react: 19.2.8
+    optionalDependencies:
+      react-dom: 19.2.8(react@19.2.8)
+
   react@19.2.8: {}
 
   resolve-from@4.0.0: {}
@@ -2312,6 +2735,10 @@ snapshots:
       '@rolldown/binding-openharmony-arm64': 1.2.6
       '@rolldown/binding-win32-arm64-msvc': 1.2.6
       '@rolldown/binding-win32-x64-msvc': 1.2.6
+
+  scheduler@0.27.0: {}
+
+  semver@6.3.1: {}
 
   semver@7.8.5: {}
 
@@ -2378,6 +2805,12 @@ snapshots:
 
   undici-types@8.3.0:
     optional: true
+
+  update-browserslist-db@1.3.4(browserslist@4.29.5):
+    dependencies:
+      browserslist: 4.29.5
+      escalade: 3.2.0
+      picocolors: 1.1.1
 
   uri-js@4.4.1:
     dependencies:
@@ -2457,4 +2890,12 @@ snapshots:
 
   xtend@4.0.2: {}
 
+  yallist@3.1.1: {}
+
   yocto-queue@0.1.0: {}
+
+  zod-validation-error@4.0.2(zod@4.6.7):
+    dependencies:
+      zod: 4.6.7
+
+  zod@4.6.7: {}

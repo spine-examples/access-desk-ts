@@ -112,9 +112,10 @@ message CreateOrganization {
   camelCase name holding an array.
 - **Order fields logically, not by when they were added:** identity first, then
   name, then descriptive fields (description, category), then classification and
-  policy (sensitivity, access levels, duration), then people (owner, approvers).
-  A related family of messages (`RequestResourceCreation`, `CreateResource`, the
-  state, the created event) shares the same order. While a contract is not
+  policy (sensitivity, access levels, duration), then people (the managers).
+  A related family of messages (`RegisterResource`,
+  `ResourceRegistrationRequested`, `CreateResource`, the state, the created
+  event) shares the same order. While a contract is not
   deployed, renumber freely to keep the order sensible.
 
 ## Message & field options

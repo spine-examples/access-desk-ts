@@ -53,7 +53,7 @@ Use only packages required by the implemented slice. The anticipated family is:
 | Black-box tests                              | `@spine-event-engine/testing`           |
 
 Application model and runtime code also use the exact compatible
-`@bufbuild/protobuf` family selected by the snapshot. Verify peer/dependency
+`@bufbuild/protobuf` family the Spine packages select. Verify peer/dependency
 requirements rather than guessing versions.
 
 ## Workspace and model structure
@@ -104,8 +104,13 @@ its `.proto` or `spine-proto.json` changes; the affected `server`'s `compose` +
 scripts should expose this sequence. Generated sources, manifests, registries,
 declarations, and build output are never hand-edited.
 
-For one model to import another's `.proto` (e.g. Resources using Identity's
-`PersonId`), add the producer package to the consumer model's `spine-proto.json`
+`handlers` also writes `generated/spine-bootstrap.ts`, which registers the
+handler metadata of the package's decorated classes. The module that builds a
+context imports it first, `import "../generated/spine-bootstrap.js"`, so `add()`
+finds the metadata of each class.
+
+For one model to import another's `.proto`, such as the model of the Resources
+bounded context using `PersonId` from the Identity bounded context, add the producer package to the consumer model's `spine-proto.json`
 `dependencies` **and** to its `package.json` `dependencies`, then `pnpm install`;
 declare transitive proto deps too. Reference cross-package types by full proto path
 (`accessdesk.identity.PersonId`). Spine value types are imported the same way:
@@ -139,7 +144,8 @@ is delivered. (`box.assertEvents()` does not include rejection events; subscribe
 ## Bounded contexts and handlers
 
 Choose `BoundedContext.singleTenant()` or `.multitenant()` explicitly. Access
-Desk uses a single-tenant Identity context and a multitenant Resources context.
+Desk uses a single-tenant Identity bounded context and a multitenant Resources
+bounded context.
 
 Use generated handler metadata with bare `@Assign`, `@Command`, `@React`, and
 `@Subscribe` decorators. Aggregates protect one consistency boundary;
@@ -247,8 +253,7 @@ validation nor a transition error surfaces as a generic
 error and stack discarded (`ServiceValues.commandPostError` fallback). To see the
 true cause, temporarily log in the `catch` of `#post` in
 `@spine-event-engine/server/dist/services/spine-services.js` (revert after) — do
-not commit or leave `node_modules` edits. This is how the single-field-id and
-`UNSUPPORTED_COMMAND` causes above were found.
+not commit or leave `node_modules` edits.
 
 A process manager's `@React` or `@Command` handler updates state like any other
 handler, so the state must pass its `(required)` checks afterwards. A process
@@ -284,14 +289,16 @@ Mark a cross-context event receptor with direct first-parameter
   production delivery guarantee.
 
 A single-tenant producer's event has no tenant, while a multitenant entity
-handler requires one, so a raw Identity event cannot reach a Resources handler.
-Access Desk needs no such delivery: Identity and Resources exchange no facts,
-and the gateway carries the signed-in person to Resources as the actor.
+handler requires one, so a raw event of the Identity bounded context cannot
+reach a handler of the Resources bounded context. Access Desk needs no such
+delivery: the Identity and Resources bounded contexts exchange no facts, and
+the gateway carries the signed-in person to the Resources bounded context as
+the actor.
 
 ## Protobuf Any and type registries
 
-Pack and unpack `Any` with `AnyPacker`: `tryUnpack` returns nothing for another
-type, `unpack` throws. The server application composes the complete generated TypeRegistry;
+Pack and unpack `Any` with `AnyPacker`: `pack` takes a generated message
+schema, `tryUnpack` returns nothing for another type, `unpack` throws. The server application composes the complete generated TypeRegistry;
 do not depend on runtime package scanning or mutable global schema registration.
 
 **Reading Protobuf enum custom options** (the "enum with `EnumValueOptions`
@@ -357,8 +364,8 @@ Access Desk keeps its data in PostgreSQL through `@spine-event-engine/storage-po
 - **Pools.** One per database, ten connections by default. Spine's pools do not
   listen for `error`, so a dropped idle connection can stop the process. Pools
   Access Desk opens itself listen.
-- **Subscriptions outlast restarts.** One nobody cancels stays for good, so the
-  gateway leaves it for Spine to clear when its session expires.
+- **Subscriptions outlast restarts.** One nobody cancels stays until its time
+  runs out.
 - **Inbox.** Commands accepted before a stop are delivered after the restart.
 
 ## Authentication and browser clients
@@ -395,14 +402,17 @@ controls defined in the architecture.
 - `bindings.activate` receives the trusted context, not the session; only
   `authorize` sees the session's principal. Spine may refuse a
   request after `authorize` without calling the bindings.
+- The bindings' `create`, `activate`, and `cancel` also take
+  `reader: ReaderIdentity`, the principal the subscription belongs
+  to. Spine refuses another principal's activation or cancellation.
 - Ending a session does not end its streams; Spine stops them only when the
-  session's time runs out.
+  session's time runs out. A gateway that ends sessions early cancels their
+  subscriptions itself.
 - Only Spine's cancel effect clears a subscription everywhere it is kept.
   The store receives it only when a browser cancels, or when a subscription
   expires.
 - Once the client's `activate` returns, the server has acknowledged the
-  subscription, and every later change arrives. On `2.0.0-snapshot.22`, updates
-  right after `activate` could be lost.
+  subscription, and every later change arrives.
 - A query takes an id filter or `EQUAL` filters on top-level `(column)`
   fields. A subscription to read models takes id filters and `EQUAL` field
   filters, also on nested paths. A subscription to events takes only

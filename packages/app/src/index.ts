@@ -20,6 +20,8 @@ export { typeRegistry } from "../generated/model-registry.js";
 export { AccessDesk, type AccessDeskOptions } from "./server/access-desk.js";
 export { Gateway, type GatewayOptions } from "./gateway/gateway.js";
 export { RevokedTokens } from "./gateway/revoked-tokens.js";
+export { TrustedNetwork, type ReaderAdmission } from "./trusted-network.js";
+export { SessionKey } from "./gateway/session-key.js";
 export { Storage, type ServerDatabases } from "./storage.js";
 export { Settings, type DatabaseServer } from "./settings.js";
 export type { ExternalSignIn } from "./gateway/routes/sign-in-routes.js";

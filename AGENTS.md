@@ -165,8 +165,8 @@ work independent. Subagents must not spawn further agents.
    scope.
 
 Keep narrow TSDoc and behavior claims current with each runtime slice. Defer
-broad documentation and all-example execution until affected interfaces are
-unless a changed public interface requires earlier updates. Do not stop
+broad documentation until the affected interfaces are stable, unless a changed
+public interface requires earlier updates. Do not stop
 for routine implementation choices; stop only for a real authorization,
 high-risk ambiguity, safety, or external-state blocker.
 
@@ -176,16 +176,17 @@ Never mark a non-trivial change complete without fresh verification. Choose the
 smallest command that proves the touched behavior, then broaden when shared
 behavior, generated contracts, persistence, or context choreography changes.
 
-The application workspace has not yet established a root command set.
-Use the scripts in the current `package.json` and the nearest package README
-once scaffolding exists; do not invent commands. Follow the verification ladder
-in `references/development.md`, including Proto generation/schema checks,
-targeted typecheck/lint, unit tests, affected-context Spine `BlackBox` tests,
-integration/scheduler recovery tests, and gateway/browser tests as applicable.
+Use the scripts in the root `package.json` and the nearest package README; do
+not invent commands. `pnpm run check` builds, typechecks, and lints the
+workspace; `pnpm run test` runs every test; `pnpm run verify` runs both. The
+tests need PostgreSQL running (`pnpm run postgres:start`). Follow the
+verification ladder in `references/development.md`, including Proto
+generation/schema checks, targeted typecheck/lint, affected-context Spine
+`BlackBox` tests, and gateway tests as applicable.
 
 A local `BlackBox` pass proves one local bounded context only. It does not
 prove browser behavior, cross-process delivery, authentication, or production
-Datastore behavior.
+storage behavior.
 
 If verification cannot be run, state the reason and the unverified boundary in
 the final response.
@@ -206,7 +207,7 @@ Skip routine review of generated or vendored files, including:
 - IDE metadata such as `.idea/**`.
 
 Do not skip authored `.proto` files, `spine-proto.json`, workspace manifests,
-Datastore indexes, integration envelopes, gateway authorization, or
+storage and deployment configuration, gateway authorization, or
 bounded-context import boundaries.
 
 ## Asking Questions
