@@ -329,17 +329,18 @@ block (Spine leaves `EnumValueOptions` free).
 - **One Delivery for all contexts.** By default, all messages of all contexts
   go through one shard, one after another. A handler that waits for another
   context of the same process waits forever, since that context's messages
-  queue behind it. A `deliveryStrategy` that gives each context a separate shard avoids it.
-- **Tenant index.** A multitenant context takes what is given in a tenant
-  only once the environment's `tenantIndex` keeps the tenant, and refuses
-  anything else as `TENANT_UNKNOWN`. In memory, `keep()` adds any tenant, and a
-  new process starts with none. Spine never calls `keep()` itself. It asks
-  `contains()` on every request in a tenant and before delivering each
-  message from the Inbox, and reads `page()` to prepare the tables of every
-  tenant when a context is built and on `createStorageStructures()`.
-- **Restart.** Spine keeps no tenant list beyond a fixed
-  `setTenantOptions` list. After a restart, the tenants are whatever the
-  `tenantIndex` lists. The Inbox and the subscriptions are kept in the shared
+  queue behind it. A `deliveryStrategy` that gives each context a separate
+  shard avoids it.
+- **Tenant index.** The environment's `tenantIndex` defaults to
+  `SINGLE_TENANT`, which keeps no tenants; a multitenant context then cannot
+  be built. `PersistentTenantIndex.create({ storageFactory, group })` keeps
+  the tenants through the storage factory, so on PostgreSQL they outlast a
+  restart. Close it after the contexts; it leaves the factory open. A
+  multitenant context takes what is given in a tenant only once the index
+  keeps the tenant, and refuses anything else as `TENANT_UNKNOWN`. Spine
+  never calls `keep()` itself. It asks `contains()` on every request in a
+  tenant and before delivering each message from the Inbox.
+- **Restart.** The Inbox and the subscriptions are kept in the shared
   database, each with its tenant inside the message, and are delivered only
   once the index admits that tenant.
 
@@ -352,15 +353,14 @@ Access Desk keeps its data in PostgreSQL through `@spine-event-engine/storage-po
   the Inbox, and the delivery shards. Each tenant of a multitenant context
   keeps its entities and events in a separate database, which
   `setTenantOptions` or `setTenantResolver` names.
-- **Tenant catalog.** With `setTenantOptions`, the tenants listed are the
-  catalog of the default `tenantIndex`, and `keep()` refuses any other. With
-  `setTenantResolver`, the catalog is empty, so the application must supply a
-  `tenantIndex`.
+- **Tenant databases.** `setTenantOptions` and `setTenantResolver` only say
+  in which database a tenant's data is kept. They do not register tenants:
+  only the `tenantIndex` decides which tenants are accepted.
 - **Connections.** Building the factory opens no connection, and neither does
   creating storage. `checkConnection()` checks the shared database.
   `close()` is async.
-- **Schema.** Spine creates its tables, with primary keys only. The databases
-  must exist already.
+- **Schema.** Spine creates its tables, with their primary keys and the
+  indexes its own records declare. The databases must exist already.
 - **Pools.** One per database, ten connections by default. Spine's pools do not
   listen for `error`, so a dropped idle connection can stop the process. Pools
   Access Desk opens itself listen.
@@ -398,16 +398,14 @@ controls defined in the architecture.
 - `DurableSubscriptionBindings` runs operations on one subscription one at a
   time, and keeps one more waiting. A second activation of an active
   subscription waits instead of being refused; a cancel behind it is refused
-  as `binding-busy`.
+  as `binding-busy`. A subscription opens only for the principal, the actor,
+  and the tenant it was made for.
 - `bindings.activate` receives the trusted context, not the session; only
   `authorize` sees the session's principal. Spine may refuse a
   request after `authorize` without calling the bindings.
 - The bindings' `create`, `activate`, and `cancel` also take
   `reader: ReaderIdentity`, the principal the subscription belongs
   to. Spine refuses another principal's activation or cancellation.
-- Ending a session does not end its streams; Spine stops them only when the
-  session's time runs out. A gateway that ends sessions early cancels their
-  subscriptions itself.
 - Only Spine's cancel effect clears a subscription everywhere it is kept.
   The store receives it only when a browser cancels, or when a subscription
   expires.
@@ -429,14 +427,20 @@ controls defined in the architecture.
   gateway's origin, as through a development proxy.
 - Without `cookies`, a session is a bearer token. `SignedSessions` needs a
   P-256 key. Without a `SignedTokenRevocation`, `logout` answers `expiryOnly`
-  and the token works until it expires. `OpaqueSessions` keeps sessions in
-  process memory.
+  and the token works until it expires. `OpaqueSessions` is created with
+  `await OpaqueSessions.create(...)` and keeps sessions in process memory
+  unless given a `PersistentOpaqueSessionStore`.
+- `PersistentTokenRevocations.create(...)`, given a storage factory, a group,
+  and the tokens' issuer and audience, keeps revoked tokens through the
+  factory. It forgets none by itself: `purgeExpired(cutoff)` deletes those no
+  longer taken.
 - `SignedSessions` accepts both ECDSA forms of a signature, so one token has
   two texts with the same `jti`.
-- `SignedSessions` accepts a token for `clockSkewSeconds` after it expires, but
-  passes `revoke` the token's bare expiry.
+- `SignedSessions` accepts a token for `clockSkewSeconds` after it expires, and
+  passes `revoke` that last moment.
 - `resolve` refuses every token while `isRevoked` fails. `logout` does not call
-  `isRevoked`.
+  `isRevoked`, and stops the session's requests in this process even when
+  `revoke` fails.
 - `postAndSubscribe` subscribes, waits for the server's acknowledgement, then
   posts. Its subscription brings only the events the command causes directly.
   Spine has no call that returns the event itself; `firstUpdateTimeoutMs` with
