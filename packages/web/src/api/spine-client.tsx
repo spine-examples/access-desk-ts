@@ -16,6 +16,7 @@ import { create } from "@bufbuild/protobuf";
 import { SpineClientProvider } from "@spine-event-engine/client-react";
 import { Client, type ClientRequest } from "@spine-event-engine/client-web";
 import { useEffect, useState, type ReactElement, type ReactNode } from "react";
+import { Session } from "../session/session.js";
 import { OrganizationIdSchema } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { OrganizationViewQuery } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_query.js";
 import { Config } from "../config.js";
@@ -27,7 +28,9 @@ export const SpineClient = {
    *
    * Scopes requests to the user's organization and authenticates them with the
    * session token. Replaces and closes the client when the user, organization,
-   * or token changes, and closes it on unmount.
+   * or token changes, and closes it on unmount. On sign-out it closes before
+   * the session ends, so its subscriptions are canceled while the token
+   * still works.
    */
   Scope: ({
     token,
@@ -41,14 +44,17 @@ export const SpineClient = {
     readonly children: ReactNode;
   }): ReactElement => {
     const [request, setRequest] = useState<ClientRequest>();
+    const { closeOnSignOut } = Session.useSession();
     useEffect(() => {
       const client = SpineClient.open(token, organization);
       setRequest(client.onBehalfOf(person));
+      const forget = closeOnSignOut(() => client.close());
       return () => {
+        forget();
         setRequest(undefined);
         void client.close();
       };
-    }, [token, person, organization]);
+    }, [token, person, organization, closeOnSignOut]);
     return request === undefined ? (
       <p>Connecting…</p>
     ) : (
