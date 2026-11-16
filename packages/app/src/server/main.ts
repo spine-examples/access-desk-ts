@@ -16,7 +16,6 @@ import { Server } from "@spine-event-engine/server";
 import { AccessDesk } from "./access-desk.js";
 import { Settings } from "../settings.js";
 import { Storage } from "../storage.js";
-import { TrustedNetwork } from "../trusted-network.js";
 
 /**
  * The application server.
@@ -46,10 +45,10 @@ const contexts = await AccessDesk.assemble({
 });
 const server = await new Server({
   contexts: [contexts.identity, contexts.resources],
-  resources: [contexts.members],
+  resources: [contexts.members, contexts.organizations],
   host,
   port,
-  services: { readerAdmission: TrustedNetwork.admission },
+  services: { readerAdmission: "trusted-network" },
 }).run();
 listening.address = server.baseUrl;
 
