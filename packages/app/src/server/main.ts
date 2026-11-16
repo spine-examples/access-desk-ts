@@ -27,10 +27,7 @@ import { Storage } from "../storage.js";
 const settings = Settings.ofServer(process.env);
 const { host, port } = settings.listening;
 
-const storage = await Storage.openServer(
-  Storage.serverDatabases(settings.database),
-  settings.organizations,
-);
+const storage = await Storage.openServer(Storage.serverDatabases(settings.database));
 
 const listening: { address?: string } = {};
 const contexts = await AccessDesk.assemble({
@@ -41,7 +38,6 @@ const contexts = await AccessDesk.assemble({
     return listening.address;
   },
   storage,
-  organizations: settings.organizations,
 });
 const server = await new Server({
   contexts: [contexts.identity, contexts.resources],
@@ -53,9 +49,6 @@ const server = await new Server({
 listening.address = server.baseUrl;
 
 console.log(`Access Desk application server: ${server.baseUrl}`);
-console.log(
-  `Organizations ${settings.organizations.join(", ")} are kept, and no other organization is.`,
-);
 if (!Settings.onlyThisMachine(host)) {
   console.warn(
     `The application server listens on ${host}, so other machines can reach it. ` +

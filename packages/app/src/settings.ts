@@ -52,13 +52,6 @@ export interface DatabaseServer {
 export interface ServerSettings {
   /** Where the application server listens. */
   readonly listening: Listening;
-  /**
-   * The organizations the application server keeps, by their identifiers.
-   */
-  // TODO:02-11-2026:mykyta.pimonov: Register organizations while the server
-  //  runs, instead of listing them here, once Spine keeps the tenants given to
-  //  its index across restarts.
-  readonly organizations: readonly string[];
   /** The PostgreSQL server the application server keeps its data on. */
   readonly database: DatabaseServer;
 }
@@ -154,23 +147,6 @@ class Reading {
   }
 
   /**
-   * Reads organizations that must be listed, each once, separated by commas.
-   */
-  organizations(name: string): string[] {
-    const text = this.text(name);
-    const organizations = text.split(",").map((organization) => organization.trim());
-    const valid =
-      organizations.every((organization) => organization !== "") &&
-      new Set(organizations).size === organizations.length;
-    if (text !== "" && !valid) {
-      this.#problems.push(
-        `${name} must list organizations, each once, separated by commas, and is "${text}".`,
-      );
-    }
-    return text === "" || !valid ? [] : organizations;
-  }
-
-  /**
    * Reads the PostgreSQL server, from `ACCESS_DESK_DATABASE_HOST`, `_PORT`,
    * `_USER`, and `_PASSWORD`.
    */
@@ -232,7 +208,6 @@ export const Settings = {
     const reading = new Reading(environment);
     return reading.done({
       listening: reading.listening("ACCESS_DESK_SERVER"),
-      organizations: reading.organizations("ACCESS_DESK_ORGANIZATIONS"),
       database: reading.databaseServer(),
     });
   },

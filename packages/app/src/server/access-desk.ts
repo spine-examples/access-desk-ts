@@ -12,17 +12,16 @@
  * and limitations under the License.
  */
 
-import { create } from "@bufbuild/protobuf";
 import type { Any } from "@bufbuild/protobuf/wkt";
-import { TenantIdSchema, type TenantId } from "@spine-event-engine/proto";
 import {
   Environment,
+  PersistentTenantIndex,
   ServerEnvironment,
   ShardIndex,
   type BoundedContext,
   type DeliveryStrategy,
 } from "@spine-event-engine/server";
-import type { StorageFactory } from "@spine-event-engine/storage";
+import { StorageGroup, type StorageFactory } from "@spine-event-engine/storage";
 import { IdentityContext } from "@access-desk/identity-server";
 import { ResourcesContext } from "@access-desk/resources-server";
 import { typeRegistry } from "../../generated/model-registry.js";
@@ -42,10 +41,6 @@ export interface AccessDeskOptions {
    * everything that belongs to no organization together.
    */
   readonly storage: StorageFactory;
-  /**
-   * The organizations the application keeps, by their identifiers.
-   */
-  readonly organizations: readonly string[];
 }
 
 /** The assembled application. */
@@ -61,7 +56,12 @@ export interface AccessDesk {
    * after the contexts.
    */
   readonly members: ReachedOrganizationMembers;
+  /** The register of the organizations the application keeps. */
+  readonly organizations: PersistentTenantIndex;
 }
+
+/** The storage group the register of organizations is kept in. */
+const ORGANIZATIONS = new StorageGroup("organizations");
 
 /**
  * Delivers the messages of each context in a separate shard.
@@ -78,33 +78,32 @@ export const AccessDesk = {
   /**
    * Assembles Access Desk from its contexts.
    *
-   * 1. Sets up the server environment of this process over the storage.
-   * 2. Adds the organizations to the environment's tenant index, so Resources
-   *    takes what is given in them.
+   * 1. Opens the register of the organizations the application keeps. The
+   *    register is kept in the shared database, which is the one list of the
+   *    organizations.
+   * 2. Sets up the server environment of this process over the storage and
+   *    the register, so Resources takes only what is given in a registered
+   *    organization.
    * 3. Builds the contexts.
    *
    * @param options How to assemble the application.
    * @returns The contexts, ready to be hosted by a server.
    */
   async assemble(options: AccessDeskOptions): Promise<AccessDesk> {
+    const organizations = await PersistentTenantIndex.create({
+      storageFactory: options.storage,
+      group: ORGANIZATIONS,
+    });
     ServerEnvironment.when(Environment.instance().type).use({
       storageFactory: options.storage,
       typeRegistry,
       deliveryStrategy: SHARD_PER_CONTEXT,
+      tenantIndex: organizations,
     });
-    const environment = ServerEnvironment.instance();
-    await environment.completeSetup();
-    for (const organization of options.organizations) {
-      await environment.tenantIndex.keep(AccessDesk.tenantOf(organization));
-    }
+    await ServerEnvironment.instance().completeSetup();
     const members = ReachedOrganizationMembers.through(options.server);
     const identity = await IdentityContext.create({ members });
     const resources = await ResourcesContext.create();
-    return { identity, resources, members };
-  },
-
-  /** Returns the tenant of an organization. */
-  tenantOf(organization: string): TenantId {
-    return create(TenantIdSchema, { kind: { case: "value", value: organization } });
+    return { identity, resources, members, organizations };
   },
 };

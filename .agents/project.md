@@ -144,9 +144,9 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
   That is a new database for each, and for a multitenant context one
   shared database and one for each tenant, which must be listed up front. The
   application's server tests open the storage the way the server does, through
-  `Storage.openServer`, for the organizations they work in (`acme` and
-  `globex`). A test creates each organization's database first, as an
-  application administrator does.
+  `Storage.openServer`, and register the organizations they work in (`acme`
+  and `globex`) in the server's register. A test creates each organization's
+  database first, as an application administrator does.
 - **Spine has one server environment per process.** Before a test builds a
   context, `TestEnvironment.start` (`@access-desk/testing/environment`) sets the
   environment up over the test's storage and keeps its tenants; after the
