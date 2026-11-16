@@ -75,9 +75,9 @@ shares its network.
 
 ## postgres
 
-Each time it starts, its `post_start` hook creates the databases that are
-missing, one for each organization of `ACCESS_DESK_ORGANIZATIONS`, and only
-then it reports itself healthy. The databases are kept in the volume
+Each time it starts, its `post_start` hook creates the databases of the
+application server and the gateway that are missing, and only then it reports
+itself healthy. The databases are kept in the volume
 `access-desk_postgres-data`, which `pnpm run postgres:start` uses as well.
 
 ## Run it

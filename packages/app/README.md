@@ -30,7 +30,6 @@ refuses to start and names it.
 | ------------------------------- | ------------------- | ---------------------------------------------------------------------- |
 | `ACCESS_DESK_SERVER_HOST`       | server, gateway     | The address the application server listens on.                         |
 | `ACCESS_DESK_SERVER_PORT`       | server, gateway     | The port the application server listens on.                            |
-| `ACCESS_DESK_ORGANIZATIONS`     | server, database    | The organizations the server keeps, by commas.                         |
 | `ACCESS_DESK_GATEWAY_HOST`      | gateway, web client | The address the gateway listens on.                                    |
 | `ACCESS_DESK_GATEWAY_PORT`      | gateway, web client | The port the gateway listens on.                                       |
 | `ACCESS_DESK_WEB_HOST`          | gateway, web client | The address the web client listens on, where Google sends people back. |
@@ -61,18 +60,17 @@ pnpm run postgres:start
 ```
 
 Each time PostgreSQL starts, it creates any of the databases below that are
-missing. Running the command again after changing `ACCESS_DESK_ORGANIZATIONS`
-restarts it with the new setting.
+missing, except the databases of organizations, which are created by hand.
 
 Spine creates the tables itself, but not the databases. `pnpm run postgres:stop`
 stops the PostgreSQL server. `pnpm run postgres:delete` removes it, and all
 its data.
 
-| Database                              | Used by            | What it stores                                                                                       |
-| ------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------- |
-| `accessdesk_server`                   | application server | People and their accounts, subscriptions to updates, and messages that are not delivered yet.        |
-| `accessdesk_resources_<organization>` | application server | The data of a single organization: its members, resources, access requests, grants, and audit trail. |
-| `accessdesk_gateway`                  | gateway            | Who opened each subscription, and the sessions people signed out of.                                 |
+| Database                              | Used by            | What it stores                                                                                                            |
+| ------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `accessdesk_server`                   | application server | The organizations it keeps, people and their accounts, subscriptions to updates, and messages that are not delivered yet. |
+| `accessdesk_resources_<organization>` | application server | The data of a single organization: its members, resources, access requests, grants, and audit trail.                      |
+| `accessdesk_gateway`                  | gateway            | Who opened each subscription, the sessions people signed out of, and the sign-ins under way.                              |
 
 The application server and the gateway never share a database. The gateway
 gets the application's data only by asking the application server.
@@ -83,6 +81,7 @@ In Spine, all contexts in one process share a single storage. Data that
 doesn't belong to a particular organization goes into the shared database,
 `accessdesk_server`:
 
+- The organizations the server keeps.
 - Identity: people, the accounts they sign in with, their email addresses,
   and their memberships. Identity is not split by organization.
 - Subscriptions to both contexts.
@@ -91,25 +90,16 @@ doesn't belong to a particular organization goes into the shared database,
 
 #### Organizations
 
-Each organization gets a separate database, named after its identifier:
+Each organization gets a separate database, named after its identifier: the
+database of `teamdev` is `accessdesk_resources_teamdev`. PostgreSQL limits a
+database name to 63 characters, so an identifier can be at most 42 characters
+long.
 
-```dotenv
-ACCESS_DESK_ORGANIZATIONS=teamdev,codematters
-```
-
-With this setting, the databases are `accessdesk_resources_teamdev` and
-`accessdesk_resources_codematters`. PostgreSQL limits a database name to 63
-characters, so an identifier can be at most 42 characters long.
-
-The application server works only with the organizations listed in
-`ACCESS_DESK_ORGANIZATIONS`, and rejects requests for any other. The list is
-fixed for now, because Spine does not yet remember organizations added at
-runtime across restarts. To add an organization:
-
-1. Add it to `ACCESS_DESK_ORGANIZATIONS`.
-2. Run `pnpm run postgres:start` to restart PostgreSQL with the new setting
-   and create its database.
-3. Restart the application server.
+The application server works only with the organizations registered in
+`accessdesk_server`, and rejects requests for any other. That register is the
+one list of organizations: the server finds the database of a registered
+organization by the organization's identifier, when it first needs it. When
+the server starts, it names the organizations it keeps.
 
 #### Subscriptions
 
@@ -123,6 +113,11 @@ application server keep a record of the subscription:
   it is active, in `accessdesk_server`. It uses this to send updates, and to
   restore the subscription after a restart. A subscription to Resources
   belongs to one organization and gets that organization's updates only.
+
+When the person signs out, every subscription they have open stops. The web
+client cancels its subscriptions before it signs out, which deletes both
+records. A subscription nobody cancels, as when the tab is closed, is kept
+until its session would have expired, and then deleted.
 
 #### Sessions
 
@@ -143,8 +138,12 @@ who makes it, and the server trusts it, as only the gateway reaches the server.
 
 A signed token stays valid until it expires, even after the person signs out.
 So on sign-out, the gateway saves the token's identifier in
-`accessdesk_gateway` and rejects that token from then on. Once the token
-expires, the gateway deletes the identifier.
+`accessdesk_gateway` and rejects that token from then on. Each sign-out also
+deletes the identifiers of the tokens that have expired since.
+
+A sign-in through Google that has started is kept in `accessdesk_gateway` too,
+so the person can finish it even when the gateway restarts in between. Each
+new sign-in deletes those left unfinished for too long.
 
 #### Tests
 

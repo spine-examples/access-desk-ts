@@ -43,10 +43,10 @@ do the tests. The application server stores each organization in a separate
 database. Everything that belongs to no single organization goes into one
 shared database: people, their accounts, email addresses, and memberships,
 subscriptions to both contexts, and messages waiting to be delivered. The
-server works only with the organizations listed in its settings, and each of
-them needs a database; adding one takes a restart. The gateway stores who
-opened each subscription and the sessions people signed out of in a separate
-database.
+server works only with the organizations registered in the shared database,
+each with a database of its own. The gateway stores who opened each
+subscription, the sessions people signed out of, and the sign-ins under way in
+a separate database.
 
 An initial deployment may co-host both contexts in one application server.
 Co-location does not weaken the boundaries: each context must have a separate model
