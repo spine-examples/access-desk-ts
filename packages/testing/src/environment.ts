@@ -13,9 +13,19 @@
  */
 
 import type { TenantId } from "@spine-event-engine/proto";
-import { EnvironmentType, ServerEnvironment } from "@spine-event-engine/server";
+import {
+  EnvironmentType,
+  PersistentTenantIndex,
+  ServerEnvironment,
+} from "@spine-event-engine/server";
 import { ServerTests } from "@spine-event-engine/server/testing";
-import type { StorageFactory } from "@spine-event-engine/storage";
+import { StorageGroup, type StorageFactory } from "@spine-event-engine/storage";
+
+/** The storage group the register of tenants is kept in. */
+const TENANTS = new StorageGroup("tenants");
+
+/** The register of the tenants of the environment set up last, while it is open. */
+let registered: PersistentTenantIndex | undefined;
 
 /**
  * The server environment a test's contexts run in.
@@ -26,27 +36,44 @@ import type { StorageFactory } from "@spine-event-engine/storage";
  */
 export const TestEnvironment = {
   /**
-   * Sets up the environment over the storage, and keeps the tenants.
+   * Sets up the environment over the storage, and registers the tenants.
    *
-   * It resets the environment an earlier test left first.
+   * It resets the environment an earlier test left first. With no tenants,
+   * the environment is single-tenant and keeps no register.
    *
    * @param storage The storage the test's contexts keep their data in.
    * @param tenants The tenants the test works in, for a multitenant context.
    */
   async start(storage: StorageFactory, tenants: readonly TenantId[] = []): Promise<void> {
-    await ServerTests.resetEnvironment();
-    ServerEnvironment.when(EnvironmentType.Local).use({ storageFactory: storage });
-    const environment = ServerEnvironment.instance();
-    await environment.completeSetup();
+    await TestEnvironment.reset();
+    const index =
+      tenants.length === 0
+        ? undefined
+        : await PersistentTenantIndex.create({ storageFactory: storage, group: TENANTS });
+    registered = index;
+    ServerEnvironment.when(EnvironmentType.Local).use({
+      storageFactory: storage,
+      ...(index === undefined ? {} : { tenantIndex: index }),
+    });
+    await ServerEnvironment.instance().completeSetup();
     for (const tenant of tenants) {
-      await environment.tenantIndex.keep(tenant);
+      await index?.keep(tenant);
     }
   },
 
   /**
    * Closes the environment, so the next test can set up a new one.
+   *
+   * The register of tenants closes first, as the environment closes the
+   * storage it is kept in.
    */
-  reset(): Promise<void> {
-    return ServerTests.resetEnvironment();
+  async reset(): Promise<void> {
+    const index = registered;
+    registered = undefined;
+    try {
+      await index?.close();
+    } finally {
+      await ServerTests.resetEnvironment();
+    }
   },
 };
