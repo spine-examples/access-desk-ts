@@ -13,12 +13,8 @@
  */
 
 import { generateKeyPairSync } from "node:crypto";
-import { create } from "@bufbuild/protobuf";
-import type { SignedTokenRevocation } from "@spine-event-engine/auth";
-import { EmailAddressSchema } from "@spine-event-engine/proto";
-import { PersonIdSchema } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
+import { SignedSessions } from "@spine-event-engine/auth";
 import { SessionKey } from "../../../src/gateway/session-key.js";
-import { Sessions, type SessionSubscriptions } from "../../../src/gateway/sessions.js";
 
 /**
  * Creates a new key a gateway may sign sessions with.
@@ -36,95 +32,37 @@ export function newSessionKey(): SessionKey {
   return key;
 }
 
-/** The key the gateway of the tests signs sessions with. */
-const KEY = newSessionKey();
-
-/** The order of the P-256 curve, the number every signature's `s` is taken modulo. */
-const P256_ORDER = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551n;
-
-/** How long a session lasts, in milliseconds. */
-export const SESSION_MS = 8 * 60 * 60 * 1_000;
-
-/** The person who signs in across the tests. */
-export const person = {
-  id: create(PersonIdSchema, { uuid: "person-1" }),
-  email: create(EmailAddressSchema, { value: "maya@example.com" }),
-  name: "Maya Chen",
-};
-
 /**
- * Creates the sessions of a gateway that signs with the tests' key.
+ * Creates the sessions of a gateway that signs with a new key.
  *
- * Two of them over the same revoked tokens stand for one gateway before and
- * after a restart.
- *
- * @param revoked Where the gateway keeps the tokens of ended sessions.
- * @param subscriptions The subscriptions held under the sessions. None when left out.
+ * A session ends only when its token expires, as nothing keeps the sessions
+ * people ended.
  */
-export function sessionsOfGateway(
-  revoked: SignedTokenRevocation,
-  subscriptions?: SessionSubscriptions,
-): Sessions {
-  return new Sessions({
-    key: KEY,
-    revoked,
-    ...(subscriptions === undefined ? {} : { subscriptions }),
+export function givenSessions(): SignedSessions {
+  return new SignedSessions({
+    issuer: "access-desk-test",
+    audience: "access-desk-test",
+    activeKey: newSessionKey().signing(),
   });
 }
 
 /**
- * Creates subscriptions that cancel nothing, and note each session they stop.
+ * Starts a session for a person, as the gateway does once an identity
+ * provider confirmed them.
  *
- * @param stopped Where to note the identifier of each session stopped.
+ * @param sessions The sessions of the gateway.
+ * @param attributes What the session tells of the person: their `email`,
+ *   `name`, and `organization`. Maya Chen of no organization when left out.
+ * @returns The session's token.
+ * @throws Error when the session was not started.
  */
-export function notingStops(stopped: string[]): SessionSubscriptions {
-  return {
-    closeFor: () => Promise.resolve(),
-    stop: (session) => {
-      stopped.push(session);
-      return Promise.resolve();
-    },
-  };
-}
-
-/** Builds a request that carries a token, as a browser sends it. */
-export function request(token: string): Request {
-  return new Request("https://gateway.test/auth/session", {
-    headers: { authorization: `Bearer ${token}` },
-  });
-}
-
-/**
- * Rewrites the token's signature the other way ECDSA allows: `s`
- * replaced by the curve's order less `s`.
- */
-export function withOtherSignature(token: string): string {
-  const [header = "", payload = "", signature = ""] = token.split(".");
-  const bytes = Buffer.from(signature, "base64url");
-  const s = BigInt(`0x${bytes.subarray(32).toString("hex")}`);
-  const otherS = Buffer.from((P256_ORDER - s).toString(16).padStart(64, "0"), "hex");
-  return `${header}.${payload}.${Buffer.concat([bytes.subarray(0, 32), otherS]).toString("base64url")}`;
-}
-
-/**
- * Creates a store of revoked tokens that keeps them in another store while
- * it can be read and written, and fails while it cannot.
- *
- * @param revoked The store that keeps the tokens.
- */
-export function failingWhenTold(
-  revoked: SignedTokenRevocation,
-): SignedTokenRevocation & { reading: boolean; writing: boolean } {
-  const store = {
-    kind: "supported" as const,
-    reading: true,
-    writing: true,
-    isRevoked: (id: string) =>
-      store.reading ? revoked.isRevoked(id) : Promise.reject(new Error("The store is down.")),
-    revoke: (id: string, expiresAt: Parameters<SignedTokenRevocation["revoke"]>[1]) =>
-      store.writing
-        ? revoked.revoke(id, expiresAt)
-        : Promise.reject(new Error("The store is down.")),
-  };
-  return store;
+export async function tokenOf(
+  sessions: SignedSessions,
+  attributes: Readonly<Record<string, string>> = { email: "maya@example.com", name: "Maya Chen" },
+): Promise<string> {
+  const issued = await sessions.issue({ id: "person-1", attributes });
+  if (issued.kind !== "issued") {
+    throw new Error(`The session was not started: ${issued.reason}.`);
+  }
+  return issued.credential.value;
 }

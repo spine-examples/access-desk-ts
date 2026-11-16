@@ -12,73 +12,8 @@
  * and limitations under the License.
  */
 
-import { create } from "@bufbuild/protobuf";
-import { EmailAddressSchema } from "@spine-event-engine/proto";
 import { describe, expect, it, vi } from "vitest";
-import {
-  OrganizationIdSchema,
-  PersonIdSchema,
-} from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
-import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
-import { OrganizationViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
-import type { AccessDesk } from "../../../src/gateway/access-desk.js";
-import { routing } from "../../../src/gateway/routes/route.js";
-import { sessionRoutes } from "../../../src/gateway/routes/session-routes.js";
-import type { Session, Sessions } from "../../../src/gateway/sessions.js";
-
-const person = {
-  id: create(PersonIdSchema, { uuid: "person-1" }),
-  email: create(EmailAddressSchema, { value: "maya@example.com" }),
-  name: "Maya",
-};
-const organization = create(OrganizationIdSchema, { uuid: "acme" });
-const session: Session = {
-  id: "session-1",
-  credential: { kind: "bearer", value: "token" },
-  person,
-  organization,
-};
-
-function fixture() {
-  const sessions = {
-    of: vi.fn().mockResolvedValue(session),
-    end: vi.fn().mockResolvedValue(undefined),
-    endUnresolved: vi.fn().mockResolvedValue(undefined),
-  };
-  const desk = {
-    profile: vi.fn().mockResolvedValue({
-      accounts: [{ provider: "google", subject: "1" }],
-      organization,
-    }),
-    organization: vi.fn().mockResolvedValue(
-      create(OrganizationViewSchema, {
-        id: organization,
-        name: "Acme",
-        member: [{ person: person.id, role: OrganizationRole.ADMINISTRATOR }],
-      }),
-    ),
-  };
-  const routes = sessionRoutes(
-    routing(["https://app.test"], sessions as unknown as Sessions),
-    desk as unknown as AccessDesk,
-    sessions as unknown as Sessions,
-  );
-  const call = async (path: string, body: object = {}): Promise<Response> => {
-    const route = routes.find((candidate) => candidate.path === path);
-    if (route === undefined) {
-      throw new Error(`Missing route ${path}`);
-    }
-    return route.onRequest(
-      new Request(`https://gateway.test${path}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-      }),
-      new AbortController().signal,
-    );
-  };
-  return { sessions, desk, routes, call };
-}
+import { organization, sessionRoutesFixture as fixture } from "../given/session-routes.js";
 
 describe("Gateway session routes should", () => {
   it("serialize typed session values with the organization the session works in", async () => {
@@ -97,7 +32,9 @@ describe("Gateway session routes should", () => {
 
   it("tell a person who belongs to no organization that they have none", async () => {
     const { call, sessions, desk } = fixture();
-    sessions.of.mockResolvedValueOnce({ ...session, organization: undefined });
+    sessions.resolve.mockResolvedValueOnce({
+      principal: { id: "person-1", attributes: { email: "maya@example.com", name: "Maya" } },
+    });
 
     const response = await call("/auth/session");
 
@@ -107,7 +44,7 @@ describe("Gateway session routes should", () => {
 
   it("return 401 for a session request without a resolved bearer session", async () => {
     const { call, sessions, desk } = fixture();
-    sessions.of.mockResolvedValueOnce(undefined);
+    sessions.resolve.mockResolvedValueOnce(undefined);
 
     const response = await call("/auth/session");
 
@@ -129,30 +66,54 @@ describe("Gateway session routes should", () => {
     silenced.mockRestore();
   });
 
-  it("sign out with or without a session", async () => {
-    const { call, sessions } = fixture();
-    const signedOut = await call("/auth/sign-out");
-    expect(signedOut.status).toBe(200);
-    expect(sessions.end).toHaveBeenCalledWith(session);
+  it("end the session of the token a request carries, and then forget the ended sessions that expired", async () => {
+    const { call, sessions, ended } = fixture();
 
-    sessions.end.mockClear();
-    sessions.of.mockResolvedValueOnce(undefined);
-    const alreadyOut = await call("/auth/sign-out");
-    expect(alreadyOut.status).toBe(200);
-    expect(sessions.end).not.toHaveBeenCalled();
-    expect(sessions.endUnresolved).toHaveBeenCalledOnce();
+    const response = await call("/auth/sign-out");
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({});
+    expect(sessions.logout).toHaveBeenCalledWith({ kind: "bearer", value: "token" });
+    expect(ended.purgeExpired).toHaveBeenCalledOnce();
+  });
+
+  it("end a token that does not resolve as well, and answer a request without a token", async () => {
+    const { call, sessions, ended } = fixture();
+    sessions.resolve.mockResolvedValue(undefined);
+    sessions.logout.mockResolvedValueOnce({ kind: "expiryOnly" });
+
+    expect((await call("/auth/sign-out")).status).toBe(200);
+    expect(sessions.logout).toHaveBeenCalledOnce();
+    // No session ended, so the gateway forgets nothing.
+    expect(ended.purgeExpired).not.toHaveBeenCalled();
+
+    sessions.logout.mockClear();
+    expect((await call("/auth/sign-out", null)).status).toBe(200);
+    expect(sessions.logout).not.toHaveBeenCalled();
   });
 
   it("ask to sign out again when the gateway could not remember that the session ended", async () => {
-    const { call, sessions } = fixture();
+    const { call, sessions, ended } = fixture();
     const silenced = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    sessions.of.mockResolvedValueOnce(undefined);
-    sessions.endUnresolved.mockRejectedValueOnce(new Error("The session could not be ended."));
+    sessions.logout.mockResolvedValueOnce({ kind: "unavailable" });
 
     const response = await call("/auth/sign-out");
 
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ error: "try again" });
+    expect(ended.purgeExpired).not.toHaveBeenCalled();
+    silenced.mockRestore();
+  });
+
+  it("sign out even when the ended sessions that expired cannot be forgotten", async () => {
+    const { call, ended } = fixture();
+    const silenced = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    ended.purgeExpired.mockRejectedValueOnce(new Error("The store is down."));
+
+    const response = await call("/auth/sign-out");
+
+    expect(response.status).toBe(200);
+    expect(silenced).toHaveBeenCalled();
     silenced.mockRestore();
   });
 });

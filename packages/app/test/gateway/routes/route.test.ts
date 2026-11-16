@@ -12,29 +12,17 @@
  * and limitations under the License.
  */
 
+import type { SignedSessions } from "@spine-event-engine/auth";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
-import { typeRegistry } from "../../../generated/model-registry.js";
-import { RevokedTokens } from "../../../src/gateway/revoked-tokens.js";
-import { routing } from "../../../src/gateway/routes/route.js";
-import { Sessions } from "../../../src/gateway/sessions.js";
-import { newSessionKey } from "../given/sessions.js";
+import { routing, type Session } from "../../../src/gateway/routes/route.js";
+import { givenSessions, tokenOf } from "../given/sessions.js";
 
-let storage: TestStorage;
-let revoked: Awaited<ReturnType<typeof RevokedTokens.open>>;
-let sessions: Sessions;
-beforeEach(async () => {
-  storage = await TestStorages.singleTenant(typeRegistry);
-  revoked = await RevokedTokens.open(storage.url);
-  sessions = new Sessions({
-    key: newSessionKey(),
-    revoked,
-  });
+let sessions: SignedSessions;
+beforeEach(() => {
+  sessions = givenSessions();
 });
 afterEach(async () => {
   await sessions.close();
-  await revoked.close();
-  await storage.drop();
 });
 
 function incoming(body: string, authorization?: string): Request {
@@ -60,31 +48,65 @@ describe("Gateway route construction should", () => {
       origins: ["https://app.test"],
       maxRequestBytes: 16_384,
       timeoutMs: 20_000,
+      // A session comes as a bearer token, so no cookie or CSRF header is read.
+      admission: { csrfHeaderNames: [], credentialCookieNames: [], stateCookieNames: [] },
     });
   });
 
   it("pass a JSON body and a typed session to its handler, and prevent caching", async () => {
-    const created = await sessions.create({
-      id: "p-1",
-      attributes: { email: "maya@example.com", name: "Maya" },
-    });
-    expect(created.kind).toBe("issued");
-    if (created.kind !== "issued") {
-      return;
-    }
+    const token = await tokenOf(sessions);
     const route = routing(["https://app.test"], sessions)("/sample", (body, session) =>
       Promise.resolve([200, { value: body.value, person: session?.person.id.uuid }]),
     );
 
     const response = await route.onRequest(
-      incoming('{"value":7}', `Bearer ${created.credential.value}`),
+      incoming('{"value":7}', `Bearer ${token}`),
       new AbortController().signal,
     );
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("application/json");
     expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(await response.json()).toEqual({ value: 7, person: "p-1" });
+    expect(await response.json()).toEqual({ value: 7, person: "person-1" });
+  });
+
+  it("read the person and the organization a session stands for as typed values", async () => {
+    const token = await tokenOf(sessions, {
+      email: "maya@example.com",
+      name: "Maya Chen",
+      organization: "acme",
+    });
+
+    const session = await sessionIn(`Bearer ${token}`);
+
+    expect(session?.person).toMatchObject({
+      id: { uuid: "person-1" },
+      email: { value: "maya@example.com" },
+      name: "Maya Chen",
+    });
+    expect(session?.organization?.uuid).toBe("acme");
+  });
+
+  it("read a session of a person in no organization", async () => {
+    const session = await sessionIn(`Bearer ${await tokenOf(sessions)}`);
+
+    expect(session).toBeDefined();
+    expect(session?.organization).toBeUndefined();
+  });
+
+  it.each([undefined, "Basic opaque", "bearer opaque", "Bearer ", "Bearer unknown"])(
+    "pass no session for the authorization %s",
+    async (authorization) => {
+      expect(await sessionIn(authorization)).toBeUndefined();
+    },
+  );
+
+  it("pass no session that names no email address, and name a person by their email when the session names nobody", async () => {
+    const nameless = await tokenOf(sessions, { email: "unnamed@example.com" });
+    const emailless = await tokenOf(sessions, { name: "Maya Chen" });
+
+    expect((await sessionIn(`Bearer ${nameless}`))?.person.name).toBe("unnamed@example.com");
+    expect(await sessionIn(`Bearer ${emailless}`)).toBeUndefined();
   });
 
   it.each(["", "not-json", "null", "true", "7", '"word"', "[]"])(
@@ -101,3 +123,19 @@ describe("Gateway route construction should", () => {
     },
   );
 });
+
+/**
+ * Finds the session a route's handler receives for a request.
+ *
+ * @param authorization The `Authorization` header of the request. None when left out.
+ * @returns The session, or `undefined` when the handler receives none.
+ */
+async function sessionIn(authorization?: string): Promise<Session | undefined> {
+  let received: Session | undefined;
+  const route = routing(["https://app.test"], sessions)("/sample", (_body, session) => {
+    received = session;
+    return Promise.resolve([200, {}]);
+  });
+  await route.onRequest(incoming("{}", authorization), new AbortController().signal);
+  return received;
+}
