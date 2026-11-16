@@ -19,8 +19,7 @@
 # `packages/app/src/storage.ts`.
 #
 # The PostgreSQL server runs it when it first starts, on a new volume, and
-# `compose.yaml` runs it each time the server starts, for the databases of
-# organizations added since.
+# `compose.yaml` runs it each time the server starts.
 #
 # Spine creates the tables inside the databases. It does not create databases.
 #
@@ -45,11 +44,6 @@ SQL
 # people, their accounts and memberships, subscriptions, and the messages
 # waiting for delivery.
 create accessdesk_server
-
-# Each organization has a separate database.
-for organization in $(echo "$ACCESS_DESK_ORGANIZATIONS" | tr ',' ' '); do
-    create "accessdesk_resources_$organization"
-done
 
 # The subscriptions people hold and the sessions they ended. The gateway
 # keeps them.

@@ -46,8 +46,7 @@ x-certificate-key: &certificate-key "/certs/localhost-key.pem"
 
 services:
   # The PostgreSQL server of the application server and the gateway.
-  # Each time it starts, it makes the missing databases, such as one of an
-  # organization added to ACCESS_DESK_ORGANIZATIONS.
+  # Each time it starts, it makes their missing databases.
   postgres:
     # The newest PostgreSQL the Spine adapter was accepted against.
     image: postgres:18.6-alpine
@@ -56,7 +55,6 @@ services:
       POSTGRES_PASSWORD: ${ACCESS_DESK_DATABASE_PASSWORD:?Set ACCESS_DESK_DATABASE_PASSWORD in .env.}
       POSTGRES_DB: postgres
       PGPORT: ${ACCESS_DESK_DATABASE_PORT:?Set ACCESS_DESK_DATABASE_PORT in .env.}
-      ACCESS_DESK_ORGANIZATIONS: ${ACCESS_DESK_ORGANIZATIONS:?Set ACCESS_DESK_ORGANIZATIONS in .env.}
     ports:
       - target: ${ACCESS_DESK_DATABASE_PORT:?Set ACCESS_DESK_DATABASE_PORT in .env.}
         host_ip: ${ACCESS_DESK_DATABASE_HOST:?Set ACCESS_DESK_DATABASE_HOST in .env.}
@@ -111,7 +109,6 @@ services:
       ACCESS_DESK_DATABASE_PORT: ${ACCESS_DESK_DATABASE_PORT:?Set ACCESS_DESK_DATABASE_PORT in .env.}
       ACCESS_DESK_DATABASE_USER: ${ACCESS_DESK_DATABASE_USER:?Set ACCESS_DESK_DATABASE_USER in .env.}
       ACCESS_DESK_DATABASE_PASSWORD: ${ACCESS_DESK_DATABASE_PASSWORD:?Set ACCESS_DESK_DATABASE_PASSWORD in .env.}
-      ACCESS_DESK_ORGANIZATIONS: ${ACCESS_DESK_ORGANIZATIONS:?Set ACCESS_DESK_ORGANIZATIONS in .env.}
     depends_on:
       postgres:
         condition: service_healthy
