@@ -17,7 +17,11 @@ import type { Message } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { anyIs, anyUnpack } from "@bufbuild/protobuf/wkt";
 import type { EventContext } from "@spine-event-engine/proto";
-import { BoundedContext, EventRouting } from "@spine-event-engine/server";
+import {
+  BoundedContext,
+  EventRouting,
+  type StandSubscriptionRegistry,
+} from "@spine-event-engine/server";
 import {
   OrganizationMemberAddedSchema,
   ResourceAddedSchema,
@@ -82,6 +86,12 @@ import { AccessGrantViewProjection } from "./access/grant/access-grant-view-proj
 import { AuditEntryIds } from "./audit/audit-entry-ids.js";
 import { AuditEntryProjection } from "./audit/audit-entry-projection.js";
 
+/** The settings the Resources context is assembled with. */
+export interface ResourcesContextOptions {
+  /** The store of the subscriptions to the context. */
+  readonly subscriptions?: StandSubscriptionRegistry;
+}
+
 /**
  * The Resources bounded context.
  *
@@ -94,9 +104,10 @@ export const ResourcesContext = {
   /**
    * Builds the context.
    *
+   * @param options The settings to assemble the context with.
    * @returns The assembled Resources bounded context.
    */
-  async create(): Promise<BoundedContext> {
+  async create(options: ResourcesContextOptions = {}): Promise<BoundedContext> {
     /**
      * Finds the request an event from a person's access answers.
      *
@@ -199,7 +210,7 @@ export const ResourcesContext = {
     for (const event of auditTrailEvents) {
       auditTrailRouting.route(event, (_event, context) => entryOf(event, context));
     }
-    return BoundedContext.multitenant("Resources")
+    const context = BoundedContext.multitenant("Resources")
       .add(OrganizationAggregate)
       .add(OrganizationViewProjection)
       .add(ResourceRegistrationProcessManager, { eventRouting: resourceRegistrationProcmanRouting })
@@ -210,7 +221,10 @@ export const ResourcesContext = {
       .add(AccessDecisionAssignmentProjection, { eventRouting: decisionRouting })
       .add(ResourceAccessAggregate)
       .add(AccessGrantViewProjection, { eventRouting: grantViewRouting })
-      .add(AuditEntryProjection, { eventRouting: auditTrailRouting })
-      .build();
+      .add(AuditEntryProjection, { eventRouting: auditTrailRouting });
+    if (options.subscriptions !== undefined) {
+      context.withSubscriptionRegistry(options.subscriptions);
+    }
+    return context.build();
   },
 };
