@@ -9,12 +9,13 @@ own, laid out as in production.
 | `envoy`    | An Envoy proxy that takes the web client's calls over HTTPS and passes them on to the gateway.                           | `https://<ACCESS_DESK_API_HOST>:<ACCESS_DESK_API_PORT>`                   |
 | `gateway`  | The framework's browser server: signs people in through Google and passes their allowed gRPC-Web calls on to the server. | Not published.                                                            |
 | `server`   | The gRPC server of the Identity and Resources bounded contexts.                                                          | Not published.                                                            |
+| `delivery` | The delivery server, which keeps the messages for the contexts until a worker of `server` handles them.                  | Not published.                                                            |
 | `postgres` | The databases of the application server and the gateway.                                                                 | `<ACCESS_DESK_DATABASE_HOST>:<ACCESS_DESK_DATABASE_PORT>`, for the tests. |
 
 The names in angle brackets are environment variables from `.env`.
 
 `web` is the frontend: the web client, served as a hosting service would.
-`envoy`, `gateway`, `server`, and `postgres` are the backend: everything the
+`envoy`, `gateway`, `server`, `delivery`, and `postgres` are the backend: everything the
 web client calls, at one address. The two addresses differ only in port on
 this machine, and the browser treats them as different origins, as it treats
 two hosts in production.
@@ -30,6 +31,7 @@ flowchart LR
     Envoy[envoy] --> Gateway[gateway]
     Gateway --> Server[server]
     Server --> Postgres[postgres]
+    Server --> Delivery[delivery]
     Gateway --> Postgres
   end
 ```
@@ -40,6 +42,7 @@ containers it calls:
 - `web` reaches none of them.
 - `envoy` reaches only `gateway`.
 - `gateway` reaches `server` and `postgres`.
+- `server` reaches `postgres` and `delivery`.
 
 ## web
 
@@ -67,11 +70,12 @@ It reports itself healthy once it is ready to pass calls on, as `/ready` of
 its administration interface answers. That interface listens only inside the
 container and is not published.
 
-## gateway and server
+## gateway, server, and delivery
 
-Both run from one image, each started with its own command from
+All three run from one image, each started with its own command from
 `compose.yaml`. `server` trusts every call that reaches it, as only `gateway`
-shares its network.
+shares its network, and `delivery` does the same, as only `server` shares its
+network.
 
 ## postgres
 

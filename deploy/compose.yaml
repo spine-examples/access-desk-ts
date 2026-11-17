@@ -28,8 +28,10 @@
 #   gateway   The framework's browser server: signs people in through Google
 #             and passes their allowed gRPC-Web calls on to the server.
 #             Not published.
-#   server    The gRPC server of the Identity and Resources bounded contexts.
-#             Not published.
+#   server    The gRPC server of the Identity and Resources bounded contexts:
+#             a coordinator and its workers. Not published.
+#   delivery  The delivery server, which keeps the messages for the contexts
+#             until a worker of `server` handles them. Not published.
 #   postgres  The databases of the application server and the gateway.
 #             <ACCESS_DESK_DATABASE_HOST>:<ACCESS_DESK_DATABASE_PORT>, for the
 #             tests.
@@ -92,6 +94,32 @@ services:
       timeout: 3s
       retries: 30
 
+  # The delivery server, which keeps the messages for the contexts until a
+  # worker of the application server handles them, in memory only. It is not
+  # published: only the application server calls it.
+  delivery:
+    image: access-desk:local
+    command: ["dist/src/delivery/main.js"]
+    networks: [backend-delivery]
+    environment:
+      ACCESS_DESK_DELIVERY_HOST: 0.0.0.0
+      ACCESS_DESK_DELIVERY_PORT: ${ACCESS_DESK_DELIVERY_PORT:?Set ACCESS_DESK_DELIVERY_PORT in .env.}
+    # It is one Node process, which runs its work on one thread, so one CPU is
+    # all it can use.
+    cpus: 1
+    healthcheck:
+      # Healthy once it takes an HTTP/2 connection.
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "const c=require('node:http2').connect('http://127.0.0.1:'+process.env.ACCESS_DESK_DELIVERY_PORT);c.on('connect',()=>{c.close();process.exit(0)});c.on('error',()=>process.exit(1))",
+        ]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
   # The application server, with the Identity and Resources contexts.
   # It is not published: only the gateway calls it.
   server:
@@ -101,19 +129,28 @@ services:
       dockerfile: deploy/Dockerfile
       target: application
     command: ["dist/src/server/main.js"]
-    networks: [backend-internal]
+    networks: [backend-internal, backend-delivery]
     environment:
       ACCESS_DESK_SERVER_HOST: 0.0.0.0
       ACCESS_DESK_SERVER_PORT: ${ACCESS_DESK_SERVER_PORT:?Set ACCESS_DESK_SERVER_PORT in .env.}
+      ACCESS_DESK_DELIVERY_HOST: delivery
+      ACCESS_DESK_DELIVERY_PORT: ${ACCESS_DESK_DELIVERY_PORT:?Set ACCESS_DESK_DELIVERY_PORT in .env.}
       ACCESS_DESK_DATABASE_HOST: postgres
       ACCESS_DESK_DATABASE_PORT: ${ACCESS_DESK_DATABASE_PORT:?Set ACCESS_DESK_DATABASE_PORT in .env.}
       ACCESS_DESK_DATABASE_USER: ${ACCESS_DESK_DATABASE_USER:?Set ACCESS_DESK_DATABASE_USER in .env.}
       ACCESS_DESK_DATABASE_PASSWORD: ${ACCESS_DESK_DATABASE_PASSWORD:?Set ACCESS_DESK_DATABASE_PASSWORD in .env.}
+    # One CPU for each of the three workers, as many as `WORKERS` in
+    # `packages/app/src/server/delivery-strategy.ts`; the coordinator needs
+    # little.
+    cpus: 3
     depends_on:
       postgres:
         condition: service_healthy
+      delivery:
+        condition: service_healthy
     healthcheck:
-      # Healthy once it takes an HTTP/2 connection.
+      # Healthy once it takes an HTTP/2 connection, which the coordinator does
+      # only once every worker is ready.
       test:
         [
           "CMD",
@@ -247,6 +284,8 @@ networks:
   backend-ingress:
   # The gateway, the application server, and PostgreSQL.
   backend-internal:
+  # The application server and the delivery server.
+  backend-delivery:
 
 volumes:
   # The databases of the application server and the gateway.
