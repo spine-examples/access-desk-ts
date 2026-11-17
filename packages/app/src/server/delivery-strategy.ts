@@ -29,6 +29,17 @@ import { AuditEntrySchema } from "@access-desk/resources-model/generated/accessd
 import { OrganizationViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
 import { ResourceCatalogItemSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_pb.js";
 
+/**
+ * The number of workers of the application server.
+ *
+ * A worker takes one shard at a time. While Identity adds a person to an
+ * organization, its worker waits until the organization confirms, and another
+ * worker handles the confirmation, so there must be at least two. Three
+ * workers and the delivery server suit four CPUs.
+ * The organizations and views ranges have a shard for each worker.
+ */
+export const WORKERS = 3;
+
 /** The part every type URL of an Identity receiver contains. */
 const IDENTITY = "/accessdesk.identity.";
 
@@ -102,7 +113,7 @@ const MEMBERSHIPS = new ShardRange(PEOPLE.next, 1);
  * these two ranges has a shard for every worker, so all workers can be busy
  * whichever range has messages at the moment.
  */
-const ORGANIZATIONS = new ShardRange(MEMBERSHIPS.next, 3);
+const ORGANIZATIONS = new ShardRange(MEMBERSHIPS.next, WORKERS);
 
 /**
  * The views of the Resources bounded context, with the audit trail.
@@ -110,7 +121,7 @@ const ORGANIZATIONS = new ShardRange(MEMBERSHIPS.next, 3);
  * In a range of their own, the views catch up without holding up the
  * organizations.
  */
-const VIEWS = new ShardRange(ORGANIZATIONS.next, 3);
+const VIEWS = new ShardRange(ORGANIZATIONS.next, WORKERS);
 
 /** The number of shards in all ranges. */
 const SHARD_COUNT = VIEWS.next;
@@ -127,8 +138,8 @@ const SHARD_COUNT = VIEWS.next;
  * 3. The organizations of the Resources bounded context: three shards.
  * 4. The views of the Resources bounded context: three shards.
  *
- * The last two ranges have a shard for each of the three workers of the
- * application server, and need more with more workers.
+ * The last two ranges have a shard for each of the `WORKERS` of the
+ * application server.
  *
  * Within a range, a receiver always goes to the same shard. Every process
  * that shares the delivery server must split the messages the same way, and

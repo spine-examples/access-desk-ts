@@ -12,20 +12,20 @@
  * and limitations under the License.
  */
 
-import type { Any } from "@bufbuild/protobuf/wkt";
 import {
   Environment,
+  InMemorySubscriptionRegistry,
   PersistentTenantIndex,
   ServerEnvironment,
-  ShardIndex,
   type BoundedContext,
-  type DeliveryStrategy,
+  type ServerEnvironmentDelivery,
 } from "@spine-event-engine/server";
 import { StorageGroup, type StorageFactory } from "@spine-event-engine/storage";
 import { IdentityContext } from "@access-desk/identity-server";
 import { ResourcesContext } from "@access-desk/resources-server";
 import { typeRegistry } from "../../generated/model-registry.js";
 import { ReachedOrganizationMembers } from "./organization-members.js";
+import { AccessDeskDeliveryStrategy } from "./delivery-strategy.js";
 
 /** How the application is assembled. */
 export interface AccessDeskOptions {
@@ -41,6 +41,14 @@ export interface AccessDeskOptions {
    * everything that belongs to no organization together.
    */
   readonly storage: StorageFactory;
+  /**
+   * The delivery server the contexts take their messages from, shared with the
+   * other workers of the application server.
+   *
+   * When left out, the messages wait in the shared database, and only this
+   * process delivers them.
+   */
+  readonly delivery?: ServerEnvironmentDelivery;
 }
 
 /** The assembled application. */
@@ -63,16 +71,6 @@ export interface AccessDesk {
 /** The storage group the register of organizations is kept in. */
 const ORGANIZATIONS = new StorageGroup("organizations");
 
-/**
- * Delivers the messages of each context in a separate shard.
- */
-const SHARD_PER_CONTEXT: DeliveryStrategy = {
-  shardCount: 2,
-  shardFor(_targetId: Any, targetType: string): ShardIndex {
-    return new ShardIndex(targetType.includes("/accessdesk.identity.") ? 0 : 1, 2);
-  },
-};
-
 /** Assembles the application. */
 export const AccessDesk = {
   /**
@@ -83,7 +81,7 @@ export const AccessDesk = {
    *    organizations.
    * 2. Sets up the server environment of this process over the storage and
    *    the register, so Resources takes only what is given in a registered
-   *    organization.
+   *    organization. The messages go in the shards of `AccessDeskDeliveryStrategy`.
    * 3. Builds the contexts.
    *
    * @param options How to assemble the application.
@@ -97,13 +95,19 @@ export const AccessDesk = {
     ServerEnvironment.when(Environment.instance().type).use({
       storageFactory: options.storage,
       typeRegistry,
-      deliveryStrategy: SHARD_PER_CONTEXT,
+      deliveryStrategy: AccessDeskDeliveryStrategy,
       tenantIndex: organizations,
+      ...(options.delivery === undefined ? {} : { delivery: options.delivery }),
     });
     await ServerEnvironment.instance().completeSetup();
     const members = ReachedOrganizationMembers.through(options.server);
-    const identity = await IdentityContext.create({ members });
-    const resources = await ResourcesContext.create();
+    const identity = await IdentityContext.create({
+      members,
+      subscriptions: new InMemorySubscriptionRegistry(),
+    });
+    const resources = await ResourcesContext.create({
+      subscriptions: new InMemorySubscriptionRegistry(),
+    });
     return { identity, resources, members, organizations };
   },
 };

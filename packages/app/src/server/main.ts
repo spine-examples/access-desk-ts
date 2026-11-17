@@ -12,46 +12,29 @@
  * and limitations under the License.
  */
 
-import { Server } from "@spine-event-engine/server";
-import { AccessDesk } from "./access-desk.js";
+import { ApplicationServer } from "./application-server.js";
+import { WORKERS } from "./delivery-strategy.js";
 import { Settings } from "../settings.js";
 import { Storage } from "../storage.js";
 
 /**
  * The application server.
  *
- * It hosts the Identity and Resources contexts. It knows nothing of browsers,
- * sessions, or identity providers.
+ * It hosts the Identity and Resources contexts, in a coordinator and its
+ * workers, which take the messages for the contexts from the delivery server.
+ * It knows nothing of browsers, sessions, or identity providers.
+ *
+ * The coordinator runs this module, and so does each worker it starts.
  */
 
 const settings = Settings.ofServer(process.env);
-const { host, port } = settings.listening;
 
-const storage = await Storage.openServer(Storage.serverDatabases(settings.database));
-
-const listening: { address?: string } = {};
-const contexts = await AccessDesk.assemble({
-  server: () => {
-    if (listening.address === undefined) {
-      throw new Error("The application server does not listen yet.");
-    }
-    return listening.address;
+await ApplicationServer.run(
+  {
+    listening: settings.listening,
+    workers: WORKERS,
+    deliveryUrl: settings.deliveryUrl,
+    databases: Storage.serverDatabases(settings.database),
   },
-  storage,
-});
-const server = await new Server({
-  contexts: [contexts.identity, contexts.resources],
-  resources: [contexts.members, contexts.organizations],
-  host,
-  port,
-  services: { readerAdmission: "trusted-network" },
-}).run();
-listening.address = server.baseUrl;
-
-console.log(`Access Desk application server: ${server.baseUrl}`);
-if (!Settings.onlyThisMachine(host)) {
-  console.warn(
-    `The application server listens on ${host}, so other machines can reach it. ` +
-      "Make sure only the gateway can reach it.",
-  );
-}
+  import.meta.url,
+);

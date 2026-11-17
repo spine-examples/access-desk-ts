@@ -166,6 +166,16 @@ async function givenOrganizationsRegistered(storage: ServerStorage): Promise<voi
 }
 
 /**
+ * Creates the storage of an application server, with the databases of the
+ * organizations the tests work in, and registers those organizations.
+ */
+export async function givenRegisteredStorage(): Promise<ServerStorage> {
+  const storage = await givenServerStorage();
+  await givenOrganizationsRegistered(storage);
+  return storage;
+}
+
+/**
  * Starts both application contexts on a free port, without creating an organization.
  *
  * The server keeps the organizations the tests work in, registered before it
