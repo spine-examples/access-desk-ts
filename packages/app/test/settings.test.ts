@@ -22,16 +22,27 @@ const SESSION_KEY = generateKeyPairSync("ec", { namedCurve: "P-256" })
   .privateKey.export({ type: "pkcs8", format: "der" })
   .toString("base64");
 
-const server = {
-  ACCESS_DESK_SERVER_HOST: "127.0.0.1",
-  ACCESS_DESK_SERVER_PORT: "8090",
+const database = {
   ACCESS_DESK_DATABASE_HOST: "127.0.0.1",
   ACCESS_DESK_DATABASE_PORT: "5432",
   ACCESS_DESK_DATABASE_USER: "desk",
   ACCESS_DESK_DATABASE_PASSWORD: "secret",
 };
+const server = {
+  ACCESS_DESK_SERVER_HOST: "127.0.0.1",
+  ACCESS_DESK_SERVER_PORT: "8090",
+  ACCESS_DESK_DELIVERY_HOST: "127.0.0.1",
+  ACCESS_DESK_DELIVERY_PORT: "8484",
+  ...database,
+};
+const delivery = {
+  ACCESS_DESK_DELIVERY_HOST: "127.0.0.1",
+  ACCESS_DESK_DELIVERY_PORT: "8484",
+};
 const gateway = {
-  ...server,
+  ACCESS_DESK_SERVER_HOST: "127.0.0.1",
+  ACCESS_DESK_SERVER_PORT: "8090",
+  ...database,
   ACCESS_DESK_GATEWAY_HOST: "127.0.0.1",
   ACCESS_DESK_GATEWAY_PORT: "8080",
   ACCESS_DESK_WEB_HOST: "localhost",
@@ -42,10 +53,17 @@ const gateway = {
 };
 
 describe("The settings should", () => {
-  it("give where the application server listens, and where it keeps its data", () => {
+  it("give where the application server listens, its delivery server, and where it keeps its data", () => {
     expect(Settings.ofServer(server)).toEqual({
       listening: { host: "127.0.0.1", port: 8090 },
+      deliveryUrl: "http://127.0.0.1:8484",
       database: { host: "127.0.0.1", port: 5432, user: "desk", password: "secret" },
+    });
+  });
+
+  it("give where the delivery server listens", () => {
+    expect(Settings.ofDelivery(delivery)).toEqual({
+      listening: { host: "127.0.0.1", port: 8484 },
     });
   });
 
@@ -73,7 +91,10 @@ describe("The settings should", () => {
 
   it("refuse to assume anything, and name every setting that is missing", () => {
     expect(() => Settings.ofServer({})).toThrow(
-      /ACCESS_DESK_SERVER_HOST is not set[\s\S]*ACCESS_DESK_SERVER_PORT is not set[\s\S]*ACCESS_DESK_DATABASE_HOST is not set[\s\S]*ACCESS_DESK_DATABASE_PORT is not set[\s\S]*ACCESS_DESK_DATABASE_USER is not set[\s\S]*ACCESS_DESK_DATABASE_PASSWORD is not set/,
+      /ACCESS_DESK_SERVER_HOST is not set[\s\S]*ACCESS_DESK_SERVER_PORT is not set[\s\S]*ACCESS_DESK_DELIVERY_HOST is not set[\s\S]*ACCESS_DESK_DELIVERY_PORT is not set[\s\S]*ACCESS_DESK_DATABASE_HOST is not set[\s\S]*ACCESS_DESK_DATABASE_PORT is not set[\s\S]*ACCESS_DESK_DATABASE_USER is not set[\s\S]*ACCESS_DESK_DATABASE_PASSWORD is not set/,
+    );
+    expect(() => Settings.ofDelivery({})).toThrow(
+      /ACCESS_DESK_DELIVERY_HOST is not set[\s\S]*ACCESS_DESK_DELIVERY_PORT is not set/,
     );
     expect(() => Settings.ofGateway({})).toThrow(
       /ACCESS_DESK_GATEWAY_HOST[\s\S]*ACCESS_DESK_GATEWAY_PORT[\s\S]*ACCESS_DESK_SERVER_HOST[\s\S]*ACCESS_DESK_SERVER_PORT[\s\S]*ACCESS_DESK_WEB_HOST[\s\S]*ACCESS_DESK_WEB_PORT[\s\S]*GOOGLE_CLIENT_ID is not set[\s\S]*GOOGLE_CLIENT_SECRET is not set[\s\S]*ACCESS_DESK_DATABASE_HOST is not set[\s\S]*ACCESS_DESK_SESSION_KEY is not set/,

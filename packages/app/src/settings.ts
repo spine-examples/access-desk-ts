@@ -52,8 +52,16 @@ export interface DatabaseServer {
 export interface ServerSettings {
   /** Where the application server listens. */
   readonly listening: Listening;
+  /** The address of the delivery server, which keeps the messages waiting for the workers. */
+  readonly deliveryUrl: string;
   /** The PostgreSQL server the application server keeps its data on. */
   readonly database: DatabaseServer;
+}
+
+/** The setup of the delivery server. */
+export interface DeliverySettings {
+  /** The address the delivery server listens on. */
+  readonly listening: Listening;
 }
 
 /** How the gateway is set up. */
@@ -196,7 +204,7 @@ class Reading {
 /** Settings as they are read, where a value that could not be read is `undefined`. */
 type Unread<Settings> = { readonly [Name in keyof Settings]: Settings[Name] | undefined };
 
-/** The settings of the application server and of the gateway. */
+/** The settings of the application server, the delivery server, and the gateway. */
 export const Settings = {
   /**
    * Reads the application server's settings from the environment.
@@ -206,10 +214,24 @@ export const Settings = {
    */
   ofServer(environment: NodeJS.ProcessEnv): ServerSettings {
     const reading = new Reading(environment);
+    const listening = reading.listening("ACCESS_DESK_SERVER");
+    const delivery = reading.listening("ACCESS_DESK_DELIVERY");
     return reading.done({
-      listening: reading.listening("ACCESS_DESK_SERVER"),
+      listening,
+      deliveryUrl: `http://${delivery.host}:${delivery.port.toString()}`,
       database: reading.databaseServer(),
     });
+  },
+
+  /**
+   * Reads the delivery server's settings from the environment.
+   *
+   * @param environment The environment the program runs in.
+   * @returns The settings of the delivery server.
+   */
+  ofDelivery(environment: NodeJS.ProcessEnv): DeliverySettings {
+    const reading = new Reading(environment);
+    return reading.done({ listening: reading.listening("ACCESS_DESK_DELIVERY") });
   },
 
   /**
