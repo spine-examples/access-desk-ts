@@ -13,17 +13,19 @@
  */
 
 import {
+  Application,
   Environment,
   InMemorySubscriptionRegistry,
   PersistentTenantIndex,
   ServerEnvironment,
-  type BoundedContext,
   type ServerEnvironmentDelivery,
+  type TenantIndex,
 } from "@spine-event-engine/server";
 import { StorageGroup, type StorageFactory } from "@spine-event-engine/storage";
 import { IdentityContext } from "@access-desk/identity-server";
 import { ResourcesContext } from "@access-desk/resources-server";
 import { typeRegistry } from "../../generated/model-registry.js";
+import { Closing } from "../closing.js";
 import { ReachedOrganizationMembers } from "./organization-members.js";
 import { AccessDeskDeliveryStrategy } from "./delivery-strategy.js";
 
@@ -53,19 +55,17 @@ export interface AccessDeskOptions {
 
 /** The assembled application. */
 export interface AccessDesk {
-  /** The Identity context, which holds people, their accounts, and memberships. */
-  readonly identity: BoundedContext;
-  /** The Resources context, which holds each organization, its members, and what it owns. */
-  readonly resources: BoundedContext;
+  /** The application, with both contexts, for a server to serve. */
+  readonly application: Application;
   /**
    * The service through which Identity adds people to organizations' members.
    *
    * It holds a connection to the application server, which the server closes
-   * after the contexts.
+   * when it stops.
    */
   readonly members: ReachedOrganizationMembers;
   /** The register of the organizations the application keeps. */
-  readonly organizations: PersistentTenantIndex;
+  readonly organizations: TenantIndex;
 }
 
 /** The storage group the register of organizations is kept in. */
@@ -78,36 +78,54 @@ export const AccessDesk = {
    *
    * 1. Opens the register of the organizations the application keeps. The
    *    register is kept in the shared database, which is the one list of the
-   *    organizations.
-   * 2. Sets up the server environment of this process over the storage and
-   *    the register, so Resources takes only what is given in a registered
-   *    organization. The messages go in the shards of `AccessDeskDeliveryStrategy`.
-   * 3. Builds the contexts.
+   *    organizations, so Resources takes only what is given in a registered
+   *    organization.
+   * 2. Sets up the server environment over the storage. The messages go in
+   *    the shards of `AccessDeskDeliveryStrategy`.
+   * 3. Builds the application with both contexts.
    *
    * @param options How to assemble the application.
-   * @returns The contexts, ready to be hosted by a server.
+   * @returns The application, ready to be served.
    */
   async assemble(options: AccessDeskOptions): Promise<AccessDesk> {
     const organizations = await PersistentTenantIndex.create({
       storageFactory: options.storage,
       group: ORGANIZATIONS,
     });
-    ServerEnvironment.when(Environment.instance().type).use({
-      storageFactory: options.storage,
-      typeRegistry,
-      deliveryStrategy: AccessDeskDeliveryStrategy,
-      tenantIndex: organizations,
-      ...(options.delivery === undefined ? {} : { delivery: options.delivery }),
-    });
-    await ServerEnvironment.instance().completeSetup();
+    const environment = ServerEnvironment.newBuilder()
+      .under(Environment.instance().type, (settings) => {
+        settings.use({
+          storageFactory: options.storage,
+          typeRegistry,
+          deliveryStrategy: AccessDeskDeliveryStrategy,
+          ...(options.delivery === undefined ? {} : { delivery: options.delivery }),
+        });
+      })
+      .build();
     const members = ReachedOrganizationMembers.through(options.server);
-    const identity = await IdentityContext.create({
+    const builder = Application.newBuilder()
+      .setServerEnvironment(environment)
+      .setTenantIndex(organizations)
+      .add(IdentityContext.create({ members, subscriptions: new InMemorySubscriptionRegistry() }))
+      .add(ResourcesContext.create({ subscriptions: new InMemorySubscriptionRegistry() }));
+    let application: Application;
+    try {
+      application = await builder.build();
+    } catch (error) {
+      try {
+        await Closing.inOrder(builder, organizations, environment, members);
+      } catch (cleanup) {
+        throw new AggregateError(
+          [error, cleanup],
+          "The application was not built, and not everything opened for it closed.",
+        );
+      }
+      throw error;
+    }
+    return {
+      application,
       members,
-      subscriptions: new InMemorySubscriptionRegistry(),
-    });
-    const resources = await ResourcesContext.create({
-      subscriptions: new InMemorySubscriptionRegistry(),
-    });
-    return { identity, resources, members, organizations };
+      organizations: application.tenantIndex(),
+    };
   },
 };

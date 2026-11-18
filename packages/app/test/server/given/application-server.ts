@@ -15,7 +15,6 @@
 import { createServer } from "node:net";
 import { create } from "@bufbuild/protobuf";
 import { DeliveryServer } from "@spine-event-engine/delivery-server";
-import { TestEnvironment } from "@access-desk/testing/environment";
 import {
   OrganizationIdSchema,
   type OrganizationId,
@@ -44,7 +43,6 @@ export async function stopApplicationServer(): Promise<void> {
     await stop();
   }
   delete process.env.ACCESS_DESK_TEST_SERVER_SETUP;
-  await TestEnvironment.reset();
 }
 
 /** Finds a port nothing listens on, for the coordinator, which its workers must know in advance. */

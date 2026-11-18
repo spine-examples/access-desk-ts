@@ -15,14 +15,11 @@
 import { isIP } from "node:net";
 import { RemoteDelivery } from "@spine-event-engine/delivery-client";
 import {
-  Environment,
   ManagedServerApplication,
   Server,
-  ServerEnvironment,
   type ManagedServerApplicationHandle,
   type ManagedServerApplicationOptions,
 } from "@spine-event-engine/server";
-import { typeRegistry } from "../../generated/model-registry.js";
 import type { Listening } from "../settings.js";
 import { Storage, type ServerDatabases } from "../storage.js";
 import { AccessDesk } from "./access-desk.js";
@@ -61,7 +58,6 @@ export const ApplicationServer = {
    *   ready; in a worker, the worker once it is ready.
    */
   run(setup: ApplicationServerSetup, moduleUrl: string): Promise<ManagedServerApplicationHandle> {
-    coordinatorEnvironment();
     return ManagedServerApplication.run(options(setup, moduleUrl));
   },
 
@@ -75,20 +71,9 @@ export const ApplicationServer = {
    *   ready; in a worker, the worker once it is ready.
    */
   start(setup: ApplicationServerSetup, moduleUrl: string): Promise<ManagedServerApplicationHandle> {
-    coordinatorEnvironment();
     return ManagedServerApplication.start(options(setup, moduleUrl));
   },
 };
-
-/**
- * Sets up the server environment of the coordinator, which only needs to know
- * the types of the contexts' messages.
- *
- * In a worker, assembling the contexts sets the environment up in full instead.
- */
-function coordinatorEnvironment(): void {
-  ServerEnvironment.when(Environment.instance().type).use({ typeRegistry });
-}
 
 /** Describes the coordinator and its workers to the framework. */
 function options(
@@ -107,18 +92,18 @@ function options(
     forwarding: "trusted-network",
     createServer: async (worker) => {
       delivery = RemoteDelivery.connectTo({ endpoint: setup.deliveryUrl });
-      const contexts = await AccessDesk.assemble({
+      const assembled = await AccessDesk.assemble({
         server: () => coordinator,
         storage: await Storage.openServer(setup.databases),
         delivery,
       });
-      return new Server({
-        contexts: [contexts.identity, contexts.resources],
-        resources: [contexts.members, contexts.organizations],
+      return Server.atPort(worker.port, {
         host: worker.host,
-        port: worker.port,
         services: { readerAdmission: "trusted-network" },
-      }).start();
+        resources: [assembled.members],
+      })
+        .setApplication(assembled.application)
+        .start();
     },
     synchronize: async () => {
       await delivery?.open();

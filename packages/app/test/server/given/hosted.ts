@@ -21,9 +21,9 @@ import {
   PersistentTenantIndex,
   Server,
   SignalMetadata,
+  type TenantIndex,
 } from "@spine-event-engine/server";
 import { StorageGroup } from "@spine-event-engine/storage";
-import { TestEnvironment } from "@access-desk/testing/environment";
 import { TestStorages } from "@access-desk/testing/storage";
 import { type OrganizationId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import {
@@ -59,13 +59,13 @@ export interface Hosted {
   /** The storage the server keeps its data in. */
   readonly storage: ServerStorage;
   /** The register of the organizations the server keeps. */
-  readonly organizations: PersistentTenantIndex;
+  readonly organizations: TenantIndex;
   /** The global, single-tenant Identity context. */
   readonly identity: BoundedContext;
   /** The organization-scoped Resources context. */
   readonly resources: BoundedContext;
   /**
-   * Stops the server and closes its assembled contexts.
+   * Stops the server, and closes the application with its contexts.
    *
    * It deletes the data the server kept, unless the test passed its storage in.
    */
@@ -189,27 +189,30 @@ export async function givenServer(storage?: ServerStorage): Promise<Hosted> {
   const kept = storage ?? (await givenServerStorage());
   await givenOrganizationsRegistered(kept);
   let url = "";
-  await TestEnvironment.reset();
-  const contexts = await app.AccessDesk.assemble({
+  const assembled = await app.AccessDesk.assemble({
     server: () => url,
     storage: await app.Storage.openServer(kept.settings),
   });
-  const server = await new Server({
-    contexts: [contexts.identity, contexts.resources],
-    resources: [contexts.members, contexts.organizations],
-    port: 0,
+  const server = await Server.atPort(0, {
     services: { readerAdmission: "trusted-network" },
-  }).start();
+    resources: [assembled.members],
+  })
+    .setApplication(assembled.application)
+    .start();
   url = server.baseUrl;
+  const [identity, resources] = assembled.application.contexts();
+  if (identity === undefined || resources === undefined) {
+    throw new Error("The application was built without both of its contexts.");
+  }
   return {
     url,
     storage: kept,
-    organizations: contexts.organizations,
-    identity: contexts.identity,
-    resources: contexts.resources,
+    organizations: assembled.organizations,
+    identity,
+    resources,
     stop: async () => {
       await server.close();
-      await TestEnvironment.reset();
+      await assembled.application.close();
       if (storage === undefined) {
         await kept.drop();
       }
