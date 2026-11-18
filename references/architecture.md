@@ -34,19 +34,22 @@ The system has two bounded contexts:
 | Identity        | People, the accounts they sign in with, their email addresses, and the organization each belongs to                                                                                    | Global/single-tenant |
 | Resources       | Organizations, their members, resources, ordered access levels, resource managers, request policy, requests, approval decisions, grants, extensions, revocation, and audit projections | Organization-scoped  |
 
-The application runs as two programs. The application server hosts the
-contexts. The gateway is a separate program that reaches the server over the
-network, and it is the only one a browser talks to.
+The application runs as three programs. The application server hosts the
+contexts, as a coordinator and its workers: each worker is a separate process
+with both contexts. The delivery server keeps the messages for the contexts
+until a worker handles them. The gateway is a separate program that reaches
+the application server over the network, and it is the only one a browser
+talks to.
 
 The application server and the gateway store their data in PostgreSQL, and so
 do the tests. The application server stores each organization in a separate
 database. Everything that belongs to no single organization goes into one
-shared database: people, their accounts, email addresses, and memberships,
-subscriptions to both contexts, and messages waiting to be delivered. The
-server works only with the organizations registered in the shared database,
-each with a database of its own. The gateway stores who opened each
+shared database: people, their accounts, email addresses, and memberships.
+The server works only with the organizations registered in the shared
+database, each with a database of its own. The gateway stores who opened each
 subscription, the sessions people signed out of, and the sign-ins under way in
-a separate database.
+a separate database. The delivery server keeps the messages that wait in
+memory only, and the application server keeps the subscriptions in memory.
 
 An initial deployment may co-host both contexts in one application server.
 Co-location does not weaken the boundaries: each context must have a separate model
