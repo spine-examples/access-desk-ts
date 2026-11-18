@@ -59,14 +59,19 @@ packages/
   The factory's module imports the generated `spine-bootstrap.js` first, so the
   context finds its handlers.
 - **`app`** — `@access-desk/app`, `mode: "application"`, composes **both** context
-  models into the complete application `TypeRegistry`. It runs as two programs:
-  `src/server/` is the application server, which hosts both contexts;
+  models into the complete application `TypeRegistry`. It runs as three programs:
+  `src/server/` is the application server, which hosts both contexts in
+  worker processes behind a coordinator, with the shards of their messages in
+  `delivery-strategy.ts`;
+  `src/delivery/` is the delivery server, which keeps the messages until a
+  worker handles them;
   `src/gateway/` is the browser-facing gateway
   (sign-in, sessions, authorization), which reaches the server over the
   network. The gateway endpoints live in `src/gateway/routes/`, and
   are only for signing in and the session; everything else passes through
   as Spine requests judged by `src/gateway/policy.ts`.
-  `pnpm --dir packages/app run server` and `run gateway` start each.
+  `pnpm --dir packages/app run delivery`, `run server`, and `run gateway`
+  start each.
   Every program is configured in one `.env` in the repository root.
 - **`web`** — `@access-desk/web`, the React/Vite client: `react-router`
   pages in `src/pages/`, the session in `src/session/`, and calls to the
@@ -136,7 +141,10 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
   `packages/<ctx>/server/test/`.
 - The `app` tests, in `packages/app/test/`, run the application server and the
   gateway together: settings, storage, sign-in, sessions, authorization, and
-  subscriptions through a real gateway. The web client has no tests yet.
+  subscriptions through a real gateway. They run the contexts in the test's
+  process; only `test/server/application-server.test.ts` runs a coordinator,
+  two worker processes, and a delivery server, as in production. The web
+  client has no tests yet.
 - **Every test keeps its data in PostgreSQL**, on the server `.env` names, as
   the application does. The `@access-desk/testing` package (`packages/testing`, TypeScript the tests import
   as it is, with no build) gives every BlackBox, server, and gateway
@@ -147,12 +155,11 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
   `Storage.openServer`, and register the organizations they work in (`acme`
   and `globex`) in the server's register. A test creates each organization's
   database first, as an application administrator does.
-- **Spine has one server environment per process.** Before a test builds a
-  context, `TestEnvironment.start` (`@access-desk/testing/environment`) sets the
-  environment up over the test's storage and keeps its tenants; after the
-  contexts close, `TestEnvironment.reset` closes the environment and the
-  storage with it. A restart test starts a context again over the same
-  databases.
+- **Each test builds its own application.** A BlackBox builds one over the
+  test's storage and closes it with the storage; the server tests build
+  theirs through `AccessDesk.assemble`. A BlackBox does not give out its
+  context, so a test that posts an event as the context records one uses
+  `builtResources`.
 - A process that reads a projection, such as the duplicate check of an access
   request, sees what the projection shows so far. A test waits for the view it
   depends on (`approveAndAwait` waits until a request shows approved) before its
@@ -163,7 +170,8 @@ Generation is dependency-first and reproducible from scripts (never hand-edited)
   `test/**`, and externalizes `dist` (`server.deps.external`) so the handler registry's
   classes keep the same identity as the classes the context registers (otherwise the
   registry lookup fails with "missing metadata").
-- Multitenant BlackBox: pass `{ tenant }` to `BlackBox.from`; assert the immediate
+- Pass `BlackBox.from` the context's builder, and `{ storageFactory }`; a
+  multitenant one also `{ tenant }`. Assert the immediate
   command ack directly and use `box.eventually(...)` only for async read-side visibility.
 - **Time comes from Spine's `Time`.** Every Resources decision that depends on
   the current time reads `Time.currentTime()` from
