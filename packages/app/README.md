@@ -1,21 +1,16 @@
 # Access Desk application
 
-The application runs as two programs.
+The application runs as three programs.
 
-- **The application server** hosts the Identity and Resources bounded contexts.
+- **The application server** hosts the Identity and Resources bounded contexts
   It knows nothing of browsers, sessions, or identity providers.
+- **The delivery server** keeps the messages for the contexts until a worker
+  handles them.
 - **The gateway** signs people in, keeps their sessions, and decides what each
   may send on. It holds no part of the application and reaches the server over
   the network.
 
 A browser talks only to the gateway.
-
-```mermaid
-flowchart LR
-  Browser --> Gateway
-  Gateway -->|commands, queries, subscriptions| Server[Application server]
-  Gateway --> Provider[Identity provider]
-```
 
 ## Set it up
 
@@ -30,6 +25,8 @@ refuses to start and names it.
 | ------------------------------- | ------------------- | ---------------------------------------------------------------------- |
 | `ACCESS_DESK_SERVER_HOST`       | server, gateway     | The address the application server listens on.                         |
 | `ACCESS_DESK_SERVER_PORT`       | server, gateway     | The port the application server listens on.                            |
+| `ACCESS_DESK_DELIVERY_HOST`     | delivery, server    | The address the delivery server listens on.                            |
+| `ACCESS_DESK_DELIVERY_PORT`     | delivery, server    | The port the delivery server listens on.                               |
 | `ACCESS_DESK_GATEWAY_HOST`      | gateway, web client | The address the gateway listens on.                                    |
 | `ACCESS_DESK_GATEWAY_PORT`      | gateway, web client | The port the gateway listens on.                                       |
 | `ACCESS_DESK_WEB_HOST`          | gateway, web client | The address the web client listens on, where Google sends people back. |
@@ -50,10 +47,12 @@ starts, it does not start.
 ### The database
 
 The application server and the gateway keep their data in PostgreSQL, so a
-restart loses nothing. All the databases live on one PostgreSQL server, set by
-`ACCESS_DESK_DATABASE_HOST`, `_PORT`, `_USER`, and `_PASSWORD`. For
-development, [`deploy/compose.yaml`](../../deploy/compose.yaml) runs one in
-Docker. From the repository root:
+restart of either loses nothing. The delivery server keeps the messages that
+wait in memory only, so a restart of it loses them. All the databases live on
+one PostgreSQL server, set by `ACCESS_DESK_DATABASE_HOST`, `_PORT`, `_USER`,
+and `_PASSWORD`. For development,
+[`deploy/compose.yaml`](../../deploy/compose.yaml) runs one in Docker. From
+the repository root:
 
 ```sh
 pnpm run postgres:start
@@ -66,27 +65,24 @@ Spine creates the tables itself, but not the databases. `pnpm run postgres:stop`
 stops the PostgreSQL server. `pnpm run postgres:delete` removes it, and all
 its data.
 
-| Database                              | Used by            | What it stores                                                                                                            |
-| ------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| `accessdesk_server`                   | application server | The organizations it keeps, people and their accounts, subscriptions to updates, and messages that are not delivered yet. |
-| `accessdesk_resources_<organization>` | application server | The data of a single organization: its members, resources, access requests, grants, and audit trail.                      |
-| `accessdesk_gateway`                  | gateway            | Who opened each subscription, the sessions people signed out of, and the sign-ins under way.                              |
+| Database                              | Used by            | What it stores                                                                                       |
+| ------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------- |
+| `accessdesk_server`                   | application server | The organizations it keeps, and people and their accounts.                                           |
+| `accessdesk_resources_<organization>` | application server | The data of a single organization: its members, resources, access requests, grants, and audit trail. |
+| `accessdesk_gateway`                  | gateway            | Who opened each subscription, the sessions people signed out of, and the sign-ins under way.         |
 
 The application server and the gateway never share a database. The gateway
 gets the application's data only by asking the application server.
 
 #### The shared database
 
-In Spine, all contexts in one process share a single storage. Data that
+In Spine, all contexts of an application share a single storage. Data that
 doesn't belong to a particular organization goes into the shared database,
 `accessdesk_server`:
 
 - The organizations the server keeps.
 - Identity: people, the accounts they sign in with, their email addresses,
   and their memberships. Identity is not split by organization.
-- Subscriptions to both contexts.
-- Messages waiting to be delivered, so commands accepted right before a
-  restart are still handled after it.
 
 #### Organizations
 
@@ -110,9 +106,10 @@ application server keep a record of the subscription:
   This way, only that person can activate or cancel it, and the gateway can
   restore it after a restart.
 - The application server records what the subscription watches and whether
-  it is active, in `accessdesk_server`. It uses this to send updates, and to
-  restore the subscription after a restart. A subscription to Resources
-  belongs to one organization and gets that organization's updates only.
+  it is active, in memory, in the coordinator and every worker. It uses this
+  to send updates. A restart of the application server ends the
+  subscription. A subscription to Resources belongs to one
+  organization and gets that organization's updates only.
 
 When the person signs out, every subscription they have open stops. The web
 client cancels its subscriptions before it signs out, which deletes both
@@ -157,10 +154,15 @@ layout as the application, and drops them when it finishes. See
 1. Fill in `.env`, as [Set it up](#set-it-up) tells. The session key comes
    from `pnpm --dir packages/app run session-key`.
 2. Start PostgreSQL, as [The database](#the-database) tells.
-3. Build once, then start each program in a separate terminal:
+3. Build once, then start each program in a separate terminal, the delivery
+   server first:
 
    ```sh
    pnpm --dir packages/app run build
+   ```
+
+   ```sh
+   pnpm --dir packages/app run delivery
    ```
 
    ```sh

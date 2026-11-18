@@ -20,7 +20,7 @@ and the web client does not show them yet.
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
 | [`packages/identity`](packages/identity)   | The Identity bounded context: people, their accounts, and their memberships.                                        |
 | [`packages/resources`](packages/resources) | The Resources bounded context: organizations, resources, requests, and grants.                                      |
-| [`packages/app`](packages/app/README.md)   | The application server, and the gateway browsers call it through.                                                   |
+| [`packages/app`](packages/app/README.md)   | The application server, its delivery server, and the gateway browsers call it through.                              |
 | [`packages/web`](packages/web/README.md)   | The web client.                                                                                                     |
 | [`packages/testing`](packages/testing)     | The setup the tests of the application server and the bounded contexts share.                                       |
 | [`deploy`](deploy/README.md)               | The Docker images and the Compose file that run every program in a container of its own, laid out as in production. |
@@ -87,8 +87,9 @@ remove the containers, and how they are laid out.
 
 ### Run each program on this machine
 
-For development without containers, start the application server and the
-gateway as [`packages/app/README.md`](packages/app/README.md) describes, and
+For development without containers, start the delivery server, the
+application server, and the gateway as
+[`packages/app/README.md`](packages/app/README.md) describes, and
 the web client as [`packages/web/README.md`](packages/web/README.md) describes.
 
 ## Documentation
