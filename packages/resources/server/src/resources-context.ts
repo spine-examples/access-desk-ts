@@ -20,6 +20,7 @@ import type { EventContext } from "@spine-event-engine/proto";
 import {
   BoundedContext,
   EventRouting,
+  type BoundedContextBuilder,
   type StandSubscriptionRegistry,
 } from "@spine-event-engine/server";
 import {
@@ -98,16 +99,16 @@ export interface ResourcesContextOptions {
  * It is multitenant, and each organization is a separate tenant. So
  * `CreateOrganization` is given in the tenant of the organization it creates.
  * Spine takes an organization's commands only once the organization is kept in
- * the server environment's tenant index.
+ * the application's tenant index.
  */
 export const ResourcesContext = {
   /**
-   * Builds the context.
+   * Declares the context, for an application to build.
    *
    * @param options The settings to assemble the context with.
-   * @returns The assembled Resources bounded context.
+   * @returns The declaration of the Resources bounded context.
    */
-  async create(options: ResourcesContextOptions = {}): Promise<BoundedContext> {
+  create(options: ResourcesContextOptions = {}): BoundedContextBuilder {
     /**
      * Finds the request an event from a person's access answers.
      *
@@ -210,7 +211,7 @@ export const ResourcesContext = {
     for (const event of auditTrailEvents) {
       auditTrailRouting.route(event, (_event, context) => entryOf(event, context));
     }
-    const context = BoundedContext.multitenant("Resources")
+    const context = BoundedContext.multiTenant("Resources")
       .add(OrganizationAggregate)
       .add(OrganizationViewProjection)
       .add(ResourceRegistrationProcessManager, { eventRouting: resourceRegistrationProcmanRouting })
@@ -225,6 +226,6 @@ export const ResourcesContext = {
     if (options.subscriptions !== undefined) {
       context.withSubscriptionRegistry(options.subscriptions);
     }
-    return context.build();
+    return context;
   },
 };

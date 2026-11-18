@@ -22,6 +22,7 @@ import {
   MessageIdSchema,
   type MessageId,
 } from "@spine-event-engine/proto";
+import type { BoundedContext } from "@spine-event-engine/server";
 import { type BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
 import {
   AuditEntrySchema,
@@ -30,7 +31,7 @@ import {
 import { ResourceIdSchema } from "@access-desk/resources-model/generated/accessdesk/resources/identifiers_pb.js";
 import { RegisterResourceSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_registration_commands_pb.js";
 import { ResourceRegisteredSchema } from "@access-desk/resources-model/generated/accessdesk/resources/resource/resource_registration_events_pb.js";
-import { contextOf, readAll, readWhere, testActorContext } from "../../given/resources-context.js";
+import { readAll, readWhere, tenant, testActorContext } from "../../given/resources-context.js";
 
 /**
  * Reads the whole audit trail of the organization.
@@ -173,37 +174,67 @@ export interface Recording {
   readonly cause: MessageId;
 }
 
+/** How long to wait for the audit trail of a built context, in milliseconds. */
+const PATIENCE_MS = 20_000;
+
+/**
+ * Waits until the audit trail of a built context holds a number of entries of
+ * one kind of event, reading the context's views directly.
+ *
+ * @param context The Resources context, built through `builtResources`.
+ * @param schema The type of the events.
+ * @param times How many entries of that kind to wait for.
+ * @returns The entries of that kind, as many as there were when the wait ended.
+ */
+export async function awaitRecorded(
+  context: BoundedContext,
+  schema: GenMessage<Message>,
+  times: number,
+): Promise<AuditEntry[]> {
+  const deadline = Date.now() + PATIENCE_MS;
+  for (;;) {
+    const rows = await context.stand().readAllVersioned(AuditEntrySchema, { tenantId: tenant() });
+    const entries = recordedOf(
+      rows.map(({ state }) => state),
+      schema,
+    ).map(({ entry }) => entry);
+    if (entries.length >= times || Date.now() >= deadline) {
+      return entries;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}
+
 /**
  * Records that a resource was registered, as its registration would.
  *
  * The test picks the change and its cause, to set up cases the real flow
  * never produces.
  *
- * @param box The BlackBox whose context records the event.
+ * @param context The Resources context, built through `builtResources`, that
+ *   records the event.
  * @param resource The identifier of the registered resource.
  * @param recording Which change records the event.
  */
 export async function recordRegistered(
-  box: BlackBox,
+  context: BoundedContext,
   resource: string,
   recording: Recording,
 ): Promise<void> {
   const producer = create(ResourceIdSchema, { uuid: recording.by });
-  await contextOf(box)
-    .eventBus()
-    .post(
-      SignalEnvelopes.event({
-        context: create(EventContextSchema, {
-          timestamp: Time.currentTime(),
-          producerId: AnyPacker.pack(ResourceIdSchema, producer),
-          version: { number: recording.version },
-          origin: {
-            case: "pastMessage",
-            value: { message: recording.cause, actorContext: testActorContext() },
-          },
-        }),
-        schema: ResourceRegisteredSchema,
-        message: create(ResourceRegisteredSchema, { id: { uuid: resource } }),
+  await context.eventBus().post(
+    SignalEnvelopes.event({
+      context: create(EventContextSchema, {
+        timestamp: Time.currentTime(),
+        producerId: AnyPacker.pack(ResourceIdSchema, producer),
+        version: { number: recording.version },
+        origin: {
+          case: "pastMessage",
+          value: { message: recording.cause, actorContext: testActorContext() },
+        },
       }),
-    );
+      schema: ResourceRegisteredSchema,
+      message: create(ResourceRegisteredSchema, { id: { uuid: resource } }),
+    }),
+  );
 }
