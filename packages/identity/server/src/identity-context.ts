@@ -19,6 +19,7 @@ import {
   BoundedContext,
   CommandRouting,
   EventRouting,
+  type BoundedContextBuilder,
   type StandSubscriptionRegistry,
 } from "@spine-event-engine/server";
 import {
@@ -60,12 +61,12 @@ export interface IdentityContextOptions {
  */
 export const IdentityContext = {
   /**
-   * Builds the context.
+   * Declares the context, for an application to build.
    *
    * @param options The settings to assemble the context with.
-   * @returns The assembled Identity bounded context.
+   * @returns The declaration of the Identity bounded context.
    */
-  async create(options: IdentityContextOptions): Promise<BoundedContext> {
+  create(options: IdentityContextOptions): BoundedContextBuilder {
     /** Finds the account an event about signing in belongs to. */
     const accountOf = (identity: ExternalIdentityId | undefined): ExternalIdentityId[] =>
       identity === undefined ? [] : [identity];
@@ -117,6 +118,6 @@ export const IdentityContext = {
     if (options.subscriptions !== undefined) {
       context.withSubscriptionRegistry(options.subscriptions);
     }
-    return context.build();
+    return context;
   },
 };
