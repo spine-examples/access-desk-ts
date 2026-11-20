@@ -12,7 +12,6 @@
  * and limitations under the License.
  */
 
-import { isIP } from "node:net";
 import { RemoteDelivery } from "@spine-event-engine/delivery-client";
 import {
   ManagedServerApplication,
@@ -20,7 +19,7 @@ import {
   type ManagedServerApplicationHandle,
   type ManagedServerApplicationOptions,
 } from "@spine-event-engine/server";
-import type { Listening } from "../settings.js";
+import { Settings, type Listening } from "../settings.js";
 import { Storage, type ServerDatabases } from "../storage.js";
 import { AccessDesk } from "./access-desk.js";
 
@@ -81,7 +80,7 @@ function options(
   moduleUrl: string,
 ): ManagedServerApplicationOptions {
   const { host, port } = setup.listening;
-  const coordinator = `http://${isIP(host) === 6 ? `[${host}]` : host}:${port.toString()}`;
+  const coordinator = Settings.urlOf(setup.listening);
   let delivery: RemoteDelivery | undefined;
   return {
     processCount: setup.workers,
@@ -91,10 +90,11 @@ function options(
     readerAdmission: "trusted-network",
     forwarding: "trusted-network",
     createServer: async (worker) => {
+      const storage = await Storage.openServer(setup.databases);
       delivery = RemoteDelivery.connectTo({ endpoint: setup.deliveryUrl });
       const assembled = await AccessDesk.assemble({
         server: () => coordinator,
-        storage: await Storage.openServer(setup.databases),
+        storage,
         delivery,
       });
       return Server.atPort(worker.port, {

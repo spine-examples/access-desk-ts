@@ -20,6 +20,11 @@ const LOOPBACK = new BlockList();
 LOOPBACK.addSubnet("127.0.0.0", 8, "ipv4");
 LOOPBACK.addAddress("::1", "ipv6");
 
+/** The addresses that stand for every address of the machine a program listens on. */
+const EVERY_ADDRESS = new BlockList();
+EVERY_ADDRESS.addAddress("0.0.0.0", "ipv4");
+EVERY_ADDRESS.addAddress("::", "ipv6");
+
 /** Where a program listens. */
 export interface Listening {
   /** The address to listen on. */
@@ -218,7 +223,7 @@ export const Settings = {
     const delivery = reading.listening("ACCESS_DESK_DELIVERY");
     return reading.done({
       listening,
-      deliveryUrl: `http://${delivery.host}:${delivery.port.toString()}`,
+      deliveryUrl: Settings.urlOf(delivery),
       database: reading.databaseServer(),
     });
   },
@@ -247,12 +252,38 @@ export const Settings = {
     const web = reading.listening("ACCESS_DESK_WEB");
     return reading.done({
       listening,
-      serverUrl: `http://${server.host}:${server.port.toString()}`,
+      serverUrl: Settings.urlOf(server),
       webUrl: `https://${web.host}:${web.port.toString()}/`,
       google: reading.provider("GOOGLE"),
       database: reading.databaseServer(),
       sessionKey: reading.sessionKey("ACCESS_DESK_SESSION_KEY"),
     });
+  },
+
+  /**
+   * Builds the HTTP address at which a program reaches another one where it
+   * listens.
+   *
+   * A program that listens on every address of its machine, on `0.0.0.0` or
+   * `::`, is reached at its machine's loopback address, as the address it
+   * listens on names no machine to connect to. An IPv6 address is put in
+   * brackets.
+   *
+   * @param listening Where the program listens.
+   * @returns The address to reach it at, such as `http://127.0.0.1:8090`.
+   */
+  urlOf(listening: Listening): string {
+    const host = listening.host.trim().toLowerCase();
+    const version = isIP(host);
+    const family = version === 6 ? "ipv6" : "ipv4";
+    const reached =
+      version !== 0 && EVERY_ADDRESS.check(host, family)
+        ? version === 6
+          ? "::1"
+          : "127.0.0.1"
+        : listening.host.trim();
+    const named = isIP(reached) === 6 ? `[${reached}]` : reached;
+    return `http://${named}:${listening.port.toString()}`;
   },
 
   /**
