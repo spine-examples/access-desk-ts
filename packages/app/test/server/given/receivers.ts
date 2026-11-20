@@ -57,8 +57,8 @@ const { AccessDeskDeliveryStrategy }: StrategyModule =
 /** The strategy under test. */
 export const STRATEGY = AccessDeskDeliveryStrategy;
 
-/** Identity's receivers that people sign in through. */
-export const PEOPLE = [
+/** The receivers of the Identity range: those people sign in through. */
+export const IDENTITY = [
   ExternalIdentitySchema,
   ExternalIdentityViewSchema,
   PersonEmailSchema,
@@ -67,11 +67,11 @@ export const PEOPLE = [
   MembershipViewSchema,
 ];
 
-/** Identity's membership of an email address. */
-export const MEMBERSHIPS = [MembershipSchema];
+/** The receiver of the Identity memberships range: the membership of an email address. */
+export const IDENTITY_MEMBERSHIPS = [MembershipSchema];
 
-/** The organizations of the Resources bounded context, and what they hold. */
-export const ORGANIZATIONS = [
+/** The receivers of the Resources range: the organizations, and what they hold. */
+export const RESOURCES = [
   OrganizationSchema,
   ResourceRegistrationSchema,
   ResourceSchema,
@@ -79,8 +79,8 @@ export const ORGANIZATIONS = [
   ResourceAccessSchema,
 ];
 
-/** The views of the Resources bounded context. */
-export const VIEWS = [
+/** The receivers of the Resources views range: the views of the Resources bounded context. */
+export const RESOURCES_VIEWS = [
   OrganizationViewSchema,
   ResourceCatalogItemSchema,
   AccessRequestViewSchema,

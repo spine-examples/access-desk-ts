@@ -36,18 +36,18 @@ import { ResourceCatalogItemSchema } from "@access-desk/resources-model/generate
  * organization, its worker waits until the organization confirms, and another
  * worker handles the confirmation, so there must be at least two. Three
  * workers and the delivery server suit four CPUs.
- * The organizations and views ranges have a shard for each worker.
+ * The Resources and Resources views ranges have a shard for each worker.
  */
 export const WORKERS = 3;
 
 /** The part every type URL of an Identity receiver contains. */
-const IDENTITY = "/accessdesk.identity.";
+const IDENTITY_TYPE_URL_PART = "/accessdesk.identity.";
 
 /** The type URL of Identity's membership of an email address. */
-const MEMBERSHIP = TypeUrls.derive(MembershipSchema);
+const MEMBERSHIP_TYPE_URL = TypeUrls.derive(MembershipSchema);
 
 /** The type URLs of the views of the Resources bounded context. */
-const RESOURCES_VIEWS: ReadonlySet<string> = new Set(
+const RESOURCES_VIEW_TYPE_URLS: ReadonlySet<string> = new Set(
   [
     OrganizationViewSchema,
     ResourceCatalogItemSchema,
@@ -93,7 +93,7 @@ class ShardRange {
  *
  * People sign in here, so nothing in this range waits for another shard.
  */
-const PEOPLE = new ShardRange(0, 1);
+const IDENTITY = new ShardRange(0, 1);
 
 /**
  * Identity's memberships of email addresses.
@@ -103,17 +103,17 @@ const PEOPLE = new ShardRange(0, 1);
  * waiting behind it. With one shard, at most one worker waits at a time, and
  * the others are free to handle the organization's confirmation.
  */
-const MEMBERSHIPS = new ShardRange(PEOPLE.next, 1);
+const IDENTITY_MEMBERSHIPS = new ShardRange(IDENTITY.next, 1);
 
 /**
  * The organizations of the Resources bounded context, with their members,
  * resources, access requests, and the access people hold.
  *
- * Nearly all the work of the application is here and in the views. Each of
- * these two ranges has a shard for every worker, so all workers can be busy
- * whichever range has messages at the moment.
+ * Nearly all the work of the application is here and in Resources views.
+ * Each of these two ranges has a shard for every worker, so all workers can
+ * be busy whichever range has messages at the moment.
  */
-const ORGANIZATIONS = new ShardRange(MEMBERSHIPS.next, WORKERS);
+const RESOURCES = new ShardRange(IDENTITY_MEMBERSHIPS.next, WORKERS);
 
 /**
  * The views of the Resources bounded context, with the audit trail.
@@ -121,10 +121,10 @@ const ORGANIZATIONS = new ShardRange(MEMBERSHIPS.next, WORKERS);
  * In a range of their own, the views catch up without holding up the
  * organizations.
  */
-const VIEWS = new ShardRange(ORGANIZATIONS.next, WORKERS);
+const RESOURCES_VIEWS = new ShardRange(RESOURCES.next, WORKERS);
 
 /** The number of shards in all ranges. */
-const SHARD_COUNT = VIEWS.next;
+const SHARD_COUNT = RESOURCES_VIEWS.next;
 
 /**
  * The shards the messages of Access Desk are delivered in.
@@ -133,10 +133,15 @@ const SHARD_COUNT = VIEWS.next;
  * takes one shard at a time. The receivers are grouped by how their work goes,
  * and each group has its own range of shards:
  *
- * 1. Identity's people: one shard.
- * 2. Identity's memberships: one shard.
- * 3. The organizations of the Resources bounded context: three shards.
- * 4. The views of the Resources bounded context: three shards.
+ * 1. Identity: Identity's people, their accounts, email addresses, and
+ *    views; one shard.
+ * 2. Identity memberships: Identity's memberships of email addresses; one
+ *    shard.
+ * 3. Resources: the organizations of the Resources bounded context, with
+ *    their resources, access requests, and the access people hold; three
+ *    shards.
+ * 4. Resources views: the views of the Resources bounded context, with the
+ *    audit trail; three shards.
  *
  * The last two ranges have a shard for each of the `WORKERS` of the
  * application server.
@@ -155,11 +160,11 @@ export const AccessDeskDeliveryStrategy: DeliveryStrategy = {
 
 /** Finds the range of a receiver, by the type of its state. */
 function rangeOf(targetType: string): ShardRange {
-  if (targetType === MEMBERSHIP) {
-    return MEMBERSHIPS;
+  if (targetType === MEMBERSHIP_TYPE_URL) {
+    return IDENTITY_MEMBERSHIPS;
   }
-  if (targetType.includes(IDENTITY)) {
-    return PEOPLE;
+  if (targetType.includes(IDENTITY_TYPE_URL_PART)) {
+    return IDENTITY;
   }
-  return RESOURCES_VIEWS.has(targetType) ? VIEWS : ORGANIZATIONS;
+  return RESOURCES_VIEW_TYPE_URLS.has(targetType) ? RESOURCES_VIEWS : RESOURCES;
 }

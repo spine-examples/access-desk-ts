@@ -17,32 +17,32 @@ import { describe, expect, it } from "vitest";
 import { OrganizationSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
 
 import {
-  MEMBERSHIPS,
-  ORGANIZATIONS,
-  PEOPLE,
+  IDENTITY,
+  IDENTITY_MEMBERSHIPS,
+  RESOURCES,
+  RESOURCES_VIEWS,
   STRATEGY,
-  VIEWS,
   placed,
   receiverId,
   shardsOf,
 } from "./given/receivers.js";
 
 describe("The shards of Access Desk should", () => {
-  it("give people and memberships one shard each, and organizations and views three each", () => {
+  it("give Identity and Identity memberships one shard each, and Resources and Resources views three each", () => {
     expect(STRATEGY.shardCount).toBe(8);
     expect(
-      placed([...PEOPLE, ...MEMBERSHIPS, ...ORGANIZATIONS, ...VIEWS]).every(
+      placed([...IDENTITY, ...IDENTITY_MEMBERSHIPS, ...RESOURCES, ...RESOURCES_VIEWS]).every(
         (shard) => shard.ofTotal === 8,
       ),
     ).toBe(true);
-    expect(shardsOf(PEOPLE).size).toBe(1);
-    expect(shardsOf(MEMBERSHIPS).size).toBe(1);
-    expect(shardsOf(ORGANIZATIONS).size).toBe(3);
-    expect(shardsOf(VIEWS).size).toBe(3);
+    expect(shardsOf(IDENTITY).size).toBe(1);
+    expect(shardsOf(IDENTITY_MEMBERSHIPS).size).toBe(1);
+    expect(shardsOf(RESOURCES).size).toBe(3);
+    expect(shardsOf(RESOURCES_VIEWS).size).toBe(3);
   });
 
   it("keep every range apart from the others", () => {
-    const ranges = [PEOPLE, MEMBERSHIPS, ORGANIZATIONS, VIEWS].map(shardsOf);
+    const ranges = [IDENTITY, IDENTITY_MEMBERSHIPS, RESOURCES, RESOURCES_VIEWS].map(shardsOf);
 
     const all = ranges.flatMap((range) => [...range]);
     expect(new Set(all).size).toBe(all.length);
