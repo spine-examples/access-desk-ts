@@ -203,6 +203,17 @@ describe("The gateway should", () => {
 
       expect((await session(restarted, noah.token)).status).toBe(401);
     });
+
+    it("let a person finish a sign-in through an outside provider started before the restart", async () => {
+      const running = await givenGateway();
+      const state = await start(running);
+
+      const restarted = await restartGateway(running);
+      const completed = await complete(restarted, { state, code: "1001:Noah@Acme.example" });
+
+      expect(completed.status).toBe(200);
+      expect((await session(restarted, completed.body.token as string)).status).toBe(200);
+    });
   });
 
   describe("sign a person in through an outside identity provider, and", () => {

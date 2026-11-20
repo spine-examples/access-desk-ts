@@ -12,11 +12,12 @@
  * and limitations under the License.
  */
 
+import type { PersistentTokenRevocations, SignedSessions } from "@spine-event-engine/auth";
+import { Time } from "@spine-event-engine/core/time";
 import type { BrowserAuthRoute } from "@spine-event-engine/server/browser";
 import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 import type { AccessDesk } from "../access-desk.js";
-import type { Sessions } from "../sessions.js";
-import { UNAUTHENTICATED, type Route } from "./route.js";
+import { SessionToken, UNAUTHENTICATED, UNAVAILABLE, type Route } from "./route.js";
 
 /**
  * Creates the endpoints that show who is signed in, and sign them out.
@@ -24,11 +25,14 @@ import { UNAUTHENTICATED, type Route } from "./route.js";
  * @param route Creates an endpoint.
  * @param desk Looks up people and organizations.
  * @param sessions The sessions of the people who have signed in.
+ * @param ended The sessions people ended, kept while their tokens would
+ *   still be taken.
  */
 export function sessionRoutes(
   route: Route,
   desk: AccessDesk,
-  sessions: Sessions,
+  sessions: Pick<SignedSessions, "logout">,
+  ended: Pick<PersistentTokenRevocations, "purgeExpired">,
 ): BrowserAuthRoute[] {
   return [
     /**
@@ -90,11 +94,19 @@ export function sessionRoutes(
      * Send `{}`. Answers `200` with `{}`, with or without a session, and `503`
      * when the gateway could not remember that the session ended.
      */
-    route("/auth/sign-out", async (_body, session, request) => {
-      if (session === undefined) {
-        await sessions.endUnresolved(request);
-      } else {
-        await sessions.end(session);
+    route("/auth/sign-out", async (_body, _session, request) => {
+      const token = SessionToken.of(request);
+      const outcome = token === undefined ? undefined : await sessions.logout(token);
+      if (outcome?.kind === "unavailable") {
+        console.warn("The gateway could not remember that a session ended.");
+        return UNAVAILABLE;
+      }
+      if (outcome?.kind === "revoked") {
+        try {
+          await ended.purgeExpired(Time.currentTime());
+        } catch (error) {
+          console.warn("The gateway could not forget the sessions whose tokens expired.", error);
+        }
       }
       return [200, {}];
     }),

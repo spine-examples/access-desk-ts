@@ -15,7 +15,13 @@
 import "../generated/spine-bootstrap.js";
 import { create } from "@bufbuild/protobuf";
 import type { EmailAddress } from "@spine-event-engine/proto";
-import { BoundedContext, CommandRouting, EventRouting } from "@spine-event-engine/server";
+import {
+  BoundedContext,
+  CommandRouting,
+  EventRouting,
+  type BoundedContextBuilder,
+  type StandSubscriptionRegistry,
+} from "@spine-event-engine/server";
 import {
   MembershipIdSchema,
   type ExternalIdentityId,
@@ -41,10 +47,12 @@ import { PersonAggregate } from "./person/person-aggregate.js";
 import { PersonEmailAggregate } from "./person/person-email-aggregate.js";
 import { PersonViewProjection } from "./person/person-view-projection.js";
 
-/** How the Identity context is assembled. */
+/** The settings the Identity context is assembled with. */
 export interface IdentityContextOptions {
   /** The service that adds a person to the members of an organization. */
   readonly members: OrganizationMembers;
+  /** The store of the subscriptions to the context. */
+  readonly subscriptions?: StandSubscriptionRegistry;
 }
 
 /**
@@ -53,12 +61,12 @@ export interface IdentityContextOptions {
  */
 export const IdentityContext = {
   /**
-   * Builds the context.
+   * Declares the context, for an application to build.
    *
-   * @param options How to assemble the context.
-   * @returns The assembled Identity bounded context.
+   * @param options The settings to assemble the context with.
+   * @returns The declaration of the Identity bounded context.
    */
-  async create(options: IdentityContextOptions): Promise<BoundedContext> {
+  create(options: IdentityContextOptions): BoundedContextBuilder {
     /** Finds the account an event about signing in belongs to. */
     const accountOf = (identity: ExternalIdentityId | undefined): ExternalIdentityId[] =>
       identity === undefined ? [] : [identity];
@@ -95,7 +103,7 @@ export const IdentityContext = {
       .route(OrganizationJoinedSchema, (event) =>
         event.membership === undefined ? [] : [event.membership],
       );
-    return BoundedContext.singleTenant("Identity")
+    const context = BoundedContext.singleTenant("Identity")
       .add(ExternalIdentityProcessManager, { eventRouting: accountRouting })
       .add(ExternalIdentityViewProjection)
       .add(PersonEmailAggregate)
@@ -106,7 +114,10 @@ export const IdentityContext = {
         eventRouting: membershipEvents,
         onCreate: (entity) => new MembershipProcessManager(entity, options.members),
       })
-      .add(MembershipViewProjection)
-      .build();
+      .add(MembershipViewProjection);
+    if (options.subscriptions !== undefined) {
+      context.withSubscriptionRegistry(options.subscriptions);
+    }
+    return context;
   },
 };

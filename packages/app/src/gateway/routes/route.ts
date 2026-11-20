@@ -12,8 +12,48 @@
  * and limitations under the License.
  */
 
-import type { BrowserAuthRoute } from "@spine-event-engine/server/browser";
-import type { Session, Sessions } from "../sessions.js";
+import { create } from "@bufbuild/protobuf";
+import type { BearerCredential, SessionResolver } from "@spine-event-engine/auth";
+import { EmailAddressSchema } from "@spine-event-engine/proto";
+import type {
+  BrowserAuthRoute,
+  BrowserCredentialAdmission,
+} from "@spine-event-engine/server/browser";
+import {
+  OrganizationIdSchema,
+  PersonIdSchema,
+  type OrganizationId,
+} from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
+import type { SignedIn } from "../access-desk.js";
+
+/** The endpoints read no cookie and no CSRF header, as a session comes as a bearer token. */
+const BEARER_ONLY: BrowserCredentialAdmission = {
+  csrfHeaderNames: [],
+  credentialCookieNames: [],
+  stateCookieNames: [],
+};
+
+/** A session a request carries. */
+export interface Session {
+  /** The signed-in person. */
+  readonly person: SignedIn;
+  /** The organization the person belongs to, when they belong to one. */
+  readonly organization: OrganizationId | undefined;
+}
+
+/** The token of the session a request carries. */
+export const SessionToken = {
+  /**
+   * Reads the token a request carries as `Authorization: Bearer <token>`.
+   *
+   * @param request The request.
+   * @returns The token, or `undefined` when the request carries none.
+   */
+  of(request: Request): BearerCredential | undefined {
+    const value = /^Bearer (\S+)$/.exec(request.headers.get("authorization") ?? "")?.[1];
+    return value === undefined ? undefined : { kind: "bearer", value };
+  },
+};
 
 /** A status and the JSON that goes with it. */
 export type Answer = readonly [status: number, body: object];
@@ -58,13 +98,14 @@ export type Route = (
  * @param origins The addresses of the pages that may call the gateway.
  * @param sessions The sessions of the people who have signed in.
  */
-export function routing(origins: string[], sessions: Sessions): Route {
+export function routing(origins: string[], sessions: SessionResolver): Route {
   return (path, answer) => ({
     method: "POST",
     path,
     origins,
     maxRequestBytes: 16_384,
     timeoutMs: 20_000,
+    admission: BEARER_ONLY,
     onRequest: async (request) => {
       let body: unknown;
       try {
@@ -76,7 +117,11 @@ export function routing(origins: string[], sessions: Sessions): Route {
       try {
         answered =
           typeof body === "object" && body !== null && !Array.isArray(body)
-            ? await answer(body as Record<string, unknown>, await sessions.of(request), request)
+            ? await answer(
+                body as Record<string, unknown>,
+                await sessionOf(sessions, request),
+                request,
+              )
             : REFUSED;
       } catch (error) {
         console.warn(`The gateway could not answer ${path}.`, error);
@@ -89,4 +134,35 @@ export function routing(origins: string[], sessions: Sessions): Route {
       });
     },
   });
+}
+
+/**
+ * Reads the session a request carries, while it is valid.
+ *
+ * A session that does not name the person's email address is none.
+ *
+ * @param sessions The sessions of the people who have signed in.
+ * @param request The request.
+ * @returns The session, or `undefined` when the request carries no valid one.
+ */
+async function sessionOf(
+  sessions: SessionResolver,
+  request: Request,
+): Promise<Session | undefined> {
+  const token = SessionToken.of(request);
+  const principal = token === undefined ? undefined : (await sessions.resolve(token))?.principal;
+  const { email, name, organization } = principal?.attributes ?? {};
+  return principal === undefined || email === undefined
+    ? undefined
+    : {
+        person: {
+          id: create(PersonIdSchema, { uuid: principal.id }),
+          email: create(EmailAddressSchema, { value: email }),
+          name: name ?? email,
+        },
+        organization:
+          organization === undefined
+            ? undefined
+            : create(OrganizationIdSchema, { uuid: organization }),
+      };
 }

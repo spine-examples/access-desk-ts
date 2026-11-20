@@ -28,12 +28,16 @@ import {
   IdentityProvider,
   OrganizationRole,
 } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
-import { AddOrganizationMemberSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
+import {
+  AddOrganizationMemberSchema,
+  CreateOrganizationSchema,
+} from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
 
 import {
   eventually,
   give,
   givenOrganization,
+  givenRegistered,
   givenServer,
   givenServerStorage,
   organizationView,
@@ -172,6 +176,42 @@ describe("The assembled application should", () => {
     } finally {
       await storage.drop();
     }
+  });
+
+  it("keep an organization registered while it runs once it is restarted", async () => {
+    const storage = await givenServerStorage();
+    try {
+      const before = await givenServer(storage);
+      await givenRegistered(before, "initech");
+      await before.stop();
+
+      const after = await givenServer(storage);
+      try {
+        const initech = create(OrganizationIdSchema, { uuid: "initech" });
+        await givenOrganization(after, initech);
+
+        expect((await organizationView(after, initech))?.name).toBe("initech");
+      } finally {
+        await after.stop();
+      }
+    } finally {
+      await storage.drop();
+    }
+  });
+
+  it("refuse what is given in an organization nobody registered", async () => {
+    const hosted = await givenServer();
+    server = hosted;
+    const initech = create(OrganizationIdSchema, { uuid: "initech" });
+
+    await expect(
+      give(
+        hosted.resources,
+        CreateOrganizationSchema,
+        create(CreateOrganizationSchema, { id: initech, name: "Initech" }),
+        { organization: initech },
+      ),
+    ).rejects.toThrow(/is not registered/);
   });
 
   it("add a person the organization already lists", async () => {

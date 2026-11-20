@@ -12,11 +12,13 @@
  * and limitations under the License.
  */
 
-import { OidcFlow } from "@spine-event-engine/auth";
+import { OidcFlow, PersistentOidcFlowStore, type SignedSessions } from "@spine-event-engine/auth";
+import { Time } from "@spine-event-engine/core/time";
 import type { BrowserAuthRoute } from "@spine-event-engine/server/browser";
+import { StorageGroup, type StorageFactory } from "@spine-event-engine/storage";
+import { Closing } from "../../closing.js";
 import type { AccessDesk } from "../access-desk.js";
 import { ConfirmedIdentity, type SignInProvider } from "../providers.js";
-import type { Issued, Sessions } from "../sessions.js";
 import { REFUSED, type Route } from "./route.js";
 
 /** An outside identity provider the gateway signs people in through. */
@@ -34,9 +36,29 @@ export interface ExternalSignIn {
 export interface SignInRoutes {
   /** Browser auth routes registered with BrowserServer. */
   readonly routes: BrowserAuthRoute[];
-  /** Ends every sign-in still under way. */
-  close(): void;
+  /** Stops taking sign-ins. */
+  close(): Promise<void>;
 }
+
+/** A session as the gateway hands it to the browser once a person signed in. */
+interface Issued {
+  /** The bearer token the browser sends with every request. */
+  readonly token: string;
+  /** The signed-in person the session stands for. */
+  readonly person: {
+    /** The person's identifier. */
+    readonly id: string;
+    /** The person's email address. */
+    readonly email: string;
+    /** The person's display name. */
+    readonly name: string;
+  };
+  /** The identifier of the organization the session works in, or `null`. */
+  readonly organization: string | null;
+}
+
+/** The storage group the sign-ins under way are kept in. */
+const SIGN_INS = new StorageGroup("sign-ins");
 
 /**
  * Creates the endpoints for signing in through an identity provider, such as Google.
@@ -46,20 +68,34 @@ export interface SignInRoutes {
  * 3. The provider confirms the person.
  * 4. The browser finishes the sign-in with the provider's answer.
  *
+ * The gateway keeps each sign-in under way in its storage, so the browser can
+ * finish it even when the gateway restarts in between.
+ *
  * @param route Creates an endpoint.
  * @param desk Signs the confirmed person in.
  * @param sessions The sessions of the people who have signed in.
  * @param external The identity providers to sign people in through, by key.
+ * @param storage Where the gateway keeps the sign-ins under way.
  */
-export function signInRoutes(
+export async function signInRoutes(
   route: Route,
   desk: AccessDesk,
-  sessions: Sessions,
+  sessions: Pick<SignedSessions, "issue">,
   external: Readonly<Record<string, ExternalSignIn>>,
-): SignInRoutes {
+  storage: StorageFactory,
+): Promise<SignInRoutes> {
+  /** The sign-ins under way, kept for each outside identity provider. */
+  const kept: PersistentOidcFlowStore[] = [];
   /** The sign-in flow of each outside identity provider. */
-  const flows = new Map(
-    Object.entries(external).map(([key, { provider, callbackUri }]) => [
+  const flows = new Map<string, OidcFlow>();
+  for (const [key, { provider, callbackUri }] of Object.entries(external)) {
+    const store = await PersistentOidcFlowStore.create({
+      storageFactory: storage,
+      group: SIGN_INS,
+      flowId: key,
+    });
+    kept.push(store);
+    flows.set(
       key,
       new OidcFlow({
         authorizationEndpoint: provider.authorizationEndpoint,
@@ -68,6 +104,7 @@ export function signInRoutes(
         scopes: [...provider.scopes],
         allowedPostLoginRedirects: [callbackUri],
         provider: provider.provider,
+        store,
         identityMapping: {
           // Identity knows which person the confirmed account belongs to.
           async resolve(identity) {
@@ -95,15 +132,15 @@ export function signInRoutes(
         },
         sessionIssuer: {
           async issue(principal) {
-            const created = await sessions.create(principal);
+            const created = await sessions.issue(principal);
             return created.kind === "issued"
               ? { credential: created.credential, session: created.session }
               : undefined;
           },
         },
       }),
-    ]),
-  );
+    );
+  }
 
   const routes = [
     /**
@@ -146,20 +183,29 @@ export function signInRoutes(
        * send the person to. Answers `403` for a provider that is not set up or
        * a missing `codeChallenge`.
        */
-      route("/auth/external/start", (body) => {
+      route("/auth/external/start", async (body) => {
         const key = typeof body.provider === "string" ? body.provider : "";
         const redirect = Object.hasOwn(external, key) ? external[key]?.callbackUri : undefined;
-        const started =
-          typeof body.codeChallenge === "string" && redirect !== undefined
-            ? flows
-                .get(key)
-                ?.start({ browserCodeChallenge: body.codeChallenge, postLoginRedirect: redirect })
-            : undefined;
-        return Promise.resolve(
-          started?.kind === "started"
-            ? [200, { authorizationUrl: started.authorizationUrl }]
-            : REFUSED,
-        );
+        const flow = flows.get(key);
+        if (
+          flow === undefined ||
+          redirect === undefined ||
+          typeof body.codeChallenge !== "string"
+        ) {
+          return REFUSED;
+        }
+        try {
+          await flow.purgeExpired(Time.currentTime());
+        } catch (error) {
+          console.warn("The gateway could not forget the sign-ins left unfinished.", error);
+        }
+        const started = await flow.start({
+          browserCodeChallenge: body.codeChallenge,
+          postLoginRedirect: redirect,
+        });
+        return started.kind === "started"
+          ? [200, { authorizationUrl: started.authorizationUrl }]
+          : REFUSED;
       }),
       /**
        * Finishes a sign-in and gives the person a session. The page calls it
@@ -221,10 +267,6 @@ export function signInRoutes(
 
   return {
     routes,
-    close: () => {
-      for (const flow of flows.values()) {
-        flow.close();
-      }
-    },
+    close: () => Closing.inOrder(...flows.values(), ...kept),
   };
 }

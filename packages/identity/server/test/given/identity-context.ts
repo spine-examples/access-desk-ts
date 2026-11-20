@@ -19,7 +19,6 @@ import { SignalMetadata } from "@spine-event-engine/server";
 import { type ActorContext, UserIdSchema } from "@spine-event-engine/proto";
 import { QueryIdSchema, QuerySchema, TargetSchema } from "@spine-event-engine/proto/client";
 import { BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
-import { TestEnvironment } from "@access-desk/testing/environment";
 import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
 
 import { typeRegistry } from "../../generated/model-registry.js";
@@ -95,8 +94,7 @@ const storages = new WeakMap<BlackBox, TestStorage>();
 export async function identityBlackBox(storage?: TestStorage): Promise<BlackBox> {
   const kept = storage ?? (await TestStorages.singleTenant(typeRegistry));
   ownedStorages.add(kept);
-  await TestEnvironment.start(await kept.open());
-  const context = await identityModule().IdentityContext.create({
+  const context = identityModule().IdentityContext.create({
     members: {
       add: (member) => {
         if (organizations.refusing) {
@@ -115,6 +113,7 @@ export async function identityBlackBox(storage?: TestStorage): Promise<BlackBox>
     },
   });
   const box = await BlackBox.from(context, {
+    storageFactory: await kept.open(),
     timeoutMs: 20_000,
     intervalMs: 20,
   });
@@ -143,7 +142,6 @@ export function storageOf(box: BlackBox): TestStorage {
 export async function closeIdentityBlackBoxes(): Promise<void> {
   await Promise.all([...ownedBlackBoxes].map((box) => box.close()));
   ownedBlackBoxes.clear();
-  await TestEnvironment.reset();
   await Promise.all([...ownedStorages].map((storage) => storage.drop()));
   ownedStorages.clear();
   organizations.added = [];

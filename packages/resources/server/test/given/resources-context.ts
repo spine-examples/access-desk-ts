@@ -16,7 +16,13 @@ import { create, type Message, type MessageShape } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { AnyPacker, TypeUrls } from "@spine-event-engine/core";
 import { Time, type TimeProvider } from "@spine-event-engine/core/time";
-import { SignalMetadata, type BoundedContext } from "@spine-event-engine/server";
+import {
+  Application,
+  EnvironmentType,
+  ServerEnvironment,
+  SignalMetadata,
+  type BoundedContext,
+} from "@spine-event-engine/server";
 import { type ActorContext, TenantIdSchema, UserIdSchema } from "@spine-event-engine/proto";
 import {
   CompositeFilter_CompositeOperator,
@@ -28,7 +34,6 @@ import {
   type Target,
 } from "@spine-event-engine/proto/client";
 import { BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
-import { TestEnvironment } from "@access-desk/testing/environment";
 import { TestStorages, type TestStorage } from "@access-desk/testing/storage";
 
 import { typeRegistry } from "../../generated/model-registry.js";
@@ -40,7 +45,7 @@ export const actor = "resources-user";
 const signalMetadata = new SignalMetadata();
 
 /** Builds the tenant the organization keeps its state in. */
-function tenant() {
+export function tenant() {
   return create(TenantIdSchema, { kind: { case: "value", value: organizationId } });
 }
 
@@ -72,8 +77,8 @@ function loaded(): ResourcesModule {
 }
 
 const ownedBlackBoxes = new Set<BlackBox>();
+const ownedApplications = new Set<Application>();
 const ownedStorages = new Set<TestStorage>();
-const contexts = new WeakMap<BlackBox, BoundedContext>();
 const storages = new WeakMap<BlackBox, TestStorage>();
 
 /**
@@ -96,19 +101,53 @@ export async function resourcesBlackBox(
   }
   const kept = storage ?? (await TestStorages.multitenant(typeRegistry, [tenant()]));
   ownedStorages.add(kept);
-  await TestEnvironment.start(await kept.open(), [tenant()]);
-  const context = await loaded().ResourcesContext.create();
   // Grant flows cross several entities before a read model settles, so waits
   // get generous headroom; they still return as soon as the outcome is visible.
-  const box = await BlackBox.from(context, {
+  const box = await BlackBox.from(loaded().ResourcesContext.create(), {
     tenant: organizationId,
+    storageFactory: await kept.open(),
     timeoutMs: 20_000,
     intervalMs: 20,
   });
   ownedBlackBoxes.add(box);
-  contexts.set(box, context);
   storages.set(box, kept);
   return box;
+}
+
+/**
+ * Builds the Resources context in an application of the test's own, with the
+ * organization registered, for a test that posts an event as the context
+ * itself records one. A BlackBox does not give out its context.
+ *
+ * The application is closed by {@link closeResourcesBlackBoxes}.
+ *
+ * @param clock Tells what time it is until the application is closed; the
+ *   system clock by default.
+ * @returns The built context.
+ */
+export async function builtResources(clock?: TimeProvider): Promise<BoundedContext> {
+  if (clock !== undefined) {
+    Time.setProvider(clock);
+  }
+  const kept = await TestStorages.multitenant(typeRegistry, [tenant()]);
+  ownedStorages.add(kept);
+  const storageFactory = await kept.open();
+  const environment = ServerEnvironment.newBuilder()
+    .under(EnvironmentType.Local, (settings) => {
+      settings.use({ storageFactory });
+    })
+    .build();
+  const application = await Application.newBuilder()
+    .setServerEnvironment(environment)
+    .add(loaded().ResourcesContext.create())
+    .build();
+  ownedApplications.add(application);
+  await application.tenantIndex().keep(tenant());
+  const [context] = application.contexts();
+  if (context === undefined) {
+    throw new Error("The application was built without the Resources context.");
+  }
+  return context;
 }
 
 /**
@@ -125,27 +164,15 @@ export function storageOf(box: BlackBox): TestStorage {
 }
 
 /**
- * Finds the Resources context behind a BlackBox, for tests that post events
- * directly.
- *
- * @param box A BlackBox opened through {@link resourcesBlackBox}.
- */
-export function contextOf(box: BlackBox): BoundedContext {
-  const context = contexts.get(box);
-  if (context === undefined) {
-    throw new Error("Open the BlackBox through resourcesBlackBox() to reach its context.");
-  }
-  return context;
-}
-
-/**
- * Closes and forgets every BlackBox opened through {@link resourcesBlackBox},
- * deletes the data they kept, and puts the system clock back.
+ * Closes and forgets every BlackBox opened through {@link resourcesBlackBox}
+ * and every context built through {@link builtResources}, deletes the data
+ * they kept, and puts the system clock back.
  */
 export async function closeResourcesBlackBoxes(): Promise<void> {
   await Promise.all([...ownedBlackBoxes].map((box) => box.close()));
   ownedBlackBoxes.clear();
-  await TestEnvironment.reset();
+  await Promise.all([...ownedApplications].map((application) => application.close()));
+  ownedApplications.clear();
   await Promise.all([...ownedStorages].map((storage) => storage.drop()));
   ownedStorages.clear();
   Time.resetProvider();

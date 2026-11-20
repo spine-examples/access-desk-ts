@@ -20,6 +20,11 @@ const LOOPBACK = new BlockList();
 LOOPBACK.addSubnet("127.0.0.0", 8, "ipv4");
 LOOPBACK.addAddress("::1", "ipv6");
 
+/** The addresses that stand for every address of the machine a program listens on. */
+const EVERY_ADDRESS = new BlockList();
+EVERY_ADDRESS.addAddress("0.0.0.0", "ipv4");
+EVERY_ADDRESS.addAddress("::", "ipv6");
+
 /** Where a program listens. */
 export interface Listening {
   /** The address to listen on. */
@@ -52,15 +57,16 @@ export interface DatabaseServer {
 export interface ServerSettings {
   /** Where the application server listens. */
   readonly listening: Listening;
-  /**
-   * The organizations the application server keeps, by their identifiers.
-   */
-  // TODO:02-11-2026:mykyta.pimonov: Register organizations while the server
-  //  runs, instead of listing them here, once Spine keeps the tenants given to
-  //  its index across restarts.
-  readonly organizations: readonly string[];
+  /** The address of the delivery server, which keeps the messages waiting for the workers. */
+  readonly deliveryUrl: string;
   /** The PostgreSQL server the application server keeps its data on. */
   readonly database: DatabaseServer;
+}
+
+/** The setup of the delivery server. */
+export interface DeliverySettings {
+  /** The address the delivery server listens on. */
+  readonly listening: Listening;
 }
 
 /** How the gateway is set up. */
@@ -154,23 +160,6 @@ class Reading {
   }
 
   /**
-   * Reads organizations that must be listed, each once, separated by commas.
-   */
-  organizations(name: string): string[] {
-    const text = this.text(name);
-    const organizations = text.split(",").map((organization) => organization.trim());
-    const valid =
-      organizations.every((organization) => organization !== "") &&
-      new Set(organizations).size === organizations.length;
-    if (text !== "" && !valid) {
-      this.#problems.push(
-        `${name} must list organizations, each once, separated by commas, and is "${text}".`,
-      );
-    }
-    return text === "" || !valid ? [] : organizations;
-  }
-
-  /**
    * Reads the PostgreSQL server, from `ACCESS_DESK_DATABASE_HOST`, `_PORT`,
    * `_USER`, and `_PASSWORD`.
    */
@@ -220,7 +209,7 @@ class Reading {
 /** Settings as they are read, where a value that could not be read is `undefined`. */
 type Unread<Settings> = { readonly [Name in keyof Settings]: Settings[Name] | undefined };
 
-/** The settings of the application server and of the gateway. */
+/** The settings of the application server, the delivery server, and the gateway. */
 export const Settings = {
   /**
    * Reads the application server's settings from the environment.
@@ -230,11 +219,24 @@ export const Settings = {
    */
   ofServer(environment: NodeJS.ProcessEnv): ServerSettings {
     const reading = new Reading(environment);
+    const listening = reading.listening("ACCESS_DESK_SERVER");
+    const delivery = reading.listening("ACCESS_DESK_DELIVERY");
     return reading.done({
-      listening: reading.listening("ACCESS_DESK_SERVER"),
-      organizations: reading.organizations("ACCESS_DESK_ORGANIZATIONS"),
+      listening,
+      deliveryUrl: Settings.urlOf(delivery),
       database: reading.databaseServer(),
     });
+  },
+
+  /**
+   * Reads the delivery server's settings from the environment.
+   *
+   * @param environment The environment the program runs in.
+   * @returns The settings of the delivery server.
+   */
+  ofDelivery(environment: NodeJS.ProcessEnv): DeliverySettings {
+    const reading = new Reading(environment);
+    return reading.done({ listening: reading.listening("ACCESS_DESK_DELIVERY") });
   },
 
   /**
@@ -250,12 +252,38 @@ export const Settings = {
     const web = reading.listening("ACCESS_DESK_WEB");
     return reading.done({
       listening,
-      serverUrl: `http://${server.host}:${server.port.toString()}`,
+      serverUrl: Settings.urlOf(server),
       webUrl: `https://${web.host}:${web.port.toString()}/`,
       google: reading.provider("GOOGLE"),
       database: reading.databaseServer(),
       sessionKey: reading.sessionKey("ACCESS_DESK_SESSION_KEY"),
     });
+  },
+
+  /**
+   * Builds the HTTP address at which a program reaches another one where it
+   * listens.
+   *
+   * A program that listens on every address of its machine, on `0.0.0.0` or
+   * `::`, is reached at its machine's loopback address, as the address it
+   * listens on names no machine to connect to. An IPv6 address is put in
+   * brackets.
+   *
+   * @param listening Where the program listens.
+   * @returns The address to reach it at, such as `http://127.0.0.1:8090`.
+   */
+  urlOf(listening: Listening): string {
+    const host = listening.host.trim().toLowerCase();
+    const version = isIP(host);
+    const family = version === 6 ? "ipv6" : "ipv4";
+    const reached =
+      version !== 0 && EVERY_ADDRESS.check(host, family)
+        ? version === 6
+          ? "::1"
+          : "127.0.0.1"
+        : listening.host.trim();
+    const named = isIP(reached) === 6 ? `[${reached}]` : reached;
+    return `http://${named}:${listening.port.toString()}`;
   },
 
   /**

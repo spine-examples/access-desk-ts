@@ -143,7 +143,7 @@ is delivered. (`box.assertEvents()` does not include rejection events; subscribe
 
 ## Bounded contexts and handlers
 
-Choose `BoundedContext.singleTenant()` or `.multitenant()` explicitly. Access
+Choose `BoundedContext.singleTenant()` or `.multiTenant()` explicitly. Access
 Desk uses a single-tenant Identity bounded context and a multitenant Resources
 bounded context.
 
@@ -309,64 +309,97 @@ extension" pattern): `getOption` from `@bufbuild/protobuf`,
 local first. Pick an extension field number outside Spine's `73800`–`73971`
 block (Spine leaves `EnumValueOptions` free).
 
-## Server environment
+## Application and server environment
 
-- **One environment per process.** `ServerEnvironment.when(type).use(settings)`
-  sets it up once, before the first `ServerEnvironment.instance()`, and
-  `completeSetup()` must finish before a context is built. Every context of
-  the process keeps its data in the environment's one `storageFactory`; a
-  context builder takes no separate storage.
-- **The environment closes the storage.** Closing the environment closes its
-  `storageFactory`. It refuses to close while a context is open.
-- **The server closes its contexts.** `Server.close()` stops taking requests,
-  waits for the work already accepted, closes the server's contexts, and then
-  each of its `resources` in order. A server begun with `start()` never closes
-  the environment. A server begun with `run()` closes itself on `SIGINT` or
-  `SIGTERM`, and then the environment, when no other such server runs.
-- **Tests.** `ServerTests.resetEnvironment()` from
-  `@spine-event-engine/server/testing` closes the environment, so the next
-  test can set up a new one. It refuses while a context is open.
+- **Environment.** `ServerEnvironment.newBuilder()`, configured through
+  `under(type, callback)`, takes its settings through `use({ ... })` in a
+  synchronous callback. The Production profile applies when `NODE_ENV` is
+  `production`, Local otherwise.
+- **Application.** `Application.newBuilder()` takes the environment, the
+  tenant index, and context builders, made by
+  `BoundedContext.singleTenant(name)` or `.multiTenant(name)`; it builds the
+  contexts itself. `application.contexts()` lists them in the order added.
+- **Closing.** `application.close()` closes the contexts, the tenant index,
+  and the environment, which closes its storage and Delivery. Close the
+  servers first. After a failed build, `builder.close()` releases what the
+  build opened, and the environment and tenant index are the caller's to
+  close.
+- **Server.** `Server.atPort(port, options)` serves the Application given
+  with `setApplication`, once `start()` resolves. Closing the server closes
+  its `resources` and leaves the Application open; `run()` also closes the
+  Application on `SIGINT` or `SIGTERM`.
+- **Tests.** `BlackBox.from(builder, { tenant, storageFactory })` builds its
+  own Application, keeps the tenant, and closes everything with the box. It
+  does not give out the built context.
 - **One Delivery for all contexts.** By default, all messages of all contexts
   go through one shard, one after another. A handler that waits for another
   context of the same process waits forever, since that context's messages
-  queue behind it. A `deliveryStrategy` that gives each context a separate shard avoids it.
-- **Tenant index.** A multitenant context takes what is given in a tenant
-  only once the environment's `tenantIndex` keeps the tenant, and refuses
-  anything else as `TENANT_UNKNOWN`. In memory, `keep()` adds any tenant, and a
-  new process starts with none. Spine never calls `keep()` itself. It asks
-  `contains()` on every request in a tenant and before delivering each
-  message from the Inbox, and reads `page()` to prepare the tables of every
-  tenant when a context is built and on `createStorageStructures()`.
-- **Restart.** Spine keeps no tenant list beyond a fixed
-  `setTenantOptions` list. After a restart, the tenants are whatever the
-  `tenantIndex` lists. The Inbox and the subscriptions are kept in the shared
-  database, each with its tenant inside the message, and are delivered only
-  once the index admits that tenant.
+  queue behind it. With delivery in the database, a `deliveryStrategy` that
+  gives each context a separate shard avoids it; with a delivery server, the
+  other shard also needs another process.
+- **Tenant index.** One per Application, for all its multitenant contexts.
+  `PersistentTenantIndex.create({ storageFactory, group })`, given with
+  `setTenantIndex`, keeps the tenants in a group of their own, so on
+  PostgreSQL they outlast a restart. A multitenant context takes what is
+  given in a tenant only once the index keeps the tenant, and refuses
+  anything else as `TENANT_UNKNOWN`. Spine never calls `keep()` itself. It
+  asks `contains()` on every request in a tenant and before delivering each
+  message from the Inbox.
+- **Restart.** With delivery in the database, the Inbox and the
+  subscriptions are kept in the shared database, each with its tenant inside
+  the message, and are delivered only once the index admits that tenant.
+
+## Worker processes and the delivery server
+
+- **Managed replicas.** `ManagedServerApplication.run(options)` starts a
+  coordinator and `processCount` workers. Each worker runs the same
+  `moduleUrl` and calls `createServer`; the framework marks it with
+  `SPINE_MANAGED_SERVER_CHILD=true`, and closes the Application it builds
+  there once its server stops.
+- **Coordinator.** It passes a command or a query to one ready worker, and a
+  subscription to every ready worker. It replaces a worker that exits.
+- **Subscriptions.** A worker's contexts must keep subscriptions in an
+  `InMemorySubscriptionRegistry`; a worker with any other registry does not
+  start.
+- **Remote delivery.** `RemoteDelivery.connectTo({ endpoint })`, from
+  `@spine-event-engine/delivery-client`, as the `delivery` setting of the
+  environment. A post returns once the delivery server has the message.
+- **One shard at a time.** With a delivery server, each process handles one
+  shard at a time, and keeps it until no message is left there. A handler
+  that waits for a message of another shard needs another process to handle
+  it. With delivery in the database, one process handles all shards at once.
+- **Shard strategy.** Every process that shares the delivery server must use
+  the same `deliveryStrategy`, and it must not change while messages wait.
+- **Delivery server.** `DeliveryServer` from
+  `@spine-event-engine/delivery-server` keeps everything in memory only:
+  messages that wait are lost when it stops. By default it keeps at most
+  10 000 messages and 32 MiB, and refuses more with `RESOURCE_EXHAUSTED`.
 
 ## PostgreSQL
 
 Access Desk keeps its data in PostgreSQL through `@spine-event-engine/storage-postgres`.
 
 - **Shared and tenant databases.** `setOptions({ url })` names the shared
-  database. It keeps every single-tenant context, the subscription registry,
-  the Inbox, and the delivery shards. Each tenant of a multitenant context
+  database. It keeps every single-tenant context, the subscription registry
+  unless a context keeps it in memory, and the Inbox and the delivery shards
+  unless a delivery server keeps them. Each tenant of a multitenant context
   keeps its entities and events in a separate database, which
   `setTenantOptions` or `setTenantResolver` names.
-- **Tenant catalog.** With `setTenantOptions`, the tenants listed are the
-  catalog of the default `tenantIndex`, and `keep()` refuses any other. With
-  `setTenantResolver`, the catalog is empty, so the application must supply a
-  `tenantIndex`.
+- **Tenant databases.** `setTenantOptions` and `setTenantResolver` only say
+  in which database a tenant's data is kept. They do not register tenants:
+  only the `tenantIndex` decides which tenants are accepted.
 - **Connections.** Building the factory opens no connection, and neither does
   creating storage. `checkConnection()` checks the shared database.
   `close()` is async.
-- **Schema.** Spine creates its tables, with primary keys only. The databases
-  must exist already.
+- **Schema.** Spine creates its tables, with their primary keys and the
+  indexes its own records declare. The databases must exist already.
 - **Pools.** One per database, ten connections by default. Spine's pools do not
   listen for `error`, so a dropped idle connection can stop the process. Pools
   Access Desk opens itself listen.
-- **Subscriptions outlast restarts.** One nobody cancels stays until its time
-  runs out.
-- **Inbox.** Commands accepted before a stop are delivered after the restart.
+- **Subscriptions outlast restarts** in the storage-backed registry. One
+  nobody cancels stays until its time runs out.
+- **Inbox.** With delivery in the database, commands accepted before a stop
+  are delivered after the restart.
 
 ## Authentication and browser clients
 
@@ -398,16 +431,14 @@ controls defined in the architecture.
 - `DurableSubscriptionBindings` runs operations on one subscription one at a
   time, and keeps one more waiting. A second activation of an active
   subscription waits instead of being refused; a cancel behind it is refused
-  as `binding-busy`.
+  as `binding-busy`. A subscription opens only for the principal, the actor,
+  and the tenant it was made for.
 - `bindings.activate` receives the trusted context, not the session; only
   `authorize` sees the session's principal. Spine may refuse a
   request after `authorize` without calling the bindings.
 - The bindings' `create`, `activate`, and `cancel` also take
   `reader: ReaderIdentity`, the principal the subscription belongs
   to. Spine refuses another principal's activation or cancellation.
-- Ending a session does not end its streams; Spine stops them only when the
-  session's time runs out. A gateway that ends sessions early cancels their
-  subscriptions itself.
 - Only Spine's cancel effect clears a subscription everywhere it is kept.
   The store receives it only when a browser cancels, or when a subscription
   expires.
@@ -429,14 +460,20 @@ controls defined in the architecture.
   gateway's origin, as through a development proxy.
 - Without `cookies`, a session is a bearer token. `SignedSessions` needs a
   P-256 key. Without a `SignedTokenRevocation`, `logout` answers `expiryOnly`
-  and the token works until it expires. `OpaqueSessions` keeps sessions in
-  process memory.
+  and the token works until it expires. `OpaqueSessions` is created with
+  `await OpaqueSessions.create(...)` and keeps sessions in process memory
+  unless given a `PersistentOpaqueSessionStore`.
+- `PersistentTokenRevocations.create(...)`, given a storage factory, a group,
+  and the tokens' issuer and audience, keeps revoked tokens through the
+  factory. It forgets none by itself: `purgeExpired(cutoff)` deletes those no
+  longer taken.
 - `SignedSessions` accepts both ECDSA forms of a signature, so one token has
   two texts with the same `jti`.
-- `SignedSessions` accepts a token for `clockSkewSeconds` after it expires, but
-  passes `revoke` the token's bare expiry.
+- `SignedSessions` accepts a token for `clockSkewSeconds` after it expires, and
+  passes `revoke` that last moment.
 - `resolve` refuses every token while `isRevoked` fails. `logout` does not call
-  `isRevoked`.
+  `isRevoked`, and stops the session's requests in this process even when
+  `revoke` fails.
 - `postAndSubscribe` subscribes, waits for the server's acknowledgement, then
   posts. Its subscription brings only the events the command causes directly.
   Spine has no call that returns the event itself; `firstUpdateTimeoutMs` with
@@ -472,12 +509,11 @@ decorators from raw TS source; the root `vitest.config.ts` externalizes `dist`
 so handler classes keep the identity the registry registered. Multitenant
 BlackBox: pass `{ tenant }` to `BlackBox.from`.
 
-**Emitting from a third-party context.** `ThirdPartyContext.multitenant(name)`
-emits an event into every context in the process as an external event, with the
-tenant taken from the actor passed to `emittedEvent`. It resolves the event's
-schema through `ServerEnvironment`'s `typeRegistry`, so configure
-`ServerEnvironment.when(EnvironmentType.Local).use({ typeRegistry })` with the
-complete registry before the environment first resolves. The receiving
+**Emitting from a third-party context.** `ThirdPartyContext.multiTenant(name)`,
+added to an Application, emits an event into every context of the Application
+as an external event once the Application is built, with the tenant taken from
+the actor passed to `emittedEvent`. The environment's `typeRegistry` must be
+complete. The receiving
 context's routing reads the tenant from `EventContext.origin`
 (`importContext`). In this snapshot a client subscription did not receive the
 domestic facts that followed from an imported event; assert those through
