@@ -94,8 +94,7 @@ long.
 The application server works only with the organizations registered in
 `accessdesk_server`, and rejects requests for any other. That register is the
 one list of organizations: the server finds the database of a registered
-organization by the organization's identifier, when it first needs it. When
-the server starts, it names the organizations it keeps.
+organization by the organization's identifier, when it first needs it.
 
 #### Subscriptions
 

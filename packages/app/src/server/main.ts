@@ -38,3 +38,15 @@ await ApplicationServer.run(
   },
   import.meta.url,
 );
+
+// The framework marks each worker it starts, and only the coordinator reports.
+if (process.env.SPINE_MANAGED_SERVER_CHILD !== "true") {
+  const { host } = settings.listening;
+  console.log(`Access Desk application server: ${Settings.urlOf(settings.listening)}`);
+  if (!Settings.onlyThisMachine(host)) {
+    console.warn(
+      `The application server listens on ${host}, so other machines can reach it. ` +
+        "Make sure only the gateway can reach it.",
+    );
+  }
+}
