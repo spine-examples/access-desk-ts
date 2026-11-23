@@ -96,8 +96,7 @@ services:
 
   # The delivery server, which keeps the Inbox that the workers of the
   # application server share, in memory only, and gives each shard to one
-  # worker at a time. It is not protected, so it is not published, and only
-  # the application server reaches it, over a network they share alone.
+  # worker at a time. It is not published: only the server calls it.
   delivery:
     image: access-desk:local
     command: ["dist/src/delivery/main.js"]
@@ -140,10 +139,8 @@ services:
       ACCESS_DESK_DATABASE_PORT: ${ACCESS_DESK_DATABASE_PORT:?Set ACCESS_DESK_DATABASE_PORT in .env.}
       ACCESS_DESK_DATABASE_USER: ${ACCESS_DESK_DATABASE_USER:?Set ACCESS_DESK_DATABASE_USER in .env.}
       ACCESS_DESK_DATABASE_PASSWORD: ${ACCESS_DESK_DATABASE_PASSWORD:?Set ACCESS_DESK_DATABASE_PASSWORD in .env.}
-    # Three CPUs for the four workers of `WORKERS` in
-    # `packages/app/src/server/delivery-strategy.ts`: a worker spends much of
-    # its time waiting for PostgreSQL and the delivery server, so four of them
-    # fit into three CPUs. The coordinator needs little.
+    # Three CPUs for four workers: a worker spends much of its time waiting
+    # for PostgreSQL and the delivery server. The coordinator needs little.
     cpus: 3
     depends_on:
       postgres:

@@ -61,8 +61,7 @@ packages/
 - **`app`** — `@access-desk/app`, `mode: "application"`, composes **both** context
   models into the complete application `TypeRegistry`. It runs as three servers:
   `src/server/` is the application server, which hosts both contexts in
-  worker processes behind a coordinator, with the shards of their messages in
-  `delivery-strategy.ts`;
+  worker processes behind a coordinator;
   `src/delivery/` is the delivery server, which keeps the messages until a
   worker handles them;
   `src/gateway/` is the browser-facing gateway
