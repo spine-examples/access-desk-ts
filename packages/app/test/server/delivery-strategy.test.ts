@@ -28,17 +28,17 @@ import {
 } from "./given/receivers.js";
 
 describe("The shards of Access Desk should", () => {
-  it("give Identity and Identity memberships one shard each, and Resources and Resources views three each", () => {
-    expect(STRATEGY.shardCount).toBe(8);
+  it("give Identity and Identity memberships one shard each, and Resources and Resources views four each", () => {
+    expect(STRATEGY.shardCount).toBe(10);
     expect(
       placed([...IDENTITY, ...IDENTITY_MEMBERSHIPS, ...RESOURCES, ...RESOURCES_VIEWS]).every(
-        (shard) => shard.ofTotal === 8,
+        (shard) => shard.ofTotal === 10,
       ),
     ).toBe(true);
     expect(shardsOf(IDENTITY).size).toBe(1);
     expect(shardsOf(IDENTITY_MEMBERSHIPS).size).toBe(1);
-    expect(shardsOf(RESOURCES).size).toBe(3);
-    expect(shardsOf(RESOURCES_VIEWS).size).toBe(3);
+    expect(shardsOf(RESOURCES).size).toBe(4);
+    expect(shardsOf(RESOURCES_VIEWS).size).toBe(4);
   });
 
   it("keep every range apart from the others", () => {

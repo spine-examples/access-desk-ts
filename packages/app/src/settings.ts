@@ -57,7 +57,7 @@ export interface DatabaseServer {
 export interface ServerSettings {
   /** Where the application server listens. */
   readonly listening: Listening;
-  /** The address of the delivery server, which keeps the messages waiting for the workers. */
+  /** The address of the delivery server, which keeps the Inbox the workers share. */
   readonly deliveryUrl: string;
   /** The PostgreSQL server the application server keeps its data on. */
   readonly database: DatabaseServer;

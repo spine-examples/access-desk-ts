@@ -40,9 +40,11 @@ export interface ApplicationServerSetup {
  *
  * 1. The coordinator listens where the gateway reaches the application
  *    server. It passes each command and query to one worker, and each
- *    subscription to every worker.
- * 2. Each worker is a separate process with both contexts. The coordinator
- *    starts the workers, and starts a worker again if it stops.
+ *    subscription to every worker, since any worker may handle what a
+ *    subscription watches.
+ * 2. Each worker is a separate process with both bounded contexts. It takes
+ *    their messages from the delivery server, one shard at a time. The
+ *    coordinator starts the workers, and starts a worker again if it stops.
  *
  * The same module runs as the coordinator and as every worker.
  */

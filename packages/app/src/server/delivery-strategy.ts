@@ -32,18 +32,21 @@ import { ResourceCatalogItemSchema } from "@access-desk/resources-model/generate
 /**
  * The number of workers of the application server.
  *
- * A worker takes one shard at a time. While Identity adds a person to an
- * organization, its worker waits until the organization confirms, and another
- * worker handles the confirmation, so there must be at least two. Three
- * workers and the delivery server suit four CPUs.
- * The Resources and Resources views ranges have a shard for each worker.
+ * It is the best for a machine with four dedicated CPUs: three for the
+ * application server, and one for the delivery server. A worker spends much
+ * of its time waiting for PostgreSQL and the delivery server, so four workers
+ * fit into three CPUs, and a fifth adds nothing.
+ *
+ * There must be at least two workers. While the Identity bounded context adds
+ * a person to an organization, its worker waits until the organization
+ * confirms, and only another worker can handle the confirmation.
  */
-export const WORKERS = 3;
+export const WORKERS = 4;
 
-/** The part every type URL of an Identity receiver contains. */
+/** The part every type URL of a receiver of the Identity bounded context contains. */
 const IDENTITY_TYPE_URL_PART = "/accessdesk.identity.";
 
-/** The type URL of Identity's membership of an email address. */
+/** The type URL of the membership of an email address in the Identity bounded context. */
 const MEMBERSHIP_TYPE_URL = TypeUrls.derive(MembershipSchema);
 
 /** The type URLs of the views of the Resources bounded context. */
@@ -88,30 +91,31 @@ class ShardRange {
 }
 
 /**
- * Identity's people, the accounts they sign in with, their email addresses,
- * and Identity's views.
+ * The people of the Identity bounded context, the accounts they sign in with,
+ * their email addresses, and the views of the context.
  *
- * People sign in here, so nothing in this range waits for another shard.
+ * People sign in here, so a sign-in does not depend on the work of the
+ * organizations.
  */
 const IDENTITY = new ShardRange(0, 1);
 
 /**
- * Identity's memberships of email addresses.
+ * The memberships of email addresses in the Identity bounded context.
  *
- * Adding a person to an organization holds the shard until the organization
- * confirms, which can take seconds. A range of its own keeps sign-ins from
- * waiting behind it. With one shard, at most one worker waits at a time, and
- * the others are free to handle the organization's confirmation.
+ * Adding a person waits for the organization to confirm, so the memberships
+ * are kept apart and hold up no other receiver while they wait. With one
+ * shard, at most one worker waits at a time, and the others are free to
+ * handle the confirmation.
  */
 const IDENTITY_MEMBERSHIPS = new ShardRange(IDENTITY.next, 1);
 
 /**
  * The organizations of the Resources bounded context, with their members,
- * resources, access requests, and the access people hold.
+ * resources, access requests, and the access people hold: the aggregates and
+ * processes of the context.
  *
- * Nearly all the work of the application is here and in Resources views.
- * Each of these two ranges has a shard for every worker, so all workers can
- * be busy whichever range has messages at the moment.
+ * The range has a shard for each worker, as Resources views do. Fewer shards
+ * would leave workers idle, and more only cost CPU.
  */
 const RESOURCES = new ShardRange(IDENTITY_MEMBERSHIPS.next, WORKERS);
 
@@ -119,7 +123,7 @@ const RESOURCES = new ShardRange(IDENTITY_MEMBERSHIPS.next, WORKERS);
  * The views of the Resources bounded context, with the audit trail.
  *
  * In a range of their own, the views catch up without holding up the
- * organizations.
+ * organizations. The range has a shard for each worker, as Resources does.
  */
 const RESOURCES_VIEWS = new ShardRange(RESOURCES.next, WORKERS);
 
@@ -129,26 +133,22 @@ const SHARD_COUNT = RESOURCES_VIEWS.next;
 /**
  * The shards the messages of Access Desk are delivered in.
  *
- * The messages of one shard are delivered one after another, and a worker
- * takes one shard at a time. The receivers are grouped by how their work goes,
- * and each group has its own range of shards:
+ * A shard is a group of receivers, such as aggregates and views, whose
+ * messages are delivered one after another by one worker at a time. A receiver
+ * always stays in the same shard, so it gets its messages in order. The
+ * receivers are grouped into four ranges:
  *
- * 1. Identity: Identity's people, their accounts, email addresses, and
- *    views; one shard.
- * 2. Identity memberships: Identity's memberships of email addresses; one
- *    shard.
+ * 1. Identity: the people of the Identity bounded context, their accounts,
+ *    email addresses, and views; one shard.
+ * 2. Identity memberships: the memberships of email addresses; one shard.
  * 3. Resources: the organizations of the Resources bounded context, with
- *    their resources, access requests, and the access people hold; three
- *    shards.
+ *    their resources, access requests, and the access people hold; a shard
+ *    for each of the `WORKERS`.
  * 4. Resources views: the views of the Resources bounded context, with the
- *    audit trail; three shards.
+ *    audit trail; a shard for each of the `WORKERS`.
  *
- * The last two ranges have a shard for each of the `WORKERS` of the
- * application server.
- *
- * Within a range, a receiver always goes to the same shard. Every process
- * that shares the delivery server must split the messages the same way, and
- * the split must not change while messages wait.
+ * Every process that shares the delivery server must split the messages the
+ * same way, and the split must not change while messages wait.
  */
 export const AccessDeskDeliveryStrategy: DeliveryStrategy = {
   shardCount: SHARD_COUNT,
