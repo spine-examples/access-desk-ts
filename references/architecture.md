@@ -34,10 +34,10 @@ The system has two bounded contexts:
 | Identity        | People, the accounts they sign in with, their email addresses, and the organization each belongs to                                                                                    | Global/single-tenant |
 | Resources       | Organizations, their members, resources, ordered access levels, resource managers, request policy, requests, approval decisions, grants, extensions, revocation, and audit projections | Organization-scoped  |
 
-The application runs as three programs. The application server hosts the
+The application runs as three servers. The application server hosts the
 contexts, as a coordinator and its workers: each worker is a separate process
 with both contexts. The delivery server keeps the messages for the contexts
-until a worker handles them. The gateway is a separate program that reaches
+until a worker handles them. The gateway is a separate server that reaches
 the application server over the network, and it is the only one a browser
 talks to.
 

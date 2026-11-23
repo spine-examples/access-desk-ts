@@ -145,21 +145,21 @@ describe("The settings should", () => {
     }
   });
 
-  it("reach a program that listens on every address at the loopback address", () => {
+  it("reach a server that listens on every address at the loopback address", () => {
     expect(Settings.urlOf({ host: "0.0.0.0", port: 8484 })).toBe("http://127.0.0.1:8484");
     expect(Settings.urlOf({ host: "::", port: 8484 })).toBe("http://[::1]:8484");
-    expect(
-      Settings.ofServer({ ...server, ACCESS_DESK_DELIVERY_HOST: "0.0.0.0" }).deliveryUrl,
-    ).toBe("http://127.0.0.1:8484");
+    expect(Settings.ofServer({ ...server, ACCESS_DESK_DELIVERY_HOST: "0.0.0.0" }).deliveryUrl).toBe(
+      "http://127.0.0.1:8484",
+    );
   });
 
-  it("reach a program at the address it listens on, with an IPv6 address in brackets", () => {
+  it("reach a server at the address it listens on, with an IPv6 address in brackets", () => {
     expect(Settings.urlOf({ host: "delivery", port: 8484 })).toBe("http://delivery:8484");
     expect(Settings.urlOf({ host: "10.0.0.5", port: 8090 })).toBe("http://10.0.0.5:8090");
     expect(Settings.urlOf({ host: "fd00::5", port: 8090 })).toBe("http://[fd00::5]:8090");
-    expect(
-      Settings.ofServer({ ...server, ACCESS_DESK_DELIVERY_HOST: "::1" }).deliveryUrl,
-    ).toBe("http://[::1]:8484");
+    expect(Settings.ofServer({ ...server, ACCESS_DESK_DELIVERY_HOST: "::1" }).deliveryUrl).toBe(
+      "http://[::1]:8484",
+    );
   });
 
   it("refuse a port that is not one", () => {

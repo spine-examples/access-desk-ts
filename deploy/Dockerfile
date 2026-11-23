@@ -44,7 +44,7 @@ COPY . .
 RUN pnpm -r run build
 
 # Every package built, run by Node as an unprivileged user. Each container
-# names the program it runs: the delivery server, the application server, or
+# names the server it runs: the delivery server, the application server, or
 # the gateway.
 FROM workspace AS application
 WORKDIR /workspace/packages/app

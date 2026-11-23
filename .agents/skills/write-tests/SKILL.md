@@ -55,8 +55,7 @@ state. Reuse these instead of re-implementing them per test:
 
 - `@access-desk/testing` — the PostgreSQL storage of a test from
   `@access-desk/testing/storage`, such as
-  `TestStorages.multitenant(typeRegistry, [tenant()])`, opened as the
-  `storageFactory` of `BlackBox.from`.
+  `TestStorages.multitenant(typeRegistry, [tenant()])`.
 - `test/given/event-recording.ts`, one copy in each context's `server` package —
   `eventRecording(actorContext)` returns
   `{ recordEvents, expectRejection }`. Bind it once per context with that

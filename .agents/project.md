@@ -59,7 +59,7 @@ packages/
   The factory's module imports the generated `spine-bootstrap.js` first, so the
   context finds its handlers.
 - **`app`** — `@access-desk/app`, `mode: "application"`, composes **both** context
-  models into the complete application `TypeRegistry`. It runs as three programs:
+  models into the complete application `TypeRegistry`. It runs as three servers:
   `src/server/` is the application server, which hosts both contexts in
   worker processes behind a coordinator, with the shards of their messages in
   `delivery-strategy.ts`;

@@ -20,7 +20,7 @@ const LOOPBACK = new BlockList();
 LOOPBACK.addSubnet("127.0.0.0", 8, "ipv4");
 LOOPBACK.addAddress("::1", "ipv6");
 
-/** The addresses that stand for every address of the machine a program listens on. */
+/** The addresses that stand for every address of the machine a server listens on. */
 const EVERY_ADDRESS = new BlockList();
 EVERY_ADDRESS.addAddress("0.0.0.0", "ipv4");
 EVERY_ADDRESS.addAddress("::", "ipv6");
@@ -231,7 +231,7 @@ export const Settings = {
   /**
    * Reads the delivery server's settings from the environment.
    *
-   * @param environment The environment the program runs in.
+   * @param environment The environment the server runs in.
    * @returns The settings of the delivery server.
    */
   ofDelivery(environment: NodeJS.ProcessEnv): DeliverySettings {
@@ -261,15 +261,15 @@ export const Settings = {
   },
 
   /**
-   * Builds the HTTP address at which a program reaches another one where it
+   * Builds the HTTP address at which one server reaches another where it
    * listens.
    *
-   * A program that listens on every address of its machine, on `0.0.0.0` or
+   * A server that listens on every address of its machine, on `0.0.0.0` or
    * `::`, is reached at its machine's loopback address, as the address it
    * listens on names no machine to connect to. An IPv6 address is put in
    * brackets.
    *
-   * @param listening Where the program listens.
+   * @param listening Where the server listens.
    * @returns The address to reach it at, such as `http://127.0.0.1:8090`.
    */
   urlOf(listening: Listening): string {

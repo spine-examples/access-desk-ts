@@ -13,7 +13,7 @@
  */
 
 /**
- * Access Desk as three programs: the application server, which hosts the
+ * Access Desk as three servers: the application server, which hosts the
  * contexts, the delivery server, which keeps their messages until the
  * application server handles them, and the gateway, the only one a browser
  * talks to.

@@ -1,6 +1,6 @@
 # Access Desk application
 
-The application runs as three programs.
+The application runs as three servers.
 
 - **The application server** hosts the Identity and Resources bounded contexts
   It knows nothing of browsers, sessions, or identity providers.
@@ -153,7 +153,7 @@ layout as the application, and drops them when it finishes. See
 1. Fill in `.env`, as [Set it up](#set-it-up) tells. The session key comes
    from `pnpm --dir packages/app run session-key`.
 2. Start PostgreSQL, as [The database](#the-database) tells.
-3. Build once, then start each program in a separate terminal, the delivery
+3. Build once, then start each server in a separate terminal, the delivery
    server first:
 
    ```sh
