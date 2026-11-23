@@ -22,9 +22,6 @@ import { Storage } from "../storage.js";
  *
  * It hosts the Identity and Resources contexts, in a coordinator and its
  * workers, which take the messages for the contexts from the delivery server.
- * It knows nothing of browsers, sessions, or identity providers.
- *
- * The coordinator runs this module, and so does each worker it starts.
  */
 
 const settings = Settings.ofServer(process.env);

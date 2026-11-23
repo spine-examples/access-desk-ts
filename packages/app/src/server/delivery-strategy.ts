@@ -36,10 +36,6 @@ import { ResourceCatalogItemSchema } from "@access-desk/resources-model/generate
  * application server, and one for the delivery server. A worker spends much
  * of its time waiting for PostgreSQL and the delivery server, so four workers
  * fit into three CPUs, and a fifth adds nothing.
- *
- * There must be at least two workers. While the Identity bounded context adds
- * a person to an organization, its worker waits until the organization
- * confirms, and only another worker can handle the confirmation.
  */
 export const WORKERS = 4;
 

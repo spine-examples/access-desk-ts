@@ -140,10 +140,6 @@ export function routing(origins: string[], sessions: SessionResolver): Route {
  * Reads the session a request carries, while it is valid.
  *
  * A session that does not name the person's email address is none.
- *
- * @param sessions The sessions of the people who have signed in.
- * @param request The request.
- * @returns The session, or `undefined` when the request carries no valid one.
  */
 async function sessionOf(
   sessions: SessionResolver,

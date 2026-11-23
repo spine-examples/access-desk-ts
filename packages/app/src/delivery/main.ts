@@ -22,8 +22,7 @@ import { Settings } from "../settings.js";
  * It keeps the Inbox that all workers of the application server share: the
  * messages for the bounded contexts wait there until a worker handles them.
  * It also gives each shard to one worker at a time. It keeps everything in
- * memory only, so a restart loses the messages that wait, while everything
- * already handled stays in PostgreSQL.
+ * memory only, so a restart loses the messages that wait.
  */
 
 const settings = Settings.ofDelivery(process.env);
