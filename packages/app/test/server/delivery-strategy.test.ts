@@ -14,7 +14,10 @@
 
 import { TypeUrls } from "@spine-event-engine/core";
 import { describe, expect, it } from "vitest";
-import { OrganizationSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
+import {
+  OrganizationSchema,
+  OrganizationViewSchema,
+} from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
 
 import {
   IDENTITY,
@@ -49,11 +52,14 @@ describe("The shards of Access Desk should", () => {
     expect(Math.max(...all)).toBe(STRATEGY.shardCount - 1);
   });
 
-  it("put a receiver in the same shard each time", () => {
-    const id = receiverId("acme");
-    const type = TypeUrls.derive(OrganizationSchema);
+  it("put a receiver in the same shard in every process", () => {
+    const organization = TypeUrls.derive(OrganizationSchema);
+    const view = TypeUrls.derive(OrganizationViewSchema);
 
-    const first = STRATEGY.shardFor(id, type);
-    expect(STRATEGY.shardFor(id, type).key()).toBe(first.key());
+    expect(STRATEGY.shardFor(receiverId("acme"), organization).index).toBe(4);
+    expect(STRATEGY.shardFor(receiverId("globex"), organization).index).toBe(5);
+    expect(STRATEGY.shardFor(receiverId("umbrella"), organization).index).toBe(2);
+    expect(STRATEGY.shardFor(receiverId("acme"), view).index).toBe(7);
+    expect(STRATEGY.shardFor(receiverId("globex"), view).index).toBe(8);
   });
 });
