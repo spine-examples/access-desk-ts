@@ -56,11 +56,16 @@ describe("The application server should", () => {
       () => ServerRequests.readById(identity, MembershipViewSchema, MembershipIdSchema, noah),
       (view) => view?.person !== undefined,
     );
-    const organization = await ServerRequests.readById(
-      connection.in(acme).onBehalfOf("access-desk"),
-      OrganizationViewSchema,
-      OrganizationIdSchema,
-      acme,
+    const person = membership?.person?.uuid;
+    const organization = await eventually(
+      () =>
+        ServerRequests.readById(
+          connection.in(acme).onBehalfOf("access-desk"),
+          OrganizationViewSchema,
+          OrganizationIdSchema,
+          acme,
+        ),
+      (view) => view?.member.some((member) => member.person?.uuid === person) === true,
     );
     expect(membership?.person).toBeDefined();
     expect(organization?.member.map((member) => member.person?.uuid)).toEqual([

@@ -45,6 +45,48 @@ export async function stopApplicationServer(): Promise<void> {
   delete process.env.ACCESS_DESK_TEST_SERVER_SETUP;
 }
 
+/** How many ports the coordinator tries before the test gives up. */
+const PORT_ATTEMPTS = 5;
+
+/**
+ * Starts an application server with two workers on a port nothing listens on.
+ *
+ * The workers must know the coordinator's port before they start, so the port
+ * is found in advance. Another process may take it before the coordinator
+ * listens there, and then the server is started again on another port.
+ */
+async function startedOnFreePort(
+  app: AppModule,
+  deliveryUrl: string,
+  databases: Setup["databases"],
+): Promise<{ server: Awaited<ReturnType<AppModule["ApplicationServer"]["start"]>>; port: number }> {
+  for (let attempt = 1; ; attempt++) {
+    const port = await freePort();
+    const setup: Setup = {
+      listening: { host: "127.0.0.1", port },
+      workers: 2,
+      deliveryUrl,
+      databases,
+    };
+    // The workers take the setup of the application server from here.
+    process.env.ACCESS_DESK_TEST_SERVER_SETUP = JSON.stringify(setup);
+    try {
+      return { server: await app.ApplicationServer.start(setup, WORKER), port };
+    } catch (error) {
+      if (attempt >= PORT_ATTEMPTS || !addressInUse(error)) {
+        throw error;
+      }
+    }
+  }
+}
+
+/** Whether an error says that the address to listen on is taken. */
+function addressInUse(error: unknown): boolean {
+  return (
+    typeof error === "object" && error !== null && "code" in error && error.code === "EADDRINUSE"
+  );
+}
+
 /** Finds a port nothing listens on, for the coordinator, which its workers must know in advance. */
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -72,16 +114,7 @@ export async function givenApplicationServer(): Promise<Connection> {
   started.push(() => storage.drop());
   const delivery = await new DeliveryServer({ host: "127.0.0.1", port: 0 }).start();
   started.push(() => delivery.close());
-  const port = await freePort();
-  const setup: Setup = {
-    listening: { host: "127.0.0.1", port },
-    workers: 2,
-    deliveryUrl: delivery.baseUrl,
-    databases: storage.settings,
-  };
-  // The workers take the setup of the application server from here.
-  process.env.ACCESS_DESK_TEST_SERVER_SETUP = JSON.stringify(setup);
-  const server = await app.ApplicationServer.start(setup, WORKER);
+  const { server, port } = await startedOnFreePort(app, delivery.baseUrl, storage.settings);
   started.push(() => server.close());
   const connection = new ServerConnection(() => `http://127.0.0.1:${port.toString()}`);
   started.push(() => connection.close());
