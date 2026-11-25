@@ -117,7 +117,9 @@ export const Session = {
      * Requests session revocation and clears the browser tab's session.
      *
      * What should close closes first, while the session still works, so the
-     * subscriptions are canceled on the application server too.
+     * subscriptions are canceled on the application server too. A close that
+     * fails does not hold up signing out: ending the session stops every
+     * subscription opened under it anyway.
      */
     const signOut = useCallback(async () => {
       if (state.kind === "signedIn") {
