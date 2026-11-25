@@ -367,7 +367,7 @@ block (Spine leaves `EnumValueOptions` free).
 - **One shard at a time.** With a delivery server, each process handles one
   shard at a time, and keeps it until no message is left there. A handler
   that waits for a message of another shard needs another process to handle
-  it. With delivery in the database, one process handles all shards at once.
+  it. With local delivery, one process handles all shards at once.
 - **Shard strategy.** Every process that shares the delivery server must use
   the same `deliveryStrategy`, and it must not change while messages wait.
 - **Delivery server.** `DeliveryServer` from
