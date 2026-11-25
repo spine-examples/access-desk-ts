@@ -13,10 +13,12 @@
  */
 
 import { isIP } from "node:net";
-import { StringifierRegistry } from "@spine-event-engine/core";
+import { create } from "@bufbuild/protobuf";
+import { StringifierRegistry, Validate } from "@spine-event-engine/core";
 import type { TenantId } from "@spine-event-engine/proto";
 import type { StorageFactory } from "@spine-event-engine/storage";
 import { PostgresStorageFactory } from "@spine-event-engine/storage-postgres";
+import { OrganizationIdSchema } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { typeRegistry } from "../generated/model-registry.js";
 import type { DatabaseServer } from "./settings.js";
 
@@ -42,12 +44,12 @@ const ORGANIZATION_DATABASE = `accessdesk_resources_${ORGANIZATION}`;
  */
 const GATEWAY_DATABASE = "accessdesk_gateway";
 
-/** What an organization's identifier may be made of, to go into a database name. */
-const IDENTIFIER = /^[A-Za-z0-9_-]+$/;
-
 /**
  * The longest name of a database, in characters. PostgreSQL cuts a longer
  * name short, so two databases could end up with one name.
+ *
+ * The model limits an organization's identifier to 42 characters, so that
+ * `accessdesk_resources_<organization>` stays within this length.
  */
 const DATABASE_NAME_LENGTH = 63;
 
@@ -101,14 +103,19 @@ export const Storage = {
    * @param databases The databases of the application server.
    * @param organization The organization's identifier.
    * @returns The address of the database, with the account to sign in to it.
-   * @throws Error when the identifier is not of letters, digits, "-", and "_",
-   *   or when the name it makes is too long for PostgreSQL.
+   * @throws Error when the model refuses the identifier, or when the name it
+   *   makes is too long for PostgreSQL.
    */
   organizationDatabase(databases: ServerDatabases, organization: string): string {
-    if (!IDENTIFIER.test(organization)) {
+    const checked = Validate.message(
+      OrganizationIdSchema,
+      create(OrganizationIdSchema, { value: organization }),
+      typeRegistry,
+    );
+    if (!checked.valid) {
+      const rules = checked.violations.map((violation) => violation.message?.withPlaceholders);
       throw new Error(
-        `An organization's identifier must be of letters, digits, "-", and "_", ` +
-          `and is "${organization}".`,
+        `The organization identifier "${organization}" is refused. ${rules.join(" ")}`,
       );
     }
     const database = databases.organizationDatabase.replaceAll(ORGANIZATION, organization);

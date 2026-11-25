@@ -76,7 +76,7 @@ export function sessionRoutes(
             view === undefined || session.organization === undefined
               ? null
               : {
-                  id: session.organization.uuid,
+                  id: session.organization.value,
                   name: view.name,
                   role: member === undefined ? null : OrganizationRole[member.role].toLowerCase(),
                 },

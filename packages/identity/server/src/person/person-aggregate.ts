@@ -77,7 +77,7 @@ export class PersonAggregate extends Aggregate<PersonId, typeof PersonSchema> {
     if (
       this.state.emailAddress === undefined ||
       organization === undefined ||
-      (current !== undefined && current.uuid !== organization.uuid)
+      (current !== undefined && current.value !== organization.value)
     ) {
       throw new Error("A registered person joins one organization only.");
     }

@@ -135,7 +135,7 @@ export async function givenOrganization(
   const inOrganization = connection.in(organization).onBehalfOf("access-desk");
   await inOrganization.post(
     CreateOrganizationSchema,
-    create(CreateOrganizationSchema, { id: organization, name: organization.uuid }),
+    create(CreateOrganizationSchema, { id: organization, name: organization.value }),
   );
   await eventually(
     () =>

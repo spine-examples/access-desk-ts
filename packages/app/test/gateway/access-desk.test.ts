@@ -49,7 +49,7 @@ beforeEach(() => {
 
 const person = create(PersonIdSchema, { uuid: "person-1" });
 const email = create(EmailAddressSchema, { value: "maya@example.com" });
-const organization = create(OrganizationIdSchema, { uuid: "acme" });
+const organization = create(OrganizationIdSchema, { value: "acme" });
 const account = create(ExternalIdentityIdSchema, {
   provider: IdentityProvider.GOOGLE,
   subject: "google-1",
@@ -158,7 +158,7 @@ describe("AccessDesk should", () => {
 
     const signed = await desk.signIn({ id: account, email, name: "Maya" });
 
-    expect(signed?.organization?.uuid).toBe("acme");
+    expect(signed?.organization?.value).toBe("acme");
     expect(reads.readById).toHaveBeenCalledTimes(2);
   });
 
@@ -179,7 +179,7 @@ describe("AccessDesk should", () => {
 
     const signed = await desk.signIn({ id: account, email, name: "Maya" });
 
-    expect(signed).toMatchObject({ name: "Maya", organization: { uuid: "acme" } });
+    expect(signed).toMatchObject({ name: "Maya", organization: { value: "acme" } });
     expect(reads.readById).toHaveBeenCalledTimes(3);
   });
 
@@ -204,7 +204,7 @@ describe("AccessDesk should", () => {
       { provider: "google", subject: "google-1" },
       { provider: "google", subject: "google-2" },
     ]);
-    expect(profile.organization?.uuid).toBe("acme");
+    expect(profile.organization?.value).toBe("acme");
     expect(reads.readById).toHaveBeenCalledTimes(1);
   });
 

@@ -79,7 +79,7 @@ export const SpineClient = {
     organization: string,
   ): ReturnType<ReturnType<typeof OrganizationViewQuery.create>["build"]> {
     return OrganizationViewQuery.create()
-      .byId(create(OrganizationIdSchema, { uuid: organization }))
+      .byId(create(OrganizationIdSchema, { value: organization }))
       .build();
   },
 };

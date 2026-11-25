@@ -159,6 +159,6 @@ async function sessionOf(
         organization:
           organization === undefined
             ? undefined
-            : create(OrganizationIdSchema, { uuid: organization }),
+            : create(OrganizationIdSchema, { value: organization }),
       };
 }

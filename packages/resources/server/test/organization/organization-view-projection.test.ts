@@ -40,7 +40,7 @@ describe("OrganizationViewProjection should", () => {
       expect((await createOrganization(scope, "Acme")).kind).toBe("ok");
 
       const [view] = await awaitOrganizationView(box, scope, (v) => v.name === "Acme");
-      expect(view?.id?.uuid).toBe(organizationId);
+      expect(view?.id?.value).toBe(organizationId);
       expect(view?.name).toBe("Acme");
       expect(view?.member).toEqual([]);
       expect(view?.resource).toEqual([]);

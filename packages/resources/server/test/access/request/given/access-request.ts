@@ -79,7 +79,7 @@ export async function seed(
   await awaitOrganizationView(
     box,
     scope,
-    (view) => view.id?.uuid === organizationId && view.member.length >= members.length,
+    (view) => view.id?.value === organizationId && view.member.length >= members.length,
   );
 }
 

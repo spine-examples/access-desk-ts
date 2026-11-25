@@ -84,7 +84,7 @@ describe("Gateway route construction should", () => {
       email: { value: "maya@example.com" },
       name: "Maya Chen",
     });
-    expect(session?.organization?.uuid).toBe("acme");
+    expect(session?.organization?.value).toBe("acme");
   });
 
   it("read a session of a person in no organization", async () => {

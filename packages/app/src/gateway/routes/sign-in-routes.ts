@@ -124,7 +124,7 @@ export async function signInRoutes(
                       name: person.name,
                       ...(person.organization === undefined
                         ? {}
-                        : { organization: person.organization.uuid }),
+                        : { organization: person.organization.value }),
                     },
                   },
                 };

@@ -28,7 +28,7 @@ option (type_url_prefix) = "type.accessdesk";
 message CreateOrganization {
 
     // The identifier of the organization to create.
-    accessdesk.identity.OrganizationId id = 1;
+    accessdesk.identity.OrganizationId id = 1 [(validate) = true];
 
     // The human-readable organization name, unique across organizations and
     // compared case-insensitively.
@@ -39,7 +39,7 @@ message CreateOrganization {
 message AddOrganizationMember {
 
     // The organization whose membership changes.
-    accessdesk.identity.OrganizationId organization_id = 1;
+    accessdesk.identity.OrganizationId organization_id = 1 [(validate) = true];
 
     // The person to add as a member.
     accessdesk.identity.PersonId person = 2 [(required) = true];
@@ -58,7 +58,7 @@ message AddOrganizationMember {
 message AddResource {
 
     // The organization the resource belongs to.
-    accessdesk.identity.OrganizationId organization_id = 1;
+    accessdesk.identity.OrganizationId organization_id = 1 [(validate) = true];
 
     // The resource to add.
     accessdesk.resources.ResourceId resource_id = 2 [(required) = true];

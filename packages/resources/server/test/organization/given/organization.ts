@@ -33,7 +33,7 @@ import { organizationId, readAll } from "../../given/resources-context.js";
 export function createOrganization(scope: BlackBoxScope, name = "Acme") {
   return scope.post(
     CreateOrganizationSchema,
-    create(CreateOrganizationSchema, { id: { uuid: organizationId }, name }),
+    create(CreateOrganizationSchema, { id: { value: organizationId }, name }),
   );
 }
 
@@ -47,7 +47,7 @@ export function addOrganizationMember(
   return scope.post(
     AddOrganizationMemberSchema,
     create(AddOrganizationMemberSchema, {
-      organizationId: { uuid: organizationId },
+      organizationId: { value: organizationId },
       person: { uuid: person },
       emailAddress: { value: `${person}@acme.example` },
       role,
@@ -61,7 +61,7 @@ export function addResource(scope: BlackBoxScope, resource: string, name: string
   return scope.post(
     AddResourceSchema,
     create(AddResourceSchema, {
-      organizationId: { uuid: organizationId },
+      organizationId: { value: organizationId },
       resourceId: { uuid: resource },
       name,
     }),

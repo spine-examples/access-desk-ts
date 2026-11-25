@@ -105,7 +105,7 @@ describe("ResourceRegistrationProcessManager should", () => {
       try {
         expect((await registerResource(scope, "payroll")).kind).toBe("ok");
         expect(await added.waitFor(box)).toMatchObject({
-          organizationId: { uuid: organizationId },
+          organizationId: { value: organizationId },
           resourceId: { uuid: "payroll" },
           name: "payroll",
         });

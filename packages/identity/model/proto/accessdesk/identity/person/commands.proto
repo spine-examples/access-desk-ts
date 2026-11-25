@@ -68,5 +68,5 @@ message JoinOrganization {
     accessdesk.identity.MembershipId membership = 2 [(required) = true];
 
     // The organization the person joins.
-    accessdesk.identity.OrganizationId organization = 3 [(required) = true];
+    accessdesk.identity.OrganizationId organization = 3 [(required) = true, (validate) = true];
 }

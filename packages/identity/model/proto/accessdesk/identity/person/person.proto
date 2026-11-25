@@ -40,7 +40,7 @@ message Person {
     repeated accessdesk.identity.ExternalIdentityId account = 4;
 
     // The organization the person belongs to, once they joined one.
-    accessdesk.identity.OrganizationId organization = 5;
+    accessdesk.identity.OrganizationId organization = 5 [(validate) = true];
 }
 
 // A person with every account they sign in with and the organization they
@@ -62,5 +62,5 @@ message PersonView {
     repeated accessdesk.identity.ExternalIdentityId account = 4;
 
     // The organization the person belongs to, once they belong to one.
-    accessdesk.identity.OrganizationId organization = 5;
+    accessdesk.identity.OrganizationId organization = 5 [(validate) = true];
 }

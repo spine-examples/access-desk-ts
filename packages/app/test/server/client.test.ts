@@ -48,7 +48,7 @@ function connectionTo(address: () => string) {
 }
 
 function organizationId(uuid: string) {
-  return create(OrganizationIdSchema, { uuid });
+  return create(OrganizationIdSchema, { value: uuid });
 }
 
 /**
@@ -60,7 +60,7 @@ function organizationId(uuid: string) {
 function creationShown(organization: string, name: string = organization) {
   return {
     command: CreateOrganizationSchema,
-    message: create(CreateOrganizationSchema, { id: { uuid: organization }, name }),
+    message: create(CreateOrganizationSchema, { id: { value: organization }, name }),
     view: OrganizationViewSchema,
     idSchema: OrganizationIdSchema,
     id: organizationId(organization),
@@ -71,16 +71,16 @@ function creationShown(organization: string, name: string = organization) {
 describe("ServerConnection should", () => {
   it("give the same client for an organization each time, and another for another", () => {
     const connection = connectionTo(() => "http://127.0.0.1:1");
-    const acme = create(OrganizationIdSchema, { uuid: "acme" });
-    const sameAcme = create(OrganizationIdSchema, { uuid: "acme" });
-    const globex = create(OrganizationIdSchema, { uuid: "globex" });
+    const acme = create(OrganizationIdSchema, { value: "acme" });
+    const sameAcme = create(OrganizationIdSchema, { value: "acme" });
+    const globex = create(OrganizationIdSchema, { value: "globex" });
 
     expect(connection.in(acme)).toBe(connection.in(sameAcme));
     expect(connection.in(globex)).not.toBe(connection.in(acme));
     expect(connection.in()).toBe(connection.in());
     expect(connection.in()).not.toBe(connection.in(acme));
-    expect(() => connection.in(create(OrganizationIdSchema, { uuid: "" }))).toThrow(
-      "OrganizationId UUID must not be empty.",
+    expect(() => connection.in(create(OrganizationIdSchema, { value: "" }))).toThrow(
+      "An organization identifier must not be empty.",
     );
     expect(connection.in()).toBe(connection.in());
   });
@@ -93,8 +93,8 @@ describe("ServerConnection should", () => {
     });
     expect(asked).toBe(0);
 
-    connection.in(create(OrganizationIdSchema, { uuid: "acme" }));
-    connection.in(create(OrganizationIdSchema, { uuid: "globex" }));
+    connection.in(create(OrganizationIdSchema, { value: "acme" }));
+    connection.in(create(OrganizationIdSchema, { value: "globex" }));
     connection.in();
 
     expect(asked).toBe(1);
@@ -107,7 +107,7 @@ describe("ServerConnection should", () => {
     for (const organization of ["acme", "globex"]) {
       const shown = await client.ServerRequests.postAndAwaitView(
         connection
-          .in(create(OrganizationIdSchema, { uuid: organization }))
+          .in(create(OrganizationIdSchema, { value: organization }))
           .onBehalfOf("access-desk"),
         creationShown(organization),
       );
@@ -121,7 +121,7 @@ describe("ServerConnection should", () => {
   it("connect again after it was closed", async () => {
     const server = await hosted();
     const connection = connectionTo(() => server.url);
-    const acme = connection.in(create(OrganizationIdSchema, { uuid: "acme" }));
+    const acme = connection.in(create(OrganizationIdSchema, { value: "acme" }));
     await client.ServerRequests.postAndAwaitView(
       acme.onBehalfOf("access-desk"),
       creationShown("acme"),
@@ -129,9 +129,9 @@ describe("ServerConnection should", () => {
 
     await connection.close();
 
-    expect(connection.in(create(OrganizationIdSchema, { uuid: "acme" }))).not.toBe(acme);
+    expect(connection.in(create(OrganizationIdSchema, { value: "acme" }))).not.toBe(acme);
     const shown = await client.ServerRequests.postAndAwaitView(
-      connection.in(create(OrganizationIdSchema, { uuid: "globex" })).onBehalfOf("access-desk"),
+      connection.in(create(OrganizationIdSchema, { value: "globex" })).onBehalfOf("access-desk"),
       creationShown("globex"),
     );
     expect(shown).toBe("globex");
@@ -198,14 +198,14 @@ describe("readById should", () => {
     const server = await hosted();
     await givenOrganization(server, organizationId("acme"));
     const acme = connectionTo(() => server.url)
-      .in(create(OrganizationIdSchema, { uuid: "acme" }))
+      .in(create(OrganizationIdSchema, { value: "acme" }))
       .onBehalfOf("access-desk");
 
     const view = await client.ServerRequests.readById(
       acme,
       OrganizationViewSchema,
       OrganizationIdSchema,
-      create(OrganizationIdSchema, { uuid: "acme" }),
+      create(OrganizationIdSchema, { value: "acme" }),
     );
 
     expect(view?.name).toBe("acme");
@@ -215,14 +215,14 @@ describe("readById should", () => {
     const server = await hosted();
     await givenOrganization(server, organizationId("acme"));
     const acme = connectionTo(() => server.url)
-      .in(create(OrganizationIdSchema, { uuid: "acme" }))
+      .in(create(OrganizationIdSchema, { value: "acme" }))
       .onBehalfOf("access-desk");
 
     const view = await client.ServerRequests.readById(
       acme,
       OrganizationViewSchema,
       OrganizationIdSchema,
-      create(OrganizationIdSchema, { uuid: "globex" }),
+      create(OrganizationIdSchema, { value: "globex" }),
     );
 
     expect(view).toBeUndefined();
@@ -232,14 +232,14 @@ describe("readById should", () => {
     const server = await hosted();
     await givenOrganization(server, organizationId("acme"));
     const globex = connectionTo(() => server.url)
-      .in(create(OrganizationIdSchema, { uuid: "globex" }))
+      .in(create(OrganizationIdSchema, { value: "globex" }))
       .onBehalfOf("access-desk");
 
     const view = await client.ServerRequests.readById(
       globex,
       OrganizationViewSchema,
       OrganizationIdSchema,
-      create(OrganizationIdSchema, { uuid: "acme" }),
+      create(OrganizationIdSchema, { value: "acme" }),
     );
 
     expect(view).toBeUndefined();
@@ -251,14 +251,14 @@ describe("find should", () => {
     const server = await hosted();
     await givenOrganization(server, organizationId("acme"));
     const acme = connectionTo(() => server.url)
-      .in(create(OrganizationIdSchema, { uuid: "acme" }))
+      .in(create(OrganizationIdSchema, { value: "acme" }))
       .onBehalfOf("access-desk");
     const named = (name: string) => OrganizationViewQuery.create().name().is(name).build();
 
     const found = await client.ServerRequests.find(acme, OrganizationViewSchema, named("acme"));
     const none = await client.ServerRequests.find(acme, OrganizationViewSchema, named("globex"));
 
-    expect(found.map((view) => view.id?.uuid)).toEqual(["acme"]);
+    expect(found.map((view) => view.id?.value)).toEqual(["acme"]);
     expect(none).toEqual([]);
   });
 });

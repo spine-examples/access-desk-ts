@@ -127,8 +127,6 @@ message CreateOrganization {
   holds:** `uuid` for an opaque, system-generated id, `value` for a human-readable
   dash-case slug, or a composite of several fields for a naturally compound identity.
 - Aggregate state: `option (entity).kind = AGGREGATE;`.
-- Do not put `(validate)` on ID-typed fields. Presence may still be expressed
-  with `(required)` where the contract requires it.
 - Do not use `(set_once)` on any field.
 - Projection state: `option (entity).kind = PROJECTION;` and
   `option (entity).visibility = FULL;`; put `(column) = true` only on fields that

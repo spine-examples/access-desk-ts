@@ -75,7 +75,7 @@ export function registerResource(
     RegisterResourceSchema,
     create(RegisterResourceSchema, {
       id: { uuid: resource },
-      organizationId: { uuid: organizationId },
+      organizationId: { value: organizationId },
       ...resourceDraft({ name, ...overrides }),
     }),
   );

@@ -61,18 +61,18 @@ export class ServerConnection {
    * Returns the client for one organization, or for what belongs to none.
    *
    * @param organization The organization, or nothing for what belongs to none.
-   * @throws When an organization has an empty UUID, which cannot name a tenant.
+   * @throws Error When an organization's identifier is empty, which cannot name a tenant.
    */
   in(organization?: OrganizationId): ServerClient {
-    if (organization?.uuid === "") {
-      throw new Error("OrganizationId UUID must not be empty.");
+    if (organization?.value === "") {
+      throw new Error("An organization identifier must not be empty.");
     }
-    const key = organization?.uuid;
+    const key = organization?.value;
     let client = this.#clients.get(key);
     if (client === undefined) {
       client = Client.usingTransport(
         this.#transport(),
-        organization === undefined ? {} : { tenant: organization.uuid },
+        organization === undefined ? {} : { tenant: organization.value },
       );
       this.#clients.set(key, client);
     }

@@ -51,12 +51,11 @@ describe("The storage should", () => {
   it("refuse an organization whose identifier cannot name its database", () => {
     const databases = Storage.serverDatabases(server);
 
-    expect(() => Storage.organizationDatabase(databases, "team dev")).toThrow(
-      /An organization's identifier must be of letters, digits/,
-    );
-    expect(() => Storage.organizationDatabase(databases, "o".repeat(43))).toThrow(
-      /is longer than 63 characters/,
-    );
+    for (const refused of ["team dev", "TeamDev", "o".repeat(43)]) {
+      expect(() => Storage.organizationDatabase(databases, refused)).toThrow(
+        /is 1 to 42 lower-case Latin letters, digits/,
+      );
+    }
     expect(Storage.organizationDatabase(databases, "o".repeat(42))).toMatch(/o{42}$/);
   });
 });

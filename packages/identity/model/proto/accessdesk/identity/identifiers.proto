@@ -42,7 +42,18 @@ message ExternalIdentityId {
 // Identifies an organization.
 message OrganizationId {
 
-    string uuid = 1 [(required) = true];
+    // The organization's short name, of 1 to 42 lower-case Latin letters,
+    // digits, `-`, and `_`, such as `example-com`.
+    //
+    // It names the organization's database, `accessdesk_resources_<name>`.
+    // PostgreSQL allows 63 bytes, the prefix takes 21, and a Latin character
+    // takes one. PostgreSQL also lowers the case of a name.
+    //
+    string value = 1 [
+        (required) = true,
+        (pattern).regex = "^[a-z0-9_-]{1,42}$",
+        (pattern).error_msg = "An organization identifier is 1 to 42 lower-case Latin letters, digits, `-`, and `_`."
+    ];
 }
 
 // Identifies the membership of one email address in an organization.

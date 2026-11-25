@@ -338,7 +338,7 @@ describe("The gateway should", () => {
 
       expect(await addMember(running, olivia, "globex", "noah@acme.example")).toBe("ok");
 
-      expect((await membership(running, "noah@acme.example"))?.organization?.uuid).toBe("acme");
+      expect((await membership(running, "noah@acme.example"))?.organization?.value).toBe("acme");
       expect(await member(running, "globex", noah.person)).toBeUndefined();
       expect(
         (await session(running, (await signIn(running, "noah")).token)).body.organization,
@@ -671,11 +671,10 @@ describe("The gateway should", () => {
       );
       expect([...byAddress.keys()].sort()).toEqual(["maya@acme.example", "noah@acme.example"]);
       expect(byAddress.get("noah@acme.example")).toMatchObject({
-        role: OrganizationRole.ADMINISTRATOR,
+        organization: { value: "acme" },
         person: { uuid: noah.person },
       });
       // Maya has not signed in yet, but she already is a person.
-      expect(byAddress.get("maya@acme.example")?.role).toBe(OrganizationRole.MEMBER);
       expect(byAddress.get("maya@acme.example")?.person?.uuid).toMatch(/^[0-9a-f-]{36}$/);
     });
 

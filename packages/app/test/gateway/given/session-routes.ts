@@ -25,7 +25,7 @@ import { routing } from "../../../src/gateway/routes/route.js";
 import { sessionRoutes } from "../../../src/gateway/routes/session-routes.js";
 
 const person = create(PersonIdSchema, { uuid: "person-1" });
-export const organization = create(OrganizationIdSchema, { uuid: "acme" });
+export const organization = create(OrganizationIdSchema, { value: "acme" });
 
 /** The person a session stands for, as the gateway signed it. */
 const principal = {

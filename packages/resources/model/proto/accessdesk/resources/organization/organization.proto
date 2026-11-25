@@ -28,7 +28,7 @@ message Organization {
     option (entity).kind = AGGREGATE;
 
     // Identifies the organization.
-    accessdesk.identity.OrganizationId id = 1;
+    accessdesk.identity.OrganizationId id = 1 [(validate) = true];
 
     // The organization's display name, unique across organizations and compared
     // case-insensitively.
@@ -47,7 +47,7 @@ message OrganizationView {
     option (entity).visibility = FULL;
 
     // Identifies the organization.
-    accessdesk.identity.OrganizationId id = 1;
+    accessdesk.identity.OrganizationId id = 1 [(validate) = true];
 
     // The organization's display name, unique across organizations and compared
     // case-insensitively.
