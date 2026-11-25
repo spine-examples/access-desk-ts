@@ -47,7 +47,7 @@ starts, it does not start.
 ### The database
 
 The application server and the gateway keep their data in PostgreSQL, so a
-restart of either loses nothing. The delivery server keeps the messages that
+restart of either loses none of it. The delivery server keeps the messages that
 wait in memory only, so a restart of it loses them. All the databases live on
 one PostgreSQL server, set by `ACCESS_DESK_DATABASE_HOST`, `_PORT`, `_USER`,
 and `_PASSWORD`. For development,
@@ -107,8 +107,9 @@ application server keep a record of the subscription:
 - The application server records what the subscription watches and whether
   it is active, in memory, in the coordinator and every worker. It uses this
   to send updates. A restart of the application server ends the
-  subscription. A subscription to Resources belongs to one
-  organization and gets that organization's updates only.
+  subscription, and it gets no more updates until the page subscribes again.
+  A subscription to Resources belongs to one organization and gets that
+  organization's updates only.
 
 When the person signs out, every subscription they have open stops. The web
 client cancels its subscriptions before it signs out, which deletes both

@@ -25,8 +25,8 @@ const ORGANIZATION = "{organization}";
 
 /**
  * The database of the application server that keeps what belongs to no
- * organization: people, their accounts and memberships, subscriptions, and the
- * messages waiting for delivery.
+ * organization: people, their accounts and memberships, the registered
+ * tenants, and, with local delivery, the messages waiting for delivery.
  */
 const SERVER_DATABASE = "accessdesk_server";
 
@@ -57,7 +57,8 @@ export interface ServerDatabases {
    * The address of the shared database.
    *
    * It keeps what belongs to no organization: people, their accounts and memberships,
-   * subscriptions, and the messages waiting for delivery.
+   * the registered tenants, and, with local delivery, the messages waiting for
+   * delivery.
    */
   readonly url: string;
   /**
