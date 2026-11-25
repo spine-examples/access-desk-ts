@@ -345,9 +345,11 @@ block (Spine leaves `EnumValueOptions` free).
   anything else as `TENANT_UNKNOWN`. Spine never calls `keep()` itself. It
   asks `contains()` on every request in a tenant and before delivering each
   message from the Inbox.
-- **Restart.** With delivery in the database, the Inbox and the
-  subscriptions are kept in the shared database, each with its tenant inside
-  the message, and are delivered only once the index admits that tenant.
+- **Restart.** With local delivery, the Inbox is kept in the shared
+  database, with the tenant inside each message, and a message is delivered
+  after a restart only once the index admits its tenant. Subscriptions are
+  different: a restart breaks the stream of updates whichever registry keeps
+  them, and the client has to subscribe again.
 
 ## Worker processes and the delivery server
 
@@ -396,9 +398,10 @@ Access Desk keeps its data in PostgreSQL through `@spine-event-engine/storage-po
 - **Pools.** One per database, ten connections by default. Spine's pools do not
   listen for `error`, so a dropped idle connection can stop the process. Pools
   Access Desk opens itself listen.
-- **Subscriptions outlast restarts** in the storage-backed registry. One
-  nobody cancels stays until its time runs out.
-- **Inbox.** With delivery in the database, commands accepted before a stop
+- **Subscription records** outlast restarts in the storage-backed registry,
+  but their streams of updates do not. A record nobody cancels stays until
+  its time runs out.
+- **Inbox.** With local delivery, commands accepted before a stop
   are delivered after the restart.
 
 ## Authentication and browser clients
