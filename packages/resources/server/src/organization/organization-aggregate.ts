@@ -39,6 +39,7 @@ import {
   OrganizationResourceSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import {
+  AlreadyOrganizationMember,
   OrganizationAlreadyExists,
   OrganizationResourceNameAlreadyUsed,
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/rejections.js";
@@ -67,13 +68,14 @@ export class OrganizationAggregate extends Aggregate<OrganizationId, typeof Orga
    * Makes a person a member of the organization, at most once each.
    */
   @Assign
+  @Throws(AlreadyOrganizationMember)
   addOrganizationMember(command: AddOrganizationMember): OrganizationMemberAdded {
     const person = command.person;
     if (person === undefined) {
       throw new Error("AddOrganizationMember requires a person.");
     }
     if (this.state.membership.some((item) => equals(PersonIdSchema, item.person, person))) {
-      throw new Error("A person is added to an organization once.");
+      throw AlreadyOrganizationMember.create({ organizationId: this.id, person });
     }
     const role = command.role;
     this.update((draft) => {

@@ -22,11 +22,13 @@ import {
   ResourceAddedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
 import {
+  AlreadyOrganizationMemberSchema,
   OrganizationAlreadyExistsSchema,
   OrganizationResourceNameAlreadyUsedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/rejections_pb.js";
 
 import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
+import { CreateOrganizationSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
 
 import {
   actor,
@@ -63,7 +65,7 @@ describe("OrganizationAggregate should", () => {
 
       const event = await events.waitFor(box);
       expect(event).toEqual(
-        create(OrganizationCreatedSchema, { id: { uuid: organizationId }, name: "Acme" }),
+        create(OrganizationCreatedSchema, { id: { value: organizationId }, name: "Acme" }),
       );
       await events.cancel();
     });
@@ -76,6 +78,21 @@ describe("OrganizationAggregate should", () => {
       await expectRejection(box, scope, OrganizationAlreadyExistsSchema, () =>
         createOrganization(scope, "Evil"),
       );
+    });
+
+    it("refuse an identifier other than 1 to 42 lower-case letters, digits, '-', and '_'", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      const creating = (id: string) =>
+        scope.post(
+          CreateOrganizationSchema,
+          create(CreateOrganizationSchema, { id: { value: id }, name: id }),
+        );
+
+      for (const refused of ["Acme", "acme corp", "a".repeat(43)]) {
+        expect((await creating(refused)).kind).toBe("error");
+      }
+      expect((await creating("a".repeat(42))).kind).toBe("ok");
     });
   });
 
@@ -91,7 +108,7 @@ describe("OrganizationAggregate should", () => {
       const event = await events.waitFor(box);
       expect(event).toEqual(
         create(OrganizationMemberAddedSchema, {
-          organizationId: { uuid: organizationId },
+          organizationId: { value: organizationId },
           person: { uuid: "maya" },
           emailAddress: { value: "maya@acme.example" },
           role: OrganizationRole.MEMBER,
@@ -113,6 +130,22 @@ describe("OrganizationAggregate should", () => {
 
       expect((await events.waitFor(box)).addedBy?.uuid).toBe("noah");
       await events.cancel();
+    });
+
+    it("reject a person the organization lists already with 'AlreadyOrganizationMember'", async () => {
+      const box = await resourcesBlackBox();
+      const scope = box.onBehalfOf(actor);
+      expect((await createOrganization(scope)).kind).toBe("ok");
+      const events = await recordEvents(scope, OrganizationMemberAddedSchema);
+      expect((await addOrganizationMember(scope, "maya")).kind).toBe("ok");
+      await events.waitFor(box);
+      await events.cancel();
+
+      const rejection = await expectRejection(box, scope, AlreadyOrganizationMemberSchema, () =>
+        addOrganizationMember(scope, "maya", OrganizationRole.ADMINISTRATOR),
+      );
+
+      expect(rejection.person?.uuid).toBe("maya");
     });
   });
 
@@ -144,7 +177,7 @@ describe("OrganizationAggregate should", () => {
       const event = await events.waitFor(box);
       expect(event).toEqual(
         create(ResourceAddedSchema, {
-          organizationId: { uuid: organizationId },
+          organizationId: { value: organizationId },
           resourceId: { uuid: "payroll" },
           name: "payroll",
         }),
@@ -168,7 +201,7 @@ describe("OrganizationAggregate should", () => {
 
         expect(events.received).toEqual([
           create(ResourceAddedSchema, {
-            organizationId: { uuid: organizationId },
+            organizationId: { value: organizationId },
             resourceId: { uuid: "payroll" },
             name: "payroll",
           }),

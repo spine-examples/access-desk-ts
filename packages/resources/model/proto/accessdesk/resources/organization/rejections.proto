@@ -26,7 +26,7 @@ option (type_url_prefix) = "type.accessdesk";
 message OrganizationAlreadyExists {
 
     // The organization that already exists.
-    accessdesk.identity.OrganizationId id = 1 [(required) = true];
+    accessdesk.identity.OrganizationId id = 1 [(required) = true, (validate) = true];
 }
 
 // A resource name already used in the organization.
@@ -37,4 +37,14 @@ message OrganizationResourceNameAlreadyUsed {
 
     // The name already in use.
     string name = 2 [(required) = true];
+}
+
+// The person is a member of the organization already.
+message AlreadyOrganizationMember {
+
+    // The organization the person belongs to.
+    accessdesk.identity.OrganizationId organization_id = 1 [(required) = true, (validate) = true];
+
+    // The person who is a member already.
+    accessdesk.identity.PersonId person = 2 [(required) = true];
 }
