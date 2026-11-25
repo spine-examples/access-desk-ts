@@ -151,6 +151,24 @@ class Reading {
     return { host: this.text(`${prefix}_HOST`), port: this.port(`${prefix}_PORT`) };
   }
 
+  /**
+   * Reads where another server is reached, from its `_HOST` and `_PORT`
+   * settings.
+   *
+   * The host must name a machine to connect to. `0.0.0.0` and `::` stand for
+   * every address of a machine and name none, so they are refused.
+   */
+  reached(prefix: string): Listening {
+    const reached = this.listening(prefix);
+    if (everyAddress(reached.host)) {
+      this.#problems.push(
+        `${prefix}_HOST must name the machine to connect to, and is "${reached.host}", ` +
+          "which stands for every address of a machine.",
+      );
+    }
+    return reached;
+  }
+
   /** Reads an identity provider, from its `_CLIENT_ID` and `_CLIENT_SECRET` settings. */
   provider(prefix: string): ProviderSettings {
     return {
@@ -220,7 +238,7 @@ export const Settings = {
   ofServer(environment: NodeJS.ProcessEnv): ServerSettings {
     const reading = new Reading(environment);
     const listening = reading.listening("ACCESS_DESK_SERVER");
-    const delivery = reading.listening("ACCESS_DESK_DELIVERY");
+    const delivery = reading.reached("ACCESS_DESK_DELIVERY");
     return reading.done({
       listening,
       deliveryUrl: Settings.urlOf(delivery),
@@ -248,7 +266,7 @@ export const Settings = {
   ofGateway(environment: NodeJS.ProcessEnv): GatewaySettings {
     const reading = new Reading(environment);
     const listening = reading.listening("ACCESS_DESK_GATEWAY");
-    const server = reading.listening("ACCESS_DESK_SERVER");
+    const server = reading.reached("ACCESS_DESK_SERVER");
     const web = reading.listening("ACCESS_DESK_WEB");
     return reading.done({
       listening,
@@ -265,23 +283,16 @@ export const Settings = {
    * listens.
    *
    * A server that listens on every address of its machine, on `0.0.0.0` or
-   * `::`, is reached at its machine's loopback address, as the address it
-   * listens on names no machine to connect to. An IPv6 address is put in
-   * brackets.
+   * `::`, is reached from the same machine at the loopback address, as the
+   * address it listens on names no machine to connect to. An IPv6 address is
+   * put in brackets.
    *
    * @param listening Where the server listens.
    * @returns The address to reach it at, such as `http://127.0.0.1:8090`.
    */
   urlOf(listening: Listening): string {
-    const host = listening.host.trim().toLowerCase();
-    const version = isIP(host);
-    const family = version === 6 ? "ipv6" : "ipv4";
-    const reached =
-      version !== 0 && EVERY_ADDRESS.check(host, family)
-        ? version === 6
-          ? "::1"
-          : "127.0.0.1"
-        : listening.host.trim();
+    const host = listening.host.trim();
+    const reached = everyAddress(host) ? (isIP(host) === 6 ? "::1" : "127.0.0.1") : host;
     const named = isIP(reached) === 6 ? `[${reached}]` : reached;
     return `http://${named}:${listening.port.toString()}`;
   },
@@ -302,3 +313,10 @@ export const Settings = {
     );
   },
 };
+
+/** Whether an address stands for every address of a machine, as `0.0.0.0` and `::` do. */
+function everyAddress(host: string): boolean {
+  const address = host.trim().toLowerCase();
+  const version = isIP(address);
+  return version !== 0 && EVERY_ADDRESS.check(address, version === 6 ? "ipv6" : "ipv4");
+}

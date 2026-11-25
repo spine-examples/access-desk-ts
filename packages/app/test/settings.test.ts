@@ -148,9 +148,26 @@ describe("The settings should", () => {
   it("reach a server that listens on every address at the loopback address", () => {
     expect(Settings.urlOf({ host: "0.0.0.0", port: 8484 })).toBe("http://127.0.0.1:8484");
     expect(Settings.urlOf({ host: "::", port: 8484 })).toBe("http://[::1]:8484");
-    expect(Settings.ofServer({ ...server, ACCESS_DESK_DELIVERY_HOST: "0.0.0.0" }).deliveryUrl).toBe(
-      "http://127.0.0.1:8484",
-    );
+  });
+
+  it("refuse to reach another server at an address that stands for every address", () => {
+    for (const host of ["0.0.0.0", "::"]) {
+      expect(() => Settings.ofServer({ ...server, ACCESS_DESK_DELIVERY_HOST: host })).toThrow(
+        /ACCESS_DESK_DELIVERY_HOST must name the machine to connect to/,
+      );
+      expect(() => Settings.ofGateway({ ...gateway, ACCESS_DESK_SERVER_HOST: host })).toThrow(
+        /ACCESS_DESK_SERVER_HOST must name the machine to connect to/,
+      );
+    }
+    expect(
+      Settings.ofServer({ ...server, ACCESS_DESK_SERVER_HOST: "0.0.0.0" }).listening.host,
+    ).toBe("0.0.0.0");
+    expect(
+      Settings.ofDelivery({
+        ACCESS_DESK_DELIVERY_HOST: "0.0.0.0",
+        ACCESS_DESK_DELIVERY_PORT: "8484",
+      }).listening.host,
+    ).toBe("0.0.0.0");
   });
 
   it("reach a server at the address it listens on, with an IPv6 address in brackets", () => {
