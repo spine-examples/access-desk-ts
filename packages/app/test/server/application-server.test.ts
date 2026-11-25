@@ -31,6 +31,7 @@ import {
 } from "./given/application-server.js";
 import { eventually } from "./given/hosted.js";
 
+type AppModule = typeof import("../../dist/src/index.js");
 type ClientModule = typeof import("../../dist/src/server/client.js");
 
 afterEach(stopApplicationServer);
@@ -65,5 +66,24 @@ describe("The application server should", () => {
     expect(organization?.member.map((member) => member.person?.uuid)).toEqual([
       membership?.person?.uuid,
     ]);
+  });
+
+  it("refuse to start with fewer than two workers", async () => {
+    const { ApplicationServer }: AppModule = await import("../../dist/src/index.js");
+
+    await expect(
+      ApplicationServer.start(
+        {
+          listening: { host: "127.0.0.1", port: 1 },
+          workers: 1,
+          deliveryUrl: "http://127.0.0.1:1",
+          databases: {
+            url: "postgres://127.0.0.1:1/none",
+            organizationDatabase: "none_{organization}",
+          },
+        },
+        import.meta.url,
+      ),
+    ).rejects.toThrow("at least 2, and the setup has 1");
   });
 });

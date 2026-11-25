@@ -27,7 +27,7 @@ import { AccessDesk } from "./access-desk.js";
 export interface ApplicationServerSetup {
   /** The address the application server listens on. */
   readonly listening: Listening;
-  /** The number of workers that handle the messages of the contexts. */
+  /** The number of workers that handle the messages of the contexts, at least two. */
   readonly workers: number;
   /** The address of the delivery server. */
   readonly deliveryUrl: string;
@@ -57,9 +57,13 @@ export const ApplicationServer = {
    *   server the same way.
    * @returns In the coordinator, the application server once every worker is
    *   ready; in a worker, the worker once it is ready.
+   * @throws Error when the setup has fewer than two workers.
    */
-  run(setup: ApplicationServerSetup, moduleUrl: string): Promise<ManagedServerApplicationHandle> {
-    return ManagedServerApplication.run(options(setup, moduleUrl));
+  async run(
+    setup: ApplicationServerSetup,
+    moduleUrl: string,
+  ): Promise<ManagedServerApplicationHandle> {
+    return await ManagedServerApplication.run(options(setup, moduleUrl));
   },
 
   /**
@@ -70,17 +74,40 @@ export const ApplicationServer = {
    *   server the same way.
    * @returns In the coordinator, the application server once every worker is
    *   ready; in a worker, the worker once it is ready.
+   * @throws Error when the setup has fewer than two workers.
    */
-  start(setup: ApplicationServerSetup, moduleUrl: string): Promise<ManagedServerApplicationHandle> {
-    return ManagedServerApplication.start(options(setup, moduleUrl));
+  async start(
+    setup: ApplicationServerSetup,
+    moduleUrl: string,
+  ): Promise<ManagedServerApplicationHandle> {
+    return await ManagedServerApplication.start(options(setup, moduleUrl));
   },
 };
 
-/** Describes the coordinator and its workers to the framework. */
+/**
+ * The fewest workers the application server runs with.
+ *
+ * While the Identity bounded context adds a person to an organization, its
+ * worker waits until the organization confirms. A worker takes one shard at a
+ * time, so only another worker can handle the confirmation.
+ */
+const FEWEST_WORKERS = 2;
+
+/**
+ * Describes the coordinator and its workers to the framework.
+ *
+ * @throws Error when the setup has fewer than two workers.
+ */
 function options(
   setup: ApplicationServerSetup,
   moduleUrl: string,
 ): ManagedServerApplicationOptions {
+  if (!Number.isInteger(setup.workers) || setup.workers < FEWEST_WORKERS) {
+    throw new Error(
+      `The application server needs a whole number of workers, at least ${FEWEST_WORKERS.toString()}, ` +
+        `and the setup has ${setup.workers.toString()}`,
+    );
+  }
   const { host, port } = setup.listening;
   const coordinator = Settings.urlOf(setup.listening);
   let delivery: RemoteDelivery | undefined;
