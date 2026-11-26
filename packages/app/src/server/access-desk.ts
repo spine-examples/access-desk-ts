@@ -12,21 +12,22 @@
  * and limitations under the License.
  */
 
-import { create } from "@bufbuild/protobuf";
-import type { Any } from "@bufbuild/protobuf/wkt";
-import { TenantIdSchema, type TenantId } from "@spine-event-engine/proto";
 import {
+  Application,
   Environment,
+  InMemorySubscriptionRegistry,
+  PersistentTenantIndex,
   ServerEnvironment,
-  ShardIndex,
-  type BoundedContext,
-  type DeliveryStrategy,
+  type ServerEnvironmentDelivery,
+  type TenantIndex,
 } from "@spine-event-engine/server";
-import type { StorageFactory } from "@spine-event-engine/storage";
+import { StorageGroup, type StorageFactory } from "@spine-event-engine/storage";
 import { IdentityContext } from "@access-desk/identity-server";
 import { ResourcesContext } from "@access-desk/resources-server";
 import { typeRegistry } from "../../generated/model-registry.js";
+import { Closing } from "../closing.js";
 import { ReachedOrganizationMembers } from "./organization-members.js";
+import { AccessDeskDeliveryStrategy } from "./delivery-strategy.js";
 
 /** How the application is assembled. */
 export interface AccessDeskOptions {
@@ -43,68 +44,111 @@ export interface AccessDeskOptions {
    */
   readonly storage: StorageFactory;
   /**
-   * The organizations the application keeps, by their identifiers.
+   * The delivery server the contexts take their messages from, shared with the
+   * other workers of the application server.
+   *
+   * When left out, the messages wait in the shared database, and only this
+   * process delivers them.
    */
-  readonly organizations: readonly string[];
+  readonly delivery?: ServerEnvironmentDelivery;
 }
 
 /** The assembled application. */
 export interface AccessDesk {
-  /** The Identity context, which holds people, their accounts, and memberships. */
-  readonly identity: BoundedContext;
-  /** The Resources context, which holds each organization, its members, and what it owns. */
-  readonly resources: BoundedContext;
+  /** The application, with both contexts, for a server to serve. */
+  readonly application: Application;
   /**
    * The service through which Identity adds people to organizations' members.
    *
    * It holds a connection to the application server, which the server closes
-   * after the contexts.
+   * when it stops.
    */
   readonly members: ReachedOrganizationMembers;
+  /** The register of the organizations the application keeps. */
+  readonly organizations: TenantIndex;
 }
 
-/**
- * Delivers the messages of each context in a separate shard.
- */
-const SHARD_PER_CONTEXT: DeliveryStrategy = {
-  shardCount: 2,
-  shardFor(_targetId: Any, targetType: string): ShardIndex {
-    return new ShardIndex(targetType.includes("/accessdesk.identity.") ? 0 : 1, 2);
-  },
-};
+/** The storage group the register of organizations is kept in. */
+const ORGANIZATIONS = new StorageGroup("organizations");
 
 /** Assembles the application. */
 export const AccessDesk = {
   /**
    * Assembles Access Desk from its contexts.
    *
-   * 1. Sets up the server environment of this process over the storage.
-   * 2. Adds the organizations to the environment's tenant index, so Resources
-   *    takes what is given in them.
-   * 3. Builds the contexts.
+   * 1. Sets up the server environment over the storage. The messages go in
+   *    the shards of `AccessDeskDeliveryStrategy`.
+   * 2. Opens the register of the organizations the application keeps. The
+   *    register is kept in the shared database, which is the one list of the
+   *    organizations, so Resources takes only what is given in a registered
+   *    organization.
+   * 3. Builds the application with both contexts.
+   *
+   * When a step fails, closes what the steps before it opened.
    *
    * @param options How to assemble the application.
-   * @returns The contexts, ready to be hosted by a server.
+   * @returns The application, ready to be served.
    */
   async assemble(options: AccessDeskOptions): Promise<AccessDesk> {
-    ServerEnvironment.when(Environment.instance().type).use({
-      storageFactory: options.storage,
-      typeRegistry,
-      deliveryStrategy: SHARD_PER_CONTEXT,
-    });
-    const environment = ServerEnvironment.instance();
-    await environment.completeSetup();
-    for (const organization of options.organizations) {
-      await environment.tenantIndex.keep(AccessDesk.tenantOf(organization));
+    let environment: ServerEnvironment;
+    try {
+      environment = ServerEnvironment.newBuilder()
+        .under(Environment.instance().type, (settings) => {
+          settings.use({
+            storageFactory: options.storage,
+            typeRegistry,
+            deliveryStrategy: AccessDeskDeliveryStrategy,
+            ...(options.delivery === undefined ? {} : { delivery: options.delivery }),
+          });
+        })
+        .build();
+    } catch (error) {
+      return abandon(error, [options.delivery, options.storage]);
+    }
+    let organizations: TenantIndex;
+    try {
+      organizations = await PersistentTenantIndex.create({
+        storageFactory: options.storage,
+        group: ORGANIZATIONS,
+      });
+    } catch (error) {
+      return abandon(error, [environment]);
     }
     const members = ReachedOrganizationMembers.through(options.server);
-    const identity = await IdentityContext.create({ members });
-    const resources = await ResourcesContext.create();
-    return { identity, resources, members };
-  },
-
-  /** Returns the tenant of an organization. */
-  tenantOf(organization: string): TenantId {
-    return create(TenantIdSchema, { kind: { case: "value", value: organization } });
+    const builder = Application.newBuilder();
+    try {
+      const application = await builder
+        .setServerEnvironment(environment)
+        .setTenantIndex(organizations)
+        .add(IdentityContext.create({ members, subscriptions: new InMemorySubscriptionRegistry() }))
+        .add(ResourcesContext.create({ subscriptions: new InMemorySubscriptionRegistry() }))
+        .build();
+      return { application, members, organizations: application.tenantIndex() };
+    } catch (error) {
+      return abandon(error, [builder, organizations, environment, members]);
+    }
   },
 };
+
+/**
+ * Closes what was opened for an application that was not built, and throws
+ * why it was not built.
+ *
+ * @param error Why the application was not built.
+ * @param opened What was opened for it, in the order to close it; `undefined`
+ *   stands for what was not given.
+ */
+async function abandon(
+  error: unknown,
+  opened: readonly ({ close(): unknown } | undefined)[],
+): Promise<never> {
+  try {
+    await Closing.inOrder(...opened.filter((resource) => resource !== undefined));
+  } catch (cleanup) {
+    throw new AggregateError(
+      [error, cleanup],
+      "The application was not built, and not everything opened for it closed.",
+    );
+  }
+  throw error;
+}

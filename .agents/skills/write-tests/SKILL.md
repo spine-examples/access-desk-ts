@@ -53,8 +53,7 @@ posts a request), whereas a helper (below) knows nothing about it.
 A **helper** is a generic, domain-agnostic utility — it arranges no domain
 state. Reuse these instead of re-implementing them per test:
 
-- `@access-desk/testing` — `TestEnvironment.start`/`reset` around each context
-  a test builds, and the PostgreSQL storage of a test from
+- `@access-desk/testing` — the PostgreSQL storage of a test from
   `@access-desk/testing/storage`, such as
   `TestStorages.multitenant(typeRegistry, [tenant()])`.
 - `test/given/event-recording.ts`, one copy in each context's `server` package —

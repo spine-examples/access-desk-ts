@@ -16,7 +16,8 @@
 # Builds the images of Access Desk, from the repository root:
 #
 #   application  Node with every package built. `compose.yaml` runs the
-#                application server or the gateway from it.
+#                delivery server, the application server, or the gateway
+#                from it.
 #   web          nginx with the built page. It fills in its settings from the
 #                container's environment as it starts.
 #   envoy        Envoy with its configuration, rendered as the image is built
@@ -43,7 +44,8 @@ COPY . .
 RUN pnpm -r run build
 
 # Every package built, run by Node as an unprivileged user. Each container
-# names the program it runs: the application server or the gateway.
+# names the server it runs: the delivery server, the application server, or
+# the gateway.
 FROM workspace AS application
 WORKDIR /workspace/packages/app
 USER node

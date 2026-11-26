@@ -13,32 +13,43 @@
  */
 
 import { create } from "@bufbuild/protobuf";
-import { createGrpcWebTransport } from "@connectrpc/connect-node";
 import {
-  NativeSubscriptionCreator,
+  PersistentTokenRevocations,
+  SignedSessions,
   type AuthenticatedPrincipal,
   type AuthorizedRequestContext,
-  type RequestCredential,
-  type SignedTokenRevocation,
 } from "@spine-event-engine/auth";
 import type { TypeRegistryLookup } from "@spine-event-engine/core";
 import { Time } from "@spine-event-engine/core/time";
 import { TenantIdSchema, UserIdSchema } from "@spine-event-engine/proto";
-import { BrowserServer } from "@spine-event-engine/server/browser";
-import type { StorageFactory } from "@spine-event-engine/storage";
+import { BrowserServer, DurableSubscriptionBindings } from "@spine-event-engine/server/browser";
+import { StorageGroup, type StorageFactory } from "@spine-event-engine/storage";
+import { Closing } from "../closing.js";
 import { ServerConnection } from "../server/client.js";
 import { AccessDesk } from "./access-desk.js";
-import { TrustedNetwork } from "../trusted-network.js";
 import { Policy } from "./policy.js";
 import { routing } from "./routes/route.js";
 import { sessionRoutes } from "./routes/session-routes.js";
 import { signInRoutes, type ExternalSignIn } from "./routes/sign-in-routes.js";
 import type { SessionKey } from "./session-key.js";
-import { Sessions } from "./sessions.js";
-import { Watching, type CancelAsBrowser } from "./watching.js";
 
-/** How long the gateway waits for a subscription of an ending session to be cancelled. */
-const CANCEL_MS = 5_000; // 5 seconds.
+/** How long a session lasts. */
+const SESSION_SECONDS = 8 * 60 * 60; // 8 hours.
+
+/**
+ * How long after it expires a token is still taken,
+ * as clocks may differ a little.
+ */
+const CLOCK_SKEW_SECONDS = 60;
+
+/** Who signs the sessions, as written in every token. */
+const ISSUER = "access-desk-gateway";
+
+/** Who the sessions are for, as written in every token. */
+const AUDIENCE = "access-desk";
+
+/** The storage group the sessions people ended are kept in. */
+const ENDED = new StorageGroup("ended-sessions");
 
 /** How the gateway is set up. */
 export interface GatewayOptions {
@@ -57,12 +68,7 @@ export interface GatewayOptions {
   /** The P-256 private key the gateway signs sessions with. */
   readonly sessionKey: SessionKey;
   /** Where the gateway keeps its data, so it outlasts a restart. */
-  readonly storage: {
-    /** Where the gateway keeps the subscriptions people hold. */
-    readonly subscriptions: StorageFactory;
-    /** Where the gateway keeps the tokens of the sessions people ended. */
-    readonly revokedTokens: SignedTokenRevocation;
-  };
+  readonly storage: StorageFactory;
 }
 
 /** A running gateway. */
@@ -92,36 +98,43 @@ export const Gateway = {
     const server = new ServerConnection(() => options.backend);
     const desk = new AccessDesk(server);
     const origins = [...options.origins];
-    const listening: { address?: string } = {};
-    const watching = new Watching(
-      options.storage.subscriptions,
-      cancellingThrough(() => listening.address, origins[0]),
-    );
-    const sessions = new Sessions({
-      key: options.sessionKey,
-      revoked: options.storage.revokedTokens,
-      subscriptions: watching,
+    const subscriptions = new DurableSubscriptionBindings({
+      storageFactory: options.storage,
+      namespace: "access-desk-gateway",
+      nextId: () => crypto.randomUUID(),
+      cleanup: () => Promise.resolve(),
+    });
+    const ended = await PersistentTokenRevocations.create({
+      storageFactory: options.storage,
+      group: ENDED,
+      issuer: ISSUER,
+      audience: AUDIENCE,
+    });
+    const sessions = new SignedSessions({
+      issuer: ISSUER,
+      audience: AUDIENCE,
+      activeKey: options.sessionKey.signing(),
+      revocation: ended,
+      clock: { now: () => Time.currentTimeMillis() },
+      ttlSeconds: SESSION_SECONDS,
+      clockSkewSeconds: CLOCK_SKEW_SECONDS,
     });
     const route = routing(origins, sessions);
-    const signIn = signInRoutes(route, desk, sessions, options.external);
+    const signIn = await signInRoutes(route, desk, sessions, options.external, options.storage);
     const allows = Policy.authorization(desk);
 
     const running = await BrowserServer.open(undefined, {
       backend: { baseUrl: options.backend },
-      forwardingProof: TrustedNetwork.issuer,
-      bindings: watching,
+      forwarding: "trusted-network",
+      bindings: subscriptions,
       host: options.host ?? "127.0.0.1",
       port: options.port,
       origins,
       registry: options.registry,
-      authRoutes: [...signIn.routes, ...sessionRoutes(route, desk, sessions)],
+      authRoutes: [...signIn.routes, ...sessionRoutes(route, desk, sessions, ended)],
       clock: { now: () => Time.currentTime() },
-      sessions: {
-        // The gateway hands its session out as a bearer token.
-        resolve: (credential: RequestCredential) => sessions.resolve(credential.value),
-      },
-      authorize: async (principal, request) =>
-        (await allows(principal, request)) && watching.claim(principal, request),
+      sessions,
+      authorize: allows,
       contexts: {
         resolve: (principal, request, clock) =>
           Promise.resolve(trusted(principal, clock.now(), !Policy.concernsNoOrganization(request))),
@@ -129,55 +142,13 @@ export const Gateway = {
           Promise.resolve(trusted(principal, clock.now(), true)),
       },
     });
-    listening.address = running.baseUrl;
+    let closing: Promise<void> | undefined;
     return {
       url: running.baseUrl,
-      close: async () => {
-        signIn.close();
-        await running.close();
-        await server.close();
-        await sessions.close();
-      },
+      close: () => (closing ??= Closing.inOrder(signIn, running, server, sessions, ended)),
     };
   },
 };
-
-/**
- * Cancels a subscription the way its browser would.
- *
- * Spine fully clears a subscription only when it is canceled through the
- * gateway's address. So the gateway calls itself there, with the
- * session's token.
- *
- * @param address Returns the address the gateway listens at, once it listens.
- * @param origin The address of a page that may call the gateway.
- */
-function cancellingThrough(
-  address: () => string | undefined,
-  origin: string | undefined,
-): CancelAsBrowser {
-  return async (subscription, token) => {
-    const baseUrl = address();
-    if (baseUrl === undefined || origin === undefined) {
-      throw new Error("The gateway cannot be called at its own address.");
-    }
-    const transport = createGrpcWebTransport({
-      baseUrl,
-      httpVersion: "1.1",
-      interceptors: [
-        (next) => (request) => {
-          request.header.set("origin", origin);
-          request.header.set("authorization", `Bearer ${token}`);
-          return next(request);
-        },
-      ],
-    });
-    await new NativeSubscriptionCreator(transport).cancel(
-      { wire: subscription },
-      AbortSignal.timeout(CANCEL_MS),
-    );
-  };
-}
 
 /**
  * Builds the context of a request from its session.

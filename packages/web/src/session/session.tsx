@@ -18,6 +18,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactElement,
   type ReactNode,
@@ -56,6 +57,8 @@ export interface SessionValue {
   readonly state: SessionState;
   /** Requests session revocation and clears the browser tab's session. */
   readonly signOut: () => Promise<void>;
+  /** Registers what to close before signing out, while the token still works. */
+  readonly closeOnSignOut: (close: () => Promise<void>) => () => void;
 }
 
 /** Shares session state and the sign-out action with descendant components. */
@@ -100,15 +103,36 @@ export const Session = {
       })();
     }, [adopt]);
 
-    /** Requests session revocation and clears the browser tab's session. */
+    /** What closes when the person signs out. */
+    const closers = useRef(new Set<() => Promise<void>>());
+
+    const closeOnSignOut = useCallback((close: () => Promise<void>) => {
+      closers.current.add(close);
+      return () => {
+        closers.current.delete(close);
+      };
+    }, []);
+
+    /**
+     * Requests session revocation and clears the browser tab's session.
+     *
+     * What should close closes first, while the session still works, so the
+     * subscriptions are canceled on the application server too. A close that
+     * fails does not hold up signing out: ending the session stops every
+     * subscription opened under it anyway.
+     */
     const signOut = useCallback(async () => {
       if (state.kind === "signedIn") {
+        await Promise.allSettled([...closers.current].map((close) => close()));
         await Authentication.signOut(state.token);
       }
       await adopt(undefined);
     }, [state, adopt]);
 
-    const value = useMemo(() => ({ state, signOut }), [state, signOut]);
+    const value = useMemo(
+      () => ({ state, signOut, closeOnSignOut }),
+      [state, signOut, closeOnSignOut],
+    );
     return <SessionContext value={value}>{children}</SessionContext>;
   },
 

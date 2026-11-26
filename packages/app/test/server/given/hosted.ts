@@ -16,9 +16,14 @@ import { create, type Message, type MessageShape } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { SignalEnvelopes } from "@spine-event-engine/core";
 import { TenantIdSchema, UserIdSchema } from "@spine-event-engine/proto";
-import { type BoundedContext, Server, SignalMetadata } from "@spine-event-engine/server";
-import type { StorageFactory } from "@spine-event-engine/storage";
-import { TestEnvironment } from "@access-desk/testing/environment";
+import {
+  type BoundedContext,
+  PersistentTenantIndex,
+  Server,
+  SignalMetadata,
+  type TenantIndex,
+} from "@spine-event-engine/server";
+import { StorageGroup } from "@spine-event-engine/storage";
 import { TestStorages } from "@access-desk/testing/storage";
 import { type OrganizationId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import {
@@ -39,21 +44,28 @@ type ServerDatabases = import("../../../dist/src/index.js").ServerDatabases;
 /**
  * The organizations the tests of the application work in.
  *
- * The server keeps only these, as it keeps only those `ACCESS_DESK_ORGANIZATIONS`
- * lists, and refuses everything given in any other organization.
+ * The server keeps only these, as only these are registered, and refuses
+ * everything given in any other organization.
  */
 const ORGANIZATIONS = ["acme", "globex"] as const;
+
+/** The storage group the server keeps the register of organizations in. */
+const REGISTER = new StorageGroup("organizations");
 
 /** A running application server and its contexts, owned by a test. */
 export interface Hosted {
   /** The HTTP address the server listens at. */
   readonly url: string;
+  /** The storage the server keeps its data in. */
+  readonly storage: ServerStorage;
+  /** The register of the organizations the server keeps. */
+  readonly organizations: TenantIndex;
   /** The global, single-tenant Identity context. */
   readonly identity: BoundedContext;
   /** The organization-scoped Resources context. */
   readonly resources: BoundedContext;
   /**
-   * Stops the server and closes its assembled contexts.
+   * Stops the server, and closes the application with its contexts.
    *
    * It deletes the data the server kept, unless the test passed its storage in.
    */
@@ -88,22 +100,31 @@ export async function givenServerStorage(): Promise<ServerStorage> {
 }
 
 /**
- * Opens the storage of an application server, as the server does when it
- * starts.
- *
- * It first creates the database of each organization, as an application
- * administrator does, unless it is there already.
+ * Creates the database of an organization, as an administrator does, unless it
+ * is there already.
  *
  * @param storage The storage of the server.
+ * @param organization The organization's identifier.
  */
-async function openServerStorage(storage: ServerStorage): Promise<StorageFactory> {
-  const settings = storage.settings;
+async function givenDatabaseOf(storage: ServerStorage, organization: string): Promise<void> {
   const app: AppModule = await import("../../../dist/src/index.js");
-  for (const organization of ORGANIZATIONS) {
-    const url = new URL(app.Storage.organizationDatabase(settings, organization));
-    await TestStorages.createDatabases([url.pathname.slice(1)]);
-  }
-  return app.Storage.openServer(settings, ORGANIZATIONS);
+  const url = new URL(app.Storage.organizationDatabase(storage.settings, organization));
+  await TestStorages.createDatabases([url.pathname.slice(1)]);
+}
+
+/**
+ * Registers an organization with a running application server: creates the
+ * organization's database, and adds the organization to the server's
+ * register.
+ *
+ * @param hosted The running server.
+ * @param organization The organization's identifier.
+ */
+export async function givenRegistered(hosted: Hosted, organization: string): Promise<void> {
+  await givenDatabaseOf(hosted.storage, organization);
+  await hosted.organizations.keep(
+    create(TenantIdSchema, { kind: { case: "value", value: organization } }),
+  );
 }
 
 /**
@@ -116,10 +137,49 @@ export function tenant(organization: OrganizationId) {
 }
 
 /**
+ * Creates the databases of the test organizations and registers them before
+ * the server starts.
+ *
+ * @param storage The storage of the server.
+ */
+async function givenOrganizationsRegistered(storage: ServerStorage): Promise<void> {
+  const app: AppModule = await import("../../../dist/src/index.js");
+  const factory = await app.Storage.openServer(storage.settings);
+  try {
+    const register = await PersistentTenantIndex.create({
+      storageFactory: factory,
+      group: REGISTER,
+    });
+    try {
+      for (const organization of ORGANIZATIONS) {
+        await givenDatabaseOf(storage, organization);
+        await register.keep(
+          create(TenantIdSchema, { kind: { case: "value", value: organization } }),
+        );
+      }
+    } finally {
+      await register.close();
+    }
+  } finally {
+    await factory.close();
+  }
+}
+
+/**
+ * Creates the storage of an application server, with the databases of the
+ * organizations the tests work in, and registers those organizations.
+ */
+export async function givenRegisteredStorage(): Promise<ServerStorage> {
+  const storage = await givenServerStorage();
+  await givenOrganizationsRegistered(storage);
+  return storage;
+}
+
+/**
  * Starts both application contexts on a free port, without creating an organization.
  *
- * The server keeps the organizations the tests work in, and its data in the
- * storage of the run.
+ * The server keeps the organizations the tests work in, registered before it
+ * starts, and its data in the storage of the run.
  *
  * @param storage The storage to start the server over, to keep the data an
  *   earlier server kept. New, empty storage when left out.
@@ -127,27 +187,32 @@ export function tenant(organization: OrganizationId) {
 export async function givenServer(storage?: ServerStorage): Promise<Hosted> {
   const app: AppModule = await import("../../../dist/src/index.js");
   const kept = storage ?? (await givenServerStorage());
+  await givenOrganizationsRegistered(kept);
   let url = "";
-  await TestEnvironment.reset();
-  const contexts = await app.AccessDesk.assemble({
+  const assembled = await app.AccessDesk.assemble({
     server: () => url,
-    storage: await openServerStorage(kept),
-    organizations: ORGANIZATIONS,
+    storage: await app.Storage.openServer(kept.settings),
   });
-  const server = await new Server({
-    contexts: [contexts.identity, contexts.resources],
-    resources: [contexts.members],
-    port: 0,
-    services: { readerAdmission: app.TrustedNetwork.admission },
-  }).start();
+  const server = await Server.atPort(0, {
+    services: { readerAdmission: "trusted-network" },
+    resources: [assembled.members],
+  })
+    .setApplication(assembled.application)
+    .start();
   url = server.baseUrl;
+  const [identity, resources] = assembled.application.contexts();
+  if (identity === undefined || resources === undefined) {
+    throw new Error("The application was built without both of its contexts.");
+  }
   return {
     url,
-    identity: contexts.identity,
-    resources: contexts.resources,
+    storage: kept,
+    organizations: assembled.organizations,
+    identity,
+    resources,
     stop: async () => {
       await server.close();
-      await TestEnvironment.reset();
+      await assembled.application.close();
       if (storage === undefined) {
         await kept.drop();
       }

@@ -65,6 +65,7 @@ import {
 } from "../access/request/given/access-request.js";
 import {
   actor,
+  builtResources,
   closeResourcesBlackBoxes,
   loadResourcesContext,
   resourcesBlackBox,
@@ -74,6 +75,7 @@ import { closeResource, openResource, registerResource } from "../resource/given
 import {
   awaitEntries,
   awaitEntry,
+  awaitRecorded,
   eventsOf,
   readAuditTrail,
   readAuditTrailOf,
@@ -398,42 +400,40 @@ describe("AuditEntryProjection should", () => {
   });
 
   it("keep two actions apart when one command led to both", async () => {
-    const box = await resourcesBlackBox(testClock());
-    const reader = box.onBehalfOf(actor);
+    const context = await builtResources(testClock());
     const command = registrationCommand("one-command");
 
     // Two resources are registered as a result of the same command.
-    await recordRegistered(box, "ledger", { by: "ledger", version: 0, cause: command });
-    await recordRegistered(box, "payroll", { by: "payroll", version: 0, cause: command });
+    await recordRegistered(context, "ledger", { by: "ledger", version: 0, cause: command });
+    await recordRegistered(context, "payroll", { by: "payroll", version: 0, cause: command });
 
-    const registered = await awaitEntries(box, reader, ResourceRegisteredSchema, 2);
+    const registered = await awaitRecorded(context, ResourceRegisteredSchema, 2);
     expect(registered.map((entry) => entry.resource?.uuid).sort()).toEqual(["ledger", "payroll"]);
   });
 
   it("never replace an entry with a different action", async () => {
-    const box = await resourcesBlackBox(testClock());
-    const reader = box.onBehalfOf(actor);
-    await recordRegistered(box, "ledger", {
+    const context = await builtResources(testClock());
+    await recordRegistered(context, "ledger", {
       by: "ledger",
       version: 4,
       cause: registrationCommand("first"),
     });
-    await awaitEntry(box, reader, ResourceRegisteredSchema);
+    await awaitRecorded(context, ResourceRegisteredSchema, 1);
 
     // A different action claims the same entry: same resource, same version.
-    await recordRegistered(box, "ledger-copy", {
+    await recordRegistered(context, "ledger-copy", {
       by: "ledger",
       version: 4,
       cause: registrationCommand("second"),
     });
     // Events arrive in order, so once this entry appears, the claim was handled.
-    await recordRegistered(box, "payroll", {
+    await recordRegistered(context, "payroll", {
       by: "payroll",
       version: 0,
       cause: registrationCommand("third"),
     });
 
-    const registered = await awaitEntries(box, reader, ResourceRegisteredSchema, 2);
+    const registered = await awaitRecorded(context, ResourceRegisteredSchema, 2);
     expect(registered.map((entry) => entry.resource?.uuid).sort()).toEqual(["ledger", "payroll"]);
   });
 

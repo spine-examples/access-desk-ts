@@ -13,14 +13,15 @@
  */
 
 /**
- * Access Desk as two programs: the application server, which hosts the
- * contexts, and the gateway, the only one a browser talks to.
+ * Access Desk as three servers: the application server, which hosts the
+ * contexts, the delivery server, which keeps their messages until the
+ * application server handles them, and the gateway, the only one a browser
+ * talks to.
  */
 export { typeRegistry } from "../generated/model-registry.js";
 export { AccessDesk, type AccessDeskOptions } from "./server/access-desk.js";
+export { ApplicationServer, type ApplicationServerSetup } from "./server/application-server.js";
 export { Gateway, type GatewayOptions } from "./gateway/gateway.js";
-export { RevokedTokens } from "./gateway/revoked-tokens.js";
-export { TrustedNetwork, type ReaderAdmission } from "./trusted-network.js";
 export { SessionKey } from "./gateway/session-key.js";
 export { Storage, type ServerDatabases } from "./storage.js";
 export { Settings, type DatabaseServer } from "./settings.js";

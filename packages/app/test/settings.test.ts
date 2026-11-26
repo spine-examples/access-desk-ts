@@ -22,17 +22,27 @@ const SESSION_KEY = generateKeyPairSync("ec", { namedCurve: "P-256" })
   .privateKey.export({ type: "pkcs8", format: "der" })
   .toString("base64");
 
-const server = {
-  ACCESS_DESK_SERVER_HOST: "127.0.0.1",
-  ACCESS_DESK_SERVER_PORT: "8090",
-  ACCESS_DESK_ORGANIZATIONS: "teamdev, codematters",
+const database = {
   ACCESS_DESK_DATABASE_HOST: "127.0.0.1",
   ACCESS_DESK_DATABASE_PORT: "5432",
   ACCESS_DESK_DATABASE_USER: "desk",
   ACCESS_DESK_DATABASE_PASSWORD: "secret",
 };
+const server = {
+  ACCESS_DESK_SERVER_HOST: "127.0.0.1",
+  ACCESS_DESK_SERVER_PORT: "8090",
+  ACCESS_DESK_DELIVERY_HOST: "127.0.0.1",
+  ACCESS_DESK_DELIVERY_PORT: "8484",
+  ...database,
+};
+const delivery = {
+  ACCESS_DESK_DELIVERY_HOST: "127.0.0.1",
+  ACCESS_DESK_DELIVERY_PORT: "8484",
+};
 const gateway = {
-  ...server,
+  ACCESS_DESK_SERVER_HOST: "127.0.0.1",
+  ACCESS_DESK_SERVER_PORT: "8090",
+  ...database,
   ACCESS_DESK_GATEWAY_HOST: "127.0.0.1",
   ACCESS_DESK_GATEWAY_PORT: "8080",
   ACCESS_DESK_WEB_HOST: "localhost",
@@ -43,11 +53,17 @@ const gateway = {
 };
 
 describe("The settings should", () => {
-  it("give where the application server listens, which organizations it keeps, and where it keeps its data", () => {
+  it("give where the application server listens, its delivery server, and where it keeps its data", () => {
     expect(Settings.ofServer(server)).toEqual({
       listening: { host: "127.0.0.1", port: 8090 },
-      organizations: ["teamdev", "codematters"],
+      deliveryUrl: "http://127.0.0.1:8484",
       database: { host: "127.0.0.1", port: 5432, user: "desk", password: "secret" },
+    });
+  });
+
+  it("give where the delivery server listens", () => {
+    expect(Settings.ofDelivery(delivery)).toEqual({
+      listening: { host: "127.0.0.1", port: 8484 },
     });
   });
 
@@ -66,14 +82,6 @@ describe("The settings should", () => {
     );
   });
 
-  it("refuse organizations that are not listed one by one", () => {
-    for (const organizations of ["teamdev,,codematters", "teamdev,teamdev"]) {
-      expect(() =>
-        Settings.ofServer({ ...server, ACCESS_DESK_ORGANIZATIONS: organizations }),
-      ).toThrow(/ACCESS_DESK_ORGANIZATIONS must list organizations/);
-    }
-  });
-
   it("take the database password as it is written", () => {
     const settings = Settings.ofServer({ ...server, ACCESS_DESK_DATABASE_PASSWORD: " p@ss " });
 
@@ -83,7 +91,10 @@ describe("The settings should", () => {
 
   it("refuse to assume anything, and name every setting that is missing", () => {
     expect(() => Settings.ofServer({})).toThrow(
-      /ACCESS_DESK_SERVER_HOST is not set[\s\S]*ACCESS_DESK_SERVER_PORT is not set[\s\S]*ACCESS_DESK_ORGANIZATIONS is not set[\s\S]*ACCESS_DESK_DATABASE_HOST is not set[\s\S]*ACCESS_DESK_DATABASE_PORT is not set[\s\S]*ACCESS_DESK_DATABASE_USER is not set[\s\S]*ACCESS_DESK_DATABASE_PASSWORD is not set/,
+      /ACCESS_DESK_SERVER_HOST is not set[\s\S]*ACCESS_DESK_SERVER_PORT is not set[\s\S]*ACCESS_DESK_DELIVERY_HOST is not set[\s\S]*ACCESS_DESK_DELIVERY_PORT is not set[\s\S]*ACCESS_DESK_DATABASE_HOST is not set[\s\S]*ACCESS_DESK_DATABASE_PORT is not set[\s\S]*ACCESS_DESK_DATABASE_USER is not set[\s\S]*ACCESS_DESK_DATABASE_PASSWORD is not set/,
+    );
+    expect(() => Settings.ofDelivery({})).toThrow(
+      /ACCESS_DESK_DELIVERY_HOST is not set[\s\S]*ACCESS_DESK_DELIVERY_PORT is not set/,
     );
     expect(() => Settings.ofGateway({})).toThrow(
       /ACCESS_DESK_GATEWAY_HOST[\s\S]*ACCESS_DESK_GATEWAY_PORT[\s\S]*ACCESS_DESK_SERVER_HOST[\s\S]*ACCESS_DESK_SERVER_PORT[\s\S]*ACCESS_DESK_WEB_HOST[\s\S]*ACCESS_DESK_WEB_PORT[\s\S]*GOOGLE_CLIENT_ID is not set[\s\S]*GOOGLE_CLIENT_SECRET is not set[\s\S]*ACCESS_DESK_DATABASE_HOST is not set[\s\S]*ACCESS_DESK_SESSION_KEY is not set/,
@@ -132,6 +143,40 @@ describe("The settings should", () => {
     ]) {
       expect(Settings.onlyThisMachine(host)).toBe(false);
     }
+  });
+
+  it("reach a server that listens on every address at the loopback address", () => {
+    expect(Settings.urlOf({ host: "0.0.0.0", port: 8484 })).toBe("http://127.0.0.1:8484");
+    expect(Settings.urlOf({ host: "::", port: 8484 })).toBe("http://[::1]:8484");
+  });
+
+  it("refuse to reach another server at an address that stands for every address", () => {
+    for (const host of ["0.0.0.0", "::"]) {
+      expect(() => Settings.ofServer({ ...server, ACCESS_DESK_DELIVERY_HOST: host })).toThrow(
+        /ACCESS_DESK_DELIVERY_HOST must name the machine to connect to/,
+      );
+      expect(() => Settings.ofGateway({ ...gateway, ACCESS_DESK_SERVER_HOST: host })).toThrow(
+        /ACCESS_DESK_SERVER_HOST must name the machine to connect to/,
+      );
+    }
+    expect(
+      Settings.ofServer({ ...server, ACCESS_DESK_SERVER_HOST: "0.0.0.0" }).listening.host,
+    ).toBe("0.0.0.0");
+    expect(
+      Settings.ofDelivery({
+        ACCESS_DESK_DELIVERY_HOST: "0.0.0.0",
+        ACCESS_DESK_DELIVERY_PORT: "8484",
+      }).listening.host,
+    ).toBe("0.0.0.0");
+  });
+
+  it("reach a server at the address it listens on, with an IPv6 address in brackets", () => {
+    expect(Settings.urlOf({ host: "delivery", port: 8484 })).toBe("http://delivery:8484");
+    expect(Settings.urlOf({ host: "10.0.0.5", port: 8090 })).toBe("http://10.0.0.5:8090");
+    expect(Settings.urlOf({ host: "fd00::5", port: 8090 })).toBe("http://[fd00::5]:8090");
+    expect(Settings.ofServer({ ...server, ACCESS_DESK_DELIVERY_HOST: "::1" }).deliveryUrl).toBe(
+      "http://[::1]:8484",
+    );
   });
 
   it("refuse a port that is not one", () => {

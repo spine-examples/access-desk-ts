@@ -235,16 +235,13 @@ async function givenOrganization(
  * @returns The running application.
  */
 export async function givenGateway(): Promise<Running> {
-  const app: AppModule = await import("../../../dist/src/index.js");
   const hosted = await givenServer();
   afterwards(() => hosted.stop());
   await givenOrganization(hosted, "acme", "noah@acme.example");
   await givenOrganization(hosted, "globex", "olivia@acme.example");
   const storage = await TestStorages.singleTenant(typeRegistry);
   afterwards(() => storage.drop());
-  const revokedTokens = await app.RevokedTokens.open(storage.url);
-  afterwards(() => revokedTokens.close());
-  return startGateway({ hosted, storage, revokedTokens });
+  return startGateway({ hosted, storage });
 }
 
 /**
@@ -268,10 +265,11 @@ export async function restartGateway(running: Running): Promise<Running> {
 interface Kept {
   /** The application server behind the gateway. */
   readonly hosted: Hosted;
-  /** Where the gateway keeps the subscriptions people hold. */
+  /**
+   * Where the gateway keeps the subscriptions people hold, the sessions they
+   * ended, and the sign-ins under way.
+   */
   readonly storage: TestStorage;
-  /** The tokens of the sessions people ended before they expired. */
-  readonly revokedTokens: Parameters<AppModule["Gateway"]["start"]>[0]["storage"]["revokedTokens"];
 }
 
 /** The gateway in front of each running application, and what it keeps. */
@@ -288,7 +286,7 @@ async function startGateway(kept: Kept): Promise<Running> {
     port: 0,
     external: fakeProviders(providers),
     sessionKey: SESSION_KEY,
-    storage: { subscriptions: await kept.storage.open(), revokedTokens: kept.revokedTokens },
+    storage: await kept.storage.open(),
   });
   // The gateway and the application server are separate, so each is stopped.
   // Closing a gateway twice does nothing more.

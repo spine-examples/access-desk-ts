@@ -12,54 +12,38 @@
  * and limitations under the License.
  */
 
-import { Server } from "@spine-event-engine/server";
-import { AccessDesk } from "./access-desk.js";
+import { ApplicationServer } from "./application-server.js";
+import { WORKERS } from "./delivery-strategy.js";
 import { Settings } from "../settings.js";
 import { Storage } from "../storage.js";
-import { TrustedNetwork } from "../trusted-network.js";
 
 /**
  * The application server.
  *
- * It hosts the Identity and Resources contexts. It knows nothing of browsers,
- * sessions, or identity providers.
+ * It hosts the Identity and Resources contexts, in a coordinator and its
+ * workers, which take the messages for the contexts from the delivery server.
  */
 
 const settings = Settings.ofServer(process.env);
-const { host, port } = settings.listening;
 
-const storage = await Storage.openServer(
-  Storage.serverDatabases(settings.database),
-  settings.organizations,
-);
-
-const listening: { address?: string } = {};
-const contexts = await AccessDesk.assemble({
-  server: () => {
-    if (listening.address === undefined) {
-      throw new Error("The application server does not listen yet.");
-    }
-    return listening.address;
+await ApplicationServer.run(
+  {
+    listening: settings.listening,
+    workers: WORKERS,
+    deliveryUrl: settings.deliveryUrl,
+    databases: Storage.serverDatabases(settings.database),
   },
-  storage,
-  organizations: settings.organizations,
-});
-const server = await new Server({
-  contexts: [contexts.identity, contexts.resources],
-  resources: [contexts.members],
-  host,
-  port,
-  services: { readerAdmission: TrustedNetwork.admission },
-}).run();
-listening.address = server.baseUrl;
-
-console.log(`Access Desk application server: ${server.baseUrl}`);
-console.log(
-  `Organizations ${settings.organizations.join(", ")} are kept, and no other organization is.`,
+  import.meta.url,
 );
-if (!Settings.onlyThisMachine(host)) {
-  console.warn(
-    `The application server listens on ${host}, so other machines can reach it. ` +
-      "Make sure only the gateway can reach it.",
-  );
+
+// The framework marks each worker it starts, and only the coordinator reports.
+if (process.env.SPINE_MANAGED_SERVER_CHILD !== "true") {
+  const { host } = settings.listening;
+  console.log(`Access Desk application server: ${Settings.urlOf(settings.listening)}`);
+  if (!Settings.onlyThisMachine(host)) {
+    console.warn(
+      `The application server listens on ${host}, so other machines can reach it. ` +
+        "Make sure only the gateway can reach it.",
+    );
+  }
 }

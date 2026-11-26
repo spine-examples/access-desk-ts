@@ -13,9 +13,8 @@
  */
 
 import { isIP } from "node:net";
-import { create } from "@bufbuild/protobuf";
 import { StringifierRegistry } from "@spine-event-engine/core";
-import { TenantIdSchema } from "@spine-event-engine/proto";
+import type { TenantId } from "@spine-event-engine/proto";
 import type { StorageFactory } from "@spine-event-engine/storage";
 import { PostgresStorageFactory } from "@spine-event-engine/storage-postgres";
 import { typeRegistry } from "../generated/model-registry.js";
@@ -26,8 +25,8 @@ const ORGANIZATION = "{organization}";
 
 /**
  * The database of the application server that keeps what belongs to no
- * organization: people, their accounts and memberships, subscriptions, and the
- * messages waiting for delivery.
+ * organization: people, their accounts and memberships, the registered
+ * tenants, and, with local delivery, the messages waiting for delivery.
  */
 const SERVER_DATABASE = "accessdesk_server";
 
@@ -58,7 +57,8 @@ export interface ServerDatabases {
    * The address of the shared database.
    *
    * It keeps what belongs to no organization: people, their accounts and memberships,
-   * subscriptions, and the messages waiting for delivery.
+   * the registered tenants, and, with local delivery, the messages waiting for
+   * delivery.
    */
   readonly url: string;
   /**
@@ -157,25 +157,20 @@ export const Storage = {
   /**
    * Opens the storage of the application server in its PostgreSQL databases.
    *
-   * Each organization has a separate database; other data shares one database.
+   * Each organization has a separate database, named after its identifier;
+   * other data shares one database. The storage finds an organization's
+   * database when it first accesses the data of that organization.
    * All databases must exist already.
    *
    * @param databases The databases the application server keeps its data in.
-   * @param organizations The organizations the server keeps.
    * @returns The opened storage.
-   * @throws Error when an organization's identifier cannot name its database.
    */
-  openServer(
-    databases: ServerDatabases,
-    organizations: readonly string[],
-  ): Promise<StorageFactory> {
-    const tenants = organizations.map((organization) => ({
-      tenantId: create(TenantIdSchema, { kind: { case: "value", value: organization } }),
-      options: { url: Storage.organizationDatabase(databases, organization) },
-    }));
+  openServer(databases: ServerDatabases): Promise<StorageFactory> {
     return PostgresStorageFactory.newBuilder()
       .setOptions({ url: databases.url })
-      .setTenantOptions(tenants)
+      .setTenantResolver((tenant) => ({
+        url: Storage.organizationDatabase(databases, organizationOf(tenant)),
+      }))
       .setStringifierRegistry(Storage.stringifiers())
       .build();
   },
@@ -190,3 +185,17 @@ export const Storage = {
     return stringifiers;
   },
 };
+
+/**
+ * Reads the identifier of the organization a tenant stands for.
+ *
+ * @param tenant The tenant.
+ * @returns The organization's identifier.
+ * @throws Error when the tenant names no organization.
+ */
+function organizationOf(tenant: TenantId): string {
+  if (tenant.kind.case !== "value") {
+    throw new Error("A tenant names no organization unless it is a value.");
+  }
+  return tenant.kind.value;
+}
