@@ -13,12 +13,17 @@
  */
 
 import { create } from "@bufbuild/protobuf";
+import type { Any } from "@bufbuild/protobuf/wkt";
+import { AnyPacker } from "@spine-event-engine/core";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { CreateOrganizationSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
+import { OrganizationCreatedSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
+import { OrganizationAlreadyExistsSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/rejections_pb.js";
 import { OrganizationIdSchema } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { OrganizationViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
 import { OrganizationViewQuery } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_query.js";
 
+import { creation, creationShown, firstGiven, organizationId } from "./given/client.js";
 import { givenOrganization, givenServer, organizationView, type Hosted } from "./given/hosted.js";
 
 type ClientModule = typeof import("../../dist/src/server/client.js");
@@ -45,27 +50,6 @@ function connectionTo(address: () => string) {
   const connection = new client.ServerConnection(address);
   closing.push(() => connection.close());
   return connection;
-}
-
-function organizationId(uuid: string) {
-  return create(OrganizationIdSchema, { value: uuid });
-}
-
-/**
- * Describes creating an organization, which shows in its view under its name.
- *
- * @param organization The organization, whose name is its identifier.
- * @param name The name the organization is created under.
- */
-function creationShown(organization: string, name: string = organization) {
-  return {
-    command: CreateOrganizationSchema,
-    message: create(CreateOrganizationSchema, { id: { value: organization }, name }),
-    view: OrganizationViewSchema,
-    idSchema: OrganizationIdSchema,
-    id: organizationId(organization),
-    shows: (view: { readonly name: string }) => (view.name === "" ? undefined : view.name),
-  };
 }
 
 describe("ServerConnection should", () => {
@@ -138,6 +122,34 @@ describe("ServerConnection should", () => {
   });
 });
 
+describe("ServerConnection, once its server stopped, should", () => {
+  it("end, and tell that the server did not cancel the subscriptions", async () => {
+    const stopped = await givenServer();
+    let address = stopped.url;
+    const connection = connectionTo(() => address);
+    const request = connection.in(organizationId("acme")).onBehalfOf("access-desk");
+    await client.ServerRequests.subscribeTo(
+      request,
+      OrganizationViewSchema,
+      OrganizationIdSchema,
+      organizationId("acme"),
+      () => undefined,
+    );
+    await stopped.stop();
+
+    await expect(connection.close()).rejects.toThrow();
+
+    // The connection reaches the next server it is given.
+    const server = await hosted();
+    address = server.url;
+    const shown = await client.ServerRequests.postAndAwaitView(
+      connection.in(organizationId("globex")).onBehalfOf("access-desk"),
+      creationShown("globex"),
+    );
+    expect(shown).toBe("globex");
+  });
+});
+
 describe("postAndAwaitView should", () => {
   it("give the command and return what the read model shows once an update shows it", async () => {
     const server = await hosted();
@@ -179,7 +191,7 @@ describe("postAndAwaitView should", () => {
     expect((await organizationView(server, organizationId("acme")))?.name).toBe("acme");
   });
 
-  it("return nothing when the command is refused", async () => {
+  it("return nothing when the server does not take the command", async () => {
     const server = await hosted();
     const connection = connectionTo(() => server.url);
 
@@ -190,6 +202,118 @@ describe("postAndAwaitView should", () => {
     );
 
     expect(shown).toBeUndefined();
+  });
+});
+
+describe("subscribeTo should", () => {
+  it("give the state of the entity once it changes", async () => {
+    const server = await hosted();
+    const request = connectionTo(() => server.url)
+      .in(organizationId("acme"))
+      .onBehalfOf("access-desk");
+    const name = firstGiven<string>(10_000);
+    const subscription = await client.ServerRequests.subscribeTo(
+      request,
+      OrganizationViewSchema,
+      OrganizationIdSchema,
+      organizationId("acme"),
+      (view) => {
+        name.observe(view.name);
+      },
+    );
+
+    await request.post(CreateOrganizationSchema, creation("acme"));
+
+    expect(await name.value).toBe("acme");
+    await subscription.cancel();
+  });
+
+  it("give nothing of what the entity held before the subscription", async () => {
+    const server = await hosted();
+    await givenOrganization(server, organizationId("acme"));
+    const request = connectionTo(() => server.url)
+      .in(organizationId("acme"))
+      .onBehalfOf("access-desk");
+    const name = firstGiven<string>(300);
+
+    const subscription = await client.ServerRequests.subscribeTo(
+      request,
+      OrganizationViewSchema,
+      OrganizationIdSchema,
+      organizationId("acme"),
+      (view) => {
+        name.observe(view.name);
+      },
+    );
+
+    expect(await name.value).toBeUndefined();
+    await subscription.cancel();
+  });
+});
+
+describe("postAndSubscribe should", () => {
+  it("give the event the command's handler emits", async () => {
+    const server = await hosted();
+    const request = connectionTo(() => server.url)
+      .in(organizationId("acme"))
+      .onBehalfOf("access-desk");
+    const outcome = firstGiven<Any>(10_000);
+
+    const subscription = await client.ServerRequests.postAndSubscribe(
+      request,
+      CreateOrganizationSchema,
+      creation("acme"),
+      [OrganizationCreatedSchema, OrganizationAlreadyExistsSchema],
+      outcome.observe,
+    );
+
+    const event = await outcome.value;
+    const created =
+      event === undefined ? undefined : AnyPacker.tryUnpack(event, OrganizationCreatedSchema);
+    expect(created?.id?.value).toBe("acme");
+    await subscription?.cancel();
+  });
+
+  it("give the rejection the command's handler rejects the command with", async () => {
+    const server = await hosted();
+    await givenOrganization(server, organizationId("acme"));
+    const request = connectionTo(() => server.url)
+      .in(organizationId("acme"))
+      .onBehalfOf("access-desk");
+    const outcome = firstGiven<Any>(10_000);
+
+    const subscription = await client.ServerRequests.postAndSubscribe(
+      request,
+      CreateOrganizationSchema,
+      creation("acme"),
+      [OrganizationCreatedSchema, OrganizationAlreadyExistsSchema],
+      outcome.observe,
+    );
+
+    const rejection = await outcome.value;
+    const exists =
+      rejection === undefined
+        ? undefined
+        : AnyPacker.tryUnpack(rejection, OrganizationAlreadyExistsSchema);
+    expect(exists?.id?.value).toBe("acme");
+    await subscription?.cancel();
+  });
+
+  it("give no subscription when the server does not take the command", async () => {
+    const server = await hosted();
+    const request = connectionTo(() => server.url)
+      .in(organizationId("acme"))
+      .onBehalfOf("access-desk");
+
+    const subscription = await client.ServerRequests.postAndSubscribe(
+      request,
+      CreateOrganizationSchema,
+      creation("acme", ""),
+      [OrganizationCreatedSchema, OrganizationAlreadyExistsSchema],
+      () => undefined,
+    );
+
+    expect(subscription).toBeUndefined();
   });
 });
 

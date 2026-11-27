@@ -14,8 +14,13 @@
 
 import { create, type Message, type MessageShape } from "@bufbuild/protobuf";
 import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
+import type { Any } from "@bufbuild/protobuf/wkt";
 import { Http2SessionManager, createGrpcTransport } from "@connectrpc/connect-node";
-import { Client } from "@spine-event-engine/client-node";
+import {
+  Client,
+  type Subscription,
+  type SubscriptionDelivery,
+} from "@spine-event-engine/client-node";
 import type { OrganizationId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { AnyPacker, TypeUrls } from "@spine-event-engine/core";
 import {
@@ -79,13 +84,23 @@ export class ServerConnection {
     return client;
   }
 
-  /** Closes the connection, with everything that was open on it. */
+  /**
+   * Closes the connection, with everything that was open on it.
+   *
+   * The connection ends even when the server does not cancel the
+   * subscriptions of its clients, as when it stopped already.
+   *
+   * @throws Error When the server did not cancel the subscriptions.
+   */
   async close(): Promise<void> {
     const clients = [...this.#clients.values()];
     this.#clients.clear();
-    await Promise.all(clients.map((client) => client.close()));
-    this.#open?.sessions.abort();
-    this.#open = undefined;
+    try {
+      await Promise.all(clients.map((client) => client.close()));
+    } finally {
+      this.#open?.sessions.abort();
+      this.#open = undefined;
+    }
   }
 
   #transport() {
@@ -104,7 +119,7 @@ export class ServerConnection {
 /** A client that acts as one person or program. */
 export type ServerRequest = ReturnType<ServerClient["onBehalfOf"]>;
 
-/** How long to wait for a command's effect by default. */
+/** The time to wait for a command's effect by default. */
 export const PATIENCE_MS = 10_000; // 10 seconds.
 
 /** A command, and the read model that shows what it changed. */
@@ -212,63 +227,130 @@ export const ServerRequests = {
     awaited: AwaitedView<Command, View, IdSchema, Shown>,
     patienceMs: number = PATIENCE_MS,
   ): Promise<Shown | undefined> {
-    const target = Targets.byId(awaited.view, awaited.idSchema, awaited.id);
-    const type = TypeUrls.derive(awaited.view);
-    const watching = await request.createSubscription(
+    const shown = Promise.withResolvers<Shown | undefined>();
+    const timer = setTimeout(() => {
+      shown.resolve(undefined);
+    }, patienceMs);
+    let subscription: Subscription | undefined;
+    try {
+      subscription = await ServerRequests.subscribeTo(
+        request,
+        awaited.view,
+        awaited.idSchema,
+        awaited.id,
+        (view) => {
+          const effect = awaited.shows(view);
+          if (effect !== undefined) {
+            shown.resolve(effect);
+          }
+        },
+      );
+      const given = await request.post(awaited.command, awaited.message);
+      return given.kind === "ok" ? await shown.promise : undefined;
+    } finally {
+      clearTimeout(timer);
+      await subscription?.cancel();
+    }
+  },
+
+  /**
+   * Subscribes to the state of one entity, such as a projection, by its ID.
+   *
+   * The subscription brings the state each time it changes, from the moment
+   * the subscription is active. What the entity held before is read with
+   * `readById`.
+   *
+   * @param request The client that subscribes.
+   * @param schema The type of the entity state.
+   * @param idSchema The type of the entity ID.
+   * @param id The entity ID.
+   * @param observe Takes each state the subscription brings.
+   * @returns The active subscription, which the caller cancels.
+   */
+  async subscribeTo<Schema extends GenMessage<Message>, IdSchema extends GenMessage<Message>>(
+    request: ServerRequest,
+    schema: Schema,
+    idSchema: IdSchema,
+    id: MessageShape<IdSchema>,
+    observe: (state: MessageShape<Schema>) => void,
+  ): Promise<Subscription> {
+    const target = Targets.byId(schema, idSchema, id);
+    const type = TypeUrls.derive(schema);
+    const subscription = await request.createSubscription(
       create(TopicSchema, {
-        id: create(TopicIdSchema, { value: `awaited-${type}-${crypto.randomUUID()}` }),
+        id: create(TopicIdSchema, { value: `subscribed-${type}-${crypto.randomUUID()}` }),
         target,
       }),
       {
         kind: "entity",
         authoritativeQuery: () =>
           create(QuerySchema, {
-            id: create(QueryIdSchema, { value: `awaited-${type}-${crypto.randomUUID()}` }),
+            id: create(QueryIdSchema, { value: `subscribed-${type}-${crypto.randomUUID()}` }),
             target,
           }),
       },
     );
-    const shownBy = (state: Parameters<typeof AnyPacker.tryUnpack>[0] | undefined) => {
-      const view = state === undefined ? undefined : AnyPacker.tryUnpack(state, awaited.view);
-      return view === undefined ? undefined : awaited.shows(view);
-    };
-    const shown = (async (): Promise<Shown | undefined> => {
-      for await (const delivery of watching.updates) {
-        const states =
-          delivery.kind === "resynchronization"
-            ? delivery.response.message.map(({ state }) => state)
-            : delivery.update.update.case === "entityUpdates"
-              ? delivery.update.update.value.update.map(({ kind }) =>
-                  kind.case === "state" ? kind.value : undefined,
-                )
-              : [];
-        for (const state of states) {
-          const result = shownBy(state);
-          if (result !== undefined) {
-            return result;
+    void (async () => {
+      for await (const delivery of subscription.updates) {
+        for (const state of statesOf(delivery)) {
+          const unpacked = state === undefined ? undefined : AnyPacker.tryUnpack(state, schema);
+          if (unpacked !== undefined) {
+            observe(unpacked);
           }
         }
       }
-      return undefined;
-    })();
-    shown.catch(() => undefined);
-    let giveUp: ReturnType<typeof setTimeout> | undefined;
-    const tooLate = new Promise<undefined>((resolve) => {
-      giveUp = setTimeout(() => {
-        resolve(undefined);
-      }, patienceMs);
+    })().catch(() => {
+      // The subscription ends with its updates.
     });
     try {
-      await watching.activate();
-      const given = await request.post(awaited.command, awaited.message);
-      if (given.kind !== "ok") {
-        return undefined;
-      }
-      return await Promise.race([shown, tooLate]);
-    } finally {
-      clearTimeout(giveUp);
-      await watching.cancel();
+      await subscription.activate();
+    } catch (error) {
+      await subscription.cancel();
+      throw error;
     }
+    return subscription;
+  },
+
+  /**
+   * Posts a command, and subscribes to the events and rejections its handler emits.
+   *
+   * The subscription brings only what the handler emits for the command, not
+   * what other entities emit later in reaction. Such later steps show in an
+   * entity the caller subscribes to with `subscribeTo`.
+   *
+   * @param request The client that posts the command.
+   * @param schema The type of the command.
+   * @param message The command.
+   * @param outcomes The types of the events and rejections to subscribe to.
+   * @param observe Takes each event or rejection, packed.
+   * @returns The subscription, which the caller cancels, or `undefined` when
+   *   the server did not take the command.
+   */
+  async postAndSubscribe<Schema extends GenMessage<Message>>(
+    request: ServerRequest,
+    schema: Schema,
+    message: MessageShape<Schema>,
+    outcomes: readonly GenMessage<Message>[],
+    observe: (outcome: Any) => void,
+  ): Promise<Subscription | undefined> {
+    const posted = await request.postAndSubscribe(schema, message, { events: [...outcomes] });
+    if (posted.kind !== "accepted") {
+      return undefined;
+    }
+    void (async () => {
+      for await (const delivery of posted.subscription.updates) {
+        if (delivery.kind === "update" && delivery.update.update.case === "eventUpdates") {
+          for (const event of delivery.update.update.value.event) {
+            if (event.message !== undefined) {
+              observe(event.message);
+            }
+          }
+        }
+      }
+    })().catch(() => {
+      // The subscription ends with its updates.
+    });
+    return posted.subscription;
   },
 
   /**
@@ -291,3 +373,20 @@ export const ServerRequests = {
     });
   },
 };
+
+/**
+ * Gives the states of a read model that one delivery of its subscription brings.
+ *
+ * @param delivery The delivery.
+ * @returns The packed states, with `undefined` for an update that carries none.
+ */
+function statesOf(delivery: SubscriptionDelivery): (Any | undefined)[] {
+  if (delivery.kind === "resynchronization") {
+    return delivery.response.message.map(({ state }) => state);
+  }
+  return delivery.update.update.case === "entityUpdates"
+    ? delivery.update.update.value.update.map(({ kind }) =>
+        kind.case === "state" ? kind.value : undefined,
+      )
+    : [];
+}
