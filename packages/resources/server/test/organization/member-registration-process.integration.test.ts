@@ -38,15 +38,18 @@ beforeAll(loadResourcesContext, 30_000);
 afterEach(closeResourcesBlackBoxes);
 
 describe("MemberRegistrationProcessManager should", () => {
-  it("make the first organization administrator a member", async () => {
+  it("make the first organization administrator a member, registered by no organization administrator", async () => {
     const box = await resourcesBlackBox();
     const scope = box.onBehalfOf(actor);
     await createOrganization(scope);
+    const registered = await recordEvents(scope, MemberRegisteredSchema);
 
     expect(
       (await registerMember(scope, "olivia@acme.example", OrganizationRole.ADMINISTRATOR)).kind,
     ).toBe("ok");
 
+    expect((await registered.waitFor(box)).registeredBy).toBeUndefined();
+    await registered.cancel();
     const view = await awaitMember(box, scope, "olivia@acme.example");
     expect(view.member).toMatchObject([
       {

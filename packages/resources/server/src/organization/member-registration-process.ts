@@ -58,7 +58,9 @@ import type { Memberships } from "./memberships.js";
  * address.
  *
  * 1. An organization administrator registers a person in the organization by
- *    their email address, and chooses the role the person holds.
+ *    their email address, and chooses the role the person holds. The
+ *    application administrator registers the first organization administrator
+ *    with the organization.
  * 2. The person under the address is claimed as a member of the organization.
  *    When another organization claimed the person, the registration fails.
  * 3. The organization lists the person among its members, as added by the
@@ -147,7 +149,7 @@ export class MemberRegistrationProcessManager extends ProcessManager<
       person,
       emailAddress: this.id.emailAddress,
       role: this.state.role,
-      addedBy: this.state.registeredBy ?? person,
+      addedBy: this.state.registeredBy,
     });
   }
 
@@ -172,7 +174,6 @@ export class MemberRegistrationProcessManager extends ProcessManager<
     const { id: organization, person, role, addedBy } = event;
     this.update((draft) => {
       draft.person = person;
-      draft.registeredBy = addedBy;
     });
     return create(MemberRegisteredSchema, {
       id: this.id,
@@ -193,11 +194,9 @@ export class MemberRegistrationProcessManager extends ProcessManager<
     if (person === undefined) {
       throw new Error("`MemberAlreadyAdded` names no person.");
     }
-    const { organization, role } = this.state;
-    const registeredBy = this.state.registeredBy ?? person;
+    const { organization, role, registeredBy } = this.state;
     this.update((draft) => {
       draft.person = person;
-      draft.registeredBy = registeredBy;
     });
     return create(MemberRegisteredSchema, {
       id: this.id,
