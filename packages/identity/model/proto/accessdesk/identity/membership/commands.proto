@@ -17,27 +17,19 @@ syntax = "proto3";
 package accessdesk.identity.membership;
 
 import "accessdesk/identity/identifiers.proto";
-import "accessdesk/identity/values.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
-// Adds a person to the members of an organization, by their email address.
-message AddMember {
+// Claims the person under an email address as a member of an organization.
+//
+// The person is registered when nobody has signed in under the address yet.
+//
+message ClaimMember {
 
-    // The membership, which names the email address of the person to add.
+    // The membership's ID.
     accessdesk.identity.MembershipId id = 1;
 
-    // The organization the person joins.
-    accessdesk.identity.OrganizationId organization = 2 [(required) = true];
-
-    // The role the person will hold in the organization.
-    accessdesk.identity.OrganizationRole role = 3 [(required) = true];
-
-    // The administrator who adds the person.
-    //
-    // This field is empty when the person is the organization's first
-    // administrator, who counts as adding themselves.
-    //
-    accessdesk.identity.PersonId added_by = 4;
+    // The organization that claims the person as a member.
+    accessdesk.identity.OrganizationId organization = 2 [(required) = true, (validate) = true];
 }

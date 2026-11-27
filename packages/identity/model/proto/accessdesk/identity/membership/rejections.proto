@@ -21,10 +21,26 @@ import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
-// The email address already belongs to another organization, so it cannot be
-// added to this one.
-message AlreadyMemberOfOtherOrganization {
+// The organization claimed the person under the email address as a member
+// already, or is claiming them.
+//
+message MemberAlreadyClaimed {
 
-    // The membership, which names the email address that was to be added.
+    // The membership's ID.
     accessdesk.identity.MembershipId id = 1 [(required) = true];
+
+    // The organization that tried to claim the person again.
+    accessdesk.identity.OrganizationId organization = 2 [(required) = true, (validate) = true];
+}
+
+// Another organization claimed the person under the email address as a member
+// already, or is claiming them, so this one cannot.
+//
+message MemberClaimedByOtherOrganization {
+
+    // The membership's ID.
+    accessdesk.identity.MembershipId id = 1 [(required) = true];
+
+    // The organization that tried to claim the person as a member.
+    accessdesk.identity.OrganizationId organization = 2 [(required) = true, (validate) = true];
 }

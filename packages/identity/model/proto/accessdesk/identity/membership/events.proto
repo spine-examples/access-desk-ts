@@ -17,37 +17,29 @@ syntax = "proto3";
 package accessdesk.identity.membership;
 
 import "accessdesk/identity/identifiers.proto";
-import "accessdesk/identity/values.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
-// An administrator started adding an email address to an organization.
-message MemberAddingStarted {
+// An organization started claiming the person under an email address as a member.
+message MemberClaimStarted {
 
-    // The membership, which names the email address.
+    // The membership's ID.
     accessdesk.identity.MembershipId id = 1 [(required) = true];
 
-    // The organization the address is added to.
-    accessdesk.identity.OrganizationId organization = 2 [(required) = true];
-
-    // The role the person will hold in the organization.
-    accessdesk.identity.OrganizationRole role = 3 [(required) = true];
+    // The organization that claims the person as a member.
+    accessdesk.identity.OrganizationId organization = 2 [(required) = true, (validate) = true];
 }
 
-// A person was added to the members of an organization, by their email
-// address.
-message MemberAdded {
+// An organization claimed the person under an email address as a member.
+message MemberClaimed {
 
-    // The membership, which names the email address of the person.
+    // The membership's ID.
     accessdesk.identity.MembershipId id = 1 [(required) = true];
 
     // The person the address belongs to, who may not have signed in yet.
     accessdesk.identity.PersonId person = 2 [(required) = true];
 
     // The organization the person belongs to from now on.
-    accessdesk.identity.OrganizationId organization = 3 [(required) = true];
-
-    // The role the person holds in the organization.
-    accessdesk.identity.OrganizationRole role = 4 [(required) = true];
+    accessdesk.identity.OrganizationId organization = 3 [(required) = true, (validate) = true];
 }

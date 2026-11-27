@@ -17,47 +17,40 @@ syntax = "proto3";
 package accessdesk.identity.membership;
 
 import "accessdesk/identity/identifiers.proto";
-import "accessdesk/identity/values.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
 
 // A person's membership in an organization, under their email address.
+//
+// An email address belongs to one organization at most, the first to claim
+// the person under it as a member.
+//
 message Membership {
     option (entity).kind = PROCESS_MANAGER;
 
     // The membership's ID.
     accessdesk.identity.MembershipId id = 1;
 
-    // The organization the address is added to, once an administrator added it.
-    accessdesk.identity.OrganizationId organization = 2;
+    // The organization that claimed the person as a member, or is claiming them.
+    accessdesk.identity.OrganizationId organization = 2 [(validate) = true];
 
-    // The role the person holds in the organization.
-    accessdesk.identity.OrganizationRole role = 3;
-
-    // The administrator who added the person.
-    //
-    // This field is empty when the person is the organization's first
-    // administrator, who counts as adding themselves.
-    //
-    accessdesk.identity.PersonId added_by = 4;
+    // The person, once they joined the organization that claimed them.
+    accessdesk.identity.PersonId person = 3;
 }
 
-// The membership of one email address, as the organization's administrators
-// see it.
+// A person's membership in an organization, with the email address they were
+// claimed under.
 message MembershipView {
     option (entity).kind = PROJECTION;
     option (entity).visibility = FULL;
 
-    // The membership, which names the email address.
+    // The membership's ID.
     accessdesk.identity.MembershipId id = 1;
 
     // The organization the address belongs to.
-    accessdesk.identity.OrganizationId organization = 2 [(required) = true, (column) = true];
-
-    // The role the person holds in the organization.
-    accessdesk.identity.OrganizationRole role = 3 [(required) = true];
+    accessdesk.identity.OrganizationId organization = 2 [(required) = true, (validate) = true];
 
     // The person the address belongs to.
-    accessdesk.identity.PersonId person = 4 [(required) = true];
+    accessdesk.identity.PersonId person = 3 [(required) = true];
 }
