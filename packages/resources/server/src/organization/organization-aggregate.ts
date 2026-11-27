@@ -75,7 +75,7 @@ export class OrganizationAggregate extends Aggregate<OrganizationId, typeof Orga
   addMember(command: AddMember): MemberAdded {
     const person = command.person;
     if (person === undefined) {
-      throw new Error("AddMember requires a person.");
+      throw new Error("`AddMember` names no person.");
     }
     if (this.state.membership.some((item) => equals(PersonIdSchema, item.person, person))) {
       throw MemberAlreadyAdded.create({
@@ -108,7 +108,7 @@ export class OrganizationAggregate extends Aggregate<OrganizationId, typeof Orga
   addResource(command: AddResource): ResourceAdded {
     const resourceId = command.resourceId;
     if (resourceId === undefined) {
-      throw new Error("AddResource requires a resource id.");
+      throw new Error("`AddResource` names no resource.");
     }
     const existing = this.state.resource.find((reserved) =>
       equals(ResourceIdSchema, reserved.id, resourceId),

@@ -118,7 +118,7 @@ describe("OrganizationAggregate should", () => {
       await events.cancel();
     });
 
-    it("name the administrator who added the person", async () => {
+    it("name the organization administrator who added the person", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await createOrganization(scope)).kind).toBe("ok");
@@ -147,8 +147,8 @@ describe("OrganizationAggregate should", () => {
     });
   });
 
-  describe("handle 'AddMember' as an administrator, and", () => {
-    it("emit 'MemberAdded' with the administrator role", async () => {
+  describe("handle 'AddMember' as an organization administrator, and", () => {
+    it("emit 'MemberAdded' with the organization administrator role", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await createOrganization(scope)).kind).toBe("ok");
