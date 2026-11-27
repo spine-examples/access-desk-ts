@@ -21,16 +21,16 @@ import {
 } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
 import { equals } from "../proto/equals.js";
 import {
-  type AddOrganizationMember,
+  type AddMember,
   type AddResource,
   type CreateOrganization,
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
 import {
   OrganizationCreatedSchema,
-  OrganizationMemberAddedSchema,
+  MemberAddedSchema,
   ResourceAddedSchema,
   type OrganizationCreated,
-  type OrganizationMemberAdded,
+  type MemberAdded,
   type ResourceAdded,
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
 import { OrganizationSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
@@ -39,7 +39,7 @@ import {
   OrganizationResourceSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/values_pb.js";
 import {
-  AlreadyOrganizationMember,
+  MemberAlreadyAdded,
   OrganizationAlreadyExists,
   OrganizationResourceNameAlreadyUsed,
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/rejections.js";
@@ -65,17 +65,24 @@ export class OrganizationAggregate extends Aggregate<OrganizationId, typeof Orga
   }
 
   /**
-   * Makes a person a member of the organization, at most once each.
+   * Makes a person a member of the organization.
+   *
+   * Adding a person the organization lists already is rejected with
+   * `MemberAlreadyAdded`.
    */
   @Assign
-  @Throws(AlreadyOrganizationMember)
-  addOrganizationMember(command: AddOrganizationMember): OrganizationMemberAdded {
+  @Throws(MemberAlreadyAdded)
+  addMember(command: AddMember): MemberAdded {
     const person = command.person;
     if (person === undefined) {
-      throw new Error("AddOrganizationMember requires a person.");
+      throw new Error("AddMember requires a person.");
     }
     if (this.state.membership.some((item) => equals(PersonIdSchema, item.person, person))) {
-      throw AlreadyOrganizationMember.create({ organizationId: this.id, person });
+      throw MemberAlreadyAdded.create({
+        id: this.id,
+        person,
+        emailAddress: command.emailAddress,
+      });
     }
     const role = command.role;
     this.update((draft) => {
@@ -84,8 +91,8 @@ export class OrganizationAggregate extends Aggregate<OrganizationId, typeof Orga
         create(OrganizationMemberSchema, { person, emailAddress: command.emailAddress, role }),
       ];
     });
-    return create(OrganizationMemberAddedSchema, {
-      organizationId: this.id,
+    return create(MemberAddedSchema, {
+      id: this.id,
       person,
       emailAddress: command.emailAddress,
       role,
@@ -122,8 +129,8 @@ export class OrganizationAggregate extends Aggregate<OrganizationId, typeof Orga
       });
     }
     return create(ResourceAddedSchema, {
+      id: this.id,
       resourceId,
-      organizationId: this.id,
       name: command.name,
     });
   }

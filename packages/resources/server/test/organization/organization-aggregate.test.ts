@@ -18,11 +18,11 @@ import { eventRecording } from "../given/event-recording.js";
 
 import {
   OrganizationCreatedSchema,
-  OrganizationMemberAddedSchema,
+  MemberAddedSchema,
   ResourceAddedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
 import {
-  AlreadyOrganizationMemberSchema,
+  MemberAlreadyAddedSchema,
   OrganizationAlreadyExistsSchema,
   OrganizationResourceNameAlreadyUsedSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/rejections_pb.js";
@@ -39,7 +39,7 @@ import {
   testActorContext,
 } from "../given/resources-context.js";
 import {
-  addOrganizationMember,
+  addMember,
   addResource,
   awaitOrganizationView,
   createOrganization,
@@ -96,19 +96,19 @@ describe("OrganizationAggregate should", () => {
     });
   });
 
-  describe("handle 'AddOrganizationMember', and", () => {
-    it("emit 'OrganizationMemberAdded'", async () => {
+  describe("handle 'AddMember', and", () => {
+    it("emit 'MemberAdded'", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await createOrganization(scope)).kind).toBe("ok");
-      const events = await recordEvents(scope, OrganizationMemberAddedSchema);
+      const events = await recordEvents(scope, MemberAddedSchema);
 
-      expect((await addOrganizationMember(scope, "maya")).kind).toBe("ok");
+      expect((await addMember(scope, "maya")).kind).toBe("ok");
 
       const event = await events.waitFor(box);
       expect(event).toEqual(
-        create(OrganizationMemberAddedSchema, {
-          organizationId: { value: organizationId },
+        create(MemberAddedSchema, {
+          id: { value: organizationId },
           person: { uuid: "maya" },
           emailAddress: { value: "maya@acme.example" },
           role: OrganizationRole.MEMBER,
@@ -122,43 +122,39 @@ describe("OrganizationAggregate should", () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await createOrganization(scope)).kind).toBe("ok");
-      const events = await recordEvents(scope, OrganizationMemberAddedSchema);
+      const events = await recordEvents(scope, MemberAddedSchema);
 
-      expect(
-        (await addOrganizationMember(scope, "maya", OrganizationRole.MEMBER, "noah")).kind,
-      ).toBe("ok");
+      expect((await addMember(scope, "maya", OrganizationRole.MEMBER, "noah")).kind).toBe("ok");
 
       expect((await events.waitFor(box)).addedBy?.uuid).toBe("noah");
       await events.cancel();
     });
 
-    it("reject a person the organization lists already with 'AlreadyOrganizationMember'", async () => {
+    it("reject a person the organization lists already with 'MemberAlreadyAdded'", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await createOrganization(scope)).kind).toBe("ok");
-      const events = await recordEvents(scope, OrganizationMemberAddedSchema);
-      expect((await addOrganizationMember(scope, "maya")).kind).toBe("ok");
+      const events = await recordEvents(scope, MemberAddedSchema);
+      expect((await addMember(scope, "maya")).kind).toBe("ok");
       await events.waitFor(box);
       await events.cancel();
 
-      const rejection = await expectRejection(box, scope, AlreadyOrganizationMemberSchema, () =>
-        addOrganizationMember(scope, "maya", OrganizationRole.ADMINISTRATOR),
+      const rejection = await expectRejection(box, scope, MemberAlreadyAddedSchema, () =>
+        addMember(scope, "maya", OrganizationRole.ADMINISTRATOR),
       );
 
       expect(rejection.person?.uuid).toBe("maya");
     });
   });
 
-  describe("handle 'AddOrganizationMember' as an administrator, and", () => {
-    it("emit 'OrganizationMemberAdded' with the administrator role", async () => {
+  describe("handle 'AddMember' as an administrator, and", () => {
+    it("emit 'MemberAdded' with the administrator role", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await createOrganization(scope)).kind).toBe("ok");
-      const events = await recordEvents(scope, OrganizationMemberAddedSchema);
+      const events = await recordEvents(scope, MemberAddedSchema);
 
-      expect(
-        (await addOrganizationMember(scope, "noah", OrganizationRole.ADMINISTRATOR)).kind,
-      ).toBe("ok");
+      expect((await addMember(scope, "noah", OrganizationRole.ADMINISTRATOR)).kind).toBe("ok");
 
       expect((await events.waitFor(box)).role).toBe(OrganizationRole.ADMINISTRATOR);
       await events.cancel();
@@ -177,7 +173,7 @@ describe("OrganizationAggregate should", () => {
       const event = await events.waitFor(box);
       expect(event).toEqual(
         create(ResourceAddedSchema, {
-          organizationId: { value: organizationId },
+          id: { value: organizationId },
           resourceId: { uuid: "payroll" },
           name: "payroll",
         }),
@@ -201,7 +197,7 @@ describe("OrganizationAggregate should", () => {
 
         expect(events.received).toEqual([
           create(ResourceAddedSchema, {
-            organizationId: { value: organizationId },
+            id: { value: organizationId },
             resourceId: { uuid: "payroll" },
             name: "payroll",
           }),

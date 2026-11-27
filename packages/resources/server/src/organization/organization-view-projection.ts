@@ -22,7 +22,7 @@ import {
 import { equals } from "../proto/equals.js";
 import {
   type OrganizationCreated,
-  type OrganizationMemberAdded,
+  type MemberAdded,
   type ResourceAdded,
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/events_pb.js";
 import { OrganizationViewSchema } from "@access-desk/resources-model/generated/accessdesk/resources/organization/organization_pb.js";
@@ -48,7 +48,7 @@ export class OrganizationViewProjection extends Projection<
 
   /** Adds a member to the organization. */
   @Subscribe
-  onOrganizationMemberAdded(event: OrganizationMemberAdded): void {
+  onMemberAdded(event: MemberAdded): void {
     const person = event.person;
     if (person === undefined) {
       return;

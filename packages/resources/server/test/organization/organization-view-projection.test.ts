@@ -22,7 +22,7 @@ import {
   resourcesBlackBox,
 } from "../given/resources-context.js";
 import {
-  addOrganizationMember,
+  addMember,
   addResource,
   awaitOrganizationView,
   createOrganization,
@@ -47,14 +47,14 @@ describe("OrganizationViewProjection should", () => {
     });
   });
 
-  describe("react on 'OrganizationMemberAdded', and", () => {
+  describe("react on 'MemberAdded', and", () => {
     it("accumulate every member the organization gains", async () => {
       const box = await resourcesBlackBox();
       const scope = box.onBehalfOf(actor);
       expect((await createOrganization(scope)).kind).toBe("ok");
 
-      expect((await addOrganizationMember(scope, "maya")).kind).toBe("ok");
-      expect((await addOrganizationMember(scope, "noah")).kind).toBe("ok");
+      expect((await addMember(scope, "maya")).kind).toBe("ok");
+      expect((await addMember(scope, "noah")).kind).toBe("ok");
 
       const [view] = await awaitOrganizationView(box, scope, (v) => v.member.length === 2);
       expect(view?.member.map((member) => member.person?.uuid)).toEqual(["maya", "noah"]);
@@ -65,10 +65,10 @@ describe("OrganizationViewProjection should", () => {
       const scope = box.onBehalfOf(actor);
       expect((await createOrganization(scope)).kind).toBe("ok");
 
-      expect((await addOrganizationMember(scope, "maya")).kind).toBe("ok");
-      expect((await addOrganizationMember(scope, "maya")).kind).toBe("ok");
+      expect((await addMember(scope, "maya")).kind).toBe("ok");
+      expect((await addMember(scope, "maya")).kind).toBe("ok");
 
-      expect((await addOrganizationMember(scope, "noah")).kind).toBe("ok");
+      expect((await addMember(scope, "noah")).kind).toBe("ok");
       const [view] = await awaitOrganizationView(box, scope, (v) =>
         v.member.some((member) => member.person?.uuid === "noah"),
       );

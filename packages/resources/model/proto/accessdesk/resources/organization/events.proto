@@ -27,7 +27,7 @@ option (type_url_prefix) = "type.accessdesk";
 // An organization was created.
 message OrganizationCreated {
 
-    // The identifier of the created organization.
+    // The organization's ID.
     accessdesk.identity.OrganizationId id = 1 [(required) = true, (validate) = true];
 
     // The human-readable organization name, unique across organizations and
@@ -36,10 +36,10 @@ message OrganizationCreated {
 }
 
 // A person was added as a member of an organization.
-message OrganizationMemberAdded {
+message MemberAdded {
 
-    // The organization that owns this membership.
-    accessdesk.identity.OrganizationId organization_id = 1 [(required) = true, (validate) = true];
+    // The organization's ID.
+    accessdesk.identity.OrganizationId id = 1 [(required) = true, (validate) = true];
 
     // The person added as a member.
     accessdesk.identity.PersonId person = 2 [(required) = true];
@@ -57,8 +57,8 @@ message OrganizationMemberAdded {
 // A resource was added to an organization.
 message ResourceAdded {
 
-    // The organization that owns the resource.
-    accessdesk.identity.OrganizationId organization_id = 1 [(required) = true, (validate) = true];
+    // The organization's ID.
+    accessdesk.identity.OrganizationId id = 1 [(required) = true, (validate) = true];
 
     // The resource that was added.
     accessdesk.resources.ResourceId resource_id = 2 [(required) = true];

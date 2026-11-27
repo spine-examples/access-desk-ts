@@ -16,7 +16,7 @@ import { create } from "@bufbuild/protobuf";
 import { type BlackBox, type BlackBoxScope } from "@spine-event-engine/testing";
 
 import {
-  AddOrganizationMemberSchema,
+  AddMemberSchema,
   AddResourceSchema,
   CreateOrganizationSchema,
 } from "@access-desk/resources-model/generated/accessdesk/resources/organization/commands_pb.js";
@@ -37,17 +37,17 @@ export function createOrganization(scope: BlackBoxScope, name = "Acme") {
   );
 }
 
-/** Posts `AddOrganizationMember` for the person with the given identifier and role. */
-export function addOrganizationMember(
+/** Posts `AddMember` for the person with the given identifier and role. */
+export function addMember(
   scope: BlackBoxScope,
   person: string,
   role: OrganizationRole = OrganizationRole.MEMBER,
   addedBy: string = person,
 ) {
   return scope.post(
-    AddOrganizationMemberSchema,
-    create(AddOrganizationMemberSchema, {
-      organizationId: { value: organizationId },
+    AddMemberSchema,
+    create(AddMemberSchema, {
+      id: { value: organizationId },
       person: { uuid: person },
       emailAddress: { value: `${person}@acme.example` },
       role,
@@ -61,7 +61,7 @@ export function addResource(scope: BlackBoxScope, resource: string, name: string
   return scope.post(
     AddResourceSchema,
     create(AddResourceSchema, {
-      organizationId: { value: organizationId },
+      id: { value: organizationId },
       resourceId: { uuid: resource },
       name,
     }),

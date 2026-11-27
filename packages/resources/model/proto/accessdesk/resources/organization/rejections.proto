@@ -18,6 +18,7 @@ package accessdesk.resources.organization;
 
 import "accessdesk/resources/identifiers.proto";
 import "accessdesk/identity/identifiers.proto";
+import "spine/net/email_address.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
@@ -25,7 +26,7 @@ option (type_url_prefix) = "type.accessdesk";
 // An organization that already exists.
 message OrganizationAlreadyExists {
 
-    // The organization that already exists.
+    // The organization's ID.
     accessdesk.identity.OrganizationId id = 1 [(required) = true, (validate) = true];
 }
 
@@ -40,11 +41,14 @@ message OrganizationResourceNameAlreadyUsed {
 }
 
 // The person is a member of the organization already.
-message AlreadyOrganizationMember {
+message MemberAlreadyAdded {
 
-    // The organization the person belongs to.
-    accessdesk.identity.OrganizationId organization_id = 1 [(required) = true, (validate) = true];
+    // The organization's ID.
+    accessdesk.identity.OrganizationId id = 1 [(required) = true, (validate) = true];
 
     // The person who is a member already.
     accessdesk.identity.PersonId person = 2 [(required) = true];
+
+    // The email address the person was to be added under.
+    spine.net.EmailAddress email_address = 3 [(required) = true];
 }

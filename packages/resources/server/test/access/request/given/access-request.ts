@@ -30,7 +30,7 @@ import { AccessRequestStatus } from "@access-desk/resources-model/generated/acce
 import { actor, organizationId, readAll } from "../../../given/resources-context.js";
 import { managerHasTask } from "./access-decision-assignment.js";
 import {
-  addOrganizationMember,
+  addMember,
   awaitOrganizationView,
   createOrganization,
 } from "../../../organization/given/organization.js";
@@ -60,7 +60,7 @@ export async function seed(
   const scope = box.onBehalfOf(actor);
   await createOrganization(scope);
   for (const member of members) {
-    await addOrganizationMember(scope, member);
+    await addMember(scope, member);
   }
   await registerAndAwaitResource(box, scope, resourceUuid, {
     manager: [{ uuid: "primary" }],
