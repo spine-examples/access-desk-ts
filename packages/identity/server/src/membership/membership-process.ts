@@ -106,13 +106,13 @@ export class MembershipProcessManager extends ProcessManager<
     });
   }
 
-  /** Has the new person join the organization. */
+  /** Joins the new person to the organization. */
   @Command
   onPersonRegistered(event: PersonRegistered): JoinOrganization {
     return this.#join(event.id);
   }
 
-  /** Has the person who already holds the email address join the organization. */
+  /** Joins the person who already holds the email address to the organization. */
   @Command
   onPersonEmailAlreadyRegistered(rejection: PersonEmailAlreadyRegistered): JoinOrganization {
     return this.#join(rejection.person);
@@ -125,11 +125,11 @@ export class MembershipProcessManager extends ProcessManager<
     return create(MemberClaimedSchema, { id: this.id, person, organization });
   }
 
-  /** Has a person join the organization that claims them as a member. */
+  /** Joins a person to the organization that claims them as a member. */
   #join(person: PersonId | undefined): JoinOrganization {
     const { organization } = this.state;
     if (person === undefined || organization === undefined) {
-      throw new Error("A person joins the organization that claimed them as a member.");
+      throw new Error("The membership knows no person or no organization to join.");
     }
     return create(JoinOrganizationSchema, { id: person, membership: this.id, organization });
   }

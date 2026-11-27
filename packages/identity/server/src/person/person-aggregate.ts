@@ -44,7 +44,9 @@ export class PersonAggregate extends Aggregate<PersonId, typeof PersonSchema> {
   registerPerson(command: RegisterPerson): PersonRegistered {
     const { emailAddress, invoker } = command;
     if (this.state.emailAddress !== undefined || emailAddress === undefined) {
-      throw new Error("A person is registered once, under an email address.");
+      throw new Error(
+        "The person is registered already, or `RegisterPerson` names no email address.",
+      );
     }
     this.update((draft) => {
       draft.emailAddress = emailAddress;
@@ -57,7 +59,7 @@ export class PersonAggregate extends Aggregate<PersonId, typeof PersonSchema> {
   addSignInAccount(command: AddSignInAccount): SignInAccountAdded {
     const { account } = command;
     if (this.state.emailAddress === undefined || account === undefined) {
-      throw new Error("An account is added to a registered person.");
+      throw new Error("The person is not registered yet, or `AddSignInAccount` names no account.");
     }
     const name = this.state.name === "" ? command.name : "";
     this.update((draft) => {
@@ -79,7 +81,10 @@ export class PersonAggregate extends Aggregate<PersonId, typeof PersonSchema> {
       organization === undefined ||
       (current !== undefined && current.value !== organization.value)
     ) {
-      throw new Error("A registered person joins one organization only.");
+      throw new Error(
+        "The person is not registered yet, belongs to another organization, " +
+        "or `JoinOrganization` names no organization.",
+      );
     }
     this.update((draft) => {
       draft.organization = organization;
