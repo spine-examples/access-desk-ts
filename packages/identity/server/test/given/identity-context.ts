@@ -55,29 +55,6 @@ export function identityModule(): IdentityModule {
   return identity;
 }
 
-/** A person the organizations were asked to add to their members. */
-export interface AddedMember {
-  readonly organization: string;
-  readonly person: string;
-  readonly email: string;
-  readonly role: number;
-  readonly addedBy: string;
-}
-
-/**
- * The organizations' members, standing in for the Resources context.
- *
- * It keeps who was added, and refuses to add anybody while asked.
- */
-export const organizations = {
-  /** Everybody the organizations were asked to add, in order. */
-  added: [] as AddedMember[],
-  /** Whether the organizations refuse to add anybody. */
-  refusing: false,
-  /** How many times the organizations refused to add somebody. */
-  refused: 0,
-};
-
 const ownedBlackBoxes = new Set<BlackBox>();
 const ownedStorages = new Set<TestStorage>();
 const storages = new WeakMap<BlackBox, TestStorage>();
@@ -94,24 +71,7 @@ const storages = new WeakMap<BlackBox, TestStorage>();
 export async function identityBlackBox(storage?: TestStorage): Promise<BlackBox> {
   const kept = storage ?? (await TestStorages.singleTenant(typeRegistry));
   ownedStorages.add(kept);
-  const context = identityModule().IdentityContext.create({
-    members: {
-      add: (member) => {
-        if (organizations.refusing) {
-          organizations.refused += 1;
-          return Promise.reject(new Error("The organization did not add the person."));
-        }
-        organizations.added.push({
-          organization: member.organization.uuid,
-          person: member.person.uuid,
-          email: member.email.value,
-          role: member.role,
-          addedBy: member.addedBy.uuid,
-        });
-        return Promise.resolve();
-      },
-    },
-  });
+  const context = identityModule().IdentityContext.create();
   const box = await BlackBox.from(context, {
     storageFactory: await kept.open(),
     timeoutMs: 20_000,
@@ -144,9 +104,6 @@ export async function closeIdentityBlackBoxes(): Promise<void> {
   ownedBlackBoxes.clear();
   await Promise.all([...ownedStorages].map((storage) => storage.drop()));
   ownedStorages.clear();
-  organizations.added = [];
-  organizations.refusing = false;
-  organizations.refused = 0;
 }
 
 /**

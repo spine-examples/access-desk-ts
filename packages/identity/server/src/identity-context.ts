@@ -27,7 +27,7 @@ import {
   type ExternalIdentityId,
   type MembershipId,
 } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
-import { AddMemberSchema } from "@access-desk/identity-model/generated/accessdesk/identity/membership/commands_pb.js";
+import { ClaimMemberSchema } from "@access-desk/identity-model/generated/accessdesk/identity/membership/commands_pb.js";
 import {
   PersonEmailRegisteredSchema,
   type PersonEmailRegistered,
@@ -40,7 +40,6 @@ import {
 } from "@access-desk/identity-model/generated/accessdesk/identity/person/events_pb.js";
 import { MembershipProcessManager } from "./membership/membership-process.js";
 import { MembershipViewProjection } from "./membership/membership-view-projection.js";
-import type { OrganizationMembers } from "./membership/organization-members.js";
 import { ExternalIdentityProcessManager } from "./person/external-identity-process.js";
 import { ExternalIdentityViewProjection } from "./person/external-identity-view-projection.js";
 import { PersonAggregate } from "./person/person-aggregate.js";
@@ -49,8 +48,6 @@ import { PersonViewProjection } from "./person/person-view-projection.js";
 
 /** The settings the Identity context is assembled with. */
 export interface IdentityContextOptions {
-  /** The service that adds a person to the members of an organization. */
-  readonly members: OrganizationMembers;
   /** The store of the subscriptions to the context. */
   readonly subscriptions?: StandSubscriptionRegistry;
 }
@@ -66,7 +63,7 @@ export const IdentityContext = {
    * @param options The settings to assemble the context with.
    * @returns The declaration of the Identity bounded context.
    */
-  create(options: IdentityContextOptions): BoundedContextBuilder {
+  create(options: IdentityContextOptions = {}): BoundedContextBuilder {
     /** Finds the account an event about signing in belongs to. */
     const accountOf = (identity: ExternalIdentityId | undefined): ExternalIdentityId[] =>
       identity === undefined ? [] : [identity];
@@ -93,7 +90,7 @@ export const IdentityContext = {
       .route(PersonRegisteredSchema, (event) => askingAccount(event.invoker))
       .route(SignInAccountAddedSchema, (event) => accountOf(event.account));
     const membershipCommands = CommandRouting.create<MembershipId>().route(
-      AddMemberSchema,
+      ClaimMemberSchema,
       (command) => membershipOf(command.id?.emailAddress),
     );
     const membershipEvents = EventRouting.create<MembershipId>()
@@ -112,7 +109,6 @@ export const IdentityContext = {
       .add(MembershipProcessManager, {
         commandRouting: membershipCommands,
         eventRouting: membershipEvents,
-        onCreate: (entity) => new MembershipProcessManager(entity, options.members),
       })
       .add(MembershipViewProjection);
     if (options.subscriptions !== undefined) {
