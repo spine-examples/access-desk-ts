@@ -35,6 +35,13 @@ message MemberRegistrationStarted {
 
     // The role the person will hold in the organization.
     accessdesk.identity.OrganizationRole role = 3 [(required) = true];
+
+    // The organization administrator who registers the person.
+    //
+    // This field is empty when the person is the first organization
+    // administrator.
+    //
+    accessdesk.identity.PersonId registered_by = 4;
 }
 
 // The email address was resolved to the person it belongs to, as a member of
@@ -50,6 +57,13 @@ message MemberResolved {
 
     // The person the address belongs to.
     accessdesk.identity.PersonId person = 3 [(required) = true];
+
+    // The organization administrator who registers the person.
+    //
+    // This field is empty when the person is the first organization
+    // administrator.
+    //
+    accessdesk.identity.PersonId registered_by = 4;
 }
 
 // A person was registered as a member of an organization, by their email
@@ -70,7 +84,11 @@ message MemberRegistered {
     accessdesk.identity.OrganizationRole role = 4 [(required) = true];
 
     // The organization administrator who registered the person.
-    accessdesk.identity.PersonId registered_by = 5 [(required) = true];
+    //
+    // This field is empty when the person is the first organization
+    // administrator.
+    //
+    accessdesk.identity.PersonId registered_by = 5;
 }
 
 // The person under the email address could not be registered as a member of
@@ -83,4 +101,11 @@ message MemberRegistrationFailed {
 
     // The organization the person was to be registered in.
     accessdesk.identity.OrganizationId organization = 2 [(required) = true, (validate) = true];
+
+    // The organization administrator who tried to register the person.
+    //
+    // This field is empty when the person is the first organization
+    // administrator.
+    //
+    accessdesk.identity.PersonId registered_by = 3;
 }

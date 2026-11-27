@@ -47,7 +47,8 @@ message MemberRegistration {
 
     // The organization administrator who registers the person.
     //
-    // This field is empty for the organization's first administrator.
+    // This field is empty when the person is the first organization
+    // administrator.
     //
     accessdesk.identity.PersonId registered_by = 5;
 }
