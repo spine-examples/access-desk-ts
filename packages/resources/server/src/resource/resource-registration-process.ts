@@ -69,7 +69,7 @@ export class ResourceRegistrationProcessManager extends ProcessManager<
         draft,
         create(ResourceRegistrationSchema, {
           id: this.id,
-          organizationId: command.organizationId,
+          organization: command.organization,
           name: command.name,
           description: command.description,
           category: command.category,
@@ -107,7 +107,7 @@ export class ResourceRegistrationProcessManager extends ProcessManager<
   @Command
   onResourceCreated(event: ResourceCreated): AddResource {
     return create(AddResourceSchema, {
-      organizationId: this.state.organizationId,
+      id: this.state.organization,
       resourceId: event.id ?? this.id,
       name: this.state.name,
     });
@@ -131,7 +131,10 @@ export class ResourceRegistrationProcessManager extends ProcessManager<
     if (!this.isDeleted) {
       this.markDraftDeleted();
     }
-    return create(ResourceRegistrationFailedSchema, { id: this.id });
+    return create(ResourceRegistrationFailedSchema, {
+      id: this.id,
+      organization: this.state.organization,
+    });
   }
 
   /**
@@ -142,7 +145,10 @@ export class ResourceRegistrationProcessManager extends ProcessManager<
     if (!this.isDeleted) {
       this.markDraftDeleted();
     }
-    return create(ResourceRegisteredSchema, { id: this.id });
+    return create(ResourceRegisteredSchema, {
+      id: this.id,
+      organization: this.state.organization,
+    });
   }
 
   /**
@@ -153,6 +159,9 @@ export class ResourceRegistrationProcessManager extends ProcessManager<
     if (!this.isDeleted) {
       this.markDraftDeleted();
     }
-    return create(ResourceRegistrationFailedSchema, { id: this.id });
+    return create(ResourceRegistrationFailedSchema, {
+      id: this.id,
+      organization: this.state.organization,
+    });
   }
 }

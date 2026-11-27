@@ -17,6 +17,7 @@ syntax = "proto3";
 package accessdesk.resources.resource;
 
 import "accessdesk/resources/identifiers.proto";
+import "accessdesk/identity/identifiers.proto";
 import "spine/options.proto";
 
 option (type_url_prefix) = "type.accessdesk";
@@ -33,6 +34,9 @@ message ResourceRegistered {
 
     // The resource that was registered.
     accessdesk.resources.ResourceId id = 1 [(required) = true];
+
+    // The organization that registered the resource.
+    accessdesk.identity.OrganizationId organization = 2 [(required) = true, (validate) = true];
 }
 
 // A resource could not be entered into its organization's registry.
@@ -40,4 +44,7 @@ message ResourceRegistrationFailed {
 
     // The resource whose registration failed.
     accessdesk.resources.ResourceId id = 1 [(required) = true];
+
+    // The organization that tried to register the resource.
+    accessdesk.identity.OrganizationId organization = 2 [(required) = true, (validate) = true];
 }
