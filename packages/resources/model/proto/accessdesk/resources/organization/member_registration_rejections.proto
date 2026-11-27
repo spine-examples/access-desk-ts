@@ -1,0 +1,46 @@
+/*
+ * Copyright 2026 CodeMatters, Lda.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+ * except in compliance with the License. You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under
+ * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+ * either express or implied. See the License for the specific language governing permissions
+ * and limitations under the License.
+ */
+
+syntax = "proto3";
+
+package accessdesk.resources.organization;
+
+import "accessdesk/identity/identifiers.proto";
+import "spine/options.proto";
+
+option (type_url_prefix) = "type.accessdesk";
+
+// The person under the email address is a member of the organization already.
+message MemberAlreadyRegistered {
+
+    // The member registration's ID.
+    accessdesk.identity.MembershipId id = 1 [(required) = true];
+
+    // The organization the person belongs to.
+    accessdesk.identity.OrganizationId organization = 2 [(required) = true, (validate) = true];
+
+    // The person the address belongs to.
+    accessdesk.identity.PersonId person = 3 [(required) = true];
+}
+
+// Another organization claimed the person under the email address already,
+// so this one cannot.
+message MemberOfOtherOrganization {
+
+    // The member registration's ID.
+    accessdesk.identity.MembershipId id = 1 [(required) = true];
+
+    // The organization the address was to be registered in.
+    accessdesk.identity.OrganizationId organization = 2 [(required) = true, (validate) = true];
+}
