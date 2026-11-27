@@ -13,7 +13,6 @@
  */
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 
 import {
   actor,
@@ -21,26 +20,21 @@ import {
   identityBlackBox,
   loadIdentityContext,
 } from "../given/identity-context.js";
-import { addMember, awaitMembership, organizationId } from "./given/membership.js";
+import { awaitMembership, claimMember, organizationId } from "./given/membership.js";
 
 beforeAll(loadIdentityContext, 30_000);
 afterEach(closeIdentityBlackBoxes);
 
 describe("MembershipViewProjection should", () => {
-  describe("react on 'MemberAdded', and", () => {
-    it("list the address with its organization, role, and person", async () => {
+  describe("react on 'MemberClaimed', and", () => {
+    it("list the address with its organization and person", async () => {
       const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
 
-      expect(
-        (await addMember(scope, "noah@acme.example", OrganizationRole.ADMINISTRATOR)).kind,
-      ).toBe("ok");
+      expect((await claimMember(scope, "noah@acme.example")).kind).toBe("ok");
 
       const membership = await awaitMembership(box, scope, "noah@acme.example");
-      expect(membership).toMatchObject({
-        organization: { uuid: organizationId },
-        role: OrganizationRole.ADMINISTRATOR,
-      });
+      expect(membership).toMatchObject({ organization: { value: organizationId } });
       expect(membership.person?.uuid).toMatch(/^[0-9a-f-]{36}$/);
     });
   });

@@ -34,9 +34,6 @@ message Membership {
 
     // The organization that claimed the person as a member, or is claiming them.
     accessdesk.identity.OrganizationId organization = 2 [(validate) = true];
-
-    // The person, once they joined the organization that claimed them.
-    accessdesk.identity.PersonId person = 3;
 }
 
 // A person's membership in an organization, with the email address they were

@@ -14,9 +14,11 @@
 
 import { create } from "@bufbuild/protobuf";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { MemberAddingStartedSchema } from "@access-desk/identity-model/generated/accessdesk/identity/membership/events_pb.js";
-import { AlreadyMemberOfOtherOrganizationSchema } from "@access-desk/identity-model/generated/accessdesk/identity/membership/rejections_pb.js";
-import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
+import { MemberClaimStartedSchema } from "@access-desk/identity-model/generated/accessdesk/identity/membership/events_pb.js";
+import {
+  MemberAlreadyClaimedSchema,
+  MemberClaimedByOtherOrganizationSchema,
+} from "@access-desk/identity-model/generated/accessdesk/identity/membership/rejections_pb.js";
 
 import {
   actor,
@@ -26,63 +28,67 @@ import {
   loadIdentityContext,
   recordEvents,
 } from "../given/identity-context.js";
-import { addMember, awaitMembership, organizationId } from "./given/membership.js";
+import { awaitMembership, claimMember, organizationId } from "./given/membership.js";
 
 beforeAll(loadIdentityContext, 30_000);
 afterEach(closeIdentityBlackBoxes);
 
 describe("MembershipProcessManager should", () => {
-  describe("handle 'AddMember', and", () => {
-    it("emit 'MemberAddingStarted'", async () => {
+  describe("handle 'ClaimMember', and", () => {
+    it("emit 'MemberClaimStarted'", async () => {
       const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
-      const started = await recordEvents(scope, MemberAddingStartedSchema);
+      const started = await recordEvents(scope, MemberClaimStartedSchema);
 
-      expect(
-        (await addMember(scope, "noah@acme.example", OrganizationRole.ADMINISTRATOR)).kind,
-      ).toBe("ok");
+      expect((await claimMember(scope, "noah@acme.example")).kind).toBe("ok");
 
       expect(await started.waitFor(box)).toEqual(
-        create(MemberAddingStartedSchema, {
+        create(MemberClaimStartedSchema, {
           id: { emailAddress: { value: "noah@acme.example" } },
-          organization: { uuid: organizationId },
-          role: OrganizationRole.ADMINISTRATOR,
+          organization: { value: organizationId },
         }),
       );
       await started.cancel();
     });
 
-    it("start again for an address added to the same organization again", async () => {
+    it("reject claiming the person again for the same organization with 'MemberAlreadyClaimed', while the first claim goes on to its end", async () => {
       const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
-      expect((await addMember(scope, "noah@acme.example")).kind).toBe("ok");
-      await awaitMembership(box, scope, "noah@acme.example");
-      const started = await recordEvents(scope, MemberAddingStartedSchema);
+      expect((await claimMember(scope, "noah@acme.example")).kind).toBe("ok");
 
-      expect((await addMember(scope, "noah@acme.example")).kind).toBe("ok");
+      const rejection = await expectRejection(box, scope, MemberAlreadyClaimedSchema, () =>
+        claimMember(scope, " Noah@Acme.example "),
+      );
 
-      expect((await started.waitFor(box)).organization?.uuid).toBe(organizationId);
-      await started.cancel();
+      expect(rejection.organization?.value).toBe(organizationId);
+      expect((await awaitMembership(box, scope, "noah@acme.example")).person?.uuid).toMatch(
+        /^[0-9a-f-]{36}$/,
+      );
     });
 
-    it("reject an address that belongs to another organization with 'AlreadyMemberOfOtherOrganization'", async () => {
+    it("reject a person another organization claimed with 'MemberClaimedByOtherOrganization'", async () => {
       const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
-      expect((await addMember(scope, "noah@acme.example")).kind).toBe("ok");
+      expect((await claimMember(scope, "noah@acme.example")).kind).toBe("ok");
 
-      await expectRejection(box, scope, AlreadyMemberOfOtherOrganizationSchema, () =>
-        addMember(scope, "noah@acme.example", OrganizationRole.ADMINISTRATOR, "globex"),
+      const rejection = await expectRejection(
+        box,
+        scope,
+        MemberClaimedByOtherOrganizationSchema,
+        () => claimMember(scope, "noah@acme.example", "globex"),
       );
+
+      expect(rejection.organization?.value).toBe("globex");
     });
 
     it("find the membership by the email address in lower case, however it is written", async () => {
       const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
-      expect((await addMember(scope, " Noah@Acme.example ")).kind).toBe("ok");
+      expect((await claimMember(scope, " Noah@Acme.example ")).kind).toBe("ok");
       await awaitMembership(box, scope, "noah@acme.example");
 
-      await expectRejection(box, scope, AlreadyMemberOfOtherOrganizationSchema, () =>
-        addMember(scope, "NOAH@ACME.EXAMPLE", OrganizationRole.MEMBER, "globex"),
+      await expectRejection(box, scope, MemberClaimedByOtherOrganizationSchema, () =>
+        claimMember(scope, "NOAH@ACME.EXAMPLE", "globex"),
       );
     });
   });

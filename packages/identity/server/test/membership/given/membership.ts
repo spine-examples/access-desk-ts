@@ -14,42 +14,34 @@
 
 import { create } from "@bufbuild/protobuf";
 import type { BlackBox, BlackBoxScope } from "@spine-event-engine/testing";
-import { AddMemberSchema } from "@access-desk/identity-model/generated/accessdesk/identity/membership/commands_pb.js";
+import { ClaimMemberSchema } from "@access-desk/identity-model/generated/accessdesk/identity/membership/commands_pb.js";
 import {
   MembershipViewSchema,
   type MembershipView,
 } from "@access-desk/identity-model/generated/accessdesk/identity/membership/membership_pb.js";
-import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 
 import { readAll } from "../../given/identity-context.js";
 
-/** The organization the tests add people to, unless they name another. */
+/** The organization that claims members in the tests, unless the tests name another. */
 export const organizationId = "acme";
 
 /**
- * Posts `AddMember` for the email address.
+ * Posts `ClaimMember` for the person under the email address.
  *
  * @param scope Where to post the command.
- * @param email The email address of the person to add.
- * @param role The role the person is to hold. A member's when left out.
- * @param organization The organization to add them to.
- * @param addedBy The administrator who adds them. Left out when the
- *   application adds them itself.
+ * @param email The person's email address.
+ * @param organization The organization that claims the person as a member.
  */
-export function addMember(
+export function claimMember(
   scope: BlackBoxScope,
   email: string,
-  role: OrganizationRole = OrganizationRole.MEMBER,
   organization: string = organizationId,
-  addedBy?: string,
 ) {
   return scope.post(
-    AddMemberSchema,
-    create(AddMemberSchema, {
+    ClaimMemberSchema,
+    create(ClaimMemberSchema, {
       id: { emailAddress: { value: email } },
-      organization: { uuid: organization },
-      role,
-      ...(addedBy === undefined ? {} : { addedBy: { uuid: addedBy } }),
+      organization: { value: organization },
     }),
   );
 }

@@ -13,14 +13,12 @@
  */
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 
 import {
   actor,
   closeIdentityBlackBoxes,
   identityBlackBox,
   loadIdentityContext,
-  organizations,
 } from "../given/identity-context.js";
 import {
   account,
@@ -29,30 +27,21 @@ import {
   google,
   linkExternalIdentity,
 } from "../person/given/person.js";
-import { addMember, awaitMembership, organizationId } from "./given/membership.js";
+import { awaitMembership, claimMember, organizationId } from "./given/membership.js";
 
 beforeAll(loadIdentityContext, 30_000);
 afterEach(closeIdentityBlackBoxes);
 
 describe("MembershipProcessManager should", () => {
-  it("register a new person for an address nobody signed in under, and have the organization list them", async () => {
+  it("register a new person for an address nobody signed in under, and have them join the organization", async () => {
     const box = await identityBlackBox();
     const scope = box.onBehalfOf(actor);
 
-    expect((await addMember(scope, "noah@acme.example", OrganizationRole.ADMINISTRATOR)).kind).toBe(
-      "ok",
-    );
+    expect((await claimMember(scope, "noah@acme.example")).kind).toBe("ok");
 
-    const person = (await awaitMembership(box, scope, "noah@acme.example")).person?.uuid ?? "";
-    expect(organizations.added).toEqual([
-      {
-        organization: organizationId,
-        person,
-        email: "noah@acme.example",
-        role: OrganizationRole.ADMINISTRATOR,
-        addedBy: person,
-      },
-    ]);
+    const membership = await awaitMembership(box, scope, "noah@acme.example");
+    expect(membership.organization?.value).toBe(organizationId);
+    const person = membership.person?.uuid ?? "";
     // The person exists before they sign in, with no name and no account yet.
     expect(
       await awaitPerson(box, scope, person, (view) => view.organization !== undefined),
@@ -60,71 +49,35 @@ describe("MembershipProcessManager should", () => {
       emailAddress: { value: "noah@acme.example" },
       name: "",
       account: [],
-      organization: { uuid: organizationId },
+      organization: { value: organizationId },
     });
   });
 
-  it("pass the organization which administrator added the person", async () => {
-    const box = await identityBlackBox();
-    const administrator = box.onBehalfOf("person-olivia");
-
-    expect(
-      (
-        await addMember(
-          administrator,
-          "noah@acme.example",
-          OrganizationRole.MEMBER,
-          organizationId,
-          "person-olivia",
-        )
-      ).kind,
-    ).toBe("ok");
-
-    await awaitMembership(box, administrator, "noah@acme.example");
-    expect(organizations.added.map((member) => member.addedBy)).toEqual(["person-olivia"]);
-  });
-
-  it("have the organization list the person who already signed in under the address", async () => {
+  it("name the person who already signed in under the address", async () => {
     const box = await identityBlackBox();
     const scope = box.onBehalfOf(actor);
     await linkExternalIdentity(scope, account(google, "1001"), "noah@acme.example");
     const person = (await awaitLinked(box, scope, account(google, "1001"))).person?.uuid;
 
-    expect((await addMember(scope, "noah@acme.example")).kind).toBe("ok");
+    expect((await claimMember(scope, "noah@acme.example")).kind).toBe("ok");
 
     expect((await awaitMembership(box, scope, "noah@acme.example")).person?.uuid).toBe(person);
-    expect(organizations.added.map((member) => member.person)).toEqual([person]);
-  });
-
-  it("finish an adding the organization refused, when the address is added to it again", async () => {
-    const box = await identityBlackBox();
-    const scope = box.onBehalfOf(actor);
-    organizations.refusing = true;
-    expect((await addMember(scope, "noah@acme.example")).kind).toBe("ok");
-    await box.eventually(
-      () => Promise.resolve(organizations.refused),
-      (refused) => refused > 0,
-    );
-    expect(organizations.added).toEqual([]);
-
-    organizations.refusing = false;
-    expect((await addMember(scope, "noah@acme.example")).kind).toBe("ok");
-
-    await awaitMembership(box, scope, "noah@acme.example");
-    expect(organizations.added.map((member) => member.email)).toEqual(["noah@acme.example"]);
+    expect(
+      (await awaitPerson(box, scope, person ?? "", (view) => view.organization !== undefined))
+        .organization?.value,
+    ).toBe(organizationId);
   });
 
   it("keep an address that belongs to an organization out of another", async () => {
     const box = await identityBlackBox();
     const scope = box.onBehalfOf(actor);
-    expect((await addMember(scope, "noah@acme.example")).kind).toBe("ok");
+    expect((await claimMember(scope, "noah@acme.example")).kind).toBe("ok");
     await awaitMembership(box, scope, "noah@acme.example");
 
-    await addMember(scope, "noah@acme.example", OrganizationRole.MEMBER, "globex");
+    await claimMember(scope, "noah@acme.example", "globex");
 
-    expect((await awaitMembership(box, scope, "noah@acme.example")).organization?.uuid).toBe(
+    expect((await awaitMembership(box, scope, "noah@acme.example")).organization?.value).toBe(
       organizationId,
     );
-    expect(organizations.added.map((member) => member.organization)).toEqual([organizationId]);
   });
 });

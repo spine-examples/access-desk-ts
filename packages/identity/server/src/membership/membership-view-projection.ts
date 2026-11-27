@@ -14,20 +14,19 @@
 
 import { Projection, Subscribe } from "@spine-event-engine/server";
 import type { MembershipId } from "@access-desk/identity-model/generated/accessdesk/identity/identifiers_pb.js";
-import type { MemberAdded } from "@access-desk/identity-model/generated/accessdesk/identity/membership/events_pb.js";
+import type { MemberClaimed } from "@access-desk/identity-model/generated/accessdesk/identity/membership/events_pb.js";
 import { MembershipViewSchema } from "@access-desk/identity-model/generated/accessdesk/identity/membership/membership_pb.js";
 
-/** Each email address added to an organization, with the person it belongs to. */
+/** Each person an organization claimed as a member, under their email address. */
 export class MembershipViewProjection extends Projection<
   MembershipId,
   typeof MembershipViewSchema
 > {
-  /** Creates the view of an address added to an organization. */
+  /** Creates the view of a person an organization claimed as a member. */
   @Subscribe
-  onMemberAdded(event: MemberAdded): void {
+  onMemberClaimed(event: MemberClaimed): void {
     this.update((draft) => {
       draft.organization = event.organization;
-      draft.role = event.role;
       draft.person = event.person;
     });
   }
