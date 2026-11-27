@@ -20,10 +20,9 @@ import {
   closeIdentityBlackBoxes,
   identityBlackBox,
   loadIdentityContext,
-  organizations,
   readAll,
 } from "../given/identity-context.js";
-import { addMember } from "../membership/given/membership.js";
+import { awaitMembership, claimMember } from "../membership/given/membership.js";
 import { account, awaitLinked, awaitPerson, google, linkExternalIdentity } from "./given/person.js";
 
 beforeAll(loadIdentityContext, 30_000);
@@ -59,16 +58,17 @@ describe("ExternalIdentityProcessManager should", () => {
     expect(people.map((view) => view.id?.uuid)).toEqual([first]);
   });
 
-  it("link the account to the person an administrator added under its email address", async () => {
+  it("link the account to the person an organization claimed as a member under its email address", async () => {
     const box = await identityBlackBox();
     const scope = box.onBehalfOf(actor);
-    expect((await addMember(scope, "noah@acme.example")).kind).toBe("ok");
+    expect((await claimMember(scope, "noah@acme.example")).kind).toBe("ok");
+    const added = (await awaitMembership(box, scope, "noah@acme.example")).person?.uuid;
 
     await linkExternalIdentity(scope, account(google, "1001"), "noah@acme.example");
 
     const person = (await awaitLinked(box, scope, account(google, "1001"))).person?.uuid ?? "";
-    // The organization listed this same person when the address was added.
-    expect(organizations.added.map((member) => member.person)).toEqual([person]);
+    // The organization claimed this same person as a member.
+    expect(person).toBe(added);
     expect(
       await awaitPerson(
         box,
@@ -79,7 +79,7 @@ describe("ExternalIdentityProcessManager should", () => {
     ).toMatchObject({
       emailAddress: { value: "noah@acme.example" },
       name: "1001 (name)",
-      organization: { uuid: "acme" },
+      organization: { value: "acme" },
     });
   });
 });

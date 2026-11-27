@@ -28,8 +28,7 @@ import {
   linkExternalIdentity,
   registerPerson,
 } from "./given/person.js";
-import { addMember, awaitMembership } from "../membership/given/membership.js";
-import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
+import { awaitMembership, claimMember } from "../membership/given/membership.js";
 
 beforeAll(loadIdentityContext, 30_000);
 afterEach(closeIdentityBlackBoxes);
@@ -71,7 +70,7 @@ describe("PersonViewProjection should", () => {
       const box = await identityBlackBox();
       const scope = box.onBehalfOf(actor);
 
-      await addMember(scope, "noah@acme.example", OrganizationRole.MEMBER, "acme");
+      await claimMember(scope, "noah@acme.example", "acme");
 
       const person = (await awaitMembership(box, scope, "noah@acme.example")).person?.uuid ?? "";
       const view = await awaitPerson(
@@ -80,7 +79,7 @@ describe("PersonViewProjection should", () => {
         person,
         (shown) => shown.organization !== undefined,
       );
-      expect(view.organization?.uuid).toBe("acme");
+      expect(view.organization?.value).toBe("acme");
     });
   });
 });

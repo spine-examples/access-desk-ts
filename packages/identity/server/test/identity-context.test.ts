@@ -24,7 +24,7 @@ import {
   readAll,
   storageOf,
 } from "./given/identity-context.js";
-import { addMember, awaitMembership } from "./membership/given/membership.js";
+import { awaitMembership, claimMember } from "./membership/given/membership.js";
 import {
   account,
   awaitLinked,
@@ -42,7 +42,7 @@ describe("IdentityContext should", () => {
     const scope = before.onBehalfOf(actor);
     await linkExternalIdentity(scope, account(google, "1001"), "noah@acme.example");
     const noah = (await awaitLinked(before, scope, account(google, "1001"))).person?.uuid ?? "";
-    expect((await addMember(scope, "olivia@acme.example")).kind).toBe("ok");
+    expect((await claimMember(scope, "olivia@acme.example")).kind).toBe("ok");
     const olivia = (await awaitMembership(before, scope, "olivia@acme.example")).person?.uuid;
     await awaitPerson(before, scope, noah);
     await before.close();

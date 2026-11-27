@@ -19,7 +19,6 @@ import {
   PersonRegisteredSchema,
   SignInAccountAddedSchema,
 } from "@access-desk/identity-model/generated/accessdesk/identity/person/events_pb.js";
-import { OrganizationRole } from "@access-desk/identity-model/generated/accessdesk/identity/values_pb.js";
 
 import {
   actor,
@@ -28,7 +27,7 @@ import {
   loadIdentityContext,
   recordEvents,
 } from "../given/identity-context.js";
-import { addMember } from "../membership/given/membership.js";
+import { claimMember } from "../membership/given/membership.js";
 import {
   account,
   awaitLinked,
@@ -98,14 +97,14 @@ describe("PersonAggregate should", () => {
       const scope = box.onBehalfOf(actor);
       const joined = await recordEvents(scope, OrganizationJoinedSchema);
 
-      await addMember(scope, "noah@acme.example", OrganizationRole.MEMBER, "acme");
+      await claimMember(scope, "noah@acme.example", "acme");
 
       const event = await joined.waitFor(box);
       expect(event).toEqual(
         create(OrganizationJoinedSchema, {
           id: event.id,
           membership: { emailAddress: { value: "noah@acme.example" } },
-          organization: { uuid: "acme" },
+          organization: { value: "acme" },
         }),
       );
       expect(event.id?.uuid).toMatch(/^[0-9a-f-]{36}$/);
